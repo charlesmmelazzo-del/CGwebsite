@@ -1,0 +1,131 @@
+{
+  "pages": [
+    {
+      "pageId": "about",
+      "label": "About",
+      "slug": "about",
+      "theme": "olive",
+      "updatedAt": "2026-04-06T00:00:00.000Z",
+      "sections": [
+        {
+          "id": "a1",
+          "type": "text",
+          "order": 0,
+          "visible": true,
+          "title": "Our Story",
+          "body": "Common Good Cocktail House is an extension of our living room. We created this space to bring people together over thoughtfully crafted cocktails in a warm, welcoming environment.",
+          "alignment": "left"
+        },
+        {
+          "id": "a2",
+          "type": "text",
+          "order": 1,
+          "visible": true,
+          "title": "What We Do",
+          "body": "We make modern, classic, upscale, and seasonal cocktails using quality spirits and house-made ingredients. Every drink is crafted with intention.",
+          "alignment": "left"
+        }
+      ]
+    },
+    {
+      "pageId": "club",
+      "label": "Club",
+      "slug": "club",
+      "theme": "amber",
+      "updatedAt": "2026-04-06T00:00:00.000Z",
+      "sections": [
+        {
+          "id": "c1",
+          "type": "cta",
+          "order": 0,
+          "visible": true,
+          "heading": "Common Good Cocktail Club",
+          "subheading": "When you subscribe, you unlock exclusive access to member pricing, early event reservations, and monthly cocktail kits delivered to your door.",
+          "buttonLabel": "Find Out More & Join",
+          "buttonUrl": "https://commongoodcocktailhouse.com/cocktailclub",
+          "buttonNewTab": true
+        }
+      ]
+    },
+    {
+      "pageId": "shop-bottles",
+      "label": "Bottles & Merch",
+      "slug": "shop/bottles",
+      "theme": "terracotta",
+      "updatedAt": "2026-04-06T00:00:00.000Z",
+      "sections": [
+        {
+          "id": "sb1",
+          "type": "cta",
+          "order": 0,
+          "visible": true,
+          "heading": "Bottles & Merch",
+          "subheading": "Shop our curated selection of spirits, bar tools, and Common Good branded merchandise.",
+          "buttonLabel": "Shop Now",
+          "buttonUrl": "#",
+          "buttonNewTab": true
+        }
+      ]
+    },
+    {
+      "pageId": "shop-cocktails",
+      "label": "Cocktails To Go",
+      "slug": "shop/cocktails",
+      "theme": "terracotta",
+      "updatedAt": "2026-04-06T00:00:00.000Z",
+      "sections": [
+        {
+          "id": "sc1",
+          "type": "cta",
+          "order": 0,
+          "visible": true,
+          "heading": "Cocktails To Go",
+          "subheading": "Order online to bring the Common Good experience anywhere. Bottled cocktails crafted fresh for your event or evening.",
+          "buttonLabel": "Shop To Go Cocktails",
+          "buttonUrl": "#",
+          "buttonNewTab": true
+        }
+      ]
+    },
+    {
+      "pageId": "shop-memberships",
+      "label": "Memberships",
+      "slug": "shop/memberships",
+      "theme": "plum",
+      "updatedAt": "2026-04-06T00:00:00.000Z",
+      "sections": [
+        {
+          "id": "sm1",
+          "type": "cta",
+          "order": 0,
+          "visible": true,
+          "heading": "Memberships & Spirits",
+          "subheading": "Unlock exclusive access to member pricing, private events, and curated spirit selections.",
+          "buttonLabel": "Memberships & Spirits",
+          "buttonUrl": "#",
+          "buttonNewTab": true
+        }
+      ]
+    },
+    {
+      "pageId": "shop-giftcards",
+      "label": "Gift Cards",
+      "slug": "shop/giftcards",
+      "theme": "teal",
+      "updatedAt": "2026-04-06T00:00:00.000Z",
+      "sections": [
+        {
+          "id": "sg1",
+          "type": "cta",
+          "order": 0,
+          "visible": true,
+          "heading": "Gift Cards",
+          "subheading": "Give the gift of Common Good. Perfect for any occasion.",
+          "buttonLabel": "Buy a Gift Card",
+          "buttonUrl": "#",
+          "buttonNewTab": true
+        }
+      ]
+    }
+  ]
+}

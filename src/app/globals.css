@@ -2,26 +2,156 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ─── Self-hosted premium fonts ───────────────────────────────────────────────
+   Drop your font files into /public/fonts/ with these exact filenames.
+   The site will use them automatically — no code change needed.
+
+   Korinth Serial (headings):
+     /public/fonts/KorinthSerial-Regular.woff2
+     /public/fonts/KorinthSerial-Bold.woff2       (optional)
+     /public/fonts/KorinthSerial-Italic.woff2     (optional)
+
+   Futura (body / nav):
+     /public/fonts/Futura-Light.woff2
+     /public/fonts/Futura-Book.woff2
+     /public/fonts/Futura-Medium.woff2
+
+   Until those files are present, Jost (Futura-like) and
+   Cormorant Garamond (Korinth-like) load from Google Fonts as fallbacks.
+──────────────────────────────────────────────────────────────────────────── */
+
+@font-face {
+  font-family: 'KorinthSerial';
+  src: url('/fonts/KorinthSerial-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+@font-face {
+  font-family: 'KorinthSerial';
+  src: url('/fonts/KorinthSerial-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'KorinthSerial';
+  src: url('/fonts/KorinthSerial-Italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Futura';
+  src: url('/fonts/Futura-Light.woff2') format('woff2');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Futura';
+  src: url('/fonts/Futura-Book.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Futura';
+  src: url('/fonts/Futura-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ─── Font variables ─────────────────────────────────────────────────────────
+   Using CSS custom properties so every component inherits automatically.
+   KorinthSerial falls back to Cormorant Garamond (loaded via next/font).
+   Futura falls back to Jost (loaded via next/font).
+──────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --font-display: 'KorinthSerial', var(--font-korinth-fallback), Georgia, serif;
+  --font-body:    'Futura', var(--font-futura-fallback), system-ui, sans-serif;
+  /* Role-specific font variables — fall back to --font-body by default.
+     Override by assigning fonts in Admin → Type & Fonts. */
+  --font-nav:     var(--font-body);
+  --font-button:  var(--font-body);
+  --font-label:   var(--font-body);
+}
+
+/* ─── Base ───────────────────────────────────────────────────────────────── */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body);
+  font-weight: 300;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
+/* Futura / Jost looks best with slightly wider tracking on small text */
+p, span, a, li, td, th, label, input, textarea, button {
+  letter-spacing: 0.01em;
+}
+
+/* ─── Page transition ────────────────────────────────────────────────────── */
+
+.page-transition {
+  animation: fadeIn 0.4s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #1A1F17; }
+::-webkit-scrollbar-thumb { background: #5a6a4a; border-radius: 3px; }
+
+/* ─── Carousel ───────────────────────────────────────────────────────────── */
+
+.embla { overflow: hidden; }
+.embla__container { display: flex; }
+.embla__slide { flex: 0 0 100%; min-width: 0; }
+
+/* ─── Admin drag handle ──────────────────────────────────────────────────── */
+
+.drag-handle { cursor: grab; }
+.drag-handle:active { cursor: grabbing; }
+
+/* ─── External iframe modal ──────────────────────────────────────────────── */
+
+.iframe-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+
+/* ─── FullCalendar overrides ─────────────────────────────────────────────── */
+
+.fc { font-family: var(--font-body) !important; }
+.fc .fc-toolbar-title {
+  font-family: var(--font-display) !important;
+  letter-spacing: 0.08em;
 }

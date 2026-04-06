@@ -1,0 +1,33 @@
+{
+  "header": {
+    "logoSize": 58,
+    "mobileLogoSize": 44,
+    "headerHeight": 72,
+    "mobileHeaderHeight": 52,
+    "navPaddingX": 20,
+    "bgColor": "#1A1F17",
+    "textColor": "#8A9A78",
+    "activeColor": "#C97D5A",
+    "borderColor": "#2a3020",
+    "navFontSize": 13,
+    "navLetterSpacing": "0.22em",
+    "navLinks": [
+      { "id": "nav-menu",   "label": "Menu",   "href": "/menu",   "visible": true, "order": 0 },
+      { "id": "nav-coffee", "label": "Coffee", "href": "/coffee", "visible": true, "order": 1 },
+      { "id": "nav-events", "label": "Events", "href": "/events", "visible": true, "order": 2 },
+      { "id": "nav-club",   "label": "Club",   "href": "/club",   "visible": true, "order": 3 },
+      { "id": "nav-shop",   "label": "Shop",   "href": "/shop",   "visible": true, "order": 4 },
+      { "id": "nav-about",  "label": "About",  "href": "/about",  "visible": true, "order": 5 }
+    ]
+  },
+  "footer": {
+    "bgColor": "#1A1F17",
+    "textColor": "#8A9A78",
+    "mutedColor": "#4a5a3a",
+    "showHours": true,
+    "showContact": true,
+    "showSocialLinks": true,
+    "copyrightText": "© 2025 Common Good Cocktail House"
+  },
+  "updatedAt": "2026-04-06T00:00:00.000Z"
+}
