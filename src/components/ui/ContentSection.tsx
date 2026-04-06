@@ -50,11 +50,12 @@ export default function ContentSectionBlock({ section, textColor, mutedColor }: 
         )}
 
         {section.body && (
-          <div
+          <p
             className="text-center leading-relaxed text-sm md:text-base max-w-2xl mx-auto whitespace-pre-wrap"
             style={{ color: mutedColor }}
-            dangerouslySetInnerHTML={{ __html: section.body }}
-          />
+          >
+            {section.body}
+          </p>
         )}
 
         {section.buttonLabel && section.buttonUrl && (

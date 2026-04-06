@@ -19,8 +19,8 @@ export default function AdminFormsPage() {
     setLoading(true);
     try {
       const url = activeTab === "all"
-        ? "/api/forms/submit"
-        : `/api/forms/submit?formId=${activeTab}`;
+        ? "/api/admin/forms"
+        : `/api/admin/forms?formId=${activeTab}`;
       const res = await fetch(url);
       const data = await res.json();
       setSubmissions(Array.isArray(data) ? data : []);
