@@ -1,32 +1,16 @@
 import HomeCarousel from "@/components/home/HomeCarousel";
-import type { CarouselItem } from "@/types";
+import { getHomeData } from "@/lib/homedata";
 
-// Sample carousel items — admin will control these via DB
-const SAMPLE_CAROUSEL: CarouselItem[] = [
-  {
-    id: "1",
-    type: "text",
-    order: 0,
-    active: true,
-    text: "Common Good is a cocktail house in the heart of Glen Ellyn, Illinois.",
-  },
-  {
-    id: "2",
-    type: "text",
-    order: 1,
-    active: true,
-    text: "Modern, classic, upscale, seasonal and sometimes whimsical cocktails.",
-  },
-  {
-    id: "3",
-    type: "text",
-    order: 2,
-    active: true,
-    text: "A space to celebrate life — from special occasions to day-to-day.",
-  },
-];
+export default async function HomePage() {
+  const { bgUrl, carouselItems } = await getHomeData();
+  const activeItems = carouselItems
+    .filter((i) => i.active)
+    .sort((a, b) => a.order - b.order);
 
-export default function HomePage() {
+  const bgStyle = bgUrl
+    ? { backgroundImage: `url('${bgUrl}')` }
+    : { backgroundImage: "url('/images/backgrounds/home-bg.jpg')" };
+
   return (
     <div
       className="min-h-screen relative flex flex-col items-center justify-center"
@@ -35,10 +19,7 @@ export default function HomePage() {
       {/* Full-bleed background image (set by admin) */}
       <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{
-          backgroundImage: "url('/images/backgrounds/home-bg.jpg')",
-          opacity: 0.3,
-        }}
+        style={{ ...bgStyle, opacity: 0.3 }}
       />
 
       {/* Botanical watermark */}
@@ -51,7 +32,7 @@ export default function HomePage() {
 
       {/* Carousel floats above background */}
       <div className="relative z-10 w-full max-w-4xl mx-auto px-4 py-16 animate-slide-up">
-        <HomeCarousel items={SAMPLE_CAROUSEL} />
+        <HomeCarousel items={activeItems} />
       </div>
     </div>
   );

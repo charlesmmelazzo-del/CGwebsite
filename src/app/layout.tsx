@@ -4,7 +4,7 @@ import "./globals.css";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import FontLoader from "@/components/FontLoader";
-import { getSiteConfig } from "@/lib/siteconfig";
+import { getSiteConfig, getSiteSettings } from "@/lib/siteconfig";
 
 const korinthFallback = Cormorant_Garamond({
   subsets: ["latin"],
@@ -40,7 +40,10 @@ export default async function RootLayout({
 }) {
   // Fetch live config on every request — changes in admin appear immediately.
   // Falls back to hardcoded defaults if Supabase env vars are missing.
-  const { header, footer } = await getSiteConfig();
+  const [{ header, footer }, settings] = await Promise.all([
+    getSiteConfig(),
+    getSiteSettings(),
+  ]);
 
   const desktopPad = header.headerHeight       ?? 72;
   const mobilePad  = header.mobileHeaderHeight ?? 52;
@@ -59,7 +62,7 @@ export default async function RootLayout({
           @media (min-width: 768px) { #cg-main { padding-top: ${desktopPad}px; } }
         `}</style>
         <main id="cg-main">{children}</main>
-        <Footer config={footer} />
+        <Footer config={footer} settings={settings} />
       </body>
     </html>
   );

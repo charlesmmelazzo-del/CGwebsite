@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// ─── Change this password to whatever you want ────────────────────────────
-// Later this will be replaced by Supabase Auth (email + password).
-const ADMIN_PASSWORD = "commongood2024";
+// ─── Set ADMIN_PASSWORD env var on Railway to override the default ─────────
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "commongood2024";
 const COOKIE_NAME   = "cg-admin-session";
 const COOKIE_VALUE  = "authenticated";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days

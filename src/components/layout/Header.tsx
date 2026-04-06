@@ -44,8 +44,8 @@ export default function Header({ config }: { config: HeaderConfig }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
 
-  // Sort and filter nav links from config
-  const visibleLinks = [...config.navLinks]
+  // Sort and filter nav links from config (guard against undefined)
+  const visibleLinks = [...(config.navLinks ?? [])]
     .filter((l) => l.visible)
     .sort((a, b) => a.order - b.order);
   const half     = Math.ceil(visibleLinks.length / 2);

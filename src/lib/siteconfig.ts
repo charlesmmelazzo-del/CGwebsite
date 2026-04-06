@@ -1,6 +1,7 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { getSupabaseAdmin } from "./supabase";
-import type { SiteConfig } from "@/types";
+import type { SiteConfig, SiteSettings } from "@/types";
+import { SITE_SETTINGS } from "./constants";
 
 export const DEFAULT_SITE_CONFIG: SiteConfig = {
   header: {
@@ -55,5 +56,21 @@ export async function getSiteConfig(): Promise<SiteConfig> {
   } catch {
     // If Supabase is unreachable (e.g. missing env vars locally), use defaults
     return DEFAULT_SITE_CONFIG;
+  }
+}
+
+/**
+ * Fetch site settings (phone, email, address, hours, social links) from Supabase.
+ * Falls back to hardcoded constants if unavailable.
+ */
+export async function getSiteSettings(): Promise<SiteSettings> {
+  noStore();
+  try {
+    const sb = getSupabaseAdmin();
+    const { data } = await sb.from("site_settings").select("*").eq("id", 1).single();
+    if (!data?.data) return { ...SITE_SETTINGS };
+    return data.data as SiteSettings;
+  } catch {
+    return { ...SITE_SETTINGS };
   }
 }

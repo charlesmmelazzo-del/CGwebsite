@@ -1,13 +1,26 @@
 "use client";
 
-import { useState } from "react";
-import { Save, Plus, Trash2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Save, Plus, Trash2, Loader2 } from "lucide-react";
 import { SITE_SETTINGS } from "@/lib/constants";
 import type { SiteSettings } from "@/types";
 
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<SiteSettings>({ ...SITE_SETTINGS });
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Load settings from Supabase on mount
+  useEffect(() => {
+    fetch("/api/admin/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.phone !== undefined) setSettings(data);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   function updateField(field: keyof SiteSettings, value: string) {
     setSettings((s) => ({ ...s, [field]: value }));
@@ -54,9 +67,51 @@ export default function AdminSettingsPage() {
     }));
   }
 
-  function handleSave() {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  function updateSocialLink(index: number, field: "label" | "url", value: string) {
+    const links = [...(settings.socialLinks ?? [])];
+    links[index] = { ...links[index], [field]: value };
+    setSettings((s) => ({ ...s, socialLinks: links }));
+  }
+
+  function addSocialLink() {
+    setSettings((s) => ({
+      ...s,
+      socialLinks: [...(s.socialLinks ?? []), { label: "", url: "" }],
+    }));
+  }
+
+  function removeSocialLink(index: number) {
+    setSettings((s) => ({
+      ...s,
+      socialLinks: (s.socialLinks ?? []).filter((_, i) => i !== index),
+    }));
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+      });
+      if (!res.ok) throw new Error("Save failed");
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch {
+      alert("Failed to save settings. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16 text-gray-400">
+        <Loader2 size={18} className="animate-spin mr-2" />
+        <span className="text-sm">Loading settings...</span>
+      </div>
+    );
   }
 
   return (
@@ -67,10 +122,11 @@ export default function AdminSettingsPage() {
         </h1>
         <button
           onClick={handleSave}
-          className="flex items-center gap-2 px-4 py-2 bg-[#C97D5A] text-white text-xs tracking-widest uppercase hover:bg-[#b86d4a] transition-colors"
+          disabled={saving}
+          className="flex items-center gap-2 px-4 py-2 bg-[#C97D5A] text-white text-xs tracking-widest uppercase hover:bg-[#b86d4a] transition-colors disabled:opacity-60"
         >
-          <Save size={14} />
-          {saved ? "Saved!" : "Save"}
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+          {saved ? "Saved!" : saving ? "Saving..." : "Save"}
         </button>
       </div>
 
@@ -144,6 +200,43 @@ export default function AdminSettingsPage() {
                 className="text-xs text-gray-400 hover:text-[#C97D5A] flex items-center gap-1 transition-colors"
               >
                 <Plus size={12} /> Add line
+              </button>
+            </div>
+          ))}
+        </section>
+
+        {/* Social Links */}
+        <section>
+          <div className="flex items-center justify-between mb-4 border-b border-gray-200 pb-2">
+            <h2 className="text-sm tracking-widest uppercase text-gray-400">Social Links</h2>
+            <button onClick={addSocialLink} className="text-gray-400 hover:text-[#C97D5A] transition-colors">
+              <Plus size={16} />
+            </button>
+          </div>
+          {(settings.socialLinks ?? []).length === 0 && (
+            <p className="text-gray-400 text-xs">No social links — click + to add one</p>
+          )}
+          {(settings.socialLinks ?? []).map((link, index) => (
+            <div key={index} className="flex items-center gap-2 mb-2">
+              <input
+                type="text"
+                value={link.label}
+                onChange={(e) => updateSocialLink(index, "label", e.target.value)}
+                placeholder="Label (e.g. Instagram)"
+                className="w-28 bg-white border border-gray-200 text-gray-700 text-xs px-2 py-1.5 outline-none rounded-sm focus:border-[#C97D5A]/50"
+              />
+              <input
+                type="text"
+                value={link.url}
+                onChange={(e) => updateSocialLink(index, "url", e.target.value)}
+                placeholder="https://..."
+                className="flex-1 bg-white border border-gray-200 text-gray-700 text-xs px-2 py-1.5 outline-none rounded-sm focus:border-[#C97D5A]/50"
+              />
+              <button
+                onClick={() => removeSocialLink(index)}
+                className="text-gray-300 hover:text-red-500 transition-colors"
+              >
+                <Trash2 size={14} />
               </button>
             </div>
           ))}

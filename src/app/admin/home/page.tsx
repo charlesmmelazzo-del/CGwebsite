@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Trash2, GripVertical, Save } from "lucide-react";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
@@ -26,11 +26,6 @@ const EMPTY_FORM: Omit<CarouselFormItem, "id"> = {
 };
 
 function newId() { return `${Date.now()}-${Math.random().toString(36).slice(2)}`; }
-
-const SAMPLE_ITEMS: CarouselItem[] = [
-  { id: "1", type: "text", order: 0, active: true, text: "Common Good is a cocktail house in the heart of Glen Ellyn, Illinois." },
-  { id: "2", type: "text", order: 1, active: true, text: "Modern, classic, upscale, seasonal and sometimes whimsical cocktails." },
-];
 
 // ─── Sortable wrapper for each carousel item card ─────────────────────────────
 function SortableCard({
@@ -218,12 +213,25 @@ function SortableCard({
 }
 
 export default function AdminHomePage() {
-  const [items, setItems] = useState<CarouselItem[]>(SAMPLE_ITEMS);
+  const [items, setItems] = useState<CarouselItem[]>([]);
   const [bgUrl, setBgUrl] = useState("");
   const [addType, setAddType] = useState<ItemType>("text");
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const sensors = useSensors(useSensor(PointerSensor));
+
+  // Load from Supabase on mount
+  useEffect(() => {
+    fetch("/api/admin/home")
+      .then((r) => r.json())
+      .then((d) => {
+        if (Array.isArray(d.carouselItems)) setItems(d.carouselItems);
+        if (typeof d.bgUrl === "string") setBgUrl(d.bgUrl);
+      })
+      .catch(() => setLoadError(true));
+  }, []);
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -290,9 +298,22 @@ export default function AdminHomePage() {
     }));
   }
 
-  function handleSave() {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/home", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bgUrl, carouselItems: items }),
+      });
+      if (!res.ok) throw new Error("Save failed");
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch {
+      alert("Failed to save. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -303,12 +324,19 @@ export default function AdminHomePage() {
         </h1>
         <button
           onClick={handleSave}
-          className="flex items-center gap-2 px-4 py-2 bg-[#C97D5A] text-white text-xs tracking-widest uppercase hover:bg-[#b86d4a] transition-colors"
+          disabled={saving}
+          className="flex items-center gap-2 px-4 py-2 bg-[#C97D5A] text-white text-xs tracking-widest uppercase hover:bg-[#b86d4a] transition-colors disabled:opacity-60"
         >
           <Save size={14} />
-          {saved ? "Saved!" : "Save Changes"}
+          {saved ? "Saved!" : saving ? "Saving..." : "Save Changes"}
         </button>
       </div>
+
+      {loadError && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-xs rounded-sm">
+          Could not load saved data. Changes will be saved when you click Save.
+        </div>
+      )}
 
       {/* Background image */}
       <section className="mb-8 p-4 bg-white border border-gray-200 rounded-sm">
@@ -321,7 +349,7 @@ export default function AdminHomePage() {
           className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm px-3 py-2 outline-none focus:border-[#C97D5A]/50 rounded-sm"
         />
         <p className="text-gray-400 text-xs mt-2">
-          Leave blank to use solid brand color background
+          Leave blank to use default background image
         </p>
       </section>
 

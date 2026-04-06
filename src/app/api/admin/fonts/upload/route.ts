@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFileSync, existsSync, mkdirSync } from "fs";
-import path from "path";
+import { getSupabaseAdmin } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
@@ -16,27 +15,45 @@ export async function POST(req: NextRequest) {
     // Validate extension
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
     if (!["woff2", "woff", "ttf", "otf"].includes(ext)) {
-      return NextResponse.json({ error: "Unsupported font format. Use .woff2, .woff, .ttf, or .otf" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Unsupported font format. Use .woff2, .woff, .ttf, or .otf" },
+        { status: 400 }
+      );
     }
 
     // Sanitize filename
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const fontsDir = path.join(process.cwd(), "public", "fonts");
-
-    if (!existsSync(fontsDir)) mkdirSync(fontsDir, { recursive: true });
-
-    const destPath = path.join(fontsDir, safeName);
     const bytes = await file.arrayBuffer();
-    writeFileSync(destPath, Buffer.from(bytes));
+
+    const sb = getSupabaseAdmin();
+
+    // Upload to Supabase Storage bucket "fonts"
+    // The bucket must exist in your Supabase project (create via dashboard or SQL)
+    const { error } = await sb.storage
+      .from("fonts")
+      .upload(safeName, bytes, {
+        contentType: file.type || "font/woff2",
+        upsert: true, // overwrite if same filename uploaded again
+      });
+
+    if (error) throw error;
+
+    // Get the public URL for the uploaded font
+    const { data: urlData } = sb.storage.from("fonts").getPublicUrl(safeName);
+    const publicUrl = urlData.publicUrl;
 
     return NextResponse.json({
       success: true,
       filename: safeName,
-      url: `/fonts/${safeName}`,
-      format: ext === "woff2" ? "woff2" : ext === "woff" ? "woff" : ext === "ttf" ? "truetype" : "opentype",
+      url: publicUrl,
+      format:
+        ext === "woff2" ? "woff2"
+        : ext === "woff" ? "woff"
+        : ext === "ttf" ? "truetype"
+        : "opentype",
     });
   } catch (err) {
     console.error("Font upload error:", err);
-    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+    return NextResponse.json({ error: "Upload failed: " + String(err) }, { status: 500 });
   }
 }
