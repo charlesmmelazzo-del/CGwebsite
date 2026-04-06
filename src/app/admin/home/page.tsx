@@ -7,7 +7,29 @@ import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } 
 import { CSS } from "@dnd-kit/utilities";
 import type { CarouselItem, CarouselTextItem, CarouselImageItem, CarouselFormItem, FormField } from "@/types";
 import ColorPicker from "@/components/ui/ColorPicker";
+import ImagePicker from "@/components/ui/ImagePicker";
 import clsx from "clsx";
+
+// ─── Supabase Storage auto-cleanup helpers ────────────────────────────────────
+function isStorageImageUrl(url: string): boolean {
+  return url.includes("/storage/v1/object/public/images/");
+}
+function storagePathFromUrl(url: string): string | null {
+  const marker = "/storage/v1/object/public/images/";
+  const idx = url.indexOf(marker);
+  if (idx === -1) return null;
+  return decodeURIComponent(url.slice(idx + marker.length));
+}
+function deleteStorageImage(url: string) {
+  if (!isStorageImageUrl(url)) return;
+  const path = storagePathFromUrl(url);
+  if (!path) return;
+  fetch("/api/admin/images", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path }),
+  }).catch(() => {});
+}
 
 type ItemType = "text" | "image" | "form";
 
@@ -121,28 +143,27 @@ function SortableCard({
         )}
 
         {item.type === "image" && (
-          <div className="space-y-2">
-            <input
-              type="text"
+          <div className="space-y-3">
+            <ImagePicker
+              label="Carousel Image"
               value={item.imageUrl}
-              onChange={(e) => onUpdateImageField(item.id, "imageUrl", e.target.value)}
-              placeholder="Image URL (carousel)"
-              className="w-full bg-white border border-gray-200 text-gray-700 text-xs px-3 py-1.5 outline-none focus:border-[#C97D5A]/50 rounded-sm"
+              onChange={(url) => onUpdateImageField(item.id, "imageUrl", url)}
             />
-            <input
-              type="text"
+            <ImagePicker
+              label="Expanded Image (shown on tap, optional)"
               value={item.expandedImageUrl ?? ""}
-              onChange={(e) => onUpdateImageField(item.id, "expandedImageUrl", e.target.value)}
-              placeholder="Expanded image URL (optional, shown on tap)"
-              className="w-full bg-white border border-gray-200 text-gray-700 text-xs px-3 py-1.5 outline-none focus:border-[#C97D5A]/50 rounded-sm"
+              onChange={(url) => onUpdateImageField(item.id, "expandedImageUrl", url)}
             />
-            <input
-              type="text"
-              value={item.altText ?? ""}
-              onChange={(e) => onUpdateImageField(item.id, "altText", e.target.value)}
-              placeholder="Alt text"
-              className="w-full bg-white border border-gray-200 text-gray-700 text-xs px-3 py-1.5 outline-none focus:border-[#C97D5A]/50 rounded-sm"
-            />
+            <div>
+              <label className="block text-[10px] tracking-widest uppercase text-gray-400 mb-1">Alt Text</label>
+              <input
+                type="text"
+                value={item.altText ?? ""}
+                onChange={(e) => onUpdateImageField(item.id, "altText", e.target.value)}
+                placeholder="Describe the image"
+                className="w-full bg-white border border-gray-200 text-gray-700 text-xs px-3 py-1.5 outline-none focus:border-[#C97D5A]/50 rounded-sm"
+              />
+            </div>
           </div>
         )}
 
@@ -253,6 +274,13 @@ export default function AdminHomePage() {
   }
 
   function removeItem(id: string) {
+    // Auto-delete any Supabase Storage images owned by this carousel item
+    const item = items.find((i) => i.id === id);
+    if (item?.type === "image") {
+      const img = item as CarouselImageItem;
+      if (img.imageUrl) deleteStorageImage(img.imageUrl);
+      if (img.expandedImageUrl) deleteStorageImage(img.expandedImageUrl);
+    }
     setItems((prev) => prev.filter((i) => i.id !== id));
   }
 

@@ -19,6 +19,7 @@ import {
   Menu,
   Type,
   Layout,
+  ImageIcon,
 } from "lucide-react";
 
 const NAV = [
@@ -29,6 +30,7 @@ const NAV = [
   { href: "/admin/menu",    label: "Menu",         icon: UtensilsCrossed },
   { href: "/admin/coffee",  label: "Coffee",       icon: Coffee },
   { href: "/admin/events",  label: "Events",       icon: Calendar },
+  { href: "/admin/images",  label: "Images",       icon: ImageIcon },
   { href: "/admin/forms",   label: "Form Data",    icon: Users },
   { href: "/admin/fonts",   label: "Type & Fonts", icon: Type },
   { href: "/admin/settings",label: "Settings",     icon: Settings },
@@ -145,7 +147,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* Scrollable content — full-height (no padding) for page builder + header editor */}
         <div className={clsx(
           "flex-1 flex flex-col overflow-hidden",
-          pathname.startsWith("/admin/pages") || pathname.startsWith("/admin/header")
+          pathname.startsWith("/admin/pages") || pathname.startsWith("/admin/header") || pathname.startsWith("/admin/images")
             ? ""
             : "overflow-y-auto p-6"
         )}>{children}</div>

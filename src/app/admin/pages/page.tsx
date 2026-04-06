@@ -18,11 +18,50 @@ import {
 import clsx from "clsx";
 import type {
   PageDocument, PageSection, TextSection, ImageSection,
-  CtaSection, EventsSection, SpacerSection,
+  CtaSection, EventsSection, SpacerSection, CarouselSection, CarouselImageItem,
 } from "@/types";
 import { THEMES, type ThemeName } from "@/lib/themes";
 import ColorPicker from "@/components/ui/ColorPicker";
 import SliderInput from "@/components/ui/SliderInput";
+import ImagePicker from "@/components/ui/ImagePicker";
+
+// ─── Image cleanup helpers ─────────────────────────────────────────────────────
+function isStorageImageUrl(url: string): boolean {
+  return url.includes("/storage/v1/object/public/images/");
+}
+function storagePathFromUrl(url: string): string | null {
+  const marker = "/storage/v1/object/public/images/";
+  const idx = url.indexOf(marker);
+  if (idx === -1) return null;
+  return decodeURIComponent(url.slice(idx + marker.length));
+}
+function extractStorageImagePaths(section: PageSection): string[] {
+  const urls: string[] = [];
+  if (section.type === "image") {
+    const url = (section as ImageSection).imageUrl;
+    if (url) urls.push(url);
+  } else if (section.type === "carousel") {
+    const slides = (section as CarouselSection).slides ?? [];
+    slides.forEach((slide) => {
+      if (slide.type === "image") {
+        const s = slide as CarouselImageItem;
+        if (s.imageUrl) urls.push(s.imageUrl);
+        if (s.expandedImageUrl) urls.push(s.expandedImageUrl);
+      }
+    });
+  }
+  return urls.filter(isStorageImageUrl).map(storagePathFromUrl).filter(Boolean) as string[];
+}
+function deleteStorageImages(paths: string[]) {
+  // Fire-and-forget — don't block section removal if cleanup fails
+  paths.forEach((path) => {
+    fetch("/api/admin/images", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path }),
+    }).catch(() => {});
+  });
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const SECTION_TYPES = [
@@ -167,10 +206,11 @@ function ImageSectionEditor({ section, onChange }: { section: ImageSection; onCh
   return (
     <div className="space-y-4 p-4">
       {/* Content */}
-      <div>
-        <span className={labelCls}>Image URL</span>
-        <input className={inputCls} value={section.imageUrl} onChange={(e) => onChange({ imageUrl: e.target.value })} placeholder="https://..." />
-      </div>
+      <ImagePicker
+        label="Image"
+        value={section.imageUrl}
+        onChange={(url) => onChange({ imageUrl: url })}
+      />
       <div>
         <span className={labelCls}>Layout</span>
         <select className={inputCls} value={section.layout ?? "full"} onChange={(e) => onChange({ layout: e.target.value as ImageSection["layout"] })}>
@@ -715,6 +755,12 @@ export default function AdminPagesPage() {
   }
 
   function removeSection(id: string) {
+    // Auto-delete any Supabase Storage images owned by this section
+    const section = activePage?.sections.find((s) => s.id === id);
+    if (section) {
+      const paths = extractStorageImagePaths(section);
+      if (paths.length > 0) deleteStorageImages(paths);
+    }
     updateActivePage({
       sections: (activePage?.sections ?? [])
         .filter((s) => s.id !== id)
