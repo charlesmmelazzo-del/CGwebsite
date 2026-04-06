@@ -4,12 +4,8 @@ import "./globals.css";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import FontLoader from "@/components/FontLoader";
+import { getSiteConfig } from "@/lib/siteconfig";
 
-/**
- * Fallback for KorinthSerial (headings / display).
- * Once you drop KorinthSerial .woff2 files into /public/fonts/,
- * the @font-face rule in globals.css takes priority automatically.
- */
 const korinthFallback = Cormorant_Garamond({
   subsets: ["latin"],
   weight: ["300", "400", "500", "600"],
@@ -18,12 +14,6 @@ const korinthFallback = Cormorant_Garamond({
   display: "swap",
 });
 
-/**
- * Fallback for Futura (body / nav / UI).
- * Jost is a geometric sans-serif built on the same skeleton as Futura —
- * spacing, proportions, and rhythm are nearly identical.
- * Replace with real Futura woff2 files in /public/fonts/ when ready.
- */
 const futuraFallback = Jost({
   subsets: ["latin"],
   weight: ["200", "300", "400", "500"],
@@ -43,20 +33,33 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Fetch live config on every request — changes in admin appear immediately.
+  // Falls back to hardcoded defaults if Supabase env vars are missing.
+  const { header, footer } = await getSiteConfig();
+
+  const desktopPad = header.headerHeight       ?? 72;
+  const mobilePad  = header.mobileHeaderHeight ?? 52;
+
   return (
     <html lang="en">
-      <body
-        className={`${korinthFallback.variable} ${futuraFallback.variable} antialiased`}
-      >
+      <body className={`${korinthFallback.variable} ${futuraFallback.variable} antialiased`}>
         <FontLoader />
-        <Header />
-        <main className="pt-[58px] md:pt-[78px]">{children}</main>
-        <Footer />
+        <Header config={header} />
+        {/*
+          Inline style tag injects responsive padding that matches the live header height.
+          This keeps it in sync even when the admin changes the header height slider.
+        */}
+        <style>{`
+          #cg-main { padding-top: ${mobilePad}px; }
+          @media (min-width: 768px) { #cg-main { padding-top: ${desktopPad}px; } }
+        `}</style>
+        <main id="cg-main">{children}</main>
+        <Footer config={footer} />
       </body>
     </html>
   );
