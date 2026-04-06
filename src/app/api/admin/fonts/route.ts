@@ -1,47 +1,67 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
-import path from "path";
+import { getSupabaseAdmin } from "@/lib/supabase";
 
-const DATA_DIR  = path.join(process.cwd(), "data");
-const DATA_FILE = path.join(DATA_DIR, "fonts.json");
+const DEFAULT_DATA = {
+  fonts: [],
+  assignments: { display: null, body: null, nav: null, button: null, label: null },
+};
 
-function readData() {
-  if (!existsSync(DATA_FILE)) {
-    return { fonts: [], assignments: { display: null, body: null, nav: null, button: null, label: null } };
-  }
-  return JSON.parse(readFileSync(DATA_FILE, "utf-8"));
+async function readData() {
+  const sb = getSupabaseAdmin();
+  const { data } = await sb.from("fonts_data").select("*").eq("id", 1).single();
+  if (!data) return { ...DEFAULT_DATA };
+  return { fonts: data.fonts ?? [], assignments: data.assignments ?? DEFAULT_DATA.assignments };
 }
 
-function writeData(data: object) {
-  if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
-  writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+async function writeData(payload: { fonts: unknown[]; assignments: Record<string, unknown> }) {
+  const sb = getSupabaseAdmin();
+  const { error } = await sb.from("fonts_data").upsert(
+    { id: 1, fonts: payload.fonts, assignments: payload.assignments, updated_at: new Date().toISOString() },
+    { onConflict: "id" }
+  );
+  if (error) throw error;
 }
 
 // GET — return all font data (fonts list + assignments)
 export async function GET() {
-  return NextResponse.json(readData());
+  try {
+    return NextResponse.json(await readData());
+  } catch (e) {
+    console.error("[GET /api/admin/fonts]", e);
+    return NextResponse.json(DEFAULT_DATA);
+  }
 }
 
 // POST — update assignments or add a font entry
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const data = readData();
+  try {
+    const body = await req.json();
+    const data = await readData();
 
-  if (body.action === "updateAssignments") {
-    data.assignments = { ...data.assignments, ...body.assignments };
-  } else if (body.action === "addFont") {
-    data.fonts = [...data.fonts, body.font];
+    if (body.action === "updateAssignments") {
+      data.assignments = { ...data.assignments, ...body.assignments };
+    } else if (body.action === "addFont") {
+      data.fonts = [...data.fonts, body.font];
+    }
+
+    await writeData(data);
+    return NextResponse.json({ success: true, data });
+  } catch (e) {
+    console.error("[POST /api/admin/fonts]", e);
+    return NextResponse.json({ success: false, error: String(e) }, { status: 500 });
   }
-
-  writeData(data);
-  return NextResponse.json({ success: true, data });
 }
 
 // DELETE — remove a font entry by id
 export async function DELETE(req: NextRequest) {
-  const { id } = await req.json();
-  const data = readData();
-  data.fonts = data.fonts.filter((f: { id: string }) => f.id !== id);
-  writeData(data);
-  return NextResponse.json({ success: true });
+  try {
+    const body = await req.json();
+    const data = await readData();
+    data.fonts = (data.fonts as { id: string }[]).filter((f) => f.id !== body.id);
+    await writeData(data);
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    console.error("[DELETE /api/admin/fonts]", e);
+    return NextResponse.json({ success: false, error: String(e) }, { status: 500 });
+  }
 }

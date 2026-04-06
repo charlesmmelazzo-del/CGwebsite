@@ -1,48 +1,70 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
-import path from "path";
-import type { PagesData, PageDocument } from "@/types";
-
-const DATA_DIR  = path.join(process.cwd(), "data");
-const DATA_FILE = path.join(DATA_DIR, "pages.json");
-
-function readData(): PagesData {
-  if (!existsSync(DATA_FILE)) {
-    return { pages: [] };
-  }
-  return JSON.parse(readFileSync(DATA_FILE, "utf-8"));
-}
-
-function writeData(data: PagesData) {
-  if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
-  writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-}
+import { getSupabaseAdmin } from "@/lib/supabase";
+import type { PageDocument } from "@/types";
 
 // GET — return all pages
 export async function GET() {
-  return NextResponse.json(readData());
+  try {
+    const sb = getSupabaseAdmin();
+    const { data, error } = await sb
+      .from("pages")
+      .select("*")
+      .order("updated_at", { ascending: true });
+
+    if (error) throw error;
+
+    const pages: PageDocument[] = (data ?? []).map((row) => ({
+      pageId:    row.page_id,
+      label:     row.label,
+      slug:      row.slug,
+      theme:     row.theme,
+      sections:  row.sections ?? [],
+      updatedAt: row.updated_at,
+    }));
+
+    return NextResponse.json({ pages });
+  } catch (e) {
+    console.error("[GET /api/admin/pages]", e);
+    return NextResponse.json({ pages: [] });
+  }
 }
 
 // POST — upsert a page (create or update by pageId)
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const data = readData();
-  const page: PageDocument = { ...body, updatedAt: new Date().toISOString() };
-  const idx = data.pages.findIndex((p) => p.pageId === page.pageId);
-  if (idx >= 0) {
-    data.pages[idx] = page;
-  } else {
-    data.pages.push(page);
+  try {
+    const sb = getSupabaseAdmin();
+    const body: PageDocument = await req.json();
+
+    const { error } = await sb.from("pages").upsert(
+      {
+        page_id:    body.pageId,
+        label:      body.label,
+        slug:       body.slug,
+        theme:      body.theme ?? null,
+        sections:   body.sections ?? [],
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "page_id" }
+    );
+
+    if (error) throw error;
+    return NextResponse.json({ success: true, page: body });
+  } catch (e) {
+    console.error("[POST /api/admin/pages]", e);
+    return NextResponse.json({ success: false, error: String(e) }, { status: 500 });
   }
-  writeData(data);
-  return NextResponse.json({ success: true, page });
 }
 
 // DELETE — remove a page by pageId
 export async function DELETE(req: NextRequest) {
-  const { pageId } = await req.json();
-  const data = readData();
-  data.pages = data.pages.filter((p) => p.pageId !== pageId);
-  writeData(data);
-  return NextResponse.json({ success: true });
+  try {
+    const sb = getSupabaseAdmin();
+    const { pageId } = await req.json();
+    const { error } = await sb.from("pages").delete().eq("page_id", pageId);
+    if (error) throw error;
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    console.error("[DELETE /api/admin/pages]", e);
+    return NextResponse.json({ success: false, error: String(e) }, { status: 500 });
+  }
 }

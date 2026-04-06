@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
-import path from "path";
+import { getSupabaseAdmin } from "@/lib/supabase";
 import type { SiteConfig } from "@/types";
-
-const DATA_DIR  = path.join(process.cwd(), "data");
-const DATA_FILE = path.join(DATA_DIR, "siteconfig.json");
 
 const DEFAULT_CONFIG: SiteConfig = {
   header: {
@@ -40,32 +36,54 @@ const DEFAULT_CONFIG: SiteConfig = {
   updatedAt: new Date().toISOString(),
 };
 
-function readData(): SiteConfig {
-  if (!existsSync(DATA_FILE)) return DEFAULT_CONFIG;
-  return JSON.parse(readFileSync(DATA_FILE, "utf-8"));
-}
-
-function writeData(data: SiteConfig) {
-  if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
-  writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+async function readConfig(): Promise<SiteConfig> {
+  const sb = getSupabaseAdmin();
+  const { data } = await sb.from("site_config").select("*").eq("id", 1).single();
+  if (!data) return DEFAULT_CONFIG;
+  return {
+    header:    data.header,
+    footer:    data.footer,
+    updatedAt: data.updated_at,
+  };
 }
 
 // GET — return current site config
 export async function GET() {
-  return NextResponse.json(readData());
+  try {
+    return NextResponse.json(await readConfig());
+  } catch (e) {
+    console.error("[GET /api/admin/siteconfig]", e);
+    return NextResponse.json(DEFAULT_CONFIG);
+  }
 }
 
 // POST — update site config (partial merge)
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const current = readData();
-  const updated: SiteConfig = {
-    ...current,
-    ...body,
-    header: body.header ? { ...current.header, ...body.header } : current.header,
-    footer: body.footer ? { ...current.footer, ...body.footer } : current.footer,
-    updatedAt: new Date().toISOString(),
-  };
-  writeData(updated);
-  return NextResponse.json({ success: true, config: updated });
+  try {
+    const sb = getSupabaseAdmin();
+    const body = await req.json();
+    const current = await readConfig();
+
+    const updated: SiteConfig = {
+      header: body.header ? { ...current.header, ...body.header } : current.header,
+      footer: body.footer ? { ...current.footer, ...body.footer } : current.footer,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const { error } = await sb.from("site_config").upsert(
+      {
+        id:         1,
+        header:     updated.header,
+        footer:     updated.footer,
+        updated_at: updated.updatedAt,
+      },
+      { onConflict: "id" }
+    );
+
+    if (error) throw error;
+    return NextResponse.json({ success: true, config: updated });
+  } catch (e) {
+    console.error("[POST /api/admin/siteconfig]", e);
+    return NextResponse.json({ success: false, error: String(e) }, { status: 500 });
+  }
 }
