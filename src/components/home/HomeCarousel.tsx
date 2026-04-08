@@ -3,7 +3,7 @@
 import { useEffect, useCallback, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import Autoplay from "embla-carousel-autoplay";
-import type { CarouselItem } from "@/types";
+import type { CarouselItem, CarouselInstagramItem } from "@/types";
 import Image from "next/image";
 import { X } from "lucide-react";
 
@@ -135,7 +135,85 @@ function SlideContent({
     return <CarouselForm item={item} />;
   }
 
+  if (item.type === "instagram") {
+    return <InstagramSlide item={item} />;
+  }
+
   return null;
+}
+
+// ─── Inline Instagram SVG glyph (lucide-react has no IG icon) ────────────────
+function InstagramIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17.5" cy="6.5" r="0.5" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function InstagramSlide({ item }: { item: CarouselInstagramItem }) {
+  const caption = item.captionOverride || item.cachedCaption || "";
+  const truncated = caption.length > 200 ? caption.slice(0, 197) + "…" : caption;
+
+  if (!item.cachedImageUrl) {
+    // Not yet fetched — show placeholder
+    return (
+      <a
+        href={item.instagramUrl || "#"}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block py-10 px-6 text-center opacity-50"
+        onClick={!item.instagramUrl ? (e) => e.preventDefault() : undefined}
+      >
+        <InstagramIcon size={32} />
+        <p className="text-xs mt-3 tracking-wider opacity-60">Instagram post loading…</p>
+      </a>
+    );
+  }
+
+  return (
+    <a
+      href={item.instagramUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="block relative group"
+      aria-label="View on Instagram"
+    >
+      {/* Photo */}
+      <div className="relative flex justify-center py-2">
+        <Image
+          src={item.cachedImageUrl}
+          alt="Instagram post"
+          width={480}
+          height={480}
+          unoptimized
+          className="object-cover max-h-80 w-auto rounded-sm"
+        />
+        {/* Subtle bottom gradient for caption readability */}
+        {truncated && (
+          <div
+            className="absolute inset-x-0 bottom-0 h-24 rounded-b-sm"
+            style={{ background: "linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 100%)" }}
+          />
+        )}
+        {/* Instagram glyph — top right */}
+        <div className="absolute top-4 right-4 text-white/80 group-hover:text-white transition-colors">
+          <InstagramIcon size={18} />
+        </div>
+        {/* Caption overlay */}
+        {truncated && (
+          <p
+            className="absolute bottom-4 inset-x-4 text-white text-xs leading-relaxed line-clamp-3"
+            style={{ color: item.textColor ?? "white" }}
+          >
+            {truncated}
+          </p>
+        )}
+      </div>
+    </a>
+  );
 }
 
 function CarouselForm({ item }: { item: Extract<CarouselItem, { type: "form" }> }) {

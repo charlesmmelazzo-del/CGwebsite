@@ -5,7 +5,8 @@ import { Plus, Trash2, GripVertical, Save } from "lucide-react";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { CarouselItem, CarouselTextItem, CarouselImageItem, CarouselFormItem, FormField } from "@/types";
+import type { CarouselItem, CarouselTextItem, CarouselImageItem, CarouselFormItem, CarouselInstagramItem, FormField } from "@/types";
+import { RefreshCw, Loader2, AlertTriangle } from "lucide-react";
 import ColorPicker from "@/components/ui/ColorPicker";
 import ImagePicker from "@/components/ui/ImagePicker";
 import clsx from "clsx";
@@ -31,7 +32,7 @@ function deleteStorageImage(url: string) {
   }).catch(() => {});
 }
 
-type ItemType = "text" | "image" | "form";
+type ItemType = "text" | "image" | "form" | "instagram";
 
 const EMPTY_TEXT: Omit<CarouselTextItem, "id"> = {
   type: "text", order: 0, active: true, text: ""
@@ -45,6 +46,10 @@ const EMPTY_FORM: Omit<CarouselFormItem, "id"> = {
   title: "", description: "",
   fields: [{ id: "f1", label: "Name", type: "text", required: true }],
   submitLabel: "Submit",
+};
+const EMPTY_INSTAGRAM: Omit<CarouselInstagramItem, "id"> = {
+  type: "instagram", order: 0, active: true,
+  instagramUrl: "", captionOverride: "",
 };
 
 function newId() { return `${Date.now()}-${Math.random().toString(36).slice(2)}`; }
@@ -61,6 +66,8 @@ function SortableCard({
   onAddFormField,
   onUpdateFormFieldDef,
   onRemoveFormField,
+  onUpdateInstagramField,
+  onRefreshInstagram,
 }: {
   item: CarouselItem;
   onToggle: (id: string) => void;
@@ -72,6 +79,8 @@ function SortableCard({
   onAddFormField: (itemId: string) => void;
   onUpdateFormFieldDef: (itemId: string, fieldId: string, key: keyof FormField, value: string | boolean) => void;
   onRemoveFormField: (itemId: string, fieldId: string) => void;
+  onUpdateInstagramField: (id: string, field: keyof Pick<CarouselInstagramItem, "instagramUrl" | "captionOverride">, value: string) => void;
+  onRefreshInstagram: (id: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
   const style = {
@@ -167,6 +176,14 @@ function SortableCard({
           </div>
         )}
 
+        {item.type === "instagram" && (
+          <InstagramSlideEditor
+            item={item as CarouselInstagramItem}
+            onUpdateField={onUpdateInstagramField}
+            onRefresh={onRefreshInstagram}
+          />
+        )}
+
         {item.type === "form" && (
           <div className="space-y-2">
             <input
@@ -233,6 +250,130 @@ function SortableCard({
   );
 }
 
+// ─── Instagram Slide Editor ───────────────────────────────────────────────────
+function InstagramSlideEditor({
+  item,
+  onUpdateField,
+  onRefresh,
+}: {
+  item: CarouselInstagramItem;
+  onUpdateField: (id: string, field: keyof Pick<CarouselInstagramItem, "instagramUrl" | "captionOverride">, value: string) => void;
+  onRefresh: (id: string) => void;
+}) {
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleRefresh() {
+    if (!item.instagramUrl) { setError("Enter a URL first."); return; }
+    setRefreshing(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/instagram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: item.instagramUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error ?? "Fetch failed");
+      onRefresh(item.id); // signals parent to call the endpoint and update cached fields
+      // We update the item inline via the parent-provided data
+      // The parent handler will update cachedImageUrl, cachedCaption, fetchedAt
+      (onRefresh as unknown as (id: string, d: { imageUrl: string; caption: string; fetchedAt: string }) => void)(item.id, data);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* URL */}
+      <div>
+        <label className="block text-[10px] tracking-widest uppercase text-gray-400 mb-1">
+          Instagram Post URL *
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="url"
+            value={item.instagramUrl}
+            onChange={(e) => onUpdateField(item.id, "instagramUrl", e.target.value)}
+            placeholder="https://www.instagram.com/p/XXXXXXXXX/"
+            className="flex-1 bg-white border border-gray-200 text-gray-700 text-xs px-3 py-1.5 outline-none focus:border-[#C97D5A]/50 rounded-sm"
+          />
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            title="Fetch / refresh post data from Instagram"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] tracking-wider uppercase text-white bg-[#C97D5A] hover:bg-[#b86d4a] disabled:opacity-60 rounded-sm transition-colors shrink-0"
+          >
+            {refreshing
+              ? <Loader2 size={11} className="animate-spin" />
+              : <RefreshCw size={11} />}
+            {refreshing ? "Fetching…" : "Refresh"}
+          </button>
+        </div>
+      </div>
+
+      {/* Cache status */}
+      {item.lastFetchFailed && (
+        <div className="flex items-start gap-1.5 bg-amber-50 border border-amber-200 text-amber-700 text-[10px] px-2.5 py-2 rounded-sm">
+          <AlertTriangle size={11} className="mt-0.5 shrink-0" />
+          <span>
+            Last refresh failed — showing cached content
+            {item.fetchedAt ? ` from ${new Date(item.fetchedAt).toLocaleDateString()}` : ""}.
+          </span>
+        </div>
+      )}
+
+      {/* Cached preview */}
+      {item.cachedImageUrl && (
+        <div className="flex items-start gap-3 p-2 bg-gray-50 border border-gray-200 rounded-sm">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={item.cachedImageUrl} alt="" className="w-16 h-16 object-cover rounded-sm shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] text-gray-400 tracking-wider uppercase mb-1">Cached preview</p>
+            <p className="text-xs text-gray-600 line-clamp-3 leading-relaxed">
+              {item.captionOverride || item.cachedCaption || "No caption"}
+            </p>
+            {item.fetchedAt && (
+              <p className="text-[9px] text-gray-400 mt-1">
+                Fetched {new Date(item.fetchedAt).toLocaleString()}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {!item.cachedImageUrl && (
+        <p className="text-[10px] text-gray-400">
+          Paste the URL above and click Refresh to fetch the post photo and caption.
+        </p>
+      )}
+
+      {error && (
+        <p className="text-[10px] text-red-500 bg-red-50 border border-red-200 px-2.5 py-2 rounded-sm">
+          {error}
+        </p>
+      )}
+
+      {/* Caption override */}
+      <div>
+        <label className="block text-[10px] tracking-widest uppercase text-gray-400 mb-1">
+          Caption Override <span className="normal-case opacity-60">(optional — leave blank to use fetched caption)</span>
+        </label>
+        <textarea
+          rows={2}
+          value={item.captionOverride ?? ""}
+          onChange={(e) => onUpdateField(item.id, "captionOverride", e.target.value)}
+          placeholder="Custom caption shown on the slide…"
+          className="w-full bg-white border border-gray-200 text-gray-700 text-xs px-3 py-1.5 outline-none resize-none focus:border-[#C97D5A]/50 rounded-sm"
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function AdminHomePage() {
   const [items, setItems] = useState<CarouselItem[]>([]);
   const [bgUrl, setBgUrl] = useState("");
@@ -267,9 +408,10 @@ export default function AdminHomePage() {
   function addItem() {
     const id = newId();
     let item: CarouselItem;
-    if (addType === "text") item = { ...EMPTY_TEXT, id, order: items.length };
-    else if (addType === "image") item = { ...EMPTY_IMAGE, id, order: items.length };
-    else item = { ...EMPTY_FORM, formId: `form-${id}`, id, order: items.length };
+    if (addType === "text")      item = { ...EMPTY_TEXT,      id, order: items.length };
+    else if (addType === "image") item = { ...EMPTY_IMAGE,     id, order: items.length };
+    else if (addType === "instagram") item = { ...EMPTY_INSTAGRAM, id, order: items.length };
+    else                          item = { ...EMPTY_FORM, formId: `form-${id}`, id, order: items.length };
     setItems((prev) => [...prev, item]);
   }
 
@@ -324,6 +466,23 @@ export default function AdminHomePage() {
       if (i.id !== itemId || i.type !== "form") return i;
       return { ...i, fields: i.fields.filter((f) => f.id !== fieldId) };
     }));
+  }
+
+  function updateInstagramField(
+    id: string,
+    field: keyof Pick<CarouselInstagramItem, "instagramUrl" | "captionOverride">,
+    value: string
+  ) {
+    setItems((prev) => prev.map((i) => i.id === id && i.type === "instagram" ? { ...i, [field]: value } : i));
+  }
+
+  function refreshInstagram(id: string, data?: { imageUrl: string; caption: string; fetchedAt: string }) {
+    if (!data) return;
+    setItems((prev) => prev.map((i) =>
+      i.id === id && i.type === "instagram"
+        ? { ...i, cachedImageUrl: data.imageUrl, cachedCaption: data.caption, fetchedAt: data.fetchedAt, lastFetchFailed: false }
+        : i
+    ));
   }
 
   async function handleSave() {
@@ -403,6 +562,8 @@ export default function AdminHomePage() {
                   onAddFormField={addFormField}
                   onUpdateFormFieldDef={updateFormFieldDef}
                   onRemoveFormField={removeFormField}
+                  onUpdateInstagramField={updateInstagramField}
+                  onRefreshInstagram={refreshInstagram as (id: string) => void}
                 />
               ))}
             </div>
@@ -419,6 +580,7 @@ export default function AdminHomePage() {
             <option value="text">Text Slide</option>
             <option value="image">Image Slide</option>
             <option value="form">Form Slide</option>
+            <option value="instagram">Instagram Slide</option>
           </select>
           <button
             onClick={addItem}

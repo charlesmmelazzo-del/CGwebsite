@@ -16,7 +16,7 @@ export interface SiteSettings {
 }
 
 // ─── Carousel ────────────────────────────────────────────────────────────────
-export type CarouselItemType = "text" | "image" | "form";
+export type CarouselItemType = "text" | "image" | "form" | "instagram";
 
 export interface CarouselItemBase {
   id: string;
@@ -47,7 +47,19 @@ export interface CarouselFormItem extends CarouselItemBase {
   submitLabel: string;
 }
 
-export type CarouselItem = CarouselTextItem | CarouselImageItem | CarouselFormItem;
+export interface CarouselInstagramItem extends CarouselItemBase {
+  type: "instagram";
+  instagramUrl: string;
+  captionOverride?: string;
+  textColor?: string;
+  // Cached on save / refresh — public site reads these, never hits Instagram directly
+  cachedImageUrl?: string;
+  cachedCaption?: string;
+  fetchedAt?: string;
+  lastFetchFailed?: boolean;
+}
+
+export type CarouselItem = CarouselTextItem | CarouselImageItem | CarouselFormItem | CarouselInstagramItem;
 
 // ─── Forms ───────────────────────────────────────────────────────────────────
 export interface FormField {
@@ -124,13 +136,19 @@ export interface MenuItem {
   tabId: string;
   title: string;
   description?: string;
-  carouselImageUrl?: string;  // cocktail photo shown in carousel card
-  menuPageImageUrl?: string;  // full menu page shown in expanded modal
+  carouselImageUrl?: string;  // cocktail photo shown on flip card front
+  menuPageImageUrl?: string;  // kept for backward compat, not shown in flip design
   /** @deprecated use carouselImageUrl */
   imageUrl?: string;
+  alt?: string;               // image alt text
   price?: string;
   order: number;
   active: boolean;
+  // Back-of-card fields (shown when card is flipped)
+  tagLine?: string;
+  ingredients?: string;
+  tastingNotes?: string;
+  notableNotes?: string;
   // Optional per-field color overrides (hex strings)
   titleColor?: string;
   descriptionColor?: string;

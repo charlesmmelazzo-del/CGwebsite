@@ -23,6 +23,11 @@ export async function GET() {
       price: r.price ?? undefined,
       carouselImageUrl: r.carousel_image_url ?? undefined,
       menuPageImageUrl: r.menu_page_image_url ?? undefined,
+      alt: r.alt ?? undefined,
+      tagLine: r.tag_line ?? undefined,
+      ingredients: r.ingredients ?? undefined,
+      tastingNotes: r.tasting_notes ?? undefined,
+      notableNotes: r.notable_notes ?? undefined,
       order: r.order,
       active: r.active,
       titleColor: r.title_color ?? undefined,
@@ -85,6 +90,8 @@ export async function POST(req: NextRequest) {
         items.map((i: {
           id: string; tabId: string; title: string; description?: string;
           price?: string; carouselImageUrl?: string; menuPageImageUrl?: string;
+          alt?: string; tagLine?: string; ingredients?: string;
+          tastingNotes?: string; notableNotes?: string;
           order: number; active: boolean; titleColor?: string;
           descriptionColor?: string; priceColor?: string;
         }) => ({
@@ -95,6 +102,11 @@ export async function POST(req: NextRequest) {
           price: i.price ?? null,
           carousel_image_url: i.carouselImageUrl ?? null,
           menu_page_image_url: i.menuPageImageUrl ?? null,
+          alt: i.alt ?? null,
+          tag_line: i.tagLine ?? null,
+          ingredients: i.ingredients ?? null,
+          tasting_notes: i.tastingNotes ?? null,
+          notable_notes: i.notableNotes ?? null,
           order: i.order,
           active: i.active,
           title_color: i.titleColor ?? null,

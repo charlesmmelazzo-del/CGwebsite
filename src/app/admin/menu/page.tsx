@@ -91,6 +91,11 @@ export function MenuAdminPanel({
       price: "",
       carouselImageUrl: "",
       menuPageImageUrl: "",
+      alt: "",
+      tagLine: "",
+      ingredients: "",
+      tastingNotes: "",
+      notableNotes: "",
       active: true,
       order: 0,
     });
@@ -111,6 +116,11 @@ export function MenuAdminPanel({
       price: editingItem.price,
       carouselImageUrl: editingItem.carouselImageUrl || undefined,
       menuPageImageUrl: editingItem.menuPageImageUrl || undefined,
+      alt: editingItem.alt || undefined,
+      tagLine: editingItem.tagLine || undefined,
+      ingredients: editingItem.ingredients || undefined,
+      tastingNotes: editingItem.tastingNotes || undefined,
+      notableNotes: editingItem.notableNotes || undefined,
       order: editingItem.order ?? items.filter((i) => i.tabId === activeTabId).length,
       active: editingItem.active ?? true,
       titleColor: editingItem.titleColor,
@@ -285,19 +295,73 @@ export function MenuAdminPanel({
                 />
               </div>
 
-              {/* Carousel image */}
+              {/* Cocktail photo */}
               <ImagePicker
-                label="Cocktail Photo (shown in carousel)"
+                label="Cocktail Photo (shown on card front)"
                 value={editingItem.carouselImageUrl}
                 onChange={(url) => setEditingItem((v) => ({ ...v, carouselImageUrl: url }))}
               />
 
-              {/* Menu page image */}
-              <ImagePicker
-                label="Full Menu Page (shown when tapped)"
-                value={editingItem.menuPageImageUrl}
-                onChange={(url) => setEditingItem((v) => ({ ...v, menuPageImageUrl: url }))}
-              />
+              {/* Alt text */}
+              <div>
+                <label className="block text-[10px] tracking-widest uppercase text-gray-400 mb-1">Image Alt Text</label>
+                <input
+                  type="text"
+                  value={editingItem.alt ?? ""}
+                  onChange={(e) => setEditingItem((v) => ({ ...v, alt: e.target.value }))}
+                  placeholder="e.g. A Hugo Ascending cocktail in a coupe glass"
+                  className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm px-3 py-2 outline-none focus:border-[#C97D5A]/50 rounded-sm"
+                />
+              </div>
+
+              {/* Back-of-card fields */}
+              <div className="border-t border-gray-100 pt-3">
+                <p className="text-[10px] tracking-widest uppercase text-gray-400 mb-3">
+                  Card Back — tap to reveal (no labels shown to customers)
+                </p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[10px] tracking-widest uppercase text-gray-400 mb-1">Tag Line</label>
+                    <input
+                      type="text"
+                      value={editingItem.tagLine ?? ""}
+                      onChange={(e) => setEditingItem((v) => ({ ...v, tagLine: e.target.value }))}
+                      placeholder="e.g. Floral, Peaks of Flavor, Yellow"
+                      className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm px-3 py-2 outline-none focus:border-[#C97D5A]/50 rounded-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] tracking-widest uppercase text-gray-400 mb-1">Ingredients</label>
+                    <textarea
+                      rows={2}
+                      value={editingItem.ingredients ?? ""}
+                      onChange={(e) => setEditingItem((v) => ({ ...v, ingredients: e.target.value }))}
+                      placeholder="e.g. Lemongrass Elderflower Liqueur, Gen-P, Bitter Bianco..."
+                      className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm px-3 py-2 outline-none resize-none focus:border-[#C97D5A]/50 rounded-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] tracking-widest uppercase text-gray-400 mb-1">Tasting Notes</label>
+                    <textarea
+                      rows={2}
+                      value={editingItem.tastingNotes ?? ""}
+                      onChange={(e) => setEditingItem((v) => ({ ...v, tastingNotes: e.target.value }))}
+                      placeholder="What does it taste like?"
+                      className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm px-3 py-2 outline-none resize-none focus:border-[#C97D5A]/50 rounded-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] tracking-widest uppercase text-gray-400 mb-1">Notable Notes</label>
+                    <textarea
+                      rows={2}
+                      value={editingItem.notableNotes ?? ""}
+                      onChange={(e) => setEditingItem((v) => ({ ...v, notableNotes: e.target.value }))}
+                      placeholder="Any extra detail worth calling out"
+                      className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm px-3 py-2 outline-none resize-none focus:border-[#C97D5A]/50 rounded-sm"
+                    />
+                  </div>
+                </div>
+              </div>
 
               <label className="flex items-center gap-2 text-xs text-gray-500">
                 <input
