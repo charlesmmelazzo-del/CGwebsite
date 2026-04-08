@@ -7,20 +7,21 @@ export default async function HomePage() {
     .filter((i) => i.active)
     .sort((a, b) => a.order - b.order);
 
-  const bgStyle = bgUrl
-    ? { backgroundImage: `url('${bgUrl}')` }
-    : { backgroundImage: "url('/images/backgrounds/home-bg.jpg')" };
-
   return (
     <div
       className="min-h-screen relative flex flex-col items-center justify-center"
       style={{ backgroundColor: "#1A1F17" }}
     >
-      {/* Full-bleed background image (set by admin) */}
-      <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ ...bgStyle, opacity: 0.3 }}
-      />
+      {/* Full-bleed background image — only when admin has set one */}
+      {bgUrl && (
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: `url('${bgUrl}')`, opacity: 0.35 }}
+        />
+      )}
+
+      {/* Gradient overlay so carousel text stays readable over any bg image */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60 pointer-events-none" />
 
       {/* Botanical watermark */}
       <div

@@ -2,10 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "common-good",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "cwd": "/Users/charles/Desktop/Common Good/Website",
+      "name": "nextjs",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd '/Users/charles/Desktop/Common Good/Website' && npm run dev"],
       "port": 3000
     }
   ]

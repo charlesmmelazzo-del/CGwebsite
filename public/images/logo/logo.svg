@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <circle cx="60" cy="60" r="54" fill="none" stroke="#8A9A78" stroke-width="1" opacity="0.6"/>
+  <text x="60" y="69" text-anchor="middle"
+        font-family="Georgia, 'Times New Roman', serif"
+        font-size="30" fill="#8A9A78" font-weight="300" letter-spacing="5">CG</text>
+</svg>

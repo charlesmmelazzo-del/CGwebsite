@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Trash2, Save, GripVertical } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, Trash2, Save, GripVertical, Loader2 } from "lucide-react";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { MenuTab, MenuItem } from "@/types";
 import ColorPicker from "@/components/ui/ColorPicker";
+import ImagePicker from "@/components/ui/ImagePicker";
 import clsx from "clsx";
 
 function newId() { return `m-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
@@ -14,20 +15,35 @@ function newId() { return `m-${Date.now()}-${Math.random().toString(36).slice(2)
 // This component is reused for both menu and coffee admin pages
 export function MenuAdminPanel({
   pageLabel,
-  initialTabs,
-  initialItems,
+  apiPath,
 }: {
   pageLabel: string;
-  initialTabs: MenuTab[];
-  initialItems: MenuItem[];
+  apiPath: string;  // e.g. "/api/admin/menu"
 }) {
-  const [tabs, setTabs] = useState<MenuTab[]>(initialTabs);
-  const [items, setItems] = useState<MenuItem[]>(initialItems);
-  const [activeTabId, setActiveTabId] = useState(initialTabs[0]?.id ?? "");
+  const [tabs, setTabs] = useState<MenuTab[]>([]);
+  const [items, setItems] = useState<MenuItem[]>([]);
+  const [activeTabId, setActiveTabId] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [editingItem, setEditingItem] = useState<Partial<MenuItem> | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor));
+
+  // Load data from Supabase on mount
+  useEffect(() => {
+    fetch(apiPath)
+      .then((r) => r.json())
+      .then((d) => {
+        const loadedTabs: MenuTab[] = d.tabs ?? [];
+        const loadedItems: MenuItem[] = d.items ?? [];
+        setTabs(loadedTabs);
+        setItems(loadedItems);
+        if (loadedTabs.length) setActiveTabId(loadedTabs[0].id);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [apiPath]);
 
   function handleTabDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -68,7 +84,16 @@ export function MenuAdminPanel({
   }
 
   function openNewItem() {
-    setEditingItem({ tabId: activeTabId, title: "", description: "", price: "", imageUrl: "", active: true, order: 0 });
+    setEditingItem({
+      tabId: activeTabId,
+      title: "",
+      description: "",
+      price: "",
+      carouselImageUrl: "",
+      menuPageImageUrl: "",
+      active: true,
+      order: 0,
+    });
   }
 
   function openEditItem(item: MenuItem) {
@@ -84,9 +109,13 @@ export function MenuAdminPanel({
       title: editingItem.title!,
       description: editingItem.description,
       price: editingItem.price,
-      imageUrl: editingItem.imageUrl,
+      carouselImageUrl: editingItem.carouselImageUrl || undefined,
+      menuPageImageUrl: editingItem.menuPageImageUrl || undefined,
       order: editingItem.order ?? items.filter((i) => i.tabId === activeTabId).length,
       active: editingItem.active ?? true,
+      titleColor: editingItem.titleColor,
+      descriptionColor: editingItem.descriptionColor,
+      priceColor: editingItem.priceColor,
     };
     if (isNew) setItems((prev) => [...prev, item]);
     else setItems((prev) => prev.map((i) => i.id === item.id ? item : i));
@@ -97,12 +126,36 @@ export function MenuAdminPanel({
     setItems((prev) => prev.filter((i) => i.id !== id));
   }
 
-  function handleSave() {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  async function handleSave() {
+    setSaving(true);
+    setSaved(false);
+    try {
+      const res = await fetch(apiPath, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tabs, items }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error ?? `Server error ${res.status}`);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      alert(`Failed to save: ${e}`);
+    } finally {
+      setSaving(false);
+    }
   }
 
   const activeItems = items.filter((i) => i.tabId === activeTabId).sort((a, b) => a.order - b.order);
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-gray-400 py-10">
+        <Loader2 size={16} className="animate-spin" />
+        <span className="text-sm">Loading...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl">
@@ -112,10 +165,11 @@ export function MenuAdminPanel({
         </h1>
         <button
           onClick={handleSave}
-          className="flex items-center gap-2 px-4 py-2 bg-[#C97D5A] text-white text-xs tracking-widest uppercase hover:bg-[#b86d4a] transition-colors"
+          disabled={saving}
+          className="flex items-center gap-2 px-4 py-2 bg-[#C97D5A] text-white text-xs tracking-widest uppercase hover:bg-[#b86d4a] transition-colors disabled:opacity-60"
         >
-          <Save size={14} />
-          {saved ? "Saved!" : "Save"}
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+          {saving ? "Saving..." : saved ? "Saved!" : "Save"}
         </button>
       </div>
 
@@ -170,12 +224,13 @@ export function MenuAdminPanel({
 
       {/* Edit modal */}
       {editingItem && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white border border-gray-200 shadow-xl w-full max-w-lg p-6 rounded-sm">
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-start justify-center p-4 overflow-y-auto">
+          <div className="bg-white border border-gray-200 shadow-xl w-full max-w-lg p-6 rounded-sm my-8">
             <h2 className="text-lg text-gray-800 mb-4" style={{ fontFamily: "var(--font-display)" }}>
               {editingItem.id ? "Edit Item" : "New Item"}
             </h2>
-            <div className="space-y-3">
+            <div className="space-y-4">
+
               {/* Name */}
               <div>
                 <div className="flex items-end justify-between mb-1">
@@ -190,7 +245,6 @@ export function MenuAdminPanel({
                   type="text"
                   value={editingItem.title ?? ""}
                   onChange={(e) => setEditingItem((v) => ({ ...v, title: e.target.value }))}
-                  style={{ color: editingItem.titleColor }}
                   className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm px-3 py-2 outline-none focus:border-[#C97D5A]/50 rounded-sm"
                 />
               </div>
@@ -209,18 +263,6 @@ export function MenuAdminPanel({
                   type="text"
                   value={editingItem.price ?? ""}
                   onChange={(e) => setEditingItem((v) => ({ ...v, price: e.target.value }))}
-                  style={{ color: editingItem.priceColor }}
-                  className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm px-3 py-2 outline-none focus:border-[#C97D5A]/50 rounded-sm"
-                />
-              </div>
-
-              {/* Image URL */}
-              <div>
-                <label className="block text-[10px] tracking-widest uppercase text-gray-400 mb-1">Image URL (menu page PNG)</label>
-                <input
-                  type="text"
-                  value={editingItem.imageUrl ?? ""}
-                  onChange={(e) => setEditingItem((v) => ({ ...v, imageUrl: e.target.value }))}
                   className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm px-3 py-2 outline-none focus:border-[#C97D5A]/50 rounded-sm"
                 />
               </div>
@@ -239,10 +281,23 @@ export function MenuAdminPanel({
                   rows={3}
                   value={editingItem.description ?? ""}
                   onChange={(e) => setEditingItem((v) => ({ ...v, description: e.target.value }))}
-                  style={{ color: editingItem.descriptionColor }}
                   className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm px-3 py-2 outline-none resize-none focus:border-[#C97D5A]/50 rounded-sm"
                 />
               </div>
+
+              {/* Carousel image */}
+              <ImagePicker
+                label="Cocktail Photo (shown in carousel)"
+                value={editingItem.carouselImageUrl}
+                onChange={(url) => setEditingItem((v) => ({ ...v, carouselImageUrl: url }))}
+              />
+
+              {/* Menu page image */}
+              <ImagePicker
+                label="Full Menu Page (shown when tapped)"
+                value={editingItem.menuPageImageUrl}
+                onChange={(url) => setEditingItem((v) => ({ ...v, menuPageImageUrl: url }))}
+              />
 
               <label className="flex items-center gap-2 text-xs text-gray-500">
                 <input
@@ -314,12 +369,21 @@ function SortableItem({ item, onEdit, onRemove }: { item: MenuItem; onEdit: (ite
       <button {...attributes} {...listeners} onClick={(e) => e.stopPropagation()} className="text-gray-300 hover:text-gray-500 cursor-grab shrink-0 touch-none">
         <GripVertical size={14} />
       </button>
+      {item.carouselImageUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={item.carouselImageUrl} alt="" className="w-10 h-10 object-cover rounded-sm shrink-0 border border-gray-200" />
+      )}
       <div className="flex-1 min-w-0">
         <p className="text-gray-700 text-xs tracking-wider">{item.title}</p>
         {item.price && <p className="text-[#C97D5A] text-xs">{item.price}</p>}
         {item.description && <p className="text-gray-400 text-xs truncate">{item.description}</p>}
       </div>
-      {!item.active && <span className="text-[10px] text-gray-400 tracking-widest uppercase shrink-0">Hidden</span>}
+      <div className="flex items-center gap-2 shrink-0">
+        {item.menuPageImageUrl && (
+          <span className="text-[9px] text-gray-400 tracking-widest uppercase bg-gray-100 px-1.5 py-0.5 rounded-sm">Menu img</span>
+        )}
+        {!item.active && <span className="text-[10px] text-gray-400 tracking-widest uppercase">Hidden</span>}
+      </div>
       <button onClick={(e) => { e.stopPropagation(); onRemove(item.id); }} className="text-gray-300 hover:text-red-500 transition-colors shrink-0">
         <Trash2 size={13} />
       </button>
@@ -328,18 +392,6 @@ function SortableItem({ item, onEdit, onRemove }: { item: MenuItem; onEdit: (ite
 }
 
 // Default export for /admin/menu
-const MENU_TABS: MenuTab[] = [
-  { id: "seasonal", label: "Seasonal Cocktails", order: 0, active: true },
-  { id: "classics", label: "Classics", order: 1, active: true },
-  { id: "nonalc", label: "Non-Alcoholic", order: 2, active: true },
-  { id: "beer", label: "Beer & Wine", order: 3, active: true },
-];
-const MENU_ITEMS: MenuItem[] = [
-  { id: "1", tabId: "seasonal", order: 0, active: true, title: "Hugo Ascending", description: "Lemongrass Infused Elderflower Liqueur, Gen-P, Bitter Bianco, Cap Corse Blanc, Cava" },
-  { id: "2", tabId: "seasonal", order: 1, active: true, title: "The Riggs", description: "Coconut Roasted Strawberry & Asparagus Infused Aperitivo..." },
-  { id: "3", tabId: "classics", order: 0, active: true, title: "Old Fashioned", description: "Bourbon, Demerara, Angostura Bitters" },
-];
-
 export default function AdminMenuPage() {
-  return <MenuAdminPanel pageLabel="Menu" initialTabs={MENU_TABS} initialItems={MENU_ITEMS} />;
+  return <MenuAdminPanel pageLabel="Menu" apiPath="/api/admin/menu" />;
 }

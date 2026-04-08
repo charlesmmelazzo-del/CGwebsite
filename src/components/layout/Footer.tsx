@@ -37,9 +37,10 @@ export default function Footer({ config, settings }: { config: FooterConfig; set
             <Link href="/">
               <div className="relative w-16 h-16 opacity-70 hover:opacity-100 transition-opacity">
                 <Image
-                  src="/images/logo/logo.png"
+                  src="/images/logo/logo.svg"
                   alt="Common Good Cocktail House"
                   fill
+                  unoptimized
                   className="object-contain"
                 />
               </div>

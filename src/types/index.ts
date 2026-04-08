@@ -124,7 +124,10 @@ export interface MenuItem {
   tabId: string;
   title: string;
   description?: string;
-  imageUrl?: string;    // full PNG of menu page
+  carouselImageUrl?: string;  // cocktail photo shown in carousel card
+  menuPageImageUrl?: string;  // full menu page shown in expanded modal
+  /** @deprecated use carouselImageUrl */
+  imageUrl?: string;
   price?: string;
   order: number;
   active: boolean;

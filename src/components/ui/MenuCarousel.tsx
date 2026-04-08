@@ -52,12 +52,12 @@ export default function MenuCarousel({ items, textColor, mutedColor }: Props) {
               <div
                 className="rounded-sm overflow-hidden border cursor-pointer group transition-transform duration-200 hover:scale-[1.02]"
                 style={{ borderColor: `${textColor}20` }}
-                onClick={() => item.imageUrl && setExpandedItem(item)}
+                onClick={() => (item.menuPageImageUrl ?? item.imageUrl) && setExpandedItem(item)}
               >
-                {item.imageUrl ? (
+                {(item.carouselImageUrl ?? item.imageUrl) ? (
                   <div className="relative h-48">
                     <Image
-                      src={item.imageUrl}
+                      src={(item.carouselImageUrl ?? item.imageUrl)!}
                       alt={item.title}
                       fill
                       className="object-cover"
@@ -91,7 +91,7 @@ export default function MenuCarousel({ items, textColor, mutedColor }: Props) {
                       {item.description}
                     </p>
                   )}
-                  {item.imageUrl && (
+                  {(item.menuPageImageUrl ?? item.imageUrl) && (
                     <p className="text-[10px] tracking-widest uppercase mt-3 opacity-40">
                       Tap to expand
                     </p>
@@ -140,7 +140,7 @@ export default function MenuCarousel({ items, textColor, mutedColor }: Props) {
       )}
 
       {/* Expanded image */}
-      {expandedItem?.imageUrl && (
+      {expandedItem && (expandedItem.menuPageImageUrl ?? expandedItem.imageUrl) && (
         <div className="iframe-modal-overlay" onClick={() => setExpandedItem(null)}>
           <div className="relative max-w-2xl w-full mx-4" onClick={(e) => e.stopPropagation()}>
             <button
@@ -150,7 +150,7 @@ export default function MenuCarousel({ items, textColor, mutedColor }: Props) {
               <X size={24} />
             </button>
             <Image
-              src={expandedItem.imageUrl}
+              src={(expandedItem.menuPageImageUrl ?? expandedItem.imageUrl)!}
               alt={expandedItem.title}
               width={800}
               height={1000}

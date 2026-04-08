@@ -92,9 +92,12 @@
 
 html {
   scroll-behavior: smooth;
+  /* Dark olive is the site's base tone — prevents white flash between sections */
+  background-color: #1A1F17;
 }
 
 body {
+  background-color: #1A1F17;
   font-family: var(--font-body);
   font-weight: 300;
   -webkit-font-smoothing: antialiased;

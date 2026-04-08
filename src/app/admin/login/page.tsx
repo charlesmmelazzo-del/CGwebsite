@@ -48,13 +48,11 @@ function LoginForm() {
         <div className="flex justify-center mb-10">
           <div className="relative w-20 h-20">
             <Image
-              src="/images/logo/logo.png"
+              src="/images/logo/logo.svg"
               alt="Common Good"
               fill
+              unoptimized
               className="object-contain"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
             />
           </div>
         </div>

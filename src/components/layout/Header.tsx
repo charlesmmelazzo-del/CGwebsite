@@ -29,9 +29,10 @@ function LogoImage({ size, textColor }: { size: number; textColor: string }) {
   return (
     <div className="relative" style={{ width: size, height: size }}>
       <Image
-        src="/images/logo/logo.png"
+        src="/images/logo/logo.svg"
         alt="Common Good Cocktail House"
         fill
+        unoptimized
         className="object-contain"
         priority
         onError={() => setFailed(true)}
