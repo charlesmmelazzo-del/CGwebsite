@@ -252,6 +252,7 @@ export interface NavLink {
 }
 
 export interface HeaderConfig {
+  logoUrl?: string;             // Supabase Storage URL for the uploaded logo
   logoSize: number;
   mobileLogoSize: number;
   headerHeight: number;         // px, default 72

@@ -62,7 +62,7 @@ export default async function RootLayout({
           @media (min-width: 768px) { #cg-main { padding-top: ${desktopPad}px; } }
         `}</style>
         <main id="cg-main">{children}</main>
-        <Footer config={footer} settings={settings} />
+        <Footer config={footer} settings={settings} logoUrl={header.logoUrl} />
       </body>
     </html>
   );

@@ -15,6 +15,7 @@ import clsx from "clsx";
 import type { SiteConfig, NavLink } from "@/types";
 import ColorPicker from "@/components/ui/ColorPicker";
 import SliderInput from "@/components/ui/SliderInput";
+import ImagePicker from "@/components/ui/ImagePicker";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function newId() { return `nl-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
@@ -334,6 +335,19 @@ export default function AdminHeaderPage() {
                   <SliderInput label="Desktop Height" value={config.header.headerHeight ?? 72} min={48} max={120} step={2} onChange={(v) => updateHeader({ headerHeight: v })} />
                   <SliderInput label="Mobile Height"  value={config.header.mobileHeaderHeight ?? 52} min={40} max={80} step={2} onChange={(v) => updateHeader({ mobileHeaderHeight: v })} />
                 </div>
+              </section>
+
+              {/* Logo */}
+              <section>
+                <p className="text-[10px] tracking-widest uppercase text-gray-500 mb-3 font-medium">Logo</p>
+                <ImagePicker
+                  label="Logo image (shown in header & footer)"
+                  value={config.header.logoUrl}
+                  onChange={(url) => updateHeader({ logoUrl: url || undefined })}
+                />
+                <p className="text-[10px] text-gray-400 mt-2">
+                  Upload a PNG or SVG via the Images library. Transparent background works best on a dark header.
+                </p>
               </section>
 
               {/* Logo sizes */}

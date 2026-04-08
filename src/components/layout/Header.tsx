@@ -7,8 +7,9 @@ import { Menu, X } from "lucide-react";
 import { usePathname } from "next/navigation";
 import type { HeaderConfig } from "@/types";
 
-function LogoImage({ size, textColor }: { size: number; textColor: string }) {
+function LogoImage({ size, textColor, logoUrl }: { size: number; textColor: string; logoUrl?: string }) {
   const [failed, setFailed] = useState(false);
+  const src = logoUrl || "/images/logo/logo.svg";
 
   if (failed) {
     return (
@@ -29,7 +30,7 @@ function LogoImage({ size, textColor }: { size: number; textColor: string }) {
   return (
     <div className="relative" style={{ width: size, height: size }}>
       <Image
-        src="/images/logo/logo.svg"
+        src={src}
         alt="Common Good Cocktail House"
         fill
         unoptimized
@@ -107,7 +108,7 @@ export default function Header({ config }: { config: HeaderConfig }) {
           href="/"
           className="flex items-center px-8 shrink-0 transition-opacity duration-200 hover:opacity-80"
         >
-          <LogoImage size={logoSize} textColor={config.textColor} />
+          <LogoImage size={logoSize} textColor={config.textColor} logoUrl={config.logoUrl} />
         </Link>
 
         {/* Right nav */}
@@ -133,7 +134,7 @@ export default function Header({ config }: { config: HeaderConfig }) {
         style={{ height: mobileH, borderBottom: `1px solid ${config.borderColor}` }}
       >
         <Link href="/" className="flex items-center gap-2.5">
-          <LogoImage size={mLogoSize} textColor={config.textColor} />
+          <LogoImage size={mLogoSize} textColor={config.textColor} logoUrl={config.logoUrl} />
           <div className="leading-tight">
             <p style={{ color: config.textColor, fontFamily: "var(--font-display)", fontSize: 13, letterSpacing: "0.2em", textTransform: "uppercase" }}>
               Common Good

@@ -4,7 +4,7 @@ import { SITE_SETTINGS } from "@/lib/constants";
 import { Phone, Mail, MapPin } from "lucide-react";
 import type { FooterConfig, SiteSettings } from "@/types";
 
-export default function Footer({ config, settings }: { config: FooterConfig; settings?: SiteSettings }) {
+export default function Footer({ config, settings, logoUrl }: { config: FooterConfig; settings?: SiteSettings; logoUrl?: string }) {
   // Use live settings from Supabase if available, fall back to hardcoded constants
   const s = settings ?? SITE_SETTINGS;
   const bg     = config.bgColor    ?? "#1A1F17";
@@ -37,7 +37,7 @@ export default function Footer({ config, settings }: { config: FooterConfig; set
             <Link href="/">
               <div className="relative w-16 h-16 opacity-70 hover:opacity-100 transition-opacity">
                 <Image
-                  src="/images/logo/logo.svg"
+                  src={logoUrl || "/images/logo/logo.svg"}
                   alt="Common Good Cocktail House"
                   fill
                   unoptimized
