@@ -157,11 +157,11 @@ function TextSectionEditor({ section, onChange }: { section: TextSection; onChan
       {/* Content */}
       <div>
         <LabelRow label="Title" picker={<ColorPicker label="Title color" value={section.titleColor} onChange={(h) => onChange({ titleColor: h })} />} />
-        <input className={inputCls} value={section.title ?? ""} onChange={(e) => onChange({ title: e.target.value })} style={{ color: section.titleColor }} />
+        <input className={inputCls} value={section.title ?? ""} onChange={(e) => onChange({ title: e.target.value })} />
       </div>
       <div>
         <LabelRow label="Body" picker={<ColorPicker label="Body color" value={section.bodyColor} onChange={(h) => onChange({ bodyColor: h })} />} />
-        <textarea className={textareaCls} rows={4} value={section.body ?? ""} onChange={(e) => onChange({ body: e.target.value })} style={{ color: section.bodyColor }} />
+        <textarea className={textareaCls} rows={4} value={section.body ?? ""} onChange={(e) => onChange({ body: e.target.value })} />
       </div>
       <div>
         <span className={labelCls}>Alignment</span>
@@ -179,7 +179,7 @@ function TextSectionEditor({ section, onChange }: { section: TextSection; onChan
       <div className="grid grid-cols-2 gap-3">
         <div>
           <LabelRow label="Button Label" picker={<ColorPicker label="Btn color" value={section.buttonColor} onChange={(h) => onChange({ buttonColor: h })} size="sm" />} />
-          <input className={inputCls} value={section.buttonLabel ?? ""} onChange={(e) => onChange({ buttonLabel: e.target.value })} style={{ color: section.buttonColor }} />
+          <input className={inputCls} value={section.buttonLabel ?? ""} onChange={(e) => onChange({ buttonLabel: e.target.value })} />
         </div>
         <div>
           <span className={labelCls}>Button URL</span>
@@ -252,16 +252,16 @@ function CtaSectionEditor({ section, onChange }: { section: CtaSection; onChange
       {/* Content */}
       <div>
         <LabelRow label="Heading" picker={<ColorPicker label="Text color" value={section.textColor} onChange={(h) => onChange({ textColor: h })} />} />
-        <input className={inputCls} value={section.heading} onChange={(e) => onChange({ heading: e.target.value })} style={{ color: section.textColor }} />
+        <input className={inputCls} value={section.heading} onChange={(e) => onChange({ heading: e.target.value })} />
       </div>
       <div>
         <span className={labelCls}>Subheading</span>
-        <textarea className={textareaCls} rows={3} value={section.subheading ?? ""} onChange={(e) => onChange({ subheading: e.target.value })} style={{ color: section.textColor }} />
+        <textarea className={textareaCls} rows={3} value={section.subheading ?? ""} onChange={(e) => onChange({ subheading: e.target.value })} />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <LabelRow label="Button Label" picker={<ColorPicker label="Btn color" value={section.buttonColor} onChange={(h) => onChange({ buttonColor: h })} size="sm" />} />
-          <input className={inputCls} value={section.buttonLabel} onChange={(e) => onChange({ buttonLabel: e.target.value })} style={{ color: section.buttonColor }} />
+          <input className={inputCls} value={section.buttonLabel} onChange={(e) => onChange({ buttonLabel: e.target.value })} />
         </div>
         <div>
           <span className={labelCls}>Button URL</span>
@@ -723,16 +723,18 @@ export default function AdminPagesPage() {
   async function handleSave() {
     if (!activePage) return;
     try {
-      await fetch("/api/admin/pages", {
+      const res = await fetch("/api/admin/pages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(activePage),
       });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error ?? `Server error ${res.status}`);
       setSaved(true);
       setDirty(false);
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
-      console.error(e);
+      alert("Save failed: " + String(e));
     }
   }
 

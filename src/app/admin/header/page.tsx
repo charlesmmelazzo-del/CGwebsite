@@ -247,16 +247,18 @@ export default function AdminHeaderPage() {
 
   async function handleSave() {
     try {
-      await fetch("/api/admin/siteconfig", {
+      const res = await fetch("/api/admin/siteconfig", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(config),
       });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error ?? `Server error ${res.status}`);
       setSaved(true);
       setDirty(false);
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
-      console.error(e);
+      alert("Save failed: " + String(e));
     }
   }
 
