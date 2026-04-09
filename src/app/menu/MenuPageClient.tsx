@@ -56,8 +56,8 @@ export default function MenuPageClient({ initialTabs, initialItems, header }: Pr
         className="h-screen overflow-hidden flex flex-col pt-[52px] md:pt-[72px]"
         style={{ color: theme.text }}
       >
-        {/* Compact page header — shrinks to its content, never scrolls */}
-        <header className="shrink-0 text-center px-6 pt-5 pb-3">
+        {/* Compact page header — desktop only, hidden on mobile to maximise swipe card height */}
+        <header className="shrink-0 text-center px-6 pt-5 pb-3 hidden md:block">
           {header.title && (
             <h1
               className="tracking-widest uppercase mb-1"

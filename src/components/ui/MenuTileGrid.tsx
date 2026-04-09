@@ -86,7 +86,6 @@ function MenuTile({
   item,
   onClick,
   textColor,
-  mutedColor,
   bgColor,
   isFavorited,
   onToggleFavorite,
@@ -94,7 +93,6 @@ function MenuTile({
   item: MenuItem;
   onClick: () => void;
   textColor: string;
-  mutedColor: string;
   bgColor: string;
   isFavorited: boolean;
   onToggleFavorite: () => void;
@@ -118,8 +116,27 @@ function MenuTile({
               className="object-cover"
               sizes="33vw"
             />
-            {/* Hover gradient — desktop only */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 md:group-hover:opacity-100 transition-opacity duration-200" />
+            {/* Hover gradient — desktop only, stronger so text is readable */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 md:group-hover:opacity-100 transition-opacity duration-200 pointer-events-none" />
+            {/* Hover overlay — title, price, description */}
+            <div className="absolute inset-0 hidden md:flex flex-col justify-end p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+              <h3
+                className="text-sm tracking-wider leading-tight line-clamp-2 drop-shadow-lg"
+                style={{ fontFamily: "var(--font-display)", color: "#fff" }}
+              >
+                {item.title}
+              </h3>
+              {item.price && (
+                <p className="text-xs mt-1 drop-shadow-lg" style={{ color: "#C97D5A" }}>
+                  {item.price}
+                </p>
+              )}
+              {item.description && (
+                <p className="text-xs mt-1 leading-snug line-clamp-2 drop-shadow-md" style={{ color: "rgba(255,255,255,0.8)" }}>
+                  {item.description}
+                </p>
+              )}
+            </div>
           </>
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
@@ -153,21 +170,6 @@ function MenuTile({
             className="drop-shadow-md"
           />
         </button>
-      </div>
-
-      {/* Caption — desktop only */}
-      <div className="hidden md:block px-2 py-1.5" style={{ backgroundColor: bgColor }}>
-        <h3
-          className="text-[11px] tracking-wider leading-tight line-clamp-1"
-          style={{ fontFamily: "var(--font-display)", color: item.titleColor ?? textColor }}
-        >
-          {item.title}
-        </h3>
-        {item.description && (
-          <p className="text-[9px] leading-snug line-clamp-1 mt-0.5 opacity-60" style={{ color: mutedColor }}>
-            {item.description}
-          </p>
-        )}
       </div>
     </button>
   );
@@ -261,7 +263,6 @@ export default function MenuTileGrid({ items, tabs, textColor, mutedColor, bgCol
                     item={item}
                     onClick={() => setEnlargedId(item.id)}
                     textColor={textColor}
-                    mutedColor={mutedColor}
                     bgColor={bgColor}
                     isFavorited={favorites.includes(item.id)}
                     onToggleFavorite={() => onToggleFavorite(item.id)}

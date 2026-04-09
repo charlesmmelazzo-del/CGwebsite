@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import Image from "next/image";
 import { Heart, List, Undo2, ArrowRight } from "lucide-react";
 import { motion, useMotionValue, useTransform, animate, type PanInfo } from "framer-motion";
@@ -81,13 +81,7 @@ interface SwipeCardProps {
   onTap: () => void;
 }
 
-function SwipeCard({
-  item,
-  isFavorited,
-  onToggleFavorite,
-  onSwipe,
-  onTap,
-}: SwipeCardProps) {
+function SwipeCard({ item, isFavorited, onToggleFavorite, onSwipe, onTap }: SwipeCardProps) {
   const imgSrc = item.carouselImageUrl ?? item.imageUrl;
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-300, 0, 300], [-12, 0, 12]);
@@ -95,7 +89,6 @@ function SwipeCard({
   const leftOpacity = useTransform(x, [-110, -20], [1, 0], { clamp: true });
   const dragRef = useRef(false);
 
-  // Pick random reactions on mount
   const [rightReaction] = useState(
     () => RIGHT_REACTIONS[Math.floor(Math.random() * RIGHT_REACTIONS.length)]
   );
@@ -104,35 +97,28 @@ function SwipeCard({
   );
 
   function handleDrag(_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) {
-    if (Math.abs(info.offset.x) > 6) {
-      dragRef.current = true;
-    }
+    if (Math.abs(info.offset.x) > 6) dragRef.current = true;
   }
 
   function handleDragEnd(_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) {
     const threshold = 90;
     if (Math.abs(info.offset.x) > threshold) {
       const dir = info.offset.x > 0 ? "right" : "left";
-      const targetX = dir === "right" ? 500 : -500;
-      animate(x, targetX, { duration: 0.35, ease: "easeOut" }).then(() => {
+      animate(x, dir === "right" ? 500 : -500, { duration: 0.35, ease: "easeOut" }).then(() => {
         onSwipe(dir);
       });
     } else {
       animate(x, 0, { type: "spring", stiffness: 300, damping: 30 });
     }
-    // Reset drag flag after a tick so click doesn't fire
     setTimeout(() => { dragRef.current = false; }, 0);
   }
 
   function handleClick() {
-    if (!dragRef.current) {
-      onTap();
-    }
+    if (!dragRef.current) onTap();
   }
 
   return (
     <motion.div
-      key={item.id}
       style={{ x, rotate }}
       drag="x"
       dragConstraints={{ left: 0, right: 0 }}
@@ -142,7 +128,6 @@ function SwipeCard({
       onClick={handleClick}
       className="absolute inset-0 rounded-2xl overflow-hidden cursor-grab active:cursor-grabbing"
     >
-      {/* Background image */}
       {imgSrc ? (
         <Image
           src={imgSrc}
@@ -153,14 +138,8 @@ function SwipeCard({
           draggable={false}
         />
       ) : (
-        <div
-          className="absolute inset-0 flex items-center justify-center"
-          style={{ backgroundColor: "#2a2a2a" }}
-        >
-          <span
-            className="select-none opacity-20 text-6xl"
-            style={{ fontFamily: "var(--font-display)", color: "#fff" }}
-          >
+        <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: "#2a2a2a" }}>
+          <span className="select-none opacity-20 text-6xl" style={{ fontFamily: "var(--font-display)", color: "#fff" }}>
             CG
           </span>
         </div>
@@ -169,74 +148,45 @@ function SwipeCard({
       {/* Gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent pointer-events-none" />
 
-      {/* Right reaction stamp (swipe right) */}
-      <motion.div
-        style={{ opacity: rightOpacity }}
-        className="absolute top-8 left-6 z-20 pointer-events-none"
-      >
-        <div
-          className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg border-2 border-green-400"
-          style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
-        >
+      {/* Right reaction stamp */}
+      <motion.div style={{ opacity: rightOpacity }} className="absolute top-8 left-6 z-20 pointer-events-none">
+        <div className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg border-2 border-green-400" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
           <span className="text-2xl">{rightReaction.emoji}</span>
           <span className="text-xs font-bold tracking-widest text-green-400">{rightReaction.text}</span>
         </div>
       </motion.div>
 
-      {/* Left reaction stamp (swipe left) */}
-      <motion.div
-        style={{ opacity: leftOpacity }}
-        className="absolute top-8 right-6 z-20 pointer-events-none"
-      >
-        <div
-          className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg border-2 border-red-400"
-          style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
-        >
+      {/* Left reaction stamp */}
+      <motion.div style={{ opacity: leftOpacity }} className="absolute top-8 right-6 z-20 pointer-events-none">
+        <div className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg border-2 border-amber-400" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
           <span className="text-2xl">{leftReaction.emoji}</span>
-          <span className="text-xs font-bold tracking-widest text-red-400">{leftReaction.text}</span>
+          <span className="text-xs font-bold tracking-widest text-amber-400">{leftReaction.text}</span>
         </div>
       </motion.div>
 
-      {/* Info panel at bottom */}
+      {/* Info panel */}
       <div className="absolute inset-x-0 bottom-0 p-5 pointer-events-none">
         <div className="flex items-end justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <h2
-              className="text-2xl tracking-wider leading-tight text-white"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
+            <h2 className="text-2xl tracking-wider leading-tight text-white" style={{ fontFamily: "var(--font-display)" }}>
               {item.title}
             </h2>
-            {item.price && (
-              <p className="text-sm mt-1" style={{ color: "#C97D5A" }}>
-                {item.price}
-              </p>
-            )}
+            {item.price && <p className="text-sm mt-1" style={{ color: "#C97D5A" }}>{item.price}</p>}
             {item.description && (
               <p className="text-sm mt-1 leading-relaxed line-clamp-2" style={{ color: "rgba(255,255,255,0.75)" }}>
                 {item.description}
               </p>
             )}
             {hasBackContent(item) && (
-              <p className="text-[10px] tracking-widest uppercase mt-2 opacity-50 text-white">
-                Tap card for details
-              </p>
+              <p className="text-[10px] tracking-widest uppercase mt-2 opacity-50 text-white">Tap card for details</p>
             )}
           </div>
-          {/* Heart button — pointer-events-auto so it's clickable */}
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleFavorite();
-            }}
+            onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
             className="pointer-events-auto shrink-0 w-11 h-11 rounded-full bg-black/40 flex items-center justify-center mb-1"
             aria-label={isFavorited ? "Remove from favorites" : "Add to favorites"}
           >
-            <Heart
-              size={22}
-              fill={isFavorited ? "#C97D5A" : "none"}
-              stroke={isFavorited ? "#C97D5A" : "#fff"}
-            />
+            <Heart size={22} fill={isFavorited ? "#C97D5A" : "none"} stroke={isFavorited ? "#C97D5A" : "#fff"} />
           </button>
         </div>
       </div>
@@ -256,60 +206,95 @@ export default function MenuMobileSwipe({
   onToggleListView,
 }: Props) {
   const [activeTabId, setActiveTabId] = useState(tabs[0]?.id ?? "");
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [globalIndex, setGlobalIndex] = useState(0);
   const [enlargedItem, setEnlargedItem] = useState<MenuItem | null>(null);
 
-  // Items for the active tab, sorted by order
-  const tabItems = useMemo(() => {
-    const tab = tabs.find((t) => t.id === activeTabId);
-    if (!tab) return [];
-    return items
-      .filter((i) => i.tabId === activeTabId)
-      .sort((a, b) => a.order - b.order);
-  }, [items, tabs, activeTabId]);
+  // Flat list of ALL items across all tabs in tab order
+  const allItems = useMemo(() => {
+    return tabs.flatMap((tab) =>
+      items.filter((i) => i.tabId === tab.id).sort((a, b) => a.order - b.order)
+    );
+  }, [items, tabs]);
 
-  const currentItem = tabItems[currentIndex] ?? null;
-  const nextItems = tabItems.slice(currentIndex + 1);
-  const isAtEnd = currentIndex >= tabItems.length;
-  const isFavorited = currentItem ? favorites.includes(currentItem.id) : false;
+  // Where each section starts in the flat list
+  const sectionBreakpoints = useMemo(() => {
+    const breakpoints: { tabId: string; startIndex: number; count: number }[] = [];
+    let offset = 0;
+    for (const tab of tabs) {
+      const count = items.filter((i) => i.tabId === tab.id).length;
+      if (count > 0) {
+        breakpoints.push({ tabId: tab.id, startIndex: offset, count });
+        offset += count;
+      }
+    }
+    return breakpoints;
+  }, [items, tabs]);
 
-  function handleTabClick(tabId: string) {
-    setActiveTabId(tabId);
-    setCurrentIndex(0);
+  function getTabForIndex(index: number): string {
+    for (let i = sectionBreakpoints.length - 1; i >= 0; i--) {
+      if (index >= sectionBreakpoints[i].startIndex) return sectionBreakpoints[i].tabId;
+    }
+    return tabs[0]?.id ?? "";
   }
 
-  function handleSwipe(_direction: "left" | "right") {
-    void _direction; // both directions advance — no reject in this fun parody interface
-    setCurrentIndex((prev) => prev + 1);
+  function getSectionProgress(index: number): { current: number; total: number; label: string } {
+    for (const bp of sectionBreakpoints) {
+      if (index >= bp.startIndex && index < bp.startIndex + bp.count) {
+        const tab = tabs.find((t) => t.id === bp.tabId);
+        return { current: index - bp.startIndex + 1, total: bp.count, label: tab?.label ?? "" };
+      }
+    }
+    return { current: 0, total: 0, label: "" };
+  }
+
+  // Wrap around for infinite looping
+  const wrappedIndex = allItems.length > 0 ? globalIndex % allItems.length : 0;
+  const currentItem = allItems[wrappedIndex] ?? null;
+  const isFavorited = currentItem ? favorites.includes(currentItem.id) : false;
+  const progress = getSectionProgress(wrappedIndex);
+
+  // Preview cards — next 2 in the flat list, wrapping
+  const nextItems = [1, 2]
+    .map((offset) => allItems[(wrappedIndex + offset) % allItems.length])
+    .filter(Boolean) as MenuItem[];
+
+  // Keep tab bar in sync as user swipes into new sections
+  useEffect(() => {
+    if (allItems.length > 0) setActiveTabId(getTabForIndex(wrappedIndex));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wrappedIndex, allItems.length]);
+
+  function handleTabClick(tabId: string) {
+    const bp = sectionBreakpoints.find((b) => b.tabId === tabId);
+    if (bp) setGlobalIndex(bp.startIndex);
+    setActiveTabId(tabId);
+  }
+
+  function handleSwipe(_d: "left" | "right") {
+    void _d;
+    setGlobalIndex((prev) => prev + 1);
   }
 
   function handleNext() {
-    if (!isAtEnd) setCurrentIndex((prev) => prev + 1);
+    setGlobalIndex((prev) => prev + 1);
   }
 
   function handlePrev() {
-    if (currentIndex > 0) setCurrentIndex((prev) => prev - 1);
+    setGlobalIndex((prev) => Math.max(0, prev - 1));
   }
-
-  const activeTab = tabs.find((t) => t.id === activeTabId);
 
   return (
     <div className="h-full flex flex-col">
       {/* Tab bar */}
-      <TabBar
-        tabs={tabs}
-        activeTabId={activeTabId}
-        onTabClick={handleTabClick}
-        textColor={textColor}
-      />
+      <TabBar tabs={tabs} activeTabId={activeTabId} onTabClick={handleTabClick} textColor={textColor} />
 
-      {/* Card area */}
-      <div className="flex-1 relative px-5 py-3">
-        {/* Card stack — preview cards behind */}
-        {!isAtEnd && nextItems.slice(0, 2).map((nextItem, i) => (
+      {/* Card area — tighter padding to maximise card height */}
+      <div className="flex-1 relative px-4 py-2">
+        {/* Stacked preview cards behind the active card */}
+        {nextItems.slice(0, 2).map((nextItem, i) => (
           <div
             key={nextItem.id}
-            className="absolute inset-x-5 inset-y-3 rounded-2xl overflow-hidden pointer-events-none"
+            className="absolute inset-x-4 inset-y-2 rounded-2xl overflow-hidden pointer-events-none"
             style={{
               transform: `scale(${1 - (i + 1) * 0.04}) translateY(${(i + 1) * -10}px)`,
               opacity: 1 - (i + 1) * 0.15,
@@ -330,10 +315,10 @@ export default function MenuMobileSwipe({
           </div>
         ))}
 
-        {/* Active card */}
-        {!isAtEnd && currentItem && (
+        {/* Active swipe card */}
+        {currentItem && (
           <SwipeCard
-            key={`${currentItem.id}-${currentIndex}`}
+            key={`${currentItem.id}-${wrappedIndex}`}
             item={currentItem}
             isFavorited={isFavorited}
             onToggleFavorite={() => onToggleFavorite(currentItem.id)}
@@ -341,47 +326,13 @@ export default function MenuMobileSwipe({
             onTap={() => setEnlargedItem(currentItem)}
           />
         )}
-
-        {/* End of deck */}
-        {isAtEnd && (
-          <div
-            className="absolute inset-x-5 inset-y-3 rounded-2xl flex flex-col items-center justify-center gap-5 p-8"
-            style={{ backgroundColor: bgColor, border: `1px solid ${textColor}15` }}
-          >
-            <span className="text-5xl">🍸</span>
-            <h3
-              className="text-xl tracking-wider text-center"
-              style={{ fontFamily: "var(--font-display)", color: textColor }}
-            >
-              You&apos;ve seen them all!
-            </h3>
-            {favorites.length > 0 && (
-              <button
-                onClick={onOpenFavorites}
-                className="flex items-center gap-2 px-4 py-2 rounded-full text-sm tracking-wider"
-                style={{ backgroundColor: "#C97D5A", color: "#fff" }}
-              >
-                <Heart size={14} fill="#fff" />
-                View Favorites ({favorites.length})
-              </button>
-            )}
-            <button
-              onClick={() => setCurrentIndex(0)}
-              className="text-sm tracking-widest uppercase opacity-60 underline underline-offset-4"
-              style={{ color: textColor }}
-            >
-              Start Over
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Counter row */}
-      <div className="shrink-0 py-1 text-center flex items-center justify-center gap-3">
-        {!isAtEnd && (
+      <div className="shrink-0 py-0.5 text-center flex items-center justify-center gap-3">
+        {progress.total > 0 && (
           <p className="text-[11px] tracking-widest uppercase opacity-50" style={{ color: textColor }}>
-            {currentIndex + 1} of {tabItems.length}
-            {activeTab ? ` — ${activeTab.label}` : ""}
+            {progress.current} of {progress.total} — {progress.label}
           </p>
         )}
         {favorites.length > 0 && (
@@ -397,7 +348,7 @@ export default function MenuMobileSwipe({
       </div>
 
       {/* Action bar */}
-      <div className="shrink-0 flex items-center justify-center gap-5 py-3 pb-4">
+      <div className="shrink-0 flex items-center justify-center gap-4 py-2 pb-3">
         <button
           onClick={onToggleListView}
           className="w-10 h-10 rounded-full flex items-center justify-center transition-opacity hover:opacity-80"
@@ -408,7 +359,7 @@ export default function MenuMobileSwipe({
         </button>
         <button
           onClick={handlePrev}
-          disabled={currentIndex === 0}
+          disabled={globalIndex === 0}
           className="w-12 h-12 rounded-full flex items-center justify-center transition-opacity disabled:opacity-30"
           style={{ border: "1px solid rgba(251,191,36,0.4)" }}
           aria-label="Previous"
@@ -422,15 +373,11 @@ export default function MenuMobileSwipe({
           style={{ border: "1px solid rgba(201,125,90,0.4)" }}
           aria-label={isFavorited ? "Remove from favorites" : "Add to favorites"}
         >
-          <Heart
-            size={26}
-            fill={isFavorited ? "#C97D5A" : "none"}
-            stroke={isFavorited ? "#C97D5A" : textColor}
-          />
+          <Heart size={26} fill={isFavorited ? "#C97D5A" : "none"} stroke={isFavorited ? "#C97D5A" : textColor} />
         </button>
         <button
           onClick={handleNext}
-          disabled={isAtEnd}
+          disabled={allItems.length === 0}
           className="w-12 h-12 rounded-full flex items-center justify-center transition-opacity disabled:opacity-30"
           style={{ border: "1px solid rgba(74,222,128,0.4)" }}
           aria-label="Next"
