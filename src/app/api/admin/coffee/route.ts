@@ -45,54 +45,75 @@ export async function POST(req: NextRequest) {
     const { tabs, items } = await req.json();
     const sb = getSupabaseAdmin();
 
-    const newTabIds: string[] = (tabs ?? []).map((t: { id: string }) => t.id);
-    const newItemIds: string[] = (items ?? []).map((i: { id: string }) => i.id);
+    const tabList: { id: string; label: string; order: number; active: boolean }[] = tabs ?? [];
+    const itemList: {
+      id: string; tabId: string; title: string; description?: string;
+      price?: string; carouselImageUrl?: string; menuPageImageUrl?: string;
+      alt?: string; tagLine?: string; ingredients?: string;
+      tastingNotes?: string; notableNotes?: string;
+      order: number; active: boolean; titleColor?: string;
+      descriptionColor?: string; priceColor?: string;
+    }[] = items ?? [];
 
-    // 1. Find and delete tabs that were removed
-    const { data: existingTabs } = await sb.from("coffee_tabs").select("id");
-    const tabsToDelete = (existingTabs ?? [])
-      .map((r) => r.id)
-      .filter((id) => !newTabIds.includes(id));
-    if (tabsToDelete.length) {
-      // Cascade: remove their items first (in case FK doesn't cascade)
-      await sb.from("coffee_items").delete().in("tab_id", tabsToDelete);
-      await sb.from("coffee_tabs").delete().in("id", tabsToDelete);
+    // Validate: drop items whose tabId doesn't match any tab in the payload
+    const tabIdSet = new Set(tabList.map((t) => t.id));
+    const validItems = itemList.filter((i) => i.tabId && tabIdSet.has(i.tabId));
+
+    // Step 1: Delete ALL existing items first (they hold FK references to tabs)
+    const { error: delItemsErr } = await sb
+      .from("coffee_items")
+      .delete()
+      .gte("order", -1);
+    if (delItemsErr) {
+      console.error("[coffee POST] delete items error:", delItemsErr);
+      throw delItemsErr;
     }
 
-    // 2. Find and delete items that were removed (within remaining tabs)
-    const { data: existingItems } = await sb.from("coffee_items").select("id");
-    const itemsToDelete = (existingItems ?? [])
-      .map((r) => r.id)
-      .filter((id) => !newItemIds.includes(id));
-    if (itemsToDelete.length) {
-      await sb.from("coffee_items").delete().in("id", itemsToDelete);
+    // Step 2: Delete ALL existing tabs (safe now — no items reference them)
+    const { error: delTabsErr } = await sb
+      .from("coffee_tabs")
+      .delete()
+      .gte("order", -1);
+    if (delTabsErr) {
+      console.error("[coffee POST] delete tabs error:", delTabsErr);
+      throw delTabsErr;
     }
 
-    // 3. Upsert tabs
-    if (newTabIds.length) {
-      const { error: tabErr } = await sb.from("coffee_tabs").upsert(
-        tabs.map((t: { id: string; label: string; order: number; active: boolean }) => ({
-          id: t.id,
-          label: t.label,
-          order: t.order,
-          active: t.active,
-        })),
-        { onConflict: "id" }
-      );
-      if (tabErr) throw tabErr;
+    // Step 3: Insert tabs fresh
+    if (tabList.length) {
+      const { data: insertedTabs, error: tabErr } = await sb
+        .from("coffee_tabs")
+        .insert(
+          tabList.map((t) => ({
+            id: t.id,
+            label: t.label,
+            order: t.order,
+            active: t.active,
+          }))
+        )
+        .select("id");
+
+      if (tabErr) {
+        console.error("[coffee POST] insert tabs error:", tabErr);
+        throw tabErr;
+      }
+
+      // Step 3b: Verify every tab actually landed
+      const insertedIds = new Set((insertedTabs ?? []).map((r) => r.id));
+      const missingTabs = tabList.filter((t) => !insertedIds.has(t.id));
+      if (missingTabs.length) {
+        console.error("[coffee POST] tabs failed to insert:", missingTabs.map((t) => t.id));
+        throw new Error(
+          `Failed to insert ${missingTabs.length} tab(s). Check that the coffee_tabs 'id' column ` +
+          `is type TEXT or UUID with no server-side default that overrides the provided value.`
+        );
+      }
     }
 
-    // 4. Upsert items
-    if (newItemIds.length) {
-      const { error: itemErr } = await sb.from("coffee_items").upsert(
-        items.map((i: {
-          id: string; tabId: string; title: string; description?: string;
-          price?: string; carouselImageUrl?: string; menuPageImageUrl?: string;
-          alt?: string; tagLine?: string; ingredients?: string;
-          tastingNotes?: string; notableNotes?: string;
-          order: number; active: boolean; titleColor?: string;
-          descriptionColor?: string; priceColor?: string;
-        }) => ({
+    // Step 4: Insert items (tabs are confirmed in DB — FK will resolve)
+    if (validItems.length) {
+      const { error: itemErr } = await sb.from("coffee_items").insert(
+        validItems.map((i) => ({
           id: i.id,
           tab_id: i.tabId,
           title: i.title,
@@ -110,16 +131,18 @@ export async function POST(req: NextRequest) {
           title_color: i.titleColor ?? null,
           description_color: i.descriptionColor ?? null,
           price_color: i.priceColor ?? null,
-        })),
-        { onConflict: "id" }
+        }))
       );
-      if (itemErr) throw itemErr;
+      if (itemErr) {
+        console.error("[coffee POST] insert items error:", itemErr);
+        throw itemErr;
+      }
     }
 
     return NextResponse.json({ success: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : (e as { message?: string })?.message ?? JSON.stringify(e);
-    console.error("[POST /api/admin/coffee]", msg, e);
+    console.error("[POST /api/admin/coffee] caught:", msg, e);
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }
@@ -132,10 +155,9 @@ export async function DELETE(req: NextRequest) {
     }
     const sb = getSupabaseAdmin();
     if (type === "tab") {
-      await Promise.all([
-        sb.from("coffee_items").delete().eq("tab_id", id),
-        sb.from("coffee_tabs").delete().eq("id", id),
-      ]);
+      // Delete items FIRST (they hold FK to tabs), THEN delete the tab
+      await sb.from("coffee_items").delete().eq("tab_id", id);
+      await sb.from("coffee_tabs").delete().eq("id", id);
     } else {
       const { error } = await sb.from("coffee_items").delete().eq("id", id);
       if (error) throw error;
