@@ -5,7 +5,12 @@ import { Save, Loader2, Info } from "lucide-react";
 import SliderInput from "@/components/ui/SliderInput";
 import ImagePicker from "@/components/ui/ImagePicker";
 import type { PageHeaderData, PageHeaderTab } from "@/types";
+import { THEMES } from "@/lib/themes";
+import type { ThemeName } from "@/lib/themes";
 import { getPageDefault } from "@/lib/pagedefaults";
+
+// ─── Theme swatches ────────────────────────────────────────────────────────────
+const THEME_OPTIONS = (Object.values(THEMES) as { name: ThemeName; label: string; bg: string }[]);
 
 // ─── Page config metadata ──────────────────────────────────────────────────────
 const PAGES = [
@@ -186,6 +191,40 @@ export default function PageTextAdmin() {
             value={current.bgImageUrl ?? ""}
             onChange={(e) => update({ bgImageUrl: e.target.value })}
           />
+        </div>
+      </section>
+
+      {/* ── Theme ── */}
+      <section className="bg-white rounded border border-gray-200 p-5 space-y-4">
+        <p className={labelCls + " text-gray-700"}>Page Color Theme</p>
+        <p className="text-xs text-gray-400">Choose the background color palette for this page.</p>
+        <div className="flex flex-wrap gap-4">
+          {THEME_OPTIONS.map((t) => {
+            const isActive = (current.theme ?? getPageDefault(activePageId).theme) === t.name;
+            return (
+              <button
+                key={t.name}
+                onClick={() => update({ theme: t.name as ThemeName })}
+                title={t.label}
+                className="flex flex-col items-center gap-1.5 group"
+              >
+                <div
+                  className="w-9 h-9 rounded-full transition-all duration-150"
+                  style={{
+                    backgroundColor: t.bg,
+                    outline: isActive ? "3px solid #C97D5A" : "2px solid transparent",
+                    outlineOffset: "2px",
+                  }}
+                />
+                <p
+                  className="text-[9px] tracking-wider uppercase transition-colors"
+                  style={{ color: isActive ? "#C97D5A" : "#9ca3af" }}
+                >
+                  {t.label}
+                </p>
+              </button>
+            );
+          })}
         </div>
       </section>
 

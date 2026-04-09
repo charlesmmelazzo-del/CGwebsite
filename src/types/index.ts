@@ -319,6 +319,7 @@ export interface PageHeaderData {
   bgImageUrl?: string;     // custom background image URL (overrides theme bg color)
   tabs?: PageHeaderTab[];  // nav tabs within the page (events, shop)
   hostSections?: HostSection[];  // events page "Host Your Event" tab content
+  theme?: ThemeName;       // page color palette; falls back to per-page default
 }
 
 // ─── Site Config (Header / Footer) ───────────────────────────────────────────

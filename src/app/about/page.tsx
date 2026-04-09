@@ -1,18 +1,21 @@
 import PageThemeWrapper from "@/components/layout/PageThemeWrapper";
 import ContentSectionBlock from "@/components/ui/ContentSection";
 import { THEMES } from "@/lib/themes";
+import type { ThemeName } from "@/lib/themes";
 import { getPageHeader } from "@/lib/pageheaders";
 import { getAboutSections } from "@/lib/pagedata";
 
 export default async function AboutPage() {
-  const theme = THEMES.blue;
   const [sections, header] = await Promise.all([
     getAboutSections(),
     getPageHeader("about"),
   ]);
 
+  const themeName: ThemeName = header.theme ?? "blue";
+  const theme = THEMES[themeName];
+
   return (
-    <PageThemeWrapper fixedTheme="blue" showIllustration={false} bgImageUrl={header.bgImageUrl}>
+    <PageThemeWrapper fixedTheme={themeName} showIllustration={false} bgImageUrl={header.bgImageUrl}>
       <div className="min-h-screen py-16" style={{ color: theme.text }}>
         <header className="text-center mb-12 px-6">
           {header.title && (

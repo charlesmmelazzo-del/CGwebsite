@@ -6,6 +6,7 @@ import MenuCarousel from "@/components/ui/MenuCarousel";
 import type { MenuTab, MenuItem } from "@/types";
 import type { PageHeaderData } from "@/types";
 import { THEMES } from "@/lib/themes";
+import type { ThemeName } from "@/lib/themes";
 import clsx from "clsx";
 
 interface Props {
@@ -15,13 +16,14 @@ interface Props {
 }
 
 export default function CoffeePageClient({ initialTabs, initialItems, header }: Props) {
-  const theme = THEMES.olive;
+  const themeName: ThemeName = header.theme ?? "olive";
+  const theme = THEMES[themeName];
   const activeTabs = initialTabs.filter((t) => t.active).sort((a, b) => a.order - b.order);
   const [activeTabId, setActiveTabId] = useState(activeTabs[0]?.id ?? "");
   const activeItems = initialItems.filter((i) => i.tabId === activeTabId && i.active);
 
   return (
-    <PageThemeWrapper fixedTheme="olive" showIllustration={false} bgImageUrl={header.bgImageUrl}>
+    <PageThemeWrapper fixedTheme={themeName} showIllustration={false} bgImageUrl={header.bgImageUrl}>
       <div className="min-h-screen py-16" style={{ color: theme.text }}>
         <header className="text-center mb-8 px-6">
           {header.title && (

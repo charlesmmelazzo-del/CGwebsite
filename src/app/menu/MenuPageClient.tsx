@@ -4,6 +4,7 @@ import PageThemeWrapper from "@/components/layout/PageThemeWrapper";
 import MenuTileGrid from "@/components/ui/MenuTileGrid";
 import type { MenuTab, MenuItem, PageHeaderData } from "@/types";
 import { THEMES } from "@/lib/themes";
+import type { ThemeName } from "@/lib/themes";
 
 interface Props {
   initialTabs: MenuTab[];
@@ -12,7 +13,8 @@ interface Props {
 }
 
 export default function MenuPageClient({ initialTabs, initialItems, header }: Props) {
-  const theme = THEMES.terracotta;
+  const themeName: ThemeName = header.theme ?? "terracotta";
+  const theme = THEMES[themeName];
 
   const activeTabs = initialTabs
     .filter((t) => t.active)
@@ -21,7 +23,7 @@ export default function MenuPageClient({ initialTabs, initialItems, header }: Pr
   const activeItems = initialItems.filter((item) => item.active);
 
   return (
-    <PageThemeWrapper fixedTheme="terracotta" showIllustration bgImageUrl={header.bgImageUrl}>
+    <PageThemeWrapper fixedTheme={themeName} showIllustration bgImageUrl={header.bgImageUrl}>
       <div className="min-h-screen py-16" style={{ color: theme.text }}>
         <header className="text-center mb-8 px-6">
           {header.title && (

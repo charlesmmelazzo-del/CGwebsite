@@ -100,7 +100,7 @@ function MenuTile({
     <button
       onClick={onClick}
       className="group text-left w-full rounded-sm overflow-hidden cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C97D5A] transition-transform duration-200 md:hover:scale-[1.02]"
-      style={{ border: `1px solid ${textColor}20` }}
+      style={{ border: `1px solid ${textColor}20`, backgroundColor: "#1a1a1a" }}
     >
       {/* Image — 4:3 aspect */}
       <div className="relative w-full aspect-[4/3] overflow-hidden">
@@ -233,6 +233,7 @@ function EnlargedTileOverlay({
                 borderRadius: "2px",
                 overflow: "hidden",
                 border: `1px solid ${textColor}20`,
+                backgroundColor: "#1a1a1a",
               }}
             >
               {/* Large image */}
@@ -267,7 +268,7 @@ function EnlargedTileOverlay({
               </div>
 
               {/* Front text */}
-              <div className="p-5" style={{ backgroundColor: `${textColor}08` }}>
+              <div className="p-5" style={{ backgroundColor: "#1a1a1a" }}>
                 <h2
                   className="text-xl md:text-2xl tracking-wider leading-tight mb-2"
                   style={{ fontFamily: "var(--font-display)", color: item.titleColor ?? textColor }}
@@ -305,13 +306,13 @@ function EnlargedTileOverlay({
                 borderRadius: "2px",
                 overflow: "hidden",
                 border: `1px solid ${textColor}20`,
-                backgroundColor: `${textColor}08`,
+                backgroundColor: "#1a1a1a",
                 display: "flex",
                 flexDirection: "column",
               }}
             >
               {/* Back header */}
-              <div className="px-5 pt-5 pb-4 shrink-0" style={{ borderBottom: `1px solid ${textColor}15` }}>
+              <div className="px-5 pt-5 pb-4 shrink-0" style={{ borderBottom: `1px solid ${textColor}30` }}>
                 <p
                   className="text-xl tracking-wider leading-tight"
                   style={{ fontFamily: "var(--font-display)", color: item.titleColor ?? textColor }}
@@ -344,7 +345,7 @@ function EnlargedTileOverlay({
               </div>
 
               {/* Back footer */}
-              <div className="px-5 py-3 shrink-0" style={{ borderTop: `1px solid ${textColor}15` }}>
+              <div className="px-5 py-3 shrink-0" style={{ borderTop: `1px solid ${textColor}30` }}>
                 <p className="text-[10px] tracking-widest uppercase opacity-30" style={{ color: textColor }}>
                   Tap to flip back
                 </p>
