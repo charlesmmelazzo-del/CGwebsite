@@ -28,7 +28,11 @@ export interface CarouselItemBase {
 export interface CarouselTextItem extends CarouselItemBase {
   type: "text";
   text: string;
-  textColor?: string;   // optional hex override
+  textColor?: string;
+  fontFamily?: string;       // CSS value e.g. "var(--font-display)"
+  fontSize?: number;         // px
+  letterSpacing?: string;    // e.g. "0.15em"
+  alignment?: "left" | "center" | "right";
 }
 
 export interface CarouselImageItem extends CarouselItemBase {
@@ -36,6 +40,9 @@ export interface CarouselImageItem extends CarouselItemBase {
   imageUrl: string;
   expandedImageUrl?: string;
   altText?: string;
+  linkLabel?: string;        // optional CTA button below the image
+  linkUrl?: string;
+  linkNewTab?: boolean;
 }
 
 export interface CarouselFormItem extends CarouselItemBase {
@@ -43,6 +50,7 @@ export interface CarouselFormItem extends CarouselItemBase {
   formId: string;
   title: string;
   description: string;
+  headerImageUrl?: string;   // optional image shown above the form instead of title/description
   fields: FormField[];
   submitLabel: string;
 }
@@ -52,6 +60,9 @@ export interface CarouselInstagramItem extends CarouselItemBase {
   instagramUrl: string;
   captionOverride?: string;
   textColor?: string;
+  linkLabel?: string;        // optional CTA button below the slide
+  linkUrl?: string;
+  linkNewTab?: boolean;
   // Cached on save / refresh — public site reads these, never hits Instagram directly
   cachedImageUrl?: string;
   cachedCaption?: string;
@@ -265,6 +276,23 @@ export interface PageHeaderTab {
   label: string;
 }
 
+/** A section on the Events "Host Your Event" tab */
+export interface HostSection {
+  id: string;
+  order: number;
+  type: "text" | "pdf";
+  // text
+  title?: string;
+  body?: string;
+  buttonLabel?: string;
+  buttonUrl?: string;
+  buttonNewTab?: boolean;
+  // pdf
+  pdfUrl?: string;
+  pdfTitle?: string;
+  pdfDownloadLabel?: string;  // button label, default "Download PDF"
+}
+
 export interface PageHeaderData {
   title: string;
   titleSize: number;       // px, default 72
@@ -272,6 +300,7 @@ export interface PageHeaderData {
   subtitleSize?: number;   // px, default 13
   bgImageUrl?: string;     // custom background image URL (overrides theme bg color)
   tabs?: PageHeaderTab[];  // nav tabs within the page (events, shop)
+  hostSections?: HostSection[];  // events page "Host Your Event" tab content
 }
 
 // ─── Site Config (Header / Footer) ───────────────────────────────────────────

@@ -3,7 +3,7 @@
 import { useEffect, useCallback, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import Autoplay from "embla-carousel-autoplay";
-import type { CarouselItem, CarouselInstagramItem } from "@/types";
+import type { CarouselItem, CarouselInstagramItem, CarouselTextItem, CarouselImageItem, CarouselFormItem } from "@/types";
 import Image from "next/image";
 import { X } from "lucide-react";
 
@@ -87,6 +87,23 @@ export default function HomeCarousel({ items }: Props) {
   );
 }
 
+// ─── Link button shared by image + instagram slides ───────────────────────────
+function SlideLink({ label, url, newTab }: { label: string; url: string; newTab?: boolean }) {
+  if (!label || !url) return null;
+  return (
+    <div className="flex justify-center mt-4">
+      <a
+        href={url}
+        target={newTab ? "_blank" : undefined}
+        rel={newTab ? "noopener noreferrer" : undefined}
+        className="inline-block px-6 py-2.5 bg-[#C97D5A] text-white text-xs tracking-widest uppercase hover:bg-[#b86d4a] transition-colors rounded-sm"
+      >
+        {label}
+      </a>
+    </div>
+  );
+}
+
 function SlideContent({
   item,
   onExpand,
@@ -95,54 +112,66 @@ function SlideContent({
   onExpand: (url: string) => void;
 }) {
   if (item.type === "text") {
+    const t = item as CarouselTextItem;
+    const align = t.alignment ?? "center";
     return (
-      <div className="py-10 px-6 text-center">
+      <div
+        className="py-10 px-6"
+        style={{ textAlign: align }}
+      >
         <p
-          className="text-2xl md:text-4xl leading-relaxed"
-          style={{ fontFamily: "var(--font-display)", color: item.textColor ?? undefined }}
+          style={{
+            fontFamily: t.fontFamily ?? "var(--font-display)",
+            fontSize:   t.fontSize ? `${t.fontSize}px` : undefined,
+            color:      t.textColor ?? undefined,
+            letterSpacing: t.letterSpacing ?? undefined,
+          }}
+          className={`leading-relaxed ${!t.fontSize ? "text-2xl md:text-4xl" : ""}`}
         >
-          {item.text}
+          {t.text}
         </p>
       </div>
     );
   }
 
   if (item.type === "image") {
+    const img = item as CarouselImageItem;
     return (
-      <div className="flex justify-center py-6">
+      <div className="flex flex-col items-center py-6">
         <div
-          className={`relative ${item.expandedImageUrl ? "cursor-pointer" : ""}`}
-          onClick={() => item.expandedImageUrl && onExpand(item.expandedImageUrl)}
+          className={`relative ${img.expandedImageUrl ? "cursor-pointer" : ""}`}
+          onClick={() => img.expandedImageUrl && onExpand(img.expandedImageUrl)}
         >
           <Image
-            src={item.imageUrl}
-            alt={item.altText ?? "Promotion"}
+            src={img.imageUrl}
+            alt={img.altText ?? "Promotion"}
             width={500}
             height={350}
             className="object-contain max-h-64 md:max-h-96 w-auto rounded-sm"
           />
-          {item.expandedImageUrl && (
+          {img.expandedImageUrl && (
             <p className="text-center text-xs mt-2 opacity-60 tracking-widest uppercase">
               Tap to expand
             </p>
           )}
         </div>
+        <SlideLink label={img.linkLabel ?? ""} url={img.linkUrl ?? ""} newTab={img.linkNewTab} />
       </div>
     );
   }
 
   if (item.type === "form") {
-    return <CarouselForm item={item} />;
+    return <CarouselForm item={item as CarouselFormItem} />;
   }
 
   if (item.type === "instagram") {
-    return <InstagramSlide item={item} />;
+    return <InstagramSlide item={item as CarouselInstagramItem} />;
   }
 
   return null;
 }
 
-// ─── Inline Instagram SVG glyph (lucide-react has no IG icon) ────────────────
+// ─── Inline Instagram SVG glyph ───────────────────────────────────────────────
 function InstagramIcon({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -158,65 +187,66 @@ function InstagramSlide({ item }: { item: CarouselInstagramItem }) {
   const truncated = caption.length > 200 ? caption.slice(0, 197) + "…" : caption;
 
   if (!item.cachedImageUrl) {
-    // Not yet fetched — show placeholder
     return (
-      <a
-        href={item.instagramUrl || "#"}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="block py-10 px-6 text-center opacity-50"
-        onClick={!item.instagramUrl ? (e) => e.preventDefault() : undefined}
-      >
-        <InstagramIcon size={32} />
-        <p className="text-xs mt-3 tracking-wider opacity-60">Instagram post loading…</p>
-      </a>
+      <div className="flex flex-col items-center">
+        <a
+          href={item.instagramUrl || "#"}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block py-10 px-6 text-center opacity-50"
+          onClick={!item.instagramUrl ? (e) => e.preventDefault() : undefined}
+        >
+          <InstagramIcon size={32} />
+          <p className="text-xs mt-3 tracking-wider opacity-60">Instagram post loading…</p>
+        </a>
+        <SlideLink label={item.linkLabel ?? ""} url={item.linkUrl ?? ""} newTab={item.linkNewTab} />
+      </div>
     );
   }
 
   return (
-    <a
-      href={item.instagramUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="block relative group"
-      aria-label="View on Instagram"
-    >
-      {/* Photo */}
-      <div className="relative flex justify-center py-2">
-        <Image
-          src={item.cachedImageUrl}
-          alt="Instagram post"
-          width={480}
-          height={480}
-          unoptimized
-          className="object-cover max-h-80 w-auto rounded-sm"
-        />
-        {/* Subtle bottom gradient for caption readability */}
-        {truncated && (
-          <div
-            className="absolute inset-x-0 bottom-0 h-24 rounded-b-sm"
-            style={{ background: "linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 100%)" }}
+    <div className="flex flex-col items-center">
+      <a
+        href={item.instagramUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block relative group w-full"
+        aria-label="View on Instagram"
+      >
+        <div className="relative flex justify-center py-2">
+          <Image
+            src={item.cachedImageUrl}
+            alt="Instagram post"
+            width={480}
+            height={480}
+            unoptimized
+            className="object-cover max-h-80 w-auto rounded-sm"
           />
-        )}
-        {/* Instagram glyph — top right */}
-        <div className="absolute top-4 right-4 text-white/80 group-hover:text-white transition-colors">
-          <InstagramIcon size={18} />
+          {truncated && (
+            <div
+              className="absolute inset-x-0 bottom-0 h-24 rounded-b-sm"
+              style={{ background: "linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 100%)" }}
+            />
+          )}
+          <div className="absolute top-4 right-4 text-white/80 group-hover:text-white transition-colors">
+            <InstagramIcon size={18} />
+          </div>
+          {truncated && (
+            <p
+              className="absolute bottom-4 inset-x-4 text-xs leading-relaxed line-clamp-3"
+              style={{ color: item.textColor ?? "white" }}
+            >
+              {truncated}
+            </p>
+          )}
         </div>
-        {/* Caption overlay */}
-        {truncated && (
-          <p
-            className="absolute bottom-4 inset-x-4 text-white text-xs leading-relaxed line-clamp-3"
-            style={{ color: item.textColor ?? "white" }}
-          >
-            {truncated}
-          </p>
-        )}
-      </div>
-    </a>
+      </a>
+      <SlideLink label={item.linkLabel ?? ""} url={item.linkUrl ?? ""} newTab={item.linkNewTab} />
+    </div>
   );
 }
 
-function CarouselForm({ item }: { item: Extract<CarouselItem, { type: "form" }> }) {
+function CarouselForm({ item }: { item: CarouselFormItem }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -249,14 +279,30 @@ function CarouselForm({ item }: { item: Extract<CarouselItem, { type: "form" }> 
 
   return (
     <div className="py-6 px-4 max-w-md mx-auto">
-      {item.title && (
-        <h3 className="text-xl tracking-wider mb-2" style={{ fontFamily: "var(--font-display)" }}>
-          {item.title}
-        </h3>
+      {/* Header: image takes priority over title/description */}
+      {item.headerImageUrl ? (
+        <div className="mb-4 flex justify-center">
+          <Image
+            src={item.headerImageUrl}
+            alt=""
+            width={480}
+            height={240}
+            className="w-full max-h-48 object-cover rounded-sm"
+          />
+        </div>
+      ) : (
+        <>
+          {item.title && (
+            <h3 className="text-xl tracking-wider mb-2" style={{ fontFamily: "var(--font-display)" }}>
+              {item.title}
+            </h3>
+          )}
+          {item.description && (
+            <p className="text-sm opacity-70 mb-4 leading-relaxed">{item.description}</p>
+          )}
+        </>
       )}
-      {item.description && (
-        <p className="text-sm opacity-70 mb-4 leading-relaxed">{item.description}</p>
-      )}
+
       <form onSubmit={handleSubmit} className="space-y-3">
         {item.fields.map((field) => (
           <div key={field.id}>
