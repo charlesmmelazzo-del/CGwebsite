@@ -59,6 +59,52 @@ export async function getSiteConfig(): Promise<SiteConfig> {
   }
 }
 
+const ROLE_VAR: Record<string, string> = {
+  display: "--font-display",
+  body:    "--font-body",
+  nav:     "--font-nav",
+  button:  "--font-button",
+  label:   "--font-label",
+};
+
+/**
+ * Build the @font-face + CSS variable override block from the fonts_data table.
+ * Returns a ready-to-inject CSS string, or "" if no custom fonts are configured.
+ * Called server-side in layout.tsx so fonts are in the initial HTML — no FOUT.
+ */
+export async function getFontCSS(): Promise<string> {
+  noStore();
+  try {
+    const sb = getSupabaseAdmin();
+    const { data } = await sb.from("fonts_data").select("*").eq("id", 1).single();
+    if (!data) return "";
+
+    const fonts: Array<{ family: string; files: Array<{ url: string; weight: string; style: string; format: string }> }> =
+      data.fonts ?? [];
+    const assignments: Record<string, string | null> = data.assignments ?? {};
+
+    let css = "";
+
+    for (const font of fonts) {
+      for (const file of font.files) {
+        css += `@font-face{font-family:'${font.family}';src:url('${file.url}') format('${file.format}');font-weight:${file.weight};font-style:${file.style};font-display:swap;}`;
+      }
+    }
+
+    const vars: string[] = [];
+    for (const [role, family] of Object.entries(assignments)) {
+      if (family && ROLE_VAR[role]) {
+        vars.push(`${ROLE_VAR[role]}:'${family}',sans-serif`);
+      }
+    }
+    if (vars.length) css += `:root{${vars.join(";")}}`;
+
+    return css;
+  } catch {
+    return "";
+  }
+}
+
 /**
  * Fetch site settings (phone, email, address, hours, social links) from Supabase.
  * Falls back to hardcoded constants if unavailable.

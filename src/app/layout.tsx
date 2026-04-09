@@ -3,8 +3,7 @@ import { Cormorant_Garamond, Jost } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
-import FontLoader from "@/components/FontLoader";
-import { getSiteConfig, getSiteSettings } from "@/lib/siteconfig";
+import { getSiteConfig, getSiteSettings, getFontCSS } from "@/lib/siteconfig";
 
 const korinthFallback = Cormorant_Garamond({
   subsets: ["latin"],
@@ -40,9 +39,10 @@ export default async function RootLayout({
 }) {
   // Fetch live config on every request — changes in admin appear immediately.
   // Falls back to hardcoded defaults if Supabase env vars are missing.
-  const [{ header, footer }, settings] = await Promise.all([
+  const [{ header, footer }, settings, fontCss] = await Promise.all([
     getSiteConfig(),
     getSiteSettings(),
+    getFontCSS(),
   ]);
 
   const desktopPad = header.headerHeight       ?? 72;
@@ -50,8 +50,10 @@ export default async function RootLayout({
 
   return (
     <html lang="en">
+      <head>
+        {fontCss && <style id="cg-font-loader" dangerouslySetInnerHTML={{ __html: fontCss }} />}
+      </head>
       <body className={`${korinthFallback.variable} ${futuraFallback.variable} antialiased`}>
-        <FontLoader />
         <Header config={header} />
         {/*
           Inline style tag injects responsive padding that matches the live header height.
