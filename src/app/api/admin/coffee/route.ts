@@ -45,55 +45,59 @@ export async function POST(req: NextRequest) {
     const { tabs, items } = await req.json();
     const sb = getSupabaseAdmin();
 
-    const tabList: { id: string; label: string; order: number; active: boolean }[] = tabs ?? [];
-    const itemList: {
-      id: string; tabId: string; title: string; description?: string;
-      price?: string; carouselImageUrl?: string; menuPageImageUrl?: string;
-      alt?: string; tagLine?: string; ingredients?: string;
-      tastingNotes?: string; notableNotes?: string;
-      order: number; active: boolean; titleColor?: string;
-      descriptionColor?: string; priceColor?: string;
-    }[] = items ?? [];
+    const newTabIds: string[] = (tabs ?? []).map((t: { id: string }) => t.id);
+    const newItemIds: string[] = (items ?? []).map((i: { id: string }) => i.id);
 
-    console.log("[POST /api/admin/coffee] tabs:", tabList.map((t) => t.id));
-    console.log("[POST /api/admin/coffee] item tabIds:", itemList.map((i) => ({ id: i.id, tabId: i.tabId })));
-
-    // Drop any items whose tabId has no matching tab (prevents FK violation)
-    const tabIdSet = new Set(tabList.map((t) => t.id));
-    const validItems = itemList.filter((i) => {
-      const ok = i.tabId && tabIdSet.has(i.tabId);
-      if (!ok) console.warn("[POST /api/admin/coffee] dropping orphan item:", i.id, "tabId:", i.tabId);
-      return ok;
-    });
-
-    // Delete-then-insert: items first (they reference tabs), then tabs.
-    const { error: delItemsErr } = await sb.from("coffee_items").delete().neq("id", "___never___");
-    if (delItemsErr) {
-      console.error("[POST /api/admin/coffee] delete items error:", delItemsErr);
-      throw delItemsErr;
+    // 1. Find and delete tabs that were removed
+    const { data: existingTabs } = await sb.from("coffee_tabs").select("id");
+    const tabsToDelete = (existingTabs ?? [])
+      .map((r) => r.id)
+      .filter((id) => !newTabIds.includes(id));
+    if (tabsToDelete.length) {
+      // Cascade: remove their items first (in case FK doesn't cascade)
+      await sb.from("coffee_items").delete().in("tab_id", tabsToDelete);
+      await sb.from("coffee_tabs").delete().in("id", tabsToDelete);
     }
 
-    const { error: delTabsErr } = await sb.from("coffee_tabs").delete().neq("id", "___never___");
-    if (delTabsErr) {
-      console.error("[POST /api/admin/coffee] delete tabs error:", delTabsErr);
-      throw delTabsErr;
+    // 2. Find and delete items that were removed (within remaining tabs)
+    const { data: existingItems } = await sb.from("coffee_items").select("id");
+    const itemsToDelete = (existingItems ?? [])
+      .map((r) => r.id)
+      .filter((id) => !newItemIds.includes(id));
+    if (itemsToDelete.length) {
+      await sb.from("coffee_items").delete().in("id", itemsToDelete);
     }
 
-    if (tabList.length) {
-      const { error } = await sb.from("coffee_tabs").insert(
-        tabList.map((t) => ({ id: t.id, label: t.label, order: t.order, active: t.active }))
+    // 3. Upsert tabs
+    if (newTabIds.length) {
+      const { error: tabErr } = await sb.from("coffee_tabs").upsert(
+        tabs.map((t: { id: string; label: string; order: number; active: boolean }) => ({
+          id: t.id,
+          label: t.label,
+          order: t.order,
+          active: t.active,
+        })),
+        { onConflict: "id" }
       );
-      if (error) {
-        console.error("[POST /api/admin/coffee] insert tabs error:", error);
-        throw error;
-      }
+      if (tabErr) throw tabErr;
     }
 
-    if (validItems.length) {
-      const { error } = await sb.from("coffee_items").insert(
-        validItems.map((i) => ({
-          id: i.id, tab_id: i.tabId, title: i.title,
-          description: i.description ?? null, price: i.price ?? null,
+    // 4. Upsert items
+    if (newItemIds.length) {
+      const { error: itemErr } = await sb.from("coffee_items").upsert(
+        items.map((i: {
+          id: string; tabId: string; title: string; description?: string;
+          price?: string; carouselImageUrl?: string; menuPageImageUrl?: string;
+          alt?: string; tagLine?: string; ingredients?: string;
+          tastingNotes?: string; notableNotes?: string;
+          order: number; active: boolean; titleColor?: string;
+          descriptionColor?: string; priceColor?: string;
+        }) => ({
+          id: i.id,
+          tab_id: i.tabId,
+          title: i.title,
+          description: i.description ?? null,
+          price: i.price ?? null,
           carousel_image_url: i.carouselImageUrl ?? null,
           menu_page_image_url: i.menuPageImageUrl ?? null,
           alt: i.alt ?? null,
@@ -101,23 +105,21 @@ export async function POST(req: NextRequest) {
           ingredients: i.ingredients ?? null,
           tasting_notes: i.tastingNotes ?? null,
           notable_notes: i.notableNotes ?? null,
-          order: i.order, active: i.active,
+          order: i.order,
+          active: i.active,
           title_color: i.titleColor ?? null,
           description_color: i.descriptionColor ?? null,
           price_color: i.priceColor ?? null,
-          updated_at: new Date().toISOString(),
-        }))
+        })),
+        { onConflict: "id" }
       );
-      if (error) {
-        console.error("[POST /api/admin/coffee] insert items error:", error);
-        throw error;
-      }
+      if (itemErr) throw itemErr;
     }
 
     return NextResponse.json({ success: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : (e as { message?: string })?.message ?? JSON.stringify(e);
-    console.error("[POST /api/admin/coffee] caught:", msg, e);
+    console.error("[POST /api/admin/coffee]", msg, e);
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }
