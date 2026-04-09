@@ -55,6 +55,7 @@ export default function MenuPageClient({ initialTabs, initialItems, header }: Pr
             tabs={activeTabs}
             textColor={theme.text}
             mutedColor={theme.muted}
+            bgColor={theme.bg}
           />
         </div>
       </div>

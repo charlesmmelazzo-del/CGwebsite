@@ -11,6 +11,7 @@ interface Props {
   tabs: MenuTab[];
   textColor: string;
   mutedColor: string;
+  bgColor: string;
 }
 
 function hasBackContent(item: MenuItem): boolean {
@@ -88,11 +89,13 @@ function MenuTile({
   onClick,
   textColor,
   mutedColor,
+  bgColor,
 }: {
   item: MenuItem;
   onClick: () => void;
   textColor: string;
   mutedColor: string;
+  bgColor: string;
 }) {
   const imgSrc = item.carouselImageUrl ?? item.imageUrl;
 
@@ -100,7 +103,7 @@ function MenuTile({
     <button
       onClick={onClick}
       className="group text-left w-full rounded-sm overflow-hidden cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C97D5A] transition-transform duration-200 md:hover:scale-[1.02]"
-      style={{ border: `1px solid ${textColor}20`, backgroundColor: "#1a1a1a" }}
+      style={{ border: `1px solid ${textColor}20`, backgroundColor: bgColor }}
     >
       {/* Image — 4:3 aspect */}
       <div className="relative w-full aspect-[4/3] overflow-hidden">
@@ -167,6 +170,7 @@ function EnlargedTileOverlay({
   onClose,
   textColor,
   mutedColor,
+  bgColor,
 }: {
   item: MenuItem;
   isFlipped: boolean;
@@ -174,6 +178,7 @@ function EnlargedTileOverlay({
   onClose: () => void;
   textColor: string;
   mutedColor: string;
+  bgColor: string;
 }) {
   const canFlip = hasBackContent(item);
   const imgSrc = item.carouselImageUrl ?? item.imageUrl;
@@ -233,7 +238,7 @@ function EnlargedTileOverlay({
                 borderRadius: "2px",
                 overflow: "hidden",
                 border: `1px solid ${textColor}20`,
-                backgroundColor: "#1a1a1a",
+                backgroundColor: bgColor,
               }}
             >
               {/* Large image */}
@@ -306,7 +311,7 @@ function EnlargedTileOverlay({
                 borderRadius: "2px",
                 overflow: "hidden",
                 border: `1px solid ${textColor}20`,
-                backgroundColor: "#1a1a1a",
+                backgroundColor: bgColor,
                 display: "flex",
                 flexDirection: "column",
               }}
@@ -359,7 +364,7 @@ function EnlargedTileOverlay({
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export default function MenuTileGrid({ items, tabs, textColor, mutedColor }: Props) {
+export default function MenuTileGrid({ items, tabs, textColor, mutedColor, bgColor }: Props) {
   const [enlargedId, setEnlargedId] = useState<string | null>(null);
   const [isFlipped, setIsFlipped] = useState(false);
   const [activeTabId, setActiveTabId] = useState(tabs[0]?.id ?? "");
@@ -464,6 +469,7 @@ export default function MenuTileGrid({ items, tabs, textColor, mutedColor }: Pro
                   onClick={() => enlargeTile(item.id)}
                   textColor={textColor}
                   mutedColor={mutedColor}
+                  bgColor={bgColor}
                 />
               ))}
             </div>
@@ -480,6 +486,7 @@ export default function MenuTileGrid({ items, tabs, textColor, mutedColor }: Pro
           onClose={closeTile}
           textColor={textColor}
           mutedColor={mutedColor}
+          bgColor={bgColor}
         />
       )}
     </div>
