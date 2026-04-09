@@ -45,35 +45,25 @@ export async function POST(req: NextRequest) {
     const { tabs, items } = await req.json();
     const sb = getSupabaseAdmin();
 
-    const newTabIds: string[] = (tabs ?? []).map((t: { id: string }) => t.id);
-    const newItemIds: string[] = (items ?? []).map((i: { id: string }) => i.id);
+    // Delete-then-insert approach: avoids FK constraint issues entirely.
+    // Items must be deleted before tabs (FK references coffee_tabs).
+    const { error: delItemsErr } = await sb.from("coffee_items").delete().neq("id", "");
+    if (delItemsErr) throw delItemsErr;
 
-    // Delete removed tabs (cascade their items first)
-    const { data: existingTabs } = await sb.from("coffee_tabs").select("id");
-    const tabsToDelete = (existingTabs ?? []).map((r) => r.id).filter((id) => !newTabIds.includes(id));
-    if (tabsToDelete.length) {
-      await sb.from("coffee_items").delete().in("tab_id", tabsToDelete);
-      await sb.from("coffee_tabs").delete().in("id", tabsToDelete);
-    }
+    const { error: delTabsErr } = await sb.from("coffee_tabs").delete().neq("id", "");
+    if (delTabsErr) throw delTabsErr;
 
-    // Delete removed items
-    const { data: existingItems } = await sb.from("coffee_items").select("id");
-    const itemsToDelete = (existingItems ?? []).map((r) => r.id).filter((id) => !newItemIds.includes(id));
-    if (itemsToDelete.length) {
-      await sb.from("coffee_items").delete().in("id", itemsToDelete);
-    }
-
-    if (newTabIds.length) {
-      const { error } = await sb.from("coffee_tabs").upsert(
+    if ((tabs ?? []).length) {
+      const { error } = await sb.from("coffee_tabs").insert(
         tabs.map((t: { id: string; label: string; order: number; active: boolean }) => ({
           id: t.id, label: t.label, order: t.order, active: t.active,
-        })),
-        { onConflict: "id" }
+        }))
       );
       if (error) throw error;
     }
-    if (newItemIds.length) {
-      const { error } = await sb.from("coffee_items").upsert(
+
+    if ((items ?? []).length) {
+      const { error } = await sb.from("coffee_items").insert(
         items.map((i: {
           id: string; tabId: string; title: string; description?: string;
           price?: string; carouselImageUrl?: string; menuPageImageUrl?: string;
@@ -96,11 +86,11 @@ export async function POST(req: NextRequest) {
           description_color: i.descriptionColor ?? null,
           price_color: i.priceColor ?? null,
           updated_at: new Date().toISOString(),
-        })),
-        { onConflict: "id" }
+        }))
       );
       if (error) throw error;
     }
+
     return NextResponse.json({ success: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : (e as { message?: string })?.message ?? JSON.stringify(e);
