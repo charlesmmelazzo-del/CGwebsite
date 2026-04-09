@@ -112,7 +112,6 @@ export async function POST(req: NextRequest) {
           title_color: i.titleColor ?? null,
           description_color: i.descriptionColor ?? null,
           price_color: i.priceColor ?? null,
-          updated_at: new Date().toISOString(),
         })),
         { onConflict: "id" }
       );
@@ -121,8 +120,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (e) {
-    console.error("[POST /api/admin/menu]", e);
-    return NextResponse.json({ success: false, error: String(e) }, { status: 500 });
+    const msg = e instanceof Error ? e.message : (e as { message?: string })?.message ?? JSON.stringify(e);
+    console.error("[POST /api/admin/menu]", msg, e);
+    return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }
 
@@ -146,7 +146,8 @@ export async function DELETE(req: NextRequest) {
     }
     return NextResponse.json({ success: true });
   } catch (e) {
-    console.error("[DELETE /api/admin/menu]", e);
-    return NextResponse.json({ success: false, error: String(e) }, { status: 500 });
+    const msg = e instanceof Error ? e.message : (e as { message?: string })?.message ?? JSON.stringify(e);
+    console.error("[DELETE /api/admin/menu]", msg, e);
+    return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }
