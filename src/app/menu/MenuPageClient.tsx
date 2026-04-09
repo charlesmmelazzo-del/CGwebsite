@@ -1,7 +1,13 @@
 "use client";
 
+import { useState, useEffect } from "react";
+import { Heart } from "lucide-react";
 import PageThemeWrapper from "@/components/layout/PageThemeWrapper";
 import MenuTileGrid from "@/components/ui/MenuTileGrid";
+import MenuMobileSwipe from "@/components/ui/MenuMobileSwipe";
+import MenuListView from "@/components/ui/MenuListView";
+import FavoritesPanel from "@/components/ui/FavoritesPanel";
+import { getFavorites, toggleFavorite, setFavorites } from "@/lib/favorites";
 import type { MenuTab, MenuItem, PageHeaderData } from "@/types";
 import { THEMES } from "@/lib/themes";
 import type { ThemeName } from "@/lib/themes";
@@ -21,6 +27,23 @@ export default function MenuPageClient({ initialTabs, initialItems, header }: Pr
     .sort((a, b) => a.order - b.order);
 
   const activeItems = initialItems.filter((item) => item.active);
+
+  const [favorites, setFavoritesState] = useState<string[]>([]);
+  const [showFavorites, setShowFavorites] = useState(false);
+  const [mobileViewMode, setMobileViewMode] = useState<"swipe" | "list">("swipe");
+
+  useEffect(() => {
+    setFavoritesState(getFavorites());
+  }, []);
+
+  function handleToggleFavorite(id: string) {
+    setFavoritesState(toggleFavorite(id));
+  }
+
+  function handleClearFavorites() {
+    setFavorites([]);
+    setFavoritesState([]);
+  }
 
   return (
     <PageThemeWrapper fixedTheme={themeName} showIllustration bgImageUrl={header.bgImageUrl}>
@@ -58,17 +81,79 @@ export default function MenuPageClient({ initialTabs, initialItems, header }: Pr
           <div className="w-12 h-px mx-auto mt-3" style={{ backgroundColor: theme.muted }} />
         </header>
 
-        {/* Grid — fills remaining height, scrolls internally */}
+        {/* Content area — fills remaining height */}
         <div className="flex-1 min-h-0">
-          <MenuTileGrid
-            items={activeItems}
-            tabs={activeTabs}
-            textColor={theme.text}
-            mutedColor={theme.muted}
-            bgColor={theme.bg}
-          />
+          {/* Desktop grid — hidden on mobile */}
+          <div className="hidden md:block h-full">
+            <MenuTileGrid
+              items={activeItems}
+              tabs={activeTabs}
+              textColor={theme.text}
+              mutedColor={theme.muted}
+              bgColor={theme.bg}
+              favorites={favorites}
+              onToggleFavorite={handleToggleFavorite}
+            />
+          </div>
+
+          {/* Mobile swipe/list — hidden on desktop */}
+          <div className="md:hidden h-full">
+            {mobileViewMode === "swipe" ? (
+              <MenuMobileSwipe
+                items={activeItems}
+                tabs={activeTabs}
+                textColor={theme.text}
+                mutedColor={theme.muted}
+                bgColor={theme.bg}
+                favorites={favorites}
+                onToggleFavorite={handleToggleFavorite}
+                onOpenFavorites={() => setShowFavorites(true)}
+                onToggleListView={() => setMobileViewMode("list")}
+              />
+            ) : (
+              <MenuListView
+                items={activeItems}
+                tabs={activeTabs}
+                textColor={theme.text}
+                mutedColor={theme.muted}
+                bgColor={theme.bg}
+                favorites={favorites}
+                onToggleFavorite={handleToggleFavorite}
+                onOpenFavorites={() => setShowFavorites(true)}
+                onToggleSwipeView={() => setMobileViewMode("swipe")}
+              />
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Desktop floating favorites button */}
+      {favorites.length > 0 && (
+        <button
+          onClick={() => setShowFavorites(true)}
+          className="fixed bottom-6 right-6 z-40 hidden md:flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg transition-transform hover:scale-105"
+          style={{ backgroundColor: "#C97D5A", color: "#fff" }}
+        >
+          <Heart size={16} fill="#fff" />
+          <span className="text-sm tracking-wider">
+            {favorites.length} {favorites.length === 1 ? "Favorite" : "Favorites"}
+          </span>
+        </button>
+      )}
+
+      {/* Favorites panel */}
+      {showFavorites && (
+        <FavoritesPanel
+          allItems={activeItems}
+          favorites={favorites}
+          onToggleFavorite={handleToggleFavorite}
+          onClearAll={handleClearFavorites}
+          onClose={() => setShowFavorites(false)}
+          textColor={theme.text}
+          mutedColor={theme.muted}
+          bgColor={theme.bg}
+        />
+      )}
     </PageThemeWrapper>
   );
 }
