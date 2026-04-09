@@ -215,7 +215,6 @@ export default function MenuCarousel({ items, tabs = [], textColor, mutedColor }
     [WheelGesturesPlugin()]
   );
   const [activeTabId, setActiveTabId] = useState(tabs[0]?.id ?? "");
-  const [selectedIndex, setSelectedIndex] = useState(0);
   const [flippedId, setFlippedId] = useState<string | null>(null);
   const progressRef = useRef<HTMLDivElement>(null);
 
@@ -223,7 +222,6 @@ export default function MenuCarousel({ items, tabs = [], textColor, mutedColor }
   const onSelect = useCallback(() => {
     if (!emblaApi) return;
     const idx = emblaApi.selectedScrollSnap();
-    setSelectedIndex(idx);
     setActiveTabId(getTabIdForIndex(idx, sectionIndices, tabs));
     setFlippedId(null);
   }, [emblaApi, sectionIndices, tabs]);

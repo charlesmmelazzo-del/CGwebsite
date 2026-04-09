@@ -1102,7 +1102,7 @@ function NewPageModal({ onCreate, onClose }: { onCreate: (page: PageDocument) =>
               <span className="bg-gray-100 border border-r-0 border-gray-200 px-3 py-2 text-xs text-gray-400 rounded-l-sm">/</span>
               <input className={clsx(inputCls, "rounded-l-none", slugConflict && "border-red-300")} value={slug} onChange={(e) => { setSlug(slugify(e.target.value)); setSlugEdited(true); }} placeholder="my-page" />
             </div>
-            {slugConflict && <p className="text-[10px] text-red-500 mt-1">"{slug}" is a reserved slug — use a different name.</p>}
+            {slugConflict && <p className="text-[10px] text-red-500 mt-1">&ldquo;{slug}&rdquo; is a reserved slug — use a different name.</p>}
           </div>
           <div>
             <span className={labelCls}>Theme</span>
