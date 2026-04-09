@@ -53,6 +53,14 @@ export interface CarouselFormItem extends CarouselItemBase {
   headerImageUrl?: string;   // optional image shown above the form instead of title/description
   fields: FormField[];
   submitLabel: string;
+  // Title typography
+  titleFontFamily?: string;
+  titleFontSize?: number;
+  titleColor?: string;
+  titleAlignment?: "left" | "center" | "right";
+  // Description typography
+  descriptionFontSize?: number;
+  descriptionColor?: string;
 }
 
 export interface CarouselInstagramItem extends CarouselItemBase {

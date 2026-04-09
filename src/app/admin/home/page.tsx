@@ -301,7 +301,7 @@ function SortableCard({
         {item.type === "form" && (() => {
           const f = item as CarouselFormItem;
           return (
-            <div className="space-y-2">
+            <div className="space-y-3">
               <ImagePicker
                 label="Header Image (optional — replaces title/description)"
                 value={f.headerImageUrl ?? ""}
@@ -309,11 +309,95 @@ function SortableCard({
               />
               {!f.headerImageUrl && (
                 <>
-                  <input type="text" value={f.title} onChange={(e) => patch({ title: e.target.value } as Partial<CarouselFormItem>)} placeholder="Form title" className={inputCls} />
-                  <textarea value={f.description} onChange={(e) => patch({ description: e.target.value } as Partial<CarouselFormItem>)} placeholder="Description" rows={2} className={inputCls + " resize-none"} />
+                  <div>
+                    <label className={labelCls}>Title Text</label>
+                    <input type="text" value={f.title} onChange={(e) => patch({ title: e.target.value } as Partial<CarouselFormItem>)} placeholder="Form title" className={inputCls} />
+                  </div>
+                  {/* Title typography */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelCls}>Title Font</label>
+                      <select
+                        value={f.titleFontFamily ?? "var(--font-display)"}
+                        onChange={(e) => patch({ titleFontFamily: e.target.value } as Partial<CarouselFormItem>)}
+                        className={inputCls}
+                      >
+                        {FONT_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelCls}>Title Size (px)</label>
+                      <input
+                        type="number"
+                        min={12} max={72}
+                        value={f.titleFontSize ?? 24}
+                        onChange={(e) => patch({ titleFontSize: Number(e.target.value) } as Partial<CarouselFormItem>)}
+                        className={inputCls}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className={labelCls}>Title Alignment</label>
+                      <div className="flex gap-1">
+                        {(["left", "center", "right"] as const).map((a) => {
+                          const Icon = a === "left" ? AlignLeft : a === "center" ? AlignCenter : AlignRight;
+                          return (
+                            <button
+                              key={a}
+                              onClick={() => patch({ titleAlignment: a } as Partial<CarouselFormItem>)}
+                              className={clsx(
+                                "p-1.5 border rounded-sm transition-colors",
+                                (f.titleAlignment ?? "center") === a
+                                  ? "border-[#C97D5A] text-[#C97D5A] bg-[#C97D5A]/10"
+                                  : "border-gray-200 text-gray-400 hover:border-gray-400"
+                              )}
+                            >
+                              <Icon size={13} />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div>
+                      <label className={labelCls}>Title Color</label>
+                      <ColorPicker
+                        label=""
+                        value={f.titleColor}
+                        onChange={(hex) => patch({ titleColor: hex } as Partial<CarouselFormItem>)}
+                      />
+                    </div>
+                  </div>
+                  {/* Description */}
+                  <div>
+                    <label className={labelCls}>Description Text</label>
+                    <textarea value={f.description} onChange={(e) => patch({ description: e.target.value } as Partial<CarouselFormItem>)} placeholder="Description" rows={2} className={inputCls + " resize-none"} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelCls}>Description Size (px)</label>
+                      <input
+                        type="number"
+                        min={10} max={32}
+                        value={f.descriptionFontSize ?? 14}
+                        onChange={(e) => patch({ descriptionFontSize: Number(e.target.value) } as Partial<CarouselFormItem>)}
+                        className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Description Color</label>
+                      <ColorPicker
+                        label=""
+                        value={f.descriptionColor}
+                        onChange={(hex) => patch({ descriptionColor: hex } as Partial<CarouselFormItem>)}
+                      />
+                    </div>
+                  </div>
                 </>
               )}
-              <div className="mt-2">
+              <div className="border-t border-gray-100 pt-3">
                 <p className={labelCls + " !mb-2"}>Fields</p>
                 {f.fields.map((field) => (
                   <div key={field.id} className="flex items-center gap-2 mb-1.5">

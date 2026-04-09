@@ -293,12 +293,29 @@ function CarouselForm({ item }: { item: CarouselFormItem }) {
       ) : (
         <>
           {item.title && (
-            <h3 className="text-xl tracking-wider mb-2" style={{ fontFamily: "var(--font-display)" }}>
+            <h3
+              className="mb-2 leading-tight"
+              style={{
+                fontFamily:  item.titleFontFamily ?? "var(--font-display)",
+                fontSize:    item.titleFontSize ? `${item.titleFontSize}px` : "1.25rem",
+                color:       item.titleColor ?? undefined,
+                textAlign:   item.titleAlignment ?? "center",
+              }}
+            >
               {item.title}
             </h3>
           )}
           {item.description && (
-            <p className="text-sm opacity-70 mb-4 leading-relaxed">{item.description}</p>
+            <p
+              className="mb-4 leading-relaxed opacity-70"
+              style={{
+                fontSize: item.descriptionFontSize ? `${item.descriptionFontSize}px` : "0.875rem",
+                color:    item.descriptionColor ?? undefined,
+                textAlign: item.titleAlignment ?? "center",
+              }}
+            >
+              {item.description}
+            </p>
           )}
         </>
       )}
