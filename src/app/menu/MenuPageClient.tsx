@@ -1,7 +1,7 @@
 "use client";
 
 import PageThemeWrapper from "@/components/layout/PageThemeWrapper";
-import MenuCarousel from "@/components/ui/MenuCarousel";
+import MenuTileGrid from "@/components/ui/MenuTileGrid";
 import type { MenuTab, MenuItem, PageHeaderData } from "@/types";
 import { THEMES } from "@/lib/themes";
 
@@ -18,12 +18,7 @@ export default function MenuPageClient({ initialTabs, initialItems, header }: Pr
     .filter((t) => t.active)
     .sort((a, b) => a.order - b.order);
 
-  // One flat list: all items from all tabs, ordered by tab then item.order
-  const allItems = activeTabs.flatMap((tab) =>
-    initialItems
-      .filter((item) => item.tabId === tab.id && item.active)
-      .sort((a, b) => a.order - b.order)
-  );
+  const activeItems = initialItems.filter((item) => item.active);
 
   return (
     <PageThemeWrapper fixedTheme="terracotta" showIllustration bgImageUrl={header.bgImageUrl}>
@@ -53,8 +48,8 @@ export default function MenuPageClient({ initialTabs, initialItems, header }: Pr
         </header>
 
         <div className="pb-16">
-          <MenuCarousel
-            items={allItems}
+          <MenuTileGrid
+            items={activeItems}
             tabs={activeTabs}
             textColor={theme.text}
             mutedColor={theme.muted}
