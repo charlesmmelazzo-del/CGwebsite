@@ -6,7 +6,7 @@ import PageThemeWrapper from "@/components/layout/PageThemeWrapper";
 import type { CalendarEvent, FormField, PageHeaderData, HostSection } from "@/types";
 import { THEMES } from "@/lib/themes";
 import clsx from "clsx";
-import { Download, FileText, MapPin } from "lucide-react";
+import { Download, FileText, MapPin, ChevronDown, CalendarPlus } from "lucide-react";
 
 type TabId = "upcoming" | "host";
 
@@ -39,64 +39,151 @@ function formatEventDate(dateStr: string) {
   };
 }
 
+function buildICS(event: CalendarEvent): string {
+  const pad = (s: string) => s.replace(/-/g, "");
+  const esc = (s: string) => s.replace(/[\\,;]/g, "\\$&").replace(/\n/g, "\\n");
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Common Good Cocktail House//Events//EN",
+    "BEGIN:VEVENT",
+    `DTSTART;VALUE=DATE:${pad(event.start)}`,
+    ...(event.end ? [`DTEND;VALUE=DATE:${pad(event.end)}`] : []),
+    `SUMMARY:${esc(event.title)}`,
+    ...(event.description ? [`DESCRIPTION:${esc(event.description)}`] : []),
+    ...(event.location ? [`LOCATION:${esc(event.location)}`] : []),
+    `UID:${event.id}@commongoodcocktailhouse.com`,
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ];
+  return `data:text/calendar;charset=utf-8,${encodeURIComponent(lines.join("\r\n"))}`;
+}
+
 function EventCard({ event, theme }: { event: CalendarEvent; theme: { text: string; muted: string } }) {
+  const [expanded, setExpanded] = useState(false);
   const start = formatEventDate(event.start);
   const isMultiDay = !!(event.end && event.end !== event.start);
   const end = isMultiDay ? formatEventDate(event.end!) : null;
+  const hasLink = !!event.linkUrl;
+  const linkLabel = event.linkLabel?.trim() || "More Info";
+  const icsHref = buildICS(event);
 
   return (
-    <div
-      className="flex gap-4 md:gap-6 px-4 md:px-8 py-6"
-      style={{ borderBottom: `1px solid ${theme.muted}20` }}
-    >
-      {/* Date column */}
-      <div className="shrink-0 text-center w-14">
-        <p className="text-[10px] tracking-widest uppercase" style={{ color: "#C97D5A" }}>{start.month}</p>
-        <p className="text-3xl leading-none my-0.5" style={{ fontFamily: "var(--font-display)", color: theme.text }}>{start.day}</p>
-        <p className="text-[9px] tracking-wider opacity-40" style={{ color: theme.text }}>{start.year}</p>
-        {isMultiDay && end && (
-          <>
-            <div className="w-3 h-px mx-auto my-1.5" style={{ backgroundColor: theme.muted, opacity: 0.3 }} />
-            <p className="text-[10px] tracking-widest uppercase" style={{ color: "#C97D5A" }}>{end.month}</p>
-            <p className="text-xl leading-none" style={{ fontFamily: "var(--font-display)", color: theme.text }}>{end.day}</p>
-          </>
-        )}
-      </div>
+    <div style={{ borderBottom: `1px solid ${theme.muted}20` }}>
+      {/* ── Main row (always visible) ── */}
+      <div
+        className="flex gap-4 md:gap-6 px-4 md:px-8 py-6 cursor-pointer select-none"
+        onClick={() => setExpanded((x) => !x)}
+        role="button"
+        aria-expanded={expanded}
+      >
+        {/* Date column */}
+        <div className="shrink-0 text-center w-14">
+          <p className="text-[10px] tracking-widest uppercase" style={{ color: "#C97D5A" }}>{start.month}</p>
+          <p className="text-3xl leading-none my-0.5" style={{ fontFamily: "var(--font-display)", color: theme.text }}>{start.day}</p>
+          <p className="text-[9px] tracking-wider opacity-40" style={{ color: theme.text }}>{start.year}</p>
+          {isMultiDay && end && (
+            <>
+              <div className="w-3 h-px mx-auto my-1.5" style={{ backgroundColor: theme.muted, opacity: 0.3 }} />
+              <p className="text-[10px] tracking-widest uppercase" style={{ color: "#C97D5A" }}>{end.month}</p>
+              <p className="text-xl leading-none" style={{ fontFamily: "var(--font-display)", color: theme.text }}>{end.day}</p>
+            </>
+          )}
+        </div>
 
-      {/* Details */}
-      <div className="flex-1 min-w-0">
-        <p className="text-[10px] tracking-widest uppercase opacity-40 mb-1.5" style={{ color: theme.text }}>{start.weekday}</p>
-        <h3
-          className="text-xl tracking-wide leading-snug mb-2"
-          style={{ fontFamily: "var(--font-display)", color: theme.text }}
-        >
-          {event.title}
-        </h3>
-        {event.location && (
-          <p className="flex items-center gap-1.5 text-xs opacity-60 mb-2" style={{ color: theme.text }}>
-            <MapPin size={11} className="shrink-0" />
-            {event.location}
-          </p>
-        )}
-        {event.description && (
-          <p className="text-sm leading-relaxed opacity-70" style={{ color: theme.text }}>
-            {event.description}
-          </p>
-        )}
-      </div>
+        {/* Details */}
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] tracking-widest uppercase opacity-40 mb-1.5" style={{ color: theme.text }}>{start.weekday}</p>
+          <h3
+            className="text-xl tracking-wide leading-snug mb-2"
+            style={{ fontFamily: "var(--font-display)", color: theme.text }}
+          >
+            {event.title}
+          </h3>
+          {event.location && (
+            <p className="flex items-center gap-1.5 text-xs opacity-60 mb-2" style={{ color: theme.text }}>
+              <MapPin size={11} className="shrink-0" />
+              {event.location}
+            </p>
+          )}
+          {event.description && (
+            <p
+              className={clsx("text-sm leading-relaxed opacity-70", !expanded && "line-clamp-2")}
+              style={{ color: theme.text }}
+            >
+              {event.description}
+            </p>
+          )}
+        </div>
 
-      {/* Thumbnail */}
-      {event.imageUrl && (
-        <div className="shrink-0 hidden sm:block">
-          <Image
-            src={event.imageUrl}
-            alt={event.title}
-            width={88}
-            height={88}
-            unoptimized
-            className="object-cover rounded-sm opacity-80"
-            style={{ width: 88, height: 88 }}
+        {/* Thumbnail (collapsed only) + expand chevron */}
+        <div className="shrink-0 flex flex-col items-end gap-3">
+          {!expanded && event.imageUrl && (
+            <div className="hidden sm:block">
+              <Image
+                src={event.imageUrl}
+                alt={event.title}
+                width={80}
+                height={80}
+                unoptimized
+                className="object-cover rounded-sm opacity-70"
+                style={{ width: 80, height: 80 }}
+              />
+            </div>
+          )}
+          <ChevronDown
+            size={16}
+            className="opacity-40 transition-transform duration-200 mt-auto"
+            style={{
+              transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
+              color: theme.text,
+            }}
           />
+        </div>
+      </div>
+
+      {/* ── Expanded panel ── */}
+      {expanded && (
+        <div className="px-4 md:px-8 pb-6 animate-fade-in">
+          {/* Full image */}
+          {event.imageUrl && (
+            <div className="mb-5">
+              <Image
+                src={event.imageUrl}
+                alt={event.title}
+                width={680}
+                height={340}
+                unoptimized
+                className="w-full max-h-64 object-cover rounded-sm opacity-90"
+              />
+            </div>
+          )}
+
+          {/* Action row: Add to Calendar + CTA */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mt-2">
+            <a
+              href={icsHref}
+              download={`${event.title.replace(/\s+/g, "-")}.ics`}
+              className="inline-flex items-center gap-2 text-xs tracking-widest uppercase opacity-60 hover:opacity-100 transition-opacity"
+              style={{ color: theme.muted }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <CalendarPlus size={13} />
+              Add to Calendar
+            </a>
+
+            {hasLink && (
+              <a
+                href={event.linkUrl!}
+                target={event.linkNewTab !== false ? "_blank" : undefined}
+                rel={event.linkNewTab !== false ? "noopener noreferrer" : undefined}
+                className="sm:ml-auto inline-block w-full sm:w-auto text-center px-5 py-2.5 bg-[#C97D5A] text-white text-xs tracking-widest uppercase hover:bg-[#b86d4a] transition-colors"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {linkLabel}
+              </a>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -105,7 +192,7 @@ function EventCard({ event, theme }: { event: CalendarEvent; theme: { text: stri
 
 function HostTextSection({ section, theme }: { section: HostSection; theme: { text: string; muted: string } }) {
   return (
-    <div className="max-w-2xl mx-auto px-6 py-8">
+    <div className="max-w-2xl mx-auto px-4 md:px-6 py-8">
       {section.title && (
         <h3
           className="text-2xl md:text-3xl tracking-wider mb-4"
@@ -140,7 +227,7 @@ function HostTextSection({ section, theme }: { section: HostSection; theme: { te
 function HostPdfSection({ section, theme }: { section: HostSection; theme: { text: string; muted: string } }) {
   if (!section.pdfUrl) return null;
   return (
-    <div className="max-w-2xl mx-auto px-6 py-8">
+    <div className="max-w-2xl mx-auto px-4 md:px-6 py-8">
       {section.pdfTitle && (
         <h3
           className="text-2xl tracking-wider mb-4 flex items-center gap-3"
@@ -267,17 +354,11 @@ export default function EventsPageClient({
         {/* Upcoming Events list */}
         {activeTab === "upcoming" && (
           <div className="animate-fade-in max-w-2xl mx-auto">
-            {initialEvents.length === 0 ? (
-              <div className="text-center py-16 opacity-40">
-                <p className="text-sm tracking-widest uppercase">No upcoming events</p>
-              </div>
-            ) : (
-              <div style={{ borderTop: `1px solid ${theme.muted}20` }}>
-                {initialEvents.map((event) => (
-                  <EventCard key={event.id} event={event} theme={theme} />
-                ))}
-              </div>
-            )}
+            <div style={{ borderTop: `1px solid ${theme.muted}20` }}>
+              {initialEvents.map((event) => (
+                <EventCard key={event.id} event={event} theme={theme} />
+              ))}
+            </div>
           </div>
         )}
 
@@ -291,7 +372,7 @@ export default function EventsPageClient({
             )}
 
             {/* Inquiry Form */}
-            <div className="max-w-lg mx-auto px-6 pb-16 pt-8">
+            <div className="max-w-lg mx-auto px-4 md:px-6 pb-16 pt-8">
               <h3
                 className="text-2xl text-center mb-6 tracking-wider"
                 style={{ fontFamily: "var(--font-display)", color: theme.text }}

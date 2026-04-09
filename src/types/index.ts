@@ -144,6 +144,10 @@ export interface CalendarEvent {
   location?: string;
   visibleFrom?: string;   // ISO date — event hidden before this date
   visibleUntil?: string;  // ISO date — event hidden after this date
+  // Optional CTA link (ticket purchase, RSVP, etc.)
+  linkUrl?: string;
+  linkLabel?: string;     // defaults to "More Info" when linkUrl is set
+  linkNewTab?: boolean;   // default true
 }
 
 // ─── Menu / Coffee ───────────────────────────────────────────────────────────

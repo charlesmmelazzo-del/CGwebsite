@@ -203,6 +203,9 @@ export default function AdminEventsPage() {
       imageUrl: editing.imageUrl,
       visibleFrom: editing.visibleFrom,
       visibleUntil: editing.visibleUntil,
+      linkUrl: editing.linkUrl,
+      linkLabel: editing.linkLabel,
+      linkNewTab: editing.linkNewTab ?? true,
     };
     setSavingEvent(true);
     try {
@@ -393,11 +396,13 @@ export default function AdminEventsPage() {
       {/* Calendar event edit modal */}
       {editing && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white border border-gray-200 shadow-xl w-full max-w-lg p-6 rounded-sm">
-            <h2 className="text-lg text-gray-800 mb-4 tracking-wider" style={{ fontFamily: "var(--font-display)" }}>
-              {editing.id ? "Edit Event" : "New Event"}
-            </h2>
-            <div className="space-y-3">
+          <div className="bg-white border border-gray-200 shadow-xl w-full max-w-lg rounded-sm flex flex-col max-h-[90dvh]">
+            <div className="p-6 pb-4 shrink-0">
+              <h2 className="text-lg text-gray-800 tracking-wider" style={{ fontFamily: "var(--font-display)" }}>
+                {editing.id ? "Edit Event" : "New Event"}
+              </h2>
+            </div>
+            <div className="overflow-y-auto px-6 pb-4 space-y-3 flex-1">
               {([
                 ["title", "Event Name *", "text"],
                 ["start", "Date *", "date"],
@@ -425,6 +430,44 @@ export default function AdminEventsPage() {
                 />
               </div>
               <div className="pt-2 border-t border-gray-100">
+                <p className="text-[10px] tracking-widest uppercase text-gray-400 mb-2">Event Link <span className="normal-case opacity-60">(optional — ticket, RSVP, etc.)</span></p>
+                <div className="space-y-2">
+                  <div>
+                    <label className={labelCls}>Link URL</label>
+                    <input
+                      type="url"
+                      value={editing.linkUrl ?? ""}
+                      onChange={(e) => setEditing((v) => ({ ...v, linkUrl: e.target.value || undefined }))}
+                      className={inputCls}
+                      placeholder="https://tickets.example.com/..."
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelCls}>Button Label</label>
+                      <input
+                        type="text"
+                        value={editing.linkLabel ?? ""}
+                        onChange={(e) => setEditing((v) => ({ ...v, linkLabel: e.target.value || undefined }))}
+                        className={inputCls}
+                        placeholder="Buy Tickets"
+                      />
+                    </div>
+                    <div className="flex items-end pb-1.5">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editing.linkNewTab ?? true}
+                          onChange={(e) => setEditing((v) => ({ ...v, linkNewTab: e.target.checked }))}
+                          className="accent-[#C97D5A]"
+                        />
+                        <span className="text-xs text-gray-500">Open in new tab</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="pt-2 border-t border-gray-100">
                 <p className="text-[10px] tracking-widest uppercase text-gray-400 mb-2">Visibility Schedule <span className="normal-case opacity-60">(optional — leave blank to always show)</span></p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -448,7 +491,7 @@ export default function AdminEventsPage() {
                 </div>
               </div>
             </div>
-            <div className="flex gap-2 mt-5">
+            <div className="flex gap-2 px-6 py-4 border-t border-gray-100 shrink-0">
               <button
                 onClick={saveEvent}
                 disabled={savingEvent}

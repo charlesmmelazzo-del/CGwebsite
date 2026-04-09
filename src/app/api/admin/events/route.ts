@@ -17,6 +17,9 @@ export async function GET() {
         imageUrl: r.image_url ?? undefined,
         visibleFrom: r.visible_from ?? undefined,
         visibleUntil: r.visible_until ?? undefined,
+        linkUrl: r.link_url ?? undefined,
+        linkLabel: r.link_label ?? undefined,
+        linkNewTab: r.link_new_tab ?? true,
       }))
     );
   } catch (e) {
@@ -44,6 +47,9 @@ export async function POST(req: NextRequest) {
         image_url: event.imageUrl ?? null,
         visible_from: event.visibleFrom ?? null,
         visible_until: event.visibleUntil ?? null,
+        link_url: event.linkUrl ?? null,
+        link_label: event.linkLabel ?? null,
+        link_new_tab: event.linkNewTab ?? true,
       },
       { onConflict: "id" }
     );
