@@ -19,7 +19,6 @@ function hasBackContent(item: MenuItem): boolean {
 }
 
 // ─── Tab Bar ──────────────────────────────────────────────────────────────────
-// No longer sticky — lives outside the scroll container so it never moves
 function TabBar({
   tabs,
   activeTabId,
@@ -33,8 +32,8 @@ function TabBar({
 }) {
   return (
     <div
-      className="shrink-0 tab-bar-scroll flex justify-center gap-0 px-4 py-0.5"
-      style={{ background: "rgba(0,0,0,0.35)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" }}
+      className="shrink-0 tab-bar-scroll flex justify-center gap-0 px-3 py-0.5"
+      style={{ background: "rgba(0,0,0,0.3)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" }}
     >
       {tabs.map((tab) => (
         <button
@@ -69,7 +68,7 @@ function SectionHeader({
   return (
     <div
       id={id}
-      className="flex items-center gap-4 py-6"
+      className="flex items-center gap-3 py-3 px-3"
       style={{ scrollMarginTop: "12px" }}
     >
       <div className="flex-1 h-px" style={{ backgroundColor: `${mutedColor}30` }} />
@@ -89,7 +88,6 @@ function MenuTile({
   item,
   onClick,
   textColor,
-  mutedColor,
   bgColor,
 }: {
   item: MenuItem;
@@ -103,62 +101,55 @@ function MenuTile({
   return (
     <button
       onClick={onClick}
-      className="group text-left w-full rounded-sm overflow-hidden cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C97D5A] transition-transform duration-200 md:hover:scale-[1.02]"
-      style={{ border: `1px solid ${textColor}20`, backgroundColor: bgColor }}
+      className="group relative w-full aspect-square overflow-hidden cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C97D5A] focus-visible:ring-inset active:scale-[0.97] active:brightness-90 transition-all duration-150"
+      style={{ backgroundColor: bgColor }}
     >
-      {/* Image — 4:3 aspect */}
-      <div className="relative w-full aspect-[4/3] overflow-hidden">
-        {imgSrc ? (
-          <>
-            <Image
-              src={imgSrc}
-              alt={item.alt ?? item.title}
-              fill
-              className="object-cover"
-              sizes="(max-width: 768px) 50vw, 33vw"
-            />
-            <div
-              className="absolute inset-x-0 bottom-0 h-12"
-              style={{ background: "linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 100%)" }}
-            />
-          </>
-        ) : (
-          <div
-            className="absolute inset-0 flex items-center justify-center"
-            style={{ backgroundColor: `${textColor}0f` }}
-          >
-            <span
-              className="select-none opacity-20"
-              style={{ fontFamily: "var(--font-display)", fontSize: "2rem", color: textColor }}
-            >
-              CG
-            </span>
-          </div>
-        )}
-      </div>
+      {imgSrc ? (
+        <>
+          {/* Square image — fills the entire tile */}
+          <Image
+            src={imgSrc}
+            alt={item.alt ?? item.title}
+            fill
+            className="object-cover"
+            sizes="33vw"
+          />
 
-      {/* Text */}
-      <div className="p-3 md:p-4">
-        <h3
-          className="text-sm tracking-wider leading-tight line-clamp-2 mb-1"
-          style={{ fontFamily: "var(--font-display)", color: item.titleColor ?? textColor }}
-        >
-          {item.title}
-        </h3>
-        {item.price && (
-          <p className="text-xs mb-1" style={{ color: item.priceColor ?? "#C97D5A" }}>
-            {item.price}
-          </p>
-        )}
-        {item.description && (
-          <p
-            className="text-xs leading-relaxed line-clamp-2"
-            style={{ color: item.descriptionColor ?? mutedColor }}
+          {/* Hover gradient — desktop only */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 md:group-hover:opacity-100 transition-opacity duration-200" />
+
+          {/* Title/price overlay — fades in on desktop hover */}
+          <div className="absolute inset-0 flex flex-col justify-end p-2.5 md:p-3 opacity-0 md:group-hover:opacity-100 transition-opacity duration-200">
+            <h3
+              className="text-xs md:text-sm tracking-wider leading-tight line-clamp-2 drop-shadow-md"
+              style={{ fontFamily: "var(--font-display)", color: "#fff" }}
+            >
+              {item.title}
+            </h3>
+            {item.price && (
+              <p className="text-[10px] md:text-xs mt-0.5 drop-shadow-md" style={{ color: "#C97D5A" }}>
+                {item.price}
+              </p>
+            )}
+          </div>
+        </>
+      ) : (
+        /* No-image placeholder */
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
+          <span
+            className="select-none opacity-20"
+            style={{ fontFamily: "var(--font-display)", fontSize: "1.5rem", color: textColor }}
           >
-            {item.description}
-          </p>
-        )}
-      </div>
+            CG
+          </span>
+          <span
+            className="text-[10px] tracking-wider opacity-30 line-clamp-1 px-2 text-center"
+            style={{ fontFamily: "var(--font-display)", color: textColor }}
+          >
+            {item.title}
+          </span>
+        </div>
+      )}
     </button>
   );
 }
@@ -384,7 +375,7 @@ export default function MenuTileGrid({ items, tabs, textColor, mutedColor, bgCol
 
   const enlargedItem = enlargedId ? items.find((i) => i.id === enlargedId) ?? null : null;
 
-  // IntersectionObserver scoped to the scroll container — active tab tracks correctly
+  // IntersectionObserver scoped to scroll container — active tab tracks scroll position
   useEffect(() => {
     if (sections.length <= 1) return;
     const root = scrollContainerRef.current;
@@ -402,9 +393,16 @@ export default function MenuTileGrid({ items, tabs, textColor, mutedColor, bgCol
     return () => observers.forEach((o) => o.disconnect());
   }, [sections]);
 
+  // Manual scroll — works correctly with the internal overflow-y-auto container
   function scrollToSection(tabId: string) {
     const el = document.getElementById(`section-${tabId}`);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    const container = scrollContainerRef.current;
+    if (el && container) {
+      const containerTop = container.getBoundingClientRect().top;
+      const elTop = el.getBoundingClientRect().top;
+      const offset = elTop - containerTop + container.scrollTop;
+      container.scrollTo({ top: offset - 8, behavior: "smooth" });
+    }
     setActiveTabId(tabId);
   }
 
@@ -445,7 +443,7 @@ export default function MenuTileGrid({ items, tabs, textColor, mutedColor, bgCol
 
       {/* Scrollable grid */}
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto px-4 md:px-6 pb-8">
+        <div className="max-w-5xl mx-auto px-0 pb-8">
           {sections.map(({ tab, items: tabItems }) => (
             <div key={tab.id}>
               <SectionHeader
@@ -454,7 +452,7 @@ export default function MenuTileGrid({ items, tabs, textColor, mutedColor, bgCol
                 textColor={textColor}
                 mutedColor={mutedColor}
               />
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6 mb-10">
+              <div className="grid grid-cols-3 gap-[3px] mb-8">
                 {tabItems.map((item) => (
                   <MenuTile
                     key={item.id}
