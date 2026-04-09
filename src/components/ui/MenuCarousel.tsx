@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import useEmblaCarousel from "embla-carousel-react";
+import { WheelGesturesPlugin } from "embla-carousel-wheel-gestures";
 import type { MenuItem, MenuTab } from "@/types";
 import Image from "next/image";
 import clsx from "clsx";
@@ -209,10 +210,14 @@ function DividerCard({ label, textColor, mutedColor }: { label: string; textColo
 export default function MenuCarousel({ items, tabs = [], textColor, mutedColor }: Props) {
   const { slides, sectionIndices } = buildSlides(items, tabs);
   const loop = slides.length >= 5;
-  const [emblaRef, emblaApi] = useEmblaCarousel({ loop, align: "center", skipSnaps: false });
+  const [emblaRef, emblaApi] = useEmblaCarousel(
+    { loop, align: "center", skipSnaps: false },
+    [WheelGesturesPlugin()]
+  );
   const [activeTabId, setActiveTabId] = useState(tabs[0]?.id ?? "");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [flippedId, setFlippedId] = useState<string | null>(null);
+  const progressRef = useRef<HTMLDivElement>(null);
 
   // Update active tab + index based on scroll position
   const onSelect = useCallback(() => {
@@ -223,11 +228,25 @@ export default function MenuCarousel({ items, tabs = [], textColor, mutedColor }
     setFlippedId(null);
   }, [emblaApi, sectionIndices, tabs]);
 
+  // Sync custom progress bar on scroll
+  const onScroll = useCallback(() => {
+    if (!emblaApi || !progressRef.current) return;
+    const progress = Math.max(0, Math.min(1, emblaApi.scrollProgress()));
+    progressRef.current.style.transform = `scaleX(${progress})`;
+  }, [emblaApi]);
+
   useEffect(() => {
     if (!emblaApi) return;
     emblaApi.on("select", onSelect);
-    return () => { emblaApi.off("select", onSelect); };
-  }, [emblaApi, onSelect]);
+    emblaApi.on("scroll", onScroll);
+    emblaApi.on("reInit", onScroll);
+    onScroll(); // init
+    return () => {
+      emblaApi.off("select", onSelect);
+      emblaApi.off("scroll", onScroll);
+      emblaApi.off("reInit", onScroll);
+    };
+  }, [emblaApi, onSelect, onScroll]);
 
   if (!slides.length) {
     return (
@@ -295,19 +314,16 @@ export default function MenuCarousel({ items, tabs = [], textColor, mutedColor }
         </div>
       </div>
 
-      {/* ── Scrollbar ── */}
+      {/* ── Progress bar ── */}
       {slides.length > 1 && (
-        <div className="px-6 mt-4">
-          <input
-            type="range"
-            min={0}
-            max={slides.length - 1}
-            value={selectedIndex}
-            onChange={(e) => emblaApi?.scrollTo(Number(e.target.value))}
-            className="w-full cursor-pointer"
-            style={{ accentColor: "#C97D5A" }}
-            aria-label="Navigate menu"
-          />
+        <div className="px-6 mt-5">
+          <div className="relative h-[2px] rounded-full overflow-hidden" style={{ backgroundColor: `${textColor}18` }}>
+            <div
+              ref={progressRef}
+              className="absolute inset-0 origin-left"
+              style={{ backgroundColor: textColor, opacity: 0.45, transform: "scaleX(0)", transition: "transform 0.15s ease-out" }}
+            />
+          </div>
         </div>
       )}
 

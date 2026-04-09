@@ -1,24 +1,15 @@
 import PageThemeWrapper from "@/components/layout/PageThemeWrapper";
 import ContentSectionBlock from "@/components/ui/ContentSection";
-import type { ContentSection } from "@/types";
 import { THEMES } from "@/lib/themes";
 import { getPageHeader } from "@/lib/pageheaders";
-
-const CLUB_SECTIONS: ContentSection[] = [
-  {
-    id: "1",
-    order: 0,
-    title: "Common Good Cocktail Club",
-    body: "When you subscribe to Common Good Cocktail House you'll unlock exclusive access to our fun and delicious cocktails and our expansive and exclusive spirits cellar.\n\nThink monthly boxes of favorite and classic cocktails and spirits, and priority access to reserve and rare bottles.",
-    buttonLabel: "Find Out More & Join",
-    buttonUrl: "https://commongoodcocktailhouse.com/cocktailclub",
-    buttonNewTab: true,
-  },
-];
+import { getClubSections } from "@/lib/pagedata";
 
 export default async function ClubPage() {
   const theme = THEMES.plum;
-  const header = await getPageHeader("club");
+  const [sections, header] = await Promise.all([
+    getClubSections(),
+    getPageHeader("club"),
+  ]);
 
   return (
     <PageThemeWrapper fixedTheme="plum" showIllustration={false} bgImageUrl={header.bgImageUrl}>
@@ -45,7 +36,7 @@ export default async function ClubPage() {
         </header>
 
         <div className="divide-y" style={{ borderColor: `${theme.muted}30` }}>
-          {CLUB_SECTIONS.map((section) => (
+          {sections.map((section) => (
             <ContentSectionBlock
               key={section.id}
               section={section}

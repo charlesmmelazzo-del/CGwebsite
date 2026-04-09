@@ -21,6 +21,7 @@ import {
   AlignLeft,
   Layout,
   ImageIcon,
+  ShoppingBag,
 } from "lucide-react";
 
 const NAV = [
@@ -31,6 +32,9 @@ const NAV = [
   { href: "/admin/menu",    label: "Menu",         icon: UtensilsCrossed },
   { href: "/admin/coffee",  label: "Coffee",       icon: Coffee },
   { href: "/admin/events",  label: "Events",       icon: Calendar },
+  { href: "/admin/about",   label: "About",        icon: Users },
+  { href: "/admin/club",    label: "Club",         icon: Coffee },
+  { href: "/admin/shop",    label: "Shop",         icon: ShoppingBag },
   { href: "/admin/images",  label: "Images",       icon: ImageIcon },
   { href: "/admin/forms",   label: "Form Data",    icon: Users },
   { href: "/admin/page-text", label: "Page Text",    icon: AlignLeft },

@@ -1,27 +1,15 @@
 import PageThemeWrapper from "@/components/layout/PageThemeWrapper";
 import ContentSectionBlock from "@/components/ui/ContentSection";
-import type { ContentSection } from "@/types";
 import { THEMES } from "@/lib/themes";
 import { getPageHeader } from "@/lib/pageheaders";
-
-const ABOUT_SECTIONS: ContentSection[] = [
-  {
-    id: "1",
-    order: 0,
-    title: "Our Story",
-    body: "Common Good Cocktail House is an extension of our living room, where you experience genuine, heartfelt hospitality. We want to share things we love with you, and we want to facilitate connection and community at our table.\n\nEveryone is welcome through our doors to discover, taste, and have a good time.",
-  },
-  {
-    id: "2",
-    order: 1,
-    title: "What We Do",
-    body: "We make modern, classic, upscale, seasonal and sometimes whimsical cocktails using fun techniques in a beautiful but low-key, friendly environment.\n\nWe want to make the best cocktails you've ever tasted. But, most of all, we want to create a space to celebrate life, from special occasions to day-to-day.",
-  },
-];
+import { getAboutSections } from "@/lib/pagedata";
 
 export default async function AboutPage() {
   const theme = THEMES.blue;
-  const header = await getPageHeader("about");
+  const [sections, header] = await Promise.all([
+    getAboutSections(),
+    getPageHeader("about"),
+  ]);
 
   return (
     <PageThemeWrapper fixedTheme="blue" showIllustration={false} bgImageUrl={header.bgImageUrl}>
@@ -48,7 +36,7 @@ export default async function AboutPage() {
         </header>
 
         <div className="divide-y" style={{ borderColor: `${theme.muted}30` }}>
-          {ABOUT_SECTIONS.map((section) => (
+          {sections.map((section) => (
             <ContentSectionBlock
               key={section.id}
               section={section}

@@ -3,6 +3,7 @@
 import { useEffect, useCallback, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import Autoplay from "embla-carousel-autoplay";
+import { WheelGesturesPlugin } from "embla-carousel-wheel-gestures";
 import type { CarouselItem, CarouselInstagramItem, CarouselTextItem, CarouselImageItem, CarouselFormItem } from "@/types";
 import Image from "next/image";
 import { X } from "lucide-react";
@@ -14,9 +15,10 @@ interface Props {
 }
 
 export default function HomeCarousel({ items, autoAdvance = true, autoAdvanceInterval = 6 }: Props) {
-  const plugins = autoAdvance
-    ? [Autoplay({ delay: autoAdvanceInterval * 1000, stopOnInteraction: true })]
-    : [];
+  const plugins = [
+    WheelGesturesPlugin(),
+    ...(autoAdvance ? [Autoplay({ delay: autoAdvanceInterval * 1000, stopOnInteraction: true })] : []),
+  ];
 
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: items.length >= 3 }, plugins);
   const [selectedIndex, setSelectedIndex] = useState(0);

@@ -4,67 +4,32 @@ import { useState } from "react";
 import PageThemeWrapper from "@/components/layout/PageThemeWrapper";
 import ContentSectionBlock from "@/components/ui/ContentSection";
 import type { ContentSection, PageHeaderData } from "@/types";
+import type { ShopTab } from "@/lib/pagedata";
 import { THEMES } from "@/lib/themes";
 import clsx from "clsx";
 
-const SHOP_CONTENT: Record<string, ContentSection[]> = {
-  bottles: [
-    {
-      id: "b1", order: 0,
-      title: "Bottles & Merch",
-      body: "Bring the Common Good experience home. Shop our curated selection of spirits, mixers, and merchandise.",
-      buttonLabel: "Shop Now",
-      buttonUrl: "https://commongoodcocktailhouse.com/shop",
-      buttonNewTab: true,
-    },
-  ],
-  cocktails: [
-    {
-      id: "c1", order: 0,
-      title: "Cocktails To Go",
-      body: "You can order online to bring the Common Good experience anywhere you want! To go cocktails, spirits, mixers, and more are available for pickup and delivery.",
-      buttonLabel: "Shop To Go Cocktails",
-      buttonUrl: "https://commongoodcocktailhouse.com/shop",
-      buttonNewTab: true,
-    },
-  ],
-  memberships: [
-    {
-      id: "m1", order: 0,
-      title: "Memberships & Spirits",
-      body: "Unlock exclusive access with a Common Good membership. Priority access to reserve and rare bottles, exclusive spirits cellar, and more.",
-      buttonLabel: "Memberships & Spirits",
-      buttonUrl: "https://commongoodcocktailhouse.com/shop",
-      buttonNewTab: true,
-    },
-  ],
-  giftcards: [
-    {
-      id: "g1", order: 0,
-      title: "Gift Cards",
-      body: "Give the gift of Common Good. Perfect for any occasion.",
-      buttonLabel: "Buy a Gift Card",
-      buttonUrl: "https://commongoodcocktailhouse.com/shop",
-      buttonNewTab: true,
-    },
-  ],
-};
-
 interface Props {
   header: PageHeaderData;
+  shopTabs: ShopTab[];
 }
 
-export default function ShopPageClient({ header }: Props) {
+export default function ShopPageClient({ header, shopTabs }: Props) {
   const theme = THEMES.teal;
-  // Use tabs from header (editable), fall back to hardcoded defaults
-  const tabs = header.tabs ?? [
-    { id: "bottles",     label: "Bottles & Merch" },
-    { id: "cocktails",   label: "Cocktails To Go" },
-    { id: "memberships", label: "Memberships" },
-    { id: "giftcards",   label: "Gift Cards" },
-  ];
-  const [activeTab, setActiveTab] = useState(tabs[0]?.id ?? "bottles");
-  const content = SHOP_CONTENT[activeTab] ?? [];
+  const tabs = shopTabs.length > 0 ? shopTabs : [];
+  const [activeTab, setActiveTab] = useState(tabs[0]?.id ?? "");
+
+  const activeTabData = tabs.find((t) => t.id === activeTab);
+  const content: ContentSection[] = activeTabData
+    ? [{
+        id: activeTab,
+        order: 0,
+        title: activeTabData.label,
+        body: activeTabData.body,
+        buttonLabel: activeTabData.buttonLabel,
+        buttonUrl: activeTabData.buttonUrl,
+        buttonNewTab: activeTabData.buttonNewTab,
+      }]
+    : [];
 
   return (
     <PageThemeWrapper fixedTheme="teal" showIllustration bgImageUrl={header.bgImageUrl}>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Home, FileText, Calendar, UtensilsCrossed, Coffee, Users, Settings, Type, Layout } from "lucide-react";
+import { Home, FileText, Calendar, UtensilsCrossed, Coffee, Users, Settings, Type, Layout, ShoppingBag } from "lucide-react";
 
 const CARDS = [
   { href: "/admin/home",     icon: Home,           title: "Home Page",    desc: "Edit carousel items, background image" },
@@ -8,6 +8,9 @@ const CARDS = [
   { href: "/admin/menu",     icon: UtensilsCrossed, title: "Menu",         desc: "Manage cocktail menu tabs and items" },
   { href: "/admin/coffee",   icon: Coffee,          title: "Coffee",       desc: "Manage coffee menu tabs and items" },
   { href: "/admin/events",   icon: Calendar,        title: "Events",       desc: "Add & manage calendar events" },
+  { href: "/admin/about",    icon: Users,           title: "About Page",   desc: "Edit the About page body sections and text" },
+  { href: "/admin/club",     icon: Coffee,          title: "Club Page",    desc: "Edit the Cocktail Club page content and link" },
+  { href: "/admin/shop",     icon: ShoppingBag,     title: "Shop Page",    desc: "Edit shop tabs, descriptions, and external URLs" },
   { href: "/admin/forms",    icon: Users,           title: "Form Data",    desc: "View & export customer form submissions" },
   { href: "/admin/fonts",    icon: Type,            title: "Type & Fonts", desc: "Upload fonts, assign to headings, nav, buttons" },
   { href: "/admin/settings", icon: Settings,        title: "Settings",     desc: "Business info, hours, social links" },
