@@ -36,7 +36,7 @@ export async function GET() {
     return NextResponse.json({ tabs, items });
   } catch (e) {
     console.error("[GET /api/admin/coffee]", e);
-    return NextResponse.json({ tabs: [], items: [] });
+    return NextResponse.json({ tabs: [], items: [], error: "Failed to load" });
   }
 }
 
@@ -103,8 +103,9 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ success: true });
   } catch (e) {
-    console.error("[POST /api/admin/coffee]", e);
-    return NextResponse.json({ success: false, error: String(e) }, { status: 500 });
+    const msg = e instanceof Error ? e.message : (e as { message?: string })?.message ?? JSON.stringify(e);
+    console.error("[POST /api/admin/coffee]", msg, e);
+    return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }
 
@@ -126,7 +127,8 @@ export async function DELETE(req: NextRequest) {
     }
     return NextResponse.json({ success: true });
   } catch (e) {
-    console.error("[DELETE /api/admin/coffee]", e);
-    return NextResponse.json({ success: false, error: String(e) }, { status: 500 });
+    const msg = e instanceof Error ? e.message : (e as { message?: string })?.message ?? JSON.stringify(e);
+    console.error("[DELETE /api/admin/coffee]", msg, e);
+    return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }
