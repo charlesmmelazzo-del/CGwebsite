@@ -152,12 +152,14 @@ export default function EventsPageClient({
     <PageThemeWrapper fixedTheme="green" showIllustration bgImageUrl={header.bgImageUrl}>
       <div className="min-h-screen py-16" style={{ color: theme.text }}>
         <header className="text-center mb-8 px-6">
-          <h1
-            className="tracking-widest uppercase mb-2"
-            style={{ fontFamily: "var(--font-display)", color: theme.text, fontSize: `${header.titleSize}px` }}
-          >
-            {header.title}
-          </h1>
+          {header.title && (
+            <h1
+              className="tracking-widest uppercase mb-2"
+              style={{ fontFamily: "var(--font-display)", color: theme.text, fontSize: `${header.titleSize}px` }}
+            >
+              {header.title}
+            </h1>
+          )}
           {header.subtitle && (
             <p className="mt-2 opacity-70" style={{ fontSize: `${header.subtitleSize ?? 14}px` }}>
               {header.subtitle}

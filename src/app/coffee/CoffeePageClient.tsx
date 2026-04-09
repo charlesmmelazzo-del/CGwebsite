@@ -24,16 +24,18 @@ export default function CoffeePageClient({ initialTabs, initialItems, header }: 
     <PageThemeWrapper fixedTheme="olive" showIllustration={false} bgImageUrl={header.bgImageUrl}>
       <div className="min-h-screen py-16" style={{ color: theme.text }}>
         <header className="text-center mb-8 px-6">
-          <h1
-            className="tracking-widest uppercase mb-2"
-            style={{
-              fontFamily: "var(--font-display)",
-              color: theme.text,
-              fontSize: `${header.titleSize}px`,
-            }}
-          >
-            {header.title}
-          </h1>
+          {header.title && (
+            <h1
+              className="tracking-widest uppercase mb-2"
+              style={{
+                fontFamily: "var(--font-display)",
+                color: theme.text,
+                fontSize: `${header.titleSize}px`,
+              }}
+            >
+              {header.title}
+            </h1>
+          )}
           {header.subtitle && (
             <p
               className="leading-relaxed max-w-xl mx-auto mt-3 opacity-70"

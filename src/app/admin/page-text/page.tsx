@@ -156,7 +156,7 @@ export default function PageTextAdmin() {
             <input
               className={inputCls}
               value={current.subtitle ?? ""}
-              onChange={(e) => update({ subtitle: e.target.value || undefined })}
+              onChange={(e) => update({ subtitle: e.target.value })}
             />
           </div>
           <SliderInput
@@ -176,7 +176,7 @@ export default function PageTextAdmin() {
         <ImagePicker
           label="Upload from library"
           value={current.bgImageUrl ?? ""}
-          onChange={(url) => update({ bgImageUrl: url || undefined })}
+          onChange={(url) => update({ bgImageUrl: url })}
         />
         <div>
           <label className={labelCls}>Or paste an image URL</label>
@@ -184,7 +184,7 @@ export default function PageTextAdmin() {
             className={inputCls}
             placeholder="https://..."
             value={current.bgImageUrl ?? ""}
-            onChange={(e) => update({ bgImageUrl: e.target.value || undefined })}
+            onChange={(e) => update({ bgImageUrl: e.target.value })}
           />
         </div>
       </section>

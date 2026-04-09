@@ -23,16 +23,18 @@ export default function MenuPageClient({ initialTabs, initialItems, header }: Pr
     <PageThemeWrapper fixedTheme="terracotta" showIllustration bgImageUrl={header.bgImageUrl}>
       <div className="min-h-screen py-16" style={{ color: theme.text }}>
         <header className="text-center mb-8 px-6">
-          <h1
-            className="tracking-widest uppercase mb-2"
-            style={{
-              fontFamily: "var(--font-display)",
-              color: theme.text,
-              fontSize: `${header.titleSize}px`,
-            }}
-          >
-            {header.title}
-          </h1>
+          {header.title && (
+            <h1
+              className="tracking-widest uppercase mb-2"
+              style={{
+                fontFamily: "var(--font-display)",
+                color: theme.text,
+                fontSize: `${header.titleSize}px`,
+              }}
+            >
+              {header.title}
+            </h1>
+          )}
           {header.subtitle && (
             <p
               className="tracking-widest uppercase opacity-60 mt-1"
