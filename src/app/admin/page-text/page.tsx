@@ -5,7 +5,7 @@ import { Save, Loader2, Info } from "lucide-react";
 import SliderInput from "@/components/ui/SliderInput";
 import ImagePicker from "@/components/ui/ImagePicker";
 import type { PageHeaderData, PageHeaderTab } from "@/types";
-import { getPageDefault } from "@/lib/pageheaders";
+import { getPageDefault } from "@/lib/pagedefaults";
 
 // ─── Page config metadata ──────────────────────────────────────────────────────
 const PAGES = [

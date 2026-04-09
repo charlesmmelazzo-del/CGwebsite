@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Plus, Trash2, Calendar, Loader2, Save, GripVertical, FileText, Type } from "lucide-react";
 import type { CalendarEvent, HostSection, PageHeaderData } from "@/types";
-import { getPageDefault } from "@/lib/pageheaders";
+import { getPageDefault } from "@/lib/pagedefaults";
 import ImagePicker from "@/components/ui/ImagePicker";
 import clsx from "clsx";
 
