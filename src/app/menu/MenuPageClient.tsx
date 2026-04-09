@@ -53,7 +53,7 @@ export default function MenuPageClient({ initialTabs, initialItems, header }: Pr
         The grid inside fills the remaining height and scrolls internally.
       */}
       <div
-        className="h-screen overflow-hidden flex flex-col pt-[52px] md:pt-[72px]"
+        className="h-screen overflow-hidden flex flex-col"
         style={{ color: theme.text }}
       >
         {/* Compact page header — desktop only, hidden on mobile to maximise swipe card height */}

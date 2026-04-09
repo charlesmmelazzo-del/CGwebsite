@@ -10,14 +10,16 @@ interface Props {
   textColor: string;
   mutedColor: string;
   bgColor: string;
+  /** If true, open directly to the back (details) side */
+  startFlipped?: boolean;
 }
 
 function hasBackContent(item: MenuItem): boolean {
   return !!(item.tagLine || item.ingredients || item.tastingNotes || item.notableNotes);
 }
 
-export default function EnlargedTileOverlay({ item, onClose, textColor, mutedColor, bgColor }: Props) {
-  const [isFlipped, setIsFlipped] = useState(false);
+export default function EnlargedTileOverlay({ item, onClose, textColor, mutedColor, bgColor, startFlipped }: Props) {
+  const [isFlipped, setIsFlipped] = useState(startFlipped ?? false);
   const canFlip = hasBackContent(item);
   const imgSrc = item.carouselImageUrl ?? item.imageUrl;
   const backLines = [item.tagLine, item.ingredients, item.tastingNotes, item.notableNotes].filter(Boolean) as string[];

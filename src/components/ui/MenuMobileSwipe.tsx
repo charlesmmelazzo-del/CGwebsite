@@ -208,6 +208,7 @@ export default function MenuMobileSwipe({
   const [activeTabId, setActiveTabId] = useState(tabs[0]?.id ?? "");
   const [globalIndex, setGlobalIndex] = useState(0);
   const [enlargedItem, setEnlargedItem] = useState<MenuItem | null>(null);
+  const [enlargedStartFlipped, setEnlargedStartFlipped] = useState(false);
 
   // Flat list of ALL items across all tabs in tab order
   const allItems = useMemo(() => {
@@ -323,7 +324,10 @@ export default function MenuMobileSwipe({
             isFavorited={isFavorited}
             onToggleFavorite={() => onToggleFavorite(currentItem.id)}
             onSwipe={handleSwipe}
-            onTap={() => setEnlargedItem(currentItem)}
+            onTap={() => {
+                setEnlargedStartFlipped(hasBackContent(currentItem));
+                setEnlargedItem(currentItem);
+              }}
           />
         )}
       </div>
@@ -394,6 +398,7 @@ export default function MenuMobileSwipe({
           textColor={textColor}
           mutedColor={mutedColor}
           bgColor={bgColor}
+          startFlipped={enlargedStartFlipped}
         />
       )}
     </div>
