@@ -24,15 +24,24 @@ export default function MenuPageClient({ initialTabs, initialItems, header }: Pr
 
   return (
     <PageThemeWrapper fixedTheme={themeName} showIllustration bgImageUrl={header.bgImageUrl}>
-      <div className="min-h-screen py-16" style={{ color: theme.text }}>
-        <header className="text-center mb-8 px-6">
+      {/*
+        h-screen + overflow-hidden = viewport-locked layout.
+        pt-[52px]/pt-[72px] clears the fixed nav bar.
+        The grid inside fills the remaining height and scrolls internally.
+      */}
+      <div
+        className="h-screen overflow-hidden flex flex-col pt-[52px] md:pt-[72px]"
+        style={{ color: theme.text }}
+      >
+        {/* Compact page header — shrinks to its content, never scrolls */}
+        <header className="shrink-0 text-center px-6 pt-5 pb-3">
           {header.title && (
             <h1
-              className="tracking-widest uppercase mb-2"
+              className="tracking-widest uppercase mb-1"
               style={{
                 fontFamily: "var(--font-display)",
                 color: theme.text,
-                fontSize: `clamp(1.75rem, 7vw, ${header.titleSize}px)`,
+                fontSize: `clamp(1.5rem, 5vw, ${header.titleSize}px)`,
               }}
             >
               {header.title}
@@ -40,16 +49,17 @@ export default function MenuPageClient({ initialTabs, initialItems, header }: Pr
           )}
           {header.subtitle && (
             <p
-              className="tracking-widest uppercase opacity-60 mt-1"
+              className="tracking-widest uppercase opacity-60 mt-0.5"
               style={{ fontSize: `${header.subtitleSize ?? 13}px` }}
             >
               {header.subtitle}
             </p>
           )}
-          <div className="w-16 h-px mx-auto mt-4" style={{ backgroundColor: theme.muted }} />
+          <div className="w-12 h-px mx-auto mt-3" style={{ backgroundColor: theme.muted }} />
         </header>
 
-        <div className="pb-16">
+        {/* Grid — fills remaining height, scrolls internally */}
+        <div className="flex-1 min-h-0">
           <MenuTileGrid
             items={activeItems}
             tabs={activeTabs}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Image from "next/image";
 import { X } from "lucide-react";
 import type { MenuItem, MenuTab } from "@/types";
@@ -18,8 +18,9 @@ function hasBackContent(item: MenuItem): boolean {
   return !!(item.tagLine || item.ingredients || item.tastingNotes || item.notableNotes);
 }
 
-// ─── Sticky Tab Bar ───────────────────────────────────────────────────────────
-function StickyTabBar({
+// ─── Tab Bar ──────────────────────────────────────────────────────────────────
+// No longer sticky — lives outside the scroll container so it never moves
+function TabBar({
   tabs,
   activeTabId,
   onTabClick,
@@ -32,7 +33,7 @@ function StickyTabBar({
 }) {
   return (
     <div
-      className="sticky top-[52px] md:top-[72px] z-30 tab-bar-scroll flex justify-center gap-0 px-4 py-0.5"
+      className="shrink-0 tab-bar-scroll flex justify-center gap-0 px-4 py-0.5"
       style={{ background: "rgba(0,0,0,0.35)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" }}
     >
       {tabs.map((tab) => (
@@ -69,7 +70,7 @@ function SectionHeader({
     <div
       id={id}
       className="flex items-center gap-4 py-6"
-      style={{ scrollMarginTop: "130px" }}
+      style={{ scrollMarginTop: "12px" }}
     >
       <div className="flex-1 h-px" style={{ backgroundColor: `${mutedColor}30` }} />
       <p
@@ -190,7 +191,6 @@ function EnlargedTileOverlay({
     item.notableNotes,
   ].filter(Boolean) as string[];
 
-  // Escape key to close
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -201,7 +201,7 @@ function EnlargedTileOverlay({
 
   return (
     <>
-      {/* Backdrop — click to close */}
+      {/* Backdrop */}
       <div className="fixed inset-0 z-50 bg-black/60 animate-fade-in" onClick={onClose} />
 
       {/* Centered card */}
@@ -210,7 +210,7 @@ function EnlargedTileOverlay({
           className="pointer-events-auto relative w-full"
           style={{ maxWidth: "420px", perspective: "1200px" }}
         >
-          {/* ✕ button — always visible, z above flip container */}
+          {/* ✕ button */}
           <button
             onClick={(e) => { e.stopPropagation(); onClose(); }}
             className="absolute -top-3 -right-3 z-10 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
@@ -273,7 +273,7 @@ function EnlargedTileOverlay({
               </div>
 
               {/* Front text */}
-              <div className="p-5" style={{ backgroundColor: "#1a1a1a" }}>
+              <div className="p-5" style={{ backgroundColor: bgColor }}>
                 <h2
                   className="text-xl md:text-2xl tracking-wider leading-tight mb-2"
                   style={{ fontFamily: "var(--font-display)", color: item.titleColor ?? textColor }}
@@ -368,6 +368,7 @@ export default function MenuTileGrid({ items, tabs, textColor, mutedColor, bgCol
   const [enlargedId, setEnlargedId] = useState<string | null>(null);
   const [isFlipped, setIsFlipped] = useState(false);
   const [activeTabId, setActiveTabId] = useState(tabs[0]?.id ?? "");
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Group items by tab — only tabs that have at least one item
   const sections = useMemo(
@@ -383,32 +384,23 @@ export default function MenuTileGrid({ items, tabs, textColor, mutedColor, bgCol
 
   const enlargedItem = enlargedId ? items.find((i) => i.id === enlargedId) ?? null : null;
 
-  // IntersectionObserver — update active tab as user scrolls
+  // IntersectionObserver scoped to the scroll container — active tab tracks correctly
   useEffect(() => {
     if (sections.length <= 1) return;
+    const root = scrollContainerRef.current;
     const observers: IntersectionObserver[] = [];
     sections.forEach(({ tab }) => {
       const el = document.getElementById(`section-${tab.id}`);
       if (!el) return;
       const obs = new IntersectionObserver(
         ([entry]) => { if (entry.isIntersecting) setActiveTabId(tab.id); },
-        { rootMargin: "-15% 0px -75% 0px" }
+        { root, rootMargin: "-10% 0px -70% 0px" }
       );
       obs.observe(el);
       observers.push(obs);
     });
     return () => observers.forEach((o) => o.disconnect());
   }, [sections]);
-
-  // Scroll lock when enlarged
-  useEffect(() => {
-    if (enlargedId) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => { document.body.style.overflow = ""; };
-  }, [enlargedId]);
 
   function scrollToSection(tabId: string) {
     const el = document.getElementById(`section-${tabId}`);
@@ -433,17 +425,17 @@ export default function MenuTileGrid({ items, tabs, textColor, mutedColor, bgCol
 
   if (!sections.length) {
     return (
-      <div className="py-16 text-center opacity-40 text-sm tracking-widest uppercase" style={{ color: textColor }}>
+      <div className="flex-1 flex items-center justify-center opacity-40 text-sm tracking-widest uppercase" style={{ color: textColor }}>
         No items yet
       </div>
     );
   }
 
   return (
-    <div>
-      {/* Sticky tab bar — only when 2+ sections exist */}
+    <div className="h-full flex flex-col">
+      {/* Tab bar — pinned at top, never scrolls */}
       {sections.length > 1 && (
-        <StickyTabBar
+        <TabBar
           tabs={sections.map((s) => s.tab)}
           activeTabId={activeTabId}
           onTabClick={scrollToSection}
@@ -451,30 +443,32 @@ export default function MenuTileGrid({ items, tabs, textColor, mutedColor, bgCol
         />
       )}
 
-      {/* Sections */}
-      <div className="max-w-4xl mx-auto px-4 md:px-6">
-        {sections.map(({ tab, items: tabItems }) => (
-          <div key={tab.id}>
-            <SectionHeader
-              id={`section-${tab.id}`}
-              label={tab.label}
-              textColor={textColor}
-              mutedColor={mutedColor}
-            />
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6 mb-10">
-              {tabItems.map((item) => (
-                <MenuTile
-                  key={item.id}
-                  item={item}
-                  onClick={() => enlargeTile(item.id)}
-                  textColor={textColor}
-                  mutedColor={mutedColor}
-                  bgColor={bgColor}
-                />
-              ))}
+      {/* Scrollable grid */}
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
+        <div className="max-w-4xl mx-auto px-4 md:px-6 pb-8">
+          {sections.map(({ tab, items: tabItems }) => (
+            <div key={tab.id}>
+              <SectionHeader
+                id={`section-${tab.id}`}
+                label={tab.label}
+                textColor={textColor}
+                mutedColor={mutedColor}
+              />
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6 mb-10">
+                {tabItems.map((item) => (
+                  <MenuTile
+                    key={item.id}
+                    item={item}
+                    onClick={() => enlargeTile(item.id)}
+                    textColor={textColor}
+                    mutedColor={mutedColor}
+                    bgColor={bgColor}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
       {/* Enlarged overlay */}
