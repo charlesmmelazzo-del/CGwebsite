@@ -27,6 +27,8 @@ export default function ShopPageClient({ header, shopTabs }: Props) {
         order: 0,
         title: activeTabData.label,
         body: activeTabData.body,
+        imageUrl: activeTabData.imageUrl,
+        imageAlt: activeTabData.imageAlt,
         buttonLabel: activeTabData.buttonLabel,
         buttonUrl: activeTabData.buttonUrl,
         buttonNewTab: activeTabData.buttonNewTab,

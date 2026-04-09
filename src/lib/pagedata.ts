@@ -6,6 +6,8 @@ export interface ShopTab {
   id: string;
   label: string;
   body: string;
+  imageUrl?: string;
+  imageAlt?: string;
   buttonLabel: string;
   buttonUrl: string;
   buttonNewTab: boolean;

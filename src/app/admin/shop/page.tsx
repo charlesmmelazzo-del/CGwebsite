@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Plus, Trash2, Save, GripVertical } from "lucide-react";
+import ImagePicker from "@/components/ui/ImagePicker";
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor,
   useSensor, useSensors, type DragEndEvent,
@@ -77,6 +78,22 @@ function TabCard({
             placeholder="Description shown on this tab…"
           />
         </div>
+        <ImagePicker
+          label="Image (optional)"
+          value={tab.imageUrl ?? ""}
+          onChange={(url) => onUpdate({ imageUrl: url || undefined })}
+        />
+        {tab.imageUrl && (
+          <div>
+            <label className={labelCls}>Image Alt Text</label>
+            <input
+              className={inputCls}
+              value={tab.imageAlt ?? ""}
+              onChange={(e) => onUpdate({ imageAlt: e.target.value || undefined })}
+              placeholder="Describe the image for accessibility"
+            />
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={labelCls}>Button Label</label>
