@@ -4,16 +4,11 @@ import { useState } from "react";
 import PageThemeWrapper from "@/components/layout/PageThemeWrapper";
 import EventsCalendar from "@/components/ui/EventsCalendar";
 import ContentSectionBlock from "@/components/ui/ContentSection";
-import type { CalendarEvent, ContentSection, FormField } from "@/types";
+import type { CalendarEvent, ContentSection, FormField, PageHeaderData } from "@/types";
 import { THEMES } from "@/lib/themes";
 import clsx from "clsx";
 
-const TABS = [
-  { id: "upcoming", label: "Upcoming Events" },
-  { id: "host", label: "Host Your Event" },
-] as const;
-
-type TabId = (typeof TABS)[number]["id"];
+type TabId = "upcoming" | "host";
 
 const HOST_SECTIONS: ContentSection[] = [
   {
@@ -33,7 +28,7 @@ const HOST_FORM_FIELDS: FormField[] = [
   { id: "details", label: "Tell Us About Your Event", type: "textarea", required: false },
 ];
 
-export default function EventsPageClient({ initialEvents }: { initialEvents: CalendarEvent[] }) {
+export default function EventsPageClient({ initialEvents, header }: { initialEvents: CalendarEvent[]; header: PageHeaderData }) {
   const [activeTab, setActiveTab] = useState<TabId>("upcoming");
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
@@ -61,22 +56,32 @@ export default function EventsPageClient({ initialEvents }: { initialEvents: Cal
     }
   }
 
+  const tabs = [
+    { id: "upcoming" as TabId, label: header.tabs?.find((t) => t.id === "upcoming")?.label ?? "Upcoming Events" },
+    { id: "host" as TabId,     label: header.tabs?.find((t) => t.id === "host")?.label ?? "Host Your Event" },
+  ];
+
   return (
-    <PageThemeWrapper fixedTheme="green" showIllustration>
+    <PageThemeWrapper fixedTheme="green" showIllustration bgImageUrl={header.bgImageUrl}>
       <div className="min-h-screen py-16" style={{ color: theme.text }}>
         <header className="text-center mb-8 px-6">
           <h1
-            className="text-5xl md:text-7xl tracking-widest uppercase mb-2"
-            style={{ fontFamily: "var(--font-display)", color: theme.text }}
+            className="tracking-widest uppercase mb-2"
+            style={{ fontFamily: "var(--font-display)", color: theme.text, fontSize: `${header.titleSize}px` }}
           >
-            Events
+            {header.title}
           </h1>
+          {header.subtitle && (
+            <p className="mt-2 opacity-70" style={{ fontSize: `${header.subtitleSize ?? 14}px` }}>
+              {header.subtitle}
+            </p>
+          )}
           <div className="w-16 h-px mx-auto mt-4" style={{ backgroundColor: theme.muted }} />
         </header>
 
         {/* Tab selector */}
         <div className="flex justify-center gap-1 mb-10 px-4">
-          {TABS.map((tab) => (
+          {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}

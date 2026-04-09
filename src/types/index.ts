@@ -259,6 +259,21 @@ export interface PagesData {
   pages: PageDocument[];
 }
 
+// ─── Page Headers ────────────────────────────────────────────────────────────
+export interface PageHeaderTab {
+  id: string;
+  label: string;
+}
+
+export interface PageHeaderData {
+  title: string;
+  titleSize: number;       // px, default 72
+  subtitle?: string;
+  subtitleSize?: number;   // px, default 13
+  bgImageUrl?: string;     // custom background image URL (overrides theme bg color)
+  tabs?: PageHeaderTab[];  // nav tabs within the page (events, shop)
+}
+
 // ─── Site Config (Header / Footer) ───────────────────────────────────────────
 export interface NavLink {
   id: string;

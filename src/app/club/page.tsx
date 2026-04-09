@@ -2,6 +2,7 @@ import PageThemeWrapper from "@/components/layout/PageThemeWrapper";
 import ContentSectionBlock from "@/components/ui/ContentSection";
 import type { ContentSection } from "@/types";
 import { THEMES } from "@/lib/themes";
+import { getPageHeader } from "@/lib/pageheaders";
 
 const CLUB_SECTIONS: ContentSection[] = [
   {
@@ -15,18 +16,29 @@ const CLUB_SECTIONS: ContentSection[] = [
   },
 ];
 
-export default function ClubPage() {
+export default async function ClubPage() {
   const theme = THEMES.plum;
+  const header = await getPageHeader("club");
+
   return (
-    <PageThemeWrapper fixedTheme="plum" showIllustration={false}>
+    <PageThemeWrapper fixedTheme="plum" showIllustration={false} bgImageUrl={header.bgImageUrl}>
       <div className="min-h-screen py-16" style={{ color: theme.text }}>
         <header className="text-center mb-12 px-6">
           <h1
-            className="text-5xl md:text-7xl tracking-widest uppercase mb-2"
-            style={{ fontFamily: "var(--font-display)", color: theme.text }}
+            className="tracking-widest uppercase mb-2"
+            style={{
+              fontFamily: "var(--font-display)",
+              color: theme.text,
+              fontSize: `${header.titleSize}px`,
+            }}
           >
-            Club
+            {header.title}
           </h1>
+          {header.subtitle && (
+            <p className="mt-2 opacity-70" style={{ fontSize: `${header.subtitleSize ?? 14}px` }}>
+              {header.subtitle}
+            </p>
+          )}
           <div className="w-16 h-px mx-auto mt-4" style={{ backgroundColor: theme.muted }} />
         </header>
 

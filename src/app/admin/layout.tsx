@@ -18,6 +18,7 @@ import {
   LogOut,
   Menu,
   Type,
+  AlignLeft,
   Layout,
   ImageIcon,
 } from "lucide-react";
@@ -32,7 +33,8 @@ const NAV = [
   { href: "/admin/events",  label: "Events",       icon: Calendar },
   { href: "/admin/images",  label: "Images",       icon: ImageIcon },
   { href: "/admin/forms",   label: "Form Data",    icon: Users },
-  { href: "/admin/fonts",   label: "Type & Fonts", icon: Type },
+  { href: "/admin/page-text", label: "Page Text",    icon: AlignLeft },
+  { href: "/admin/fonts",    label: "Type & Fonts", icon: Type },
   { href: "/admin/settings",label: "Settings",     icon: Settings },
 ];
 

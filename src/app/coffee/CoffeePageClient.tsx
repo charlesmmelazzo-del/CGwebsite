@@ -3,7 +3,8 @@
 import { useState } from "react";
 import PageThemeWrapper from "@/components/layout/PageThemeWrapper";
 import MenuCarousel from "@/components/ui/MenuCarousel";
-import type { MenuTab, MenuItem, PageHeaderData } from "@/types";
+import type { MenuTab, MenuItem } from "@/types";
+import type { PageHeaderData } from "@/types";
 import { THEMES } from "@/lib/themes";
 import clsx from "clsx";
 
@@ -13,14 +14,14 @@ interface Props {
   header: PageHeaderData;
 }
 
-export default function MenuPageClient({ initialTabs, initialItems, header }: Props) {
-  const theme = THEMES.terracotta;
+export default function CoffeePageClient({ initialTabs, initialItems, header }: Props) {
+  const theme = THEMES.olive;
   const activeTabs = initialTabs.filter((t) => t.active).sort((a, b) => a.order - b.order);
   const [activeTabId, setActiveTabId] = useState(activeTabs[0]?.id ?? "");
   const activeItems = initialItems.filter((i) => i.tabId === activeTabId && i.active);
 
   return (
-    <PageThemeWrapper fixedTheme="terracotta" showIllustration bgImageUrl={header.bgImageUrl}>
+    <PageThemeWrapper fixedTheme="olive" showIllustration={false} bgImageUrl={header.bgImageUrl}>
       <div className="min-h-screen py-16" style={{ color: theme.text }}>
         <header className="text-center mb-8 px-6">
           <h1
@@ -35,24 +36,24 @@ export default function MenuPageClient({ initialTabs, initialItems, header }: Pr
           </h1>
           {header.subtitle && (
             <p
-              className="tracking-widest uppercase opacity-60 mt-1"
-              style={{ fontSize: `${header.subtitleSize ?? 13}px` }}
+              className="leading-relaxed max-w-xl mx-auto mt-3 opacity-70"
+              style={{ fontSize: `${header.subtitleSize ?? 14}px` }}
             >
               {header.subtitle}
             </p>
           )}
-          <div className="w-16 h-px mx-auto mt-4" style={{ backgroundColor: theme.muted }} />
+          <div className="w-16 h-px mx-auto mt-6" style={{ backgroundColor: theme.muted }} />
         </header>
 
         {/* Tab bar */}
         {activeTabs.length > 0 && (
-          <div className="flex flex-wrap justify-center gap-1 px-4 mb-10 overflow-x-auto">
+          <div className="flex flex-wrap justify-center gap-1 px-4 mb-10">
             {activeTabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTabId(tab.id)}
                 className={clsx(
-                  "px-4 py-2 text-xs tracking-widest uppercase whitespace-nowrap transition-all duration-200",
+                  "px-4 py-2 text-xs tracking-widest uppercase transition-all duration-200",
                   activeTabId === tab.id
                     ? "border-b-2 border-[#C97D5A] text-[#C97D5A]"
                     : "opacity-60 hover:opacity-90"

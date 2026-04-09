@@ -39,14 +39,21 @@ This plan is ordered by priority. Each task is scoped to be executable end-to-en
 
 ## P1 — Feature gaps vs. Mike's goals
 
-### 5. Wire the menu carousel to real cocktail images + menu-page PNGs
-- **Current:** `/menu` shows placeholder "CG" cards. Mike wants: each cocktail card shows a photo; clicking expands to a PNG of the printed menu page that features that drink; users can swipe the whole carousel.
+### 5. Wire the menu carousel to real cocktail images + click-for-details flip
+- **Current:** `/menu` shows placeholder "CG" cards. Mike wants: each cocktail card shows a photo; clicking the card reveals more information *in place* (flip/swap the card content — do **not** open a lightbox or expand to a larger image, that doesn't render well).
 - **Fix:**
-  - In `/admin/menu`, add fields per cocktail: `image` (hero photo), `menuPagePng` (the expandable menu page scan), `alt`, and the already-present name/description/tag fields.
-  - On `/menu`, render the photo in the card, and on click/tap open a lightbox/modal that shows `menuPagePng` full-screen with pinch-zoom on mobile.
-  - Keep the carousel swipe behavior on mobile (touch gestures) and arrow buttons on desktop.
-  - Support an "unphotographed" state that still looks intentional (styled text-only card), since Mike explicitly wants text-only entries alongside photo entries in the carousel.
-- **Acceptance:** admin can upload both images per cocktail; site shows photo cards + text-only cards mixed; clicking opens the menu-page PNG; swipeable on touch.
+  - In `/admin/menu`, extend each cocktail with these fields (in addition to name):
+    - `image` (hero photo, shown on the front of the card)
+    - `ingredients` (free text)
+    - `tastingNotes` (free text)
+    - `tagLine` (short free text)
+    - `notableNotes` (free text)
+    - `alt` (for the image)
+  - On `/menu`, the card front shows the photo + cocktail name. Clicking/tapping the card flips or cross-fades it to a back side that displays **only the values** the admin entered for Ingredients, Tasting Notes, Tag Line, and Notable Notes — **do not render the field labels/headers**. Only show a field's value if it's non-empty (skip empty fields entirely so the back side never has blank rows).
+  - Clicking again flips the card back to the photo. Cards that are not flipped should still be swipeable as part of the carousel; the active/flipped card should stay flipped while the user reads it.
+  - Keep carousel swipe on touch and arrow buttons on desktop. No modal, no lightbox, no pinch-zoom.
+  - Support a "no photo" state that still looks intentional (styled text-only card front), since Mike wants text-only entries mixed in with photo entries.
+- **Acceptance:** admin can fill in image + Ingredients + Tasting Notes + Tag Line + Notable Notes per cocktail; front of card shows photo + name; clicking reveals those four values on the same card (values only, no labels, empty fields hidden); clicking again flips back; carousel still swipes.
 
 ### 6. Home page carousel: mixed text / image / form / Instagram slides
 - **Current:** admin already supports Text / Image / Form slides — good. Two gaps:
