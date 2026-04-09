@@ -363,7 +363,7 @@ export default function AdminHeaderPage() {
               <section>
                 <p className="text-[10px] tracking-widest uppercase text-gray-500 mb-3 font-medium">Nav Typography</p>
                 <div className="space-y-4">
-                  <SliderInput label="Font Size"     value={config.header.navFontSize}  min={10} max={20} onChange={(v) => updateHeader({ navFontSize: v })} />
+                  <SliderInput label="Font Size"     value={config.header.navFontSize}  min={10} max={36} onChange={(v) => updateHeader({ navFontSize: v })} />
                   <SliderInput label="Link Padding"  value={config.header.navPaddingX ?? 20} min={8} max={48} step={2} onChange={(v) => updateHeader({ navPaddingX: v })} />
                   <div>
                     <span className={labelCls}>Letter Spacing</span>
