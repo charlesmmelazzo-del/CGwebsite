@@ -97,7 +97,7 @@ function FlipCard({
   }
 
   return (
-    <div className="relative w-full" style={{ height: "360px", perspective: "1200px" }}>
+    <div className="relative w-full menu-card" style={{ perspective: "1200px" }}>
       <div
         style={{
           position: "absolute",
@@ -124,12 +124,12 @@ function FlipCard({
           }}
         >
           {imgSrc ? (
-            <div className="relative w-full h-[220px]">
+            <div className="relative w-full h-[180px] md:h-[220px]">
               <Image src={imgSrc} alt={item.alt ?? item.title} fill className="object-cover" sizes="320px" />
               <div className="absolute inset-x-0 bottom-0 h-16" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 100%)" }} />
             </div>
           ) : (
-            <div className="w-full h-[220px] flex items-center justify-center" style={{ backgroundColor: `${textColor}12` }}>
+            <div className="w-full h-[180px] md:h-[220px] flex items-center justify-center" style={{ backgroundColor: `${textColor}12` }}>
               <span className="text-4xl opacity-20 select-none" style={{ fontFamily: "var(--font-display)", color: textColor }}>CG</span>
             </div>
           )}
@@ -188,8 +188,8 @@ function FlipCard({
 function DividerCard({ label, textColor, mutedColor }: { label: string; textColor: string; mutedColor: string }) {
   return (
     <div
-      className="w-full flex items-center justify-center"
-      style={{ height: "360px", border: `1px solid ${textColor}15`, borderRadius: "2px" }}
+      className="w-full menu-card flex items-center justify-center"
+      style={{ border: `1px solid ${textColor}15`, borderRadius: "2px" }}
     >
       <div className="text-center px-6">
         <div className="w-8 h-px mx-auto mb-5" style={{ backgroundColor: mutedColor, opacity: 0.4 }} />
@@ -250,16 +250,16 @@ export default function MenuCarousel({ items, tabs = [], textColor, mutedColor }
   const visibleTabs = tabs.filter((t) => sectionIndices[t.id] !== undefined);
 
   return (
-    <div>
+    <div className="pb-4 md:pb-0">
       {/* ── Tab bar ── */}
       {visibleTabs.length > 1 && (
-        <div className="flex flex-wrap justify-center gap-1 px-4 mb-6 overflow-x-auto">
+        <div className="tab-bar-scroll flex justify-center gap-0 px-4 mb-6">
           {visibleTabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => scrollToSection(tab.id)}
               className={clsx(
-                "px-4 py-2 text-xs tracking-widest uppercase whitespace-nowrap transition-all duration-200 border-b-2",
+                "px-3 md:px-4 py-2 text-xs tracking-widest uppercase whitespace-nowrap transition-all duration-200 border-b-2",
                 activeTabId === tab.id
                   ? "border-[#C97D5A] text-[#C97D5A]"
                   : "border-transparent opacity-60 hover:opacity-90"

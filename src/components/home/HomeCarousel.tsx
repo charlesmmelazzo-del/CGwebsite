@@ -38,7 +38,7 @@ export default function HomeCarousel({ items, autoAdvance = true, autoAdvanceInt
   return (
     <div className="relative w-full max-w-3xl mx-auto">
       {/* Carousel */}
-      <div className="embla" ref={emblaRef}>
+      <div className="embla home-carousel-viewport" ref={emblaRef}>
         <div className="embla__container">
           {items.map((item) => (
             <div key={item.id} className="embla__slide px-4">
@@ -148,7 +148,7 @@ function SlideContent({
             alt={img.altText ?? "Promotion"}
             width={500}
             height={350}
-            className="object-contain max-h-64 md:max-h-96 w-auto rounded-sm"
+            className="object-contain max-h-[calc(100dvh-280px)] md:max-h-96 w-auto rounded-sm"
           />
           {img.expandedImageUrl && (
             <p className="text-center text-xs mt-2 opacity-60 tracking-widest uppercase">
@@ -279,7 +279,7 @@ function CarouselForm({ item }: { item: CarouselFormItem }) {
   }
 
   return (
-    <div className="py-6 px-4 max-w-md mx-auto">
+    <div className="py-6 px-4 max-w-md mx-auto overflow-y-auto max-h-[calc(100dvh-220px)] md:max-h-none">
       {item.headerImageUrl ? (
         <div className="mb-4 flex justify-center">
           <Image

@@ -1,16 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import PageThemeWrapper from "@/components/layout/PageThemeWrapper";
-import EventsCalendar from "@/components/ui/EventsCalendar";
 import type { CalendarEvent, FormField, PageHeaderData, HostSection } from "@/types";
 import { THEMES } from "@/lib/themes";
 import clsx from "clsx";
-import { Download, FileText } from "lucide-react";
+import { Download, FileText, MapPin } from "lucide-react";
 
 type TabId = "upcoming" | "host";
 
-// Fallback sections shown when no DB content has been saved yet
 const DEFAULT_HOST_SECTIONS: HostSection[] = [
   {
     id: "h1",
@@ -22,15 +21,88 @@ const DEFAULT_HOST_SECTIONS: HostSection[] = [
 ];
 
 const HOST_FORM_FIELDS: FormField[] = [
-  { id: "name",    label: "Your Name",              type: "text",     required: true },
-  { id: "email",   label: "Email Address",           type: "email",    required: true },
-  { id: "phone",   label: "Phone Number",            type: "phone",    required: false },
-  { id: "date",    label: "Event Date",              type: "text",     required: false },
-  { id: "guests",  label: "Estimated Guest Count",   type: "text",     required: false },
-  { id: "details", label: "Tell Us About Your Event",type: "textarea", required: false },
+  { id: "name",    label: "Your Name",               type: "text",     required: true },
+  { id: "email",   label: "Email Address",            type: "email",    required: true },
+  { id: "phone",   label: "Phone Number",             type: "phone",    required: false },
+  { id: "date",    label: "Event Date",               type: "text",     required: false },
+  { id: "guests",  label: "Estimated Guest Count",    type: "text",     required: false },
+  { id: "details", label: "Tell Us About Your Event", type: "textarea", required: false },
 ];
 
-// ─── Section renderers ────────────────────────────────────────────────────────
+function formatEventDate(dateStr: string) {
+  const d = new Date(dateStr + "T12:00:00");
+  return {
+    month: d.toLocaleDateString("en-US", { month: "short" }).toUpperCase(),
+    day: d.getDate().toString(),
+    year: d.getFullYear().toString(),
+    weekday: d.toLocaleDateString("en-US", { weekday: "long" }),
+  };
+}
+
+function EventCard({ event, theme }: { event: CalendarEvent; theme: { text: string; muted: string } }) {
+  const start = formatEventDate(event.start);
+  const isMultiDay = !!(event.end && event.end !== event.start);
+  const end = isMultiDay ? formatEventDate(event.end!) : null;
+
+  return (
+    <div
+      className="flex gap-4 md:gap-6 px-4 md:px-8 py-6"
+      style={{ borderBottom: `1px solid ${theme.muted}20` }}
+    >
+      {/* Date column */}
+      <div className="shrink-0 text-center w-14">
+        <p className="text-[10px] tracking-widest uppercase" style={{ color: "#C97D5A" }}>{start.month}</p>
+        <p className="text-3xl leading-none my-0.5" style={{ fontFamily: "var(--font-display)", color: theme.text }}>{start.day}</p>
+        <p className="text-[9px] tracking-wider opacity-40" style={{ color: theme.text }}>{start.year}</p>
+        {isMultiDay && end && (
+          <>
+            <div className="w-3 h-px mx-auto my-1.5" style={{ backgroundColor: theme.muted, opacity: 0.3 }} />
+            <p className="text-[10px] tracking-widest uppercase" style={{ color: "#C97D5A" }}>{end.month}</p>
+            <p className="text-xl leading-none" style={{ fontFamily: "var(--font-display)", color: theme.text }}>{end.day}</p>
+          </>
+        )}
+      </div>
+
+      {/* Details */}
+      <div className="flex-1 min-w-0">
+        <p className="text-[10px] tracking-widest uppercase opacity-40 mb-1.5" style={{ color: theme.text }}>{start.weekday}</p>
+        <h3
+          className="text-xl tracking-wide leading-snug mb-2"
+          style={{ fontFamily: "var(--font-display)", color: theme.text }}
+        >
+          {event.title}
+        </h3>
+        {event.location && (
+          <p className="flex items-center gap-1.5 text-xs opacity-60 mb-2" style={{ color: theme.text }}>
+            <MapPin size={11} className="shrink-0" />
+            {event.location}
+          </p>
+        )}
+        {event.description && (
+          <p className="text-sm leading-relaxed opacity-70" style={{ color: theme.text }}>
+            {event.description}
+          </p>
+        )}
+      </div>
+
+      {/* Thumbnail */}
+      {event.imageUrl && (
+        <div className="shrink-0 hidden sm:block">
+          <Image
+            src={event.imageUrl}
+            alt={event.title}
+            width={88}
+            height={88}
+            unoptimized
+            className="object-cover rounded-sm opacity-80"
+            style={{ width: 88, height: 88 }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function HostTextSection({ section, theme }: { section: HostSection; theme: { text: string; muted: string } }) {
   return (
     <div className="max-w-2xl mx-auto px-6 py-8">
@@ -67,7 +139,6 @@ function HostTextSection({ section, theme }: { section: HostSection; theme: { te
 
 function HostPdfSection({ section, theme }: { section: HostSection; theme: { text: string; muted: string } }) {
   if (!section.pdfUrl) return null;
-
   return (
     <div className="max-w-2xl mx-auto px-6 py-8">
       {section.pdfTitle && (
@@ -79,8 +150,6 @@ function HostPdfSection({ section, theme }: { section: HostSection; theme: { tex
           {section.pdfTitle}
         </h3>
       )}
-
-      {/* Inline PDF viewer */}
       <div className="rounded-sm overflow-hidden border mb-4" style={{ borderColor: `${theme.muted}40` }}>
         <iframe
           src={section.pdfUrl}
@@ -89,8 +158,6 @@ function HostPdfSection({ section, theme }: { section: HostSection; theme: { tex
           title={section.pdfTitle ?? "PDF Document"}
         />
       </div>
-
-      {/* Download button */}
       <a
         href={section.pdfUrl}
         download
@@ -108,19 +175,28 @@ function HostPdfSection({ section, theme }: { section: HostSection; theme: { tex
 export default function EventsPageClient({
   initialEvents,
   header,
+  hasFutureEvents,
 }: {
   initialEvents: CalendarEvent[];
   header: PageHeaderData;
+  hasFutureEvents: boolean;
 }) {
-  const [activeTab, setActiveTab] = useState<TabId>("upcoming");
+  const [activeTab, setActiveTab] = useState<TabId>(hasFutureEvents ? "upcoming" : "host");
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const theme = THEMES.green;
 
-  const hostSections = (header.hostSections && header.hostSections.length > 0)
-    ? header.hostSections
-    : DEFAULT_HOST_SECTIONS;
+  const hostSections = header.hostSections?.length ? header.hostSections : DEFAULT_HOST_SECTIONS;
+
+  const upcomingLabel = header.tabs?.find((t) => t.id === "upcoming")?.label ?? "Upcoming Events";
+  const hostLabel = header.tabs?.find((t) => t.id === "host")?.label ?? "Host Your Event";
+
+  const visibleTabs: { id: TabId; label: string }[] = [
+    ...(hasFutureEvents ? [{ id: "upcoming" as TabId, label: upcomingLabel }] : []),
+    { id: "host" as TabId, label: hostLabel },
+  ];
+  const showTabBar = visibleTabs.length > 1;
 
   async function handleHostSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -143,11 +219,6 @@ export default function EventsPageClient({
     }
   }
 
-  const tabs = [
-    { id: "upcoming" as TabId, label: header.tabs?.find((t) => t.id === "upcoming")?.label ?? "Upcoming Events" },
-    { id: "host"     as TabId, label: header.tabs?.find((t) => t.id === "host")?.label     ?? "Host Your Event" },
-  ];
-
   return (
     <PageThemeWrapper fixedTheme="green" showIllustration bgImageUrl={header.bgImageUrl}>
       <div className="min-h-screen py-16" style={{ color: theme.text }}>
@@ -155,7 +226,11 @@ export default function EventsPageClient({
           {header.title && (
             <h1
               className="tracking-widest uppercase mb-2"
-              style={{ fontFamily: "var(--font-display)", color: theme.text, fontSize: `${header.titleSize}px` }}
+              style={{
+                fontFamily: "var(--font-display)",
+                color: theme.text,
+                fontSize: `clamp(1.75rem, 7vw, ${header.titleSize}px)`,
+              }}
             >
               {header.title}
             </h1>
@@ -168,47 +243,54 @@ export default function EventsPageClient({
           <div className="w-16 h-px mx-auto mt-4" style={{ backgroundColor: theme.muted }} />
         </header>
 
-        {/* Tab selector */}
-        <div className="flex justify-center gap-1 mb-10 px-4">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={clsx(
-                "px-5 py-2.5 text-xs tracking-widest uppercase transition-all duration-200",
-                activeTab === tab.id
-                  ? "border-b-2 border-[#C97D5A] text-[#C97D5A]"
-                  : "opacity-60 hover:opacity-90"
-              )}
-              style={{ color: activeTab === tab.id ? "#C97D5A" : theme.text }}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* Tab bar — only when 2+ tabs */}
+        {showTabBar && (
+          <div className="tab-bar-scroll flex justify-center gap-0 mb-10 px-4">
+            {visibleTabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={clsx(
+                  "px-3 md:px-5 py-2 md:py-2.5 text-xs tracking-widest uppercase whitespace-nowrap transition-all duration-200",
+                  activeTab === tab.id
+                    ? "border-b-2 border-[#C97D5A] text-[#C97D5A]"
+                    : "opacity-60 hover:opacity-90"
+                )}
+                style={{ color: activeTab === tab.id ? "#C97D5A" : theme.text }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        )}
 
-        {/* Upcoming Events */}
+        {/* Upcoming Events list */}
         {activeTab === "upcoming" && (
-          <div className="animate-fade-in">
-            <EventsCalendar
-              events={initialEvents}
-              textColor={theme.text}
-              bgColor={theme.bg}
-            />
+          <div className="animate-fade-in max-w-2xl mx-auto">
+            {initialEvents.length === 0 ? (
+              <div className="text-center py-16 opacity-40">
+                <p className="text-sm tracking-widest uppercase">No upcoming events</p>
+              </div>
+            ) : (
+              <div style={{ borderTop: `1px solid ${theme.muted}20` }}>
+                {initialEvents.map((event) => (
+                  <EventCard key={event.id} event={event} theme={theme} />
+                ))}
+              </div>
+            )}
           </div>
         )}
 
         {/* Host Your Event */}
         {activeTab === "host" && (
           <div className="animate-fade-in divide-y" style={{ borderColor: `${theme.muted}20` }}>
-            {/* Dynamic sections from admin */}
             {hostSections.sort((a, b) => a.order - b.order).map((section) =>
               section.type === "pdf"
                 ? <HostPdfSection key={section.id} section={section} theme={theme} />
                 : <HostTextSection key={section.id} section={section} theme={theme} />
             )}
 
-            {/* Inquiry Form — always shown */}
+            {/* Inquiry Form */}
             <div className="max-w-lg mx-auto px-6 pb-16 pt-8">
               <h3
                 className="text-2xl text-center mb-6 tracking-wider"
@@ -216,7 +298,6 @@ export default function EventsPageClient({
               >
                 Send Us a Message
               </h3>
-
               {submitted ? (
                 <div className="text-center py-8">
                   <p className="text-lg tracking-wider">Thank you!</p>

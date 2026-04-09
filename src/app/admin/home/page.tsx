@@ -647,11 +647,12 @@ export default function AdminHomePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bgUrl, carouselItems: items, autoAdvance, autoAdvanceInterval }),
       });
-      if (!res.ok) throw new Error("Save failed");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Save failed");
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-    } catch {
-      alert("Failed to save. Please try again.");
+    } catch (e) {
+      alert("Failed to save: " + (e instanceof Error ? e.message : String(e)));
     } finally {
       setSaving(false);
     }

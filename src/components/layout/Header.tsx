@@ -147,7 +147,7 @@ export default function Header({ config }: { config: HeaderConfig }) {
         <button
           onClick={() => setMobileOpen((o) => !o)}
           style={{ color: config.textColor }}
-          className="p-1"
+          className="p-3"
           aria-label="Toggle menu"
         >
           {mobileOpen ? <X size={20} /> : <Menu size={20} />}
@@ -157,8 +157,12 @@ export default function Header({ config }: { config: HeaderConfig }) {
       {/* ── Mobile drawer ────────────────────────────────────────────────────── */}
       {mobileOpen && (
         <nav
-          className="md:hidden px-5 pb-5 animate-fade-in"
-          style={{ background: config.bgColor, borderTop: `1px solid ${config.borderColor}` }}
+          className="md:hidden px-5 pb-5 animate-fade-in overflow-y-auto"
+          style={{
+            background: config.bgColor,
+            borderTop: `1px solid ${config.borderColor}`,
+            maxHeight: "calc(100dvh - 60px)",
+          }}
         >
           {visibleLinks.map((link) => (
             <Link

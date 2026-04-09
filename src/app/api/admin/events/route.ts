@@ -15,6 +15,8 @@ export async function GET() {
         description: r.description ?? undefined,
         location: r.location ?? undefined,
         imageUrl: r.image_url ?? undefined,
+        visibleFrom: r.visible_from ?? undefined,
+        visibleUntil: r.visible_until ?? undefined,
       }))
     );
   } catch (e) {
@@ -40,7 +42,8 @@ export async function POST(req: NextRequest) {
         description: event.description ?? null,
         location: event.location ?? null,
         image_url: event.imageUrl ?? null,
-        updated_at: new Date().toISOString(),
+        visible_from: event.visibleFrom ?? null,
+        visible_until: event.visibleUntil ?? null,
       },
       { onConflict: "id" }
     );
@@ -48,7 +51,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (e) {
     console.error("[POST /api/admin/events]", e);
-    return NextResponse.json({ success: false, error: String(e) }, { status: 500 });
+    const msg = e instanceof Error ? e.message : (e as { message?: string })?.message ?? JSON.stringify(e);
+    return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }
 

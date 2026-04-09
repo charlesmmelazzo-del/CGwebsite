@@ -142,6 +142,8 @@ export interface CalendarEvent {
   description?: string;
   imageUrl?: string;
   location?: string;
+  visibleFrom?: string;   // ISO date — event hidden before this date
+  visibleUntil?: string;  // ISO date — event hidden after this date
 }
 
 // ─── Menu / Coffee ───────────────────────────────────────────────────────────

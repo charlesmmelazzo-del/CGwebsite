@@ -201,6 +201,8 @@ export default function AdminEventsPage() {
       description: editing.description,
       location: editing.location,
       imageUrl: editing.imageUrl,
+      visibleFrom: editing.visibleFrom,
+      visibleUntil: editing.visibleUntil,
     };
     setSavingEvent(true);
     try {
@@ -421,6 +423,29 @@ export default function AdminEventsPage() {
                   onChange={(e) => setEditing((v) => ({ ...v, description: e.target.value }))}
                   className={inputCls + " resize-none"}
                 />
+              </div>
+              <div className="pt-2 border-t border-gray-100">
+                <p className="text-[10px] tracking-widest uppercase text-gray-400 mb-2">Visibility Schedule <span className="normal-case opacity-60">(optional — leave blank to always show)</span></p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelCls}>Show From</label>
+                    <input
+                      type="date"
+                      value={editing.visibleFrom ?? ""}
+                      onChange={(e) => setEditing((v) => ({ ...v, visibleFrom: e.target.value || undefined }))}
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Hide After</label>
+                    <input
+                      type="date"
+                      value={editing.visibleUntil ?? ""}
+                      onChange={(e) => setEditing((v) => ({ ...v, visibleUntil: e.target.value || undefined }))}
+                      className={inputCls}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
             <div className="flex gap-2 mt-5">

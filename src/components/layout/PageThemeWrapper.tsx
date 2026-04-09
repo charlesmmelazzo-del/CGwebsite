@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { getRandomTheme, getTheme, type ThemeName } from "@/lib/themes";
 import Image from "next/image";
 
@@ -22,6 +22,9 @@ export default function PageThemeWrapper({
 }: Props) {
   const [themeName, setThemeName] = useState<ThemeName>(fixedTheme ?? "green");
   const [mounted, setMounted] = useState(false);
+  const rawId = useId();
+  // Sanitize for use as a CSS id (remove colons, prefix with letter)
+  const bgId = `pw${rawId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
 
   useEffect(() => {
     if (!fixedTheme) {
@@ -33,7 +36,6 @@ export default function PageThemeWrapper({
   const theme = getTheme(themeName);
 
   if (!mounted) {
-    // Prevent flash — render with default until client mounts
     return (
       <div
         style={{ backgroundColor: theme.bg, color: theme.text }}
@@ -45,35 +47,45 @@ export default function PageThemeWrapper({
   }
 
   return (
-    <div
-      style={{
-        backgroundColor: theme.bg,
-        color: theme.text,
-        ...(bgImageUrl
-          ? { backgroundImage: `url(${bgImageUrl})`, backgroundSize: "cover", backgroundPosition: "center", backgroundAttachment: "fixed" }
-          : {}),
-      }}
-      className="min-h-screen transition-colors duration-500 relative overflow-hidden animate-fade-in"
-    >
-      {/* Dark overlay when a custom bg image is set, for text readability */}
+    <>
+      {/* Background image — desktop only (≥768px) via media query */}
       {bgImageUrl && (
-        <div className="absolute inset-0 bg-black/50 pointer-events-none" />
+        <style>{`
+          @media (min-width: 768px) {
+            #${bgId} {
+              background-image: url(${bgImageUrl});
+              background-size: cover;
+              background-position: center;
+              background-attachment: fixed;
+            }
+          }
+        `}</style>
       )}
-      {/* Botanical illustration background */}
-      {!bgImageUrl && showIllustration && theme.illustration && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-30">
-          <div className="relative w-64 h-64 md:w-96 md:h-96">
-            <Image
-              src={theme.illustration}
-              alt=""
-              fill
-              className="object-contain"
-              aria-hidden
-            />
+      <div
+        id={bgId}
+        style={{ backgroundColor: theme.bg, color: theme.text }}
+        className="min-h-screen transition-colors duration-500 relative overflow-hidden animate-fade-in"
+      >
+        {/* Dark overlay — desktop only, matches the bg image */}
+        {bgImageUrl && (
+          <div className="hidden md:block absolute inset-0 bg-black/50 pointer-events-none" />
+        )}
+        {/* Botanical illustration background */}
+        {!bgImageUrl && showIllustration && theme.illustration && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-30">
+            <div className="relative w-64 h-64 md:w-96 md:h-96">
+              <Image
+                src={theme.illustration}
+                alt=""
+                fill
+                className="object-contain"
+                aria-hidden
+              />
+            </div>
           </div>
-        </div>
-      )}
-      <div className="relative z-10">{children}</div>
-    </div>
+        )}
+        <div className="relative z-10">{children}</div>
+      </div>
+    </>
   );
 }

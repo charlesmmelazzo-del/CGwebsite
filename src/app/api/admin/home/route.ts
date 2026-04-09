@@ -35,21 +35,36 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const sb = getSupabaseAdmin();
-    const { error } = await sb.from("home_settings").upsert(
+    // Try with auto_advance columns first; fall back to just bg_url + carousel_items
+    let upsertError = await sb.from("home_settings").upsert(
       {
         id: 1,
         bg_url: body.bgUrl ?? "",
         carousel_items: body.carouselItems ?? [],
         auto_advance: body.autoAdvance ?? true,
         auto_advance_interval: body.autoAdvanceInterval ?? 6,
-        updated_at: new Date().toISOString(),
       },
       { onConflict: "id" }
-    );
-    if (error) throw error;
+    ).then((r) => r.error);
+
+    if (upsertError) {
+      // Columns may not exist yet — retry with only the base columns
+      const fallback = await sb.from("home_settings").upsert(
+        {
+          id: 1,
+          bg_url: body.bgUrl ?? "",
+          carousel_items: body.carouselItems ?? [],
+        },
+        { onConflict: "id" }
+      );
+      upsertError = fallback.error ?? null;
+    }
+
+    if (upsertError) throw upsertError;
     return NextResponse.json({ success: true });
   } catch (e) {
     console.error("[POST /api/admin/home]", e);
-    return NextResponse.json({ success: false, error: String(e) }, { status: 500 });
+    const msg = e instanceof Error ? e.message : (e as { message?: string })?.message ?? JSON.stringify(e);
+    return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }

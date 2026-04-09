@@ -33,7 +33,7 @@ export default async function AboutPage() {
               style={{
                 fontFamily: "var(--font-display)",
                 color: theme.text,
-                fontSize: `${header.titleSize}px`,
+                fontSize: `clamp(1.75rem, 7vw, ${header.titleSize}px)`,
               }}
             >
               {header.title}

@@ -30,7 +30,7 @@ export default function CoffeePageClient({ initialTabs, initialItems, header }: 
               style={{
                 fontFamily: "var(--font-display)",
                 color: theme.text,
-                fontSize: `${header.titleSize}px`,
+                fontSize: `clamp(1.75rem, 7vw, ${header.titleSize}px)`,
               }}
             >
               {header.title}
@@ -49,13 +49,13 @@ export default function CoffeePageClient({ initialTabs, initialItems, header }: 
 
         {/* Tab bar */}
         {activeTabs.length > 0 && (
-          <div className="flex flex-wrap justify-center gap-1 px-4 mb-10">
+          <div className="tab-bar-scroll flex justify-center gap-0 px-4 mb-10">
             {activeTabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTabId(tab.id)}
                 className={clsx(
-                  "px-4 py-2 text-xs tracking-widest uppercase transition-all duration-200",
+                  "px-3 md:px-4 py-2 text-xs tracking-widest uppercase whitespace-nowrap transition-all duration-200",
                   activeTabId === tab.id
                     ? "border-b-2 border-[#C97D5A] text-[#C97D5A]"
                     : "opacity-60 hover:opacity-90"
