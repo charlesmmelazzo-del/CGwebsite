@@ -75,9 +75,6 @@ function TabBar({
 
 interface SwipeCardProps {
   item: MenuItem;
-  textColor: string;
-  mutedColor: string;
-  bgColor: string;
   isFavorited: boolean;
   onToggleFavorite: () => void;
   onSwipe: (dir: "left" | "right") => void;
@@ -86,7 +83,6 @@ interface SwipeCardProps {
 
 function SwipeCard({
   item,
-  textColor,
   isFavorited,
   onToggleFavorite,
   onSwipe,
@@ -282,7 +278,8 @@ export default function MenuMobileSwipe({
     setCurrentIndex(0);
   }
 
-  function handleSwipe(_dir: "left" | "right") {
+  function handleSwipe(_direction: "left" | "right") {
+    void _direction; // both directions advance — no reject in this fun parody interface
     setCurrentIndex((prev) => prev + 1);
   }
 
@@ -338,9 +335,6 @@ export default function MenuMobileSwipe({
           <SwipeCard
             key={`${currentItem.id}-${currentIndex}`}
             item={currentItem}
-            textColor={textColor}
-            mutedColor={mutedColor}
-            bgColor={bgColor}
             isFavorited={isFavorited}
             onToggleFavorite={() => onToggleFavorite(currentItem.id)}
             onSwipe={handleSwipe}
