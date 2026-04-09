@@ -99,7 +99,7 @@ function SlideContent({
       <div className="py-10 px-6 text-center">
         <p
           className="text-2xl md:text-4xl leading-relaxed"
-          style={{ fontFamily: "var(--font-display)" }}
+          style={{ fontFamily: "var(--font-display)", color: item.textColor ?? undefined }}
         >
           {item.text}
         </p>
