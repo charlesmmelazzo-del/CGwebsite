@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     const { error: delItemsErr } = await sb
       .from("coffee_items")
       .delete()
-      .gte("order", -1);
+      .not("id", "is", null);
     if (delItemsErr) {
       console.error("[coffee POST] delete items error:", delItemsErr);
       throw delItemsErr;
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
     const { error: delTabsErr } = await sb
       .from("coffee_tabs")
       .delete()
-      .gte("order", -1);
+      .not("id", "is", null);
     if (delTabsErr) {
       console.error("[coffee POST] delete tabs error:", delTabsErr);
       throw delTabsErr;
