@@ -2,17 +2,65 @@
 
 import { useCallback, useEffect, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
-import type { MenuItem } from "@/types";
+import type { MenuItem, MenuTab } from "@/types";
 import Image from "next/image";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import clsx from "clsx";
 
 interface Props {
   items: MenuItem[];
+  tabs?: MenuTab[];
   textColor: string;
   mutedColor: string;
 }
 
-// Returns true if the item has any back-of-card content worth showing
+// ─── Slide data (items + section dividers) ────────────────────────────────────
+type Slide =
+  | { kind: "item";    item: MenuItem; tabId: string }
+  | { kind: "divider"; tabId: string;  label: string };
+
+function buildSlides(items: MenuItem[], tabs: MenuTab[]): {
+  slides: Slide[];
+  sectionIndices: Record<string, number>;
+} {
+  const slides: Slide[] = [];
+  const sectionIndices: Record<string, number> = {};
+  let first = true;
+
+  for (const tab of tabs) {
+    const tabItems = items.filter((i) => i.tabId === tab.id);
+    if (tabItems.length === 0) continue;
+
+    if (!first) {
+      // Divider marks the start of each section after the first
+      sectionIndices[tab.id] = slides.length;
+      slides.push({ kind: "divider", tabId: tab.id, label: tab.label });
+    } else {
+      sectionIndices[tab.id] = 0;
+      first = false;
+    }
+
+    for (const item of tabItems) {
+      slides.push({ kind: "item", item, tabId: tab.id });
+    }
+  }
+
+  return { slides, sectionIndices };
+}
+
+function getTabIdForIndex(
+  index: number,
+  sectionIndices: Record<string, number>,
+  tabs: MenuTab[]
+): string {
+  let current = tabs[0]?.id ?? "";
+  for (const tab of tabs) {
+    const start = sectionIndices[tab.id];
+    if (start !== undefined && index >= start) current = tab.id;
+  }
+  return current;
+}
+
+// ─── Returns true if the item has any back-of-card content ───────────────────
 function hasBackContent(item: MenuItem): boolean {
   return !!(item.tagLine || item.ingredients || item.tastingNotes || item.notableNotes);
 }
@@ -34,7 +82,6 @@ function FlipCard({
   const canFlip = hasBackContent(item);
   const imgSrc = item.carouselImageUrl ?? item.imageUrl;
 
-  // Back-of-card fields rendered in order, labels intentionally omitted
   const backLines = [
     item.tagLine,
     item.ingredients,
@@ -50,11 +97,7 @@ function FlipCard({
   }
 
   return (
-    <div
-      className="relative w-full"
-      style={{ height: "360px", perspective: "1200px" }}
-    >
-      {/* Inner — both faces live here */}
+    <div className="relative w-full" style={{ height: "360px", perspective: "1200px" }}>
       <div
         style={{
           position: "absolute",
@@ -64,7 +107,7 @@ function FlipCard({
           transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
         }}
       >
-        {/* ── FRONT ─────────────────────────────────────────────────── */}
+        {/* ── FRONT ── */}
         <div
           role="button"
           tabIndex={canFlip ? 0 : -1}
@@ -73,82 +116,34 @@ function FlipCard({
           onKeyDown={handleKeyDown}
           onClick={canFlip ? onFlip : undefined}
           style={{
-            position: "absolute",
-            inset: 0,
-            backfaceVisibility: "hidden",
-            WebkitBackfaceVisibility: "hidden",
+            position: "absolute", inset: 0,
+            backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden",
             cursor: canFlip ? "pointer" : "default",
-            borderRadius: "2px",
-            overflow: "hidden",
+            borderRadius: "2px", overflow: "hidden",
             border: `1px solid ${textColor}20`,
           }}
         >
-          {/* Photo or text placeholder */}
           {imgSrc ? (
             <div className="relative w-full h-[220px]">
-              <Image
-                src={imgSrc}
-                alt={item.alt ?? item.title}
-                fill
-                className="object-cover"
-                sizes="320px"
-              />
-              {/* Subtle bottom gradient so name reads over photo */}
-              <div
-                className="absolute inset-x-0 bottom-0 h-16"
-                style={{ background: "linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 100%)" }}
-              />
+              <Image src={imgSrc} alt={item.alt ?? item.title} fill className="object-cover" sizes="320px" />
+              <div className="absolute inset-x-0 bottom-0 h-16" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 100%)" }} />
             </div>
           ) : (
-            <div
-              className="w-full h-[220px] flex items-center justify-center"
-              style={{ backgroundColor: `${textColor}12` }}
-            >
-              <span
-                className="text-4xl opacity-20 select-none"
-                style={{ fontFamily: "var(--font-display)", color: textColor }}
-              >
-                CG
-              </span>
+            <div className="w-full h-[220px] flex items-center justify-center" style={{ backgroundColor: `${textColor}12` }}>
+              <span className="text-4xl opacity-20 select-none" style={{ fontFamily: "var(--font-display)", color: textColor }}>CG</span>
             </div>
           )}
-
-          {/* Name / price / description */}
           <div className="p-4">
-            <h3
-              className="text-base tracking-wider mb-1 leading-tight"
-              style={{
-                fontFamily: "var(--font-display)",
-                color: item.titleColor ?? textColor,
-              }}
-            >
+            <h3 className="text-base tracking-wider mb-1 leading-tight" style={{ fontFamily: "var(--font-display)", color: item.titleColor ?? textColor }}>
               {item.title}
             </h3>
-            {item.price && (
-              <p className="text-xs mb-1.5" style={{ color: item.priceColor ?? "#C97D5A" }}>
-                {item.price}
-              </p>
-            )}
-            {item.description && (
-              <p
-                className="text-xs leading-relaxed line-clamp-2"
-                style={{ color: item.descriptionColor ?? mutedColor }}
-              >
-                {item.description}
-              </p>
-            )}
-            {canFlip && (
-              <p
-                className="text-[10px] tracking-widest uppercase mt-3 opacity-40"
-                style={{ color: textColor }}
-              >
-                Tap for details
-              </p>
-            )}
+            {item.price && <p className="text-xs mb-1.5" style={{ color: item.priceColor ?? "#C97D5A" }}>{item.price}</p>}
+            {item.description && <p className="text-xs leading-relaxed line-clamp-2" style={{ color: item.descriptionColor ?? mutedColor }}>{item.description}</p>}
+            {canFlip && <p className="text-[10px] tracking-widest uppercase mt-3 opacity-40" style={{ color: textColor }}>Tap for details</p>}
           </div>
         </div>
 
-        {/* ── BACK ──────────────────────────────────────────────────── */}
+        {/* ── BACK ── */}
         <div
           role="button"
           tabIndex={isFlipped ? 0 : -1}
@@ -157,65 +152,31 @@ function FlipCard({
           onKeyDown={handleKeyDown}
           onClick={onFlip}
           style={{
-            position: "absolute",
-            inset: 0,
-            backfaceVisibility: "hidden",
-            WebkitBackfaceVisibility: "hidden",
+            position: "absolute", inset: 0,
+            backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden",
             transform: "rotateY(180deg)",
-            cursor: "pointer",
-            borderRadius: "2px",
-            overflow: "hidden",
+            cursor: "pointer", borderRadius: "2px", overflow: "hidden",
             border: `1px solid ${textColor}20`,
             backgroundColor: `${textColor}08`,
-            display: "flex",
-            flexDirection: "column",
+            display: "flex", flexDirection: "column",
           }}
         >
-          {/* Back header: item name */}
-          <div
-            className="px-5 pt-5 pb-3 shrink-0"
-            style={{ borderBottom: `1px solid ${textColor}15` }}
-          >
-            <p
-              className="text-base tracking-wider leading-tight"
-              style={{ fontFamily: "var(--font-display)", color: item.titleColor ?? textColor }}
-            >
-              {item.title}
-            </p>
-            {item.price && (
-              <p className="text-xs mt-0.5" style={{ color: item.priceColor ?? "#C97D5A" }}>
-                {item.price}
-              </p>
-            )}
+          <div className="px-5 pt-5 pb-3 shrink-0" style={{ borderBottom: `1px solid ${textColor}15` }}>
+            <p className="text-base tracking-wider leading-tight" style={{ fontFamily: "var(--font-display)", color: item.titleColor ?? textColor }}>{item.title}</p>
+            {item.price && <p className="text-xs mt-0.5" style={{ color: item.priceColor ?? "#C97D5A" }}>{item.price}</p>}
           </div>
-
-          {/* Back body: text fields, no labels */}
           <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
             {backLines.map((line, i) => (
-              <p
-                key={i}
-                className="text-sm leading-relaxed"
-                style={{
-                  color: mutedColor,
-                  // First line (tagLine) gets slightly larger treatment
-                  fontSize: i === 0 ? "0.875rem" : "0.8125rem",
-                  opacity: i === 0 ? 1 : 0.85,
-                  fontStyle: i === 0 ? "italic" : "normal",
-                }}
-              >
-                {line}
-              </p>
+              <p key={i} className="leading-relaxed" style={{
+                color: mutedColor,
+                fontSize: i === 0 ? "0.875rem" : "0.8125rem",
+                opacity: i === 0 ? 1 : 0.85,
+                fontStyle: i === 0 ? "italic" : "normal",
+              }}>{line}</p>
             ))}
           </div>
-
-          {/* Tap to flip back hint */}
           <div className="px-5 py-3 shrink-0" style={{ borderTop: `1px solid ${textColor}15` }}>
-            <p
-              className="text-[10px] tracking-widest uppercase opacity-30"
-              style={{ color: textColor }}
-            >
-              Tap to close
-            </p>
+            <p className="text-[10px] tracking-widest uppercase opacity-30" style={{ color: textColor }}>Tap to close</p>
           </div>
         </div>
       </div>
@@ -223,19 +184,42 @@ function FlipCard({
   );
 }
 
+// ─── Section Divider Card ─────────────────────────────────────────────────────
+function DividerCard({ label, textColor, mutedColor }: { label: string; textColor: string; mutedColor: string }) {
+  return (
+    <div
+      className="w-full flex items-center justify-center"
+      style={{ height: "360px", border: `1px solid ${textColor}15`, borderRadius: "2px" }}
+    >
+      <div className="text-center px-6">
+        <div className="w-8 h-px mx-auto mb-5" style={{ backgroundColor: mutedColor, opacity: 0.4 }} />
+        <p
+          className="tracking-widest uppercase"
+          style={{ fontFamily: "var(--font-display)", color: mutedColor, fontSize: "0.75rem", letterSpacing: "0.25em", opacity: 0.7 }}
+        >
+          {label}
+        </p>
+        <div className="w-8 h-px mx-auto mt-5" style={{ backgroundColor: mutedColor, opacity: 0.4 }} />
+      </div>
+    </div>
+  );
+}
+
 // ─── Main carousel ────────────────────────────────────────────────────────────
-export default function MenuCarousel({ items, textColor, mutedColor }: Props) {
-  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true, align: "center" });
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  // Only one card can be flipped at a time; track by item id
+export default function MenuCarousel({ items, tabs = [], textColor, mutedColor }: Props) {
+  const { slides, sectionIndices } = buildSlides(items, tabs);
+  const loop = slides.length >= 5;
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop, align: "center", skipSnaps: false });
+  const [activeTabId, setActiveTabId] = useState(tabs[0]?.id ?? "");
   const [flippedId, setFlippedId] = useState<string | null>(null);
 
+  // Update active tab based on scroll position
   const onSelect = useCallback(() => {
     if (!emblaApi) return;
-    setSelectedIndex(emblaApi.selectedScrollSnap());
-    // Reset any flipped card when the carousel advances
+    const idx = emblaApi.selectedScrollSnap();
+    setActiveTabId(getTabIdForIndex(idx, sectionIndices, tabs));
     setFlippedId(null);
-  }, [emblaApi]);
+  }, [emblaApi, sectionIndices, tabs]);
 
   useEffect(() => {
     if (!emblaApi) return;
@@ -243,9 +227,7 @@ export default function MenuCarousel({ items, textColor, mutedColor }: Props) {
     return () => { emblaApi.off("select", onSelect); };
   }, [emblaApi, onSelect]);
 
-  const active = items.filter((i) => i.active);
-
-  if (!active.length) {
+  if (!slides.length) {
     return (
       <div className="py-16 text-center opacity-40 text-sm tracking-widest uppercase">
         No items yet
@@ -253,68 +235,84 @@ export default function MenuCarousel({ items, textColor, mutedColor }: Props) {
     );
   }
 
+  function scrollToSection(tabId: string) {
+    const idx = sectionIndices[tabId];
+    if (idx !== undefined) emblaApi?.scrollTo(idx);
+  }
+
   function handleFlip(id: string) {
     setFlippedId((prev) => (prev === id ? null : id));
   }
 
+  // Tab bar — only show when there are 2+ tabs with items
+  const visibleTabs = tabs.filter((t) => sectionIndices[t.id] !== undefined);
+
   return (
-    <div className="relative">
-      {/* Carousel */}
-      <div className="embla" ref={emblaRef}>
-        <div className="embla__container">
-          {active.map((item) => (
-            <div
-              key={item.id}
-              className="embla__slide px-3"
-              style={{ flex: "0 0 min(320px, 85vw)" }}
+    <div>
+      {/* ── Tab bar ── */}
+      {visibleTabs.length > 1 && (
+        <div className="flex flex-wrap justify-center gap-1 px-4 mb-6 overflow-x-auto">
+          {visibleTabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => scrollToSection(tab.id)}
+              className={clsx(
+                "px-4 py-2 text-xs tracking-widest uppercase whitespace-nowrap transition-all duration-200 border-b-2",
+                activeTabId === tab.id
+                  ? "border-[#C97D5A] text-[#C97D5A]"
+                  : "border-transparent opacity-60 hover:opacity-90"
+              )}
+              style={{ color: activeTabId === tab.id ? "#C97D5A" : textColor }}
             >
-              <FlipCard
-                item={item}
-                isFlipped={flippedId === item.id}
-                onFlip={() => handleFlip(item.id)}
-                textColor={textColor}
-                mutedColor={mutedColor}
-              />
-            </div>
+              {tab.label}
+            </button>
           ))}
+        </div>
+      )}
+
+      {/* ── Embla ── */}
+      <div className="relative px-4">
+        <div className="embla" ref={emblaRef}>
+          <div className="embla__container">
+            {slides.map((slide, i) => (
+              <div key={i} className="embla__slide px-3" style={{ flex: "0 0 min(320px, 85vw)" }}>
+                {slide.kind === "divider" ? (
+                  <DividerCard label={slide.label} textColor={textColor} mutedColor={mutedColor} />
+                ) : (
+                  <FlipCard
+                    item={slide.item}
+                    isFlipped={flippedId === slide.item.id}
+                    onFlip={() => handleFlip(slide.item.id)}
+                    textColor={textColor}
+                    mutedColor={mutedColor}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Nav arrows */}
-      {active.length > 1 && (
-        <>
-          <button
-            onClick={() => emblaApi?.scrollPrev()}
-            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 w-8 h-8 flex items-center justify-center rounded-full transition-colors hover:text-[#C97D5A]"
-            style={{ color: textColor, backgroundColor: `${textColor}10` }}
-            aria-label="Previous cocktail"
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <button
-            onClick={() => emblaApi?.scrollNext()}
-            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 w-8 h-8 flex items-center justify-center rounded-full transition-colors hover:text-[#C97D5A]"
-            style={{ color: textColor, backgroundColor: `${textColor}10` }}
-            aria-label="Next cocktail"
-          >
-            <ChevronRight size={18} />
-          </button>
-        </>
-      )}
-
-      {/* Dots */}
-      {active.length > 1 && (
-        <div className="flex justify-center gap-1.5 mt-5">
-          {active.map((_, i) => (
+      {/* ── Section dots (one per visible tab) ── */}
+      {visibleTabs.length > 1 && (
+        <div className="flex justify-center gap-3 mt-5">
+          {visibleTabs.map((tab) => (
             <button
-              key={i}
-              onClick={() => emblaApi?.scrollTo(i)}
-              aria-label={`Go to cocktail ${i + 1}`}
-              className={`rounded-full transition-all duration-300 ${
-                i === selectedIndex ? "w-4 h-1.5" : "w-1.5 h-1.5 opacity-30"
-              }`}
-              style={{ backgroundColor: i === selectedIndex ? "#C97D5A" : textColor }}
-            />
+              key={tab.id}
+              onClick={() => scrollToSection(tab.id)}
+              aria-label={`Go to ${tab.label}`}
+              className="flex flex-col items-center gap-1 group"
+            >
+              <div
+                className="rounded-full transition-all duration-300"
+                style={{
+                  width: activeTabId === tab.id ? "16px" : "6px",
+                  height: "6px",
+                  backgroundColor: activeTabId === tab.id ? "#C97D5A" : textColor,
+                  opacity: activeTabId === tab.id ? 1 : 0.3,
+                }}
+              />
+            </button>
           ))}
         </div>
       )}

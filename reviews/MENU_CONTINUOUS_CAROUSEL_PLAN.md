@@ -1,3 +1,154 @@
+# Menu Page — Continuous Looping Carousel with Tab Quick-Scroll
+
+**For:** Claude Code
+**Scope:** Replace the current tab-filtered, per-category carousel on `/menu` with a single continuous looping carousel that contains every menu item across all tabs. Tabs become section markers / quick-scroll anchors.
+
+---
+
+## Current behavior (what to change)
+
+- `MenuPageClient.tsx` tracks `activeTabId` in state and filters items by it: only items matching the selected tab are passed to `MenuCarousel.tsx`.
+- Switching tabs unmounts the current carousel items and mounts a new set — the user "jumps" between four separate carousels.
+- Embla is configured with `loop: true` and `align: "center"`.
+
+## Target behavior
+
+- **One continuous carousel** containing *all* active items from *all* active tabs, ordered: Tab 1 items (by `order`), then Tab 2 items, then Tab 3, then Tab 4, etc. — exactly the order tabs appear left-to-right, with each tab's items sorted internally by their `order` field.
+- The carousel is **centered on the page**, as it already is, and the user can **scroll left or right continuously** — it loops seamlessly (Embla `loop: true` stays).
+- **Tab bar stays at the top.** Clicking a tab **quick-scrolls** (smooth animated scroll via Embla `scrollTo`) the carousel to the **first item of that tab's section**. The tab bar does *not* filter items out — all items remain in the carousel at all times.
+- As the user manually scrolls through the carousel, the **active tab in the tab bar updates** to reflect which section the centered/active slide belongs to. This gives the user a persistent sense of "where they are" in the full menu.
+
+---
+
+## Implementation plan
+
+### 1. Build the ordered item list
+
+In `MenuPageClient.tsx`, replace the per-tab filter with a single flat list:
+
+```
+const allItems = activeTabs
+  .sort((a, b) => a.order - b.order)
+  .flatMap(tab =>
+    activeItems
+      .filter(item => item.tabId === tab.id)
+      .sort((a, b) => a.order - b.order)
+  );
+```
+
+This produces one array: `[...Seasonal items, ...Classics items, ...NA items, ...Beer & Wine items]`.
+
+### 2. Compute section start indices
+
+Build a map of tab ID → index of that tab's first item in the flat array. This powers the quick-scroll:
+
+```
+const sectionStartIndices: Record<string, number> = {};
+let idx = 0;
+for (const tab of activeTabs.sort((a, b) => a.order - b.order)) {
+  sectionStartIndices[tab.id] = idx;
+  idx += activeItems.filter(i => i.tabId === tab.id).length;
+}
+```
+
+### 3. Pass the full list + section indices to `MenuCarousel`
+
+Update the `MenuCarousel` props:
+
+- `items` — the full flat list (replaces the current per-tab-filtered list).
+- `sectionStartIndices` — `Record<string, number>` mapping tab ID to first-item index.
+- `tabs` — the sorted active tabs array (for building the tab bar inside the carousel or for the callback).
+- `onActiveSectionChange` — callback `(tabId: string) => void` that fires when the centered slide crosses a section boundary.
+
+### 4. Tab quick-scroll
+
+When the user clicks a tab in the tab bar:
+
+```
+emblaApi.scrollTo(sectionStartIndices[clickedTabId]);
+```
+
+This smooth-scrolls the carousel to the first item in that section. Embla supports `scrollTo(index)` natively — no extra library needed.
+
+### 5. Active tab tracking on manual scroll
+
+On Embla's `select` event (fires whenever the centered slide changes):
+
+```
+const currentIndex = emblaApi.selectedScrollSnap();
+// Find which section this index belongs to
+let currentTabId = activeTabs[0].id;
+for (const tab of activeTabs) {
+  if (currentIndex >= sectionStartIndices[tab.id]) {
+    currentTabId = tab.id;
+  }
+}
+onActiveSectionChange(currentTabId);
+```
+
+In `MenuPageClient.tsx`, update `activeTabId` state from this callback so the tab bar highlight follows the scroll position.
+
+### 6. Visual section dividers (optional but recommended)
+
+To give the user a sense of sections flowing into one another, insert a lightweight **section divider slide** at each boundary — a non-interactive card the same size as a menu card that shows only the next section's name (e.g. "Classics") in the heading font, styled as a subtle label. This way as users scroll they see "…last Seasonal item → 'Classics' divider → first Classics item…" and know they've entered a new section.
+
+Implementation:
+- Before building the flat list, interleave divider items at each tab boundary (give them a special `type: 'divider'` field or a flag like `isDivider: true`).
+- In the carousel render, check for dividers and render a simple styled `<div>` instead of a FlipCard. Dividers are not clickable, not flippable, and have no back content.
+- Update section start indices to account for the divider slides (each divider adds +1 to subsequent indices).
+- **Do not** show dot indicators for divider slides — only for real menu items.
+
+### 7. Embla config adjustments
+
+Current Embla options are `{ loop: true, align: 'center' }`. Keep both. Additionally consider:
+
+- `skipSnaps: false` — ensure every card is a valid snap point so quick-scroll lands precisely.
+- `dragFree: false` — keep snapping behavior so centered card is always clean.
+- If the total item count is very small (<4), looping may look odd (same cards repeating immediately). Add a guard: if total items < some threshold (say 5), disable `loop` to avoid visual stutter.
+
+### 8. Dot indicators
+
+The current carousel shows dots per item. With all items in one carousel the dot count may grow large (e.g. 15+ cocktails). Options:
+
+- **Replace dots with a thin progress bar** that shows position in the overall carousel — cleaner at scale.
+- Or **show section dots only** (one dot per tab, 4 dots), styled to indicate which section is active. Clicking a section dot scrolls to that section (same as clicking the tab).
+- **[DECIDE]**: progress bar vs. section dots vs. keep per-item dots. I'd recommend section dots — they reinforce the tab structure and stay compact.
+
+### 9. Flip card behavior in continuous mode
+
+The existing FlipCard component should work unchanged. One addition: **when the user scrolls (manually or via tab-click), auto-reset any flipped card back to its front side.** The current code already does `setFlippedId(null)` on carousel navigation — verify this still fires in the new single-carousel setup.
+
+---
+
+## Files to modify
+
+| File | Change |
+|------|--------|
+| `src/app/menu/MenuPageClient.tsx` | Remove per-tab filtering. Build flat item list + section indices. Pass to carousel. Update `activeTabId` from carousel callback. |
+| `src/components/ui/MenuCarousel.tsx` | Accept new props (`sectionStartIndices`, `tabs`, `onActiveSectionChange`). Add `scrollTo` on tab click. Add `select` event listener to track active section. Optionally render divider slides. Update dot indicators. |
+| `src/types/index.ts` | No changes needed unless you add a `divider` type — if so, add a `isDivider?: boolean` to `MenuItem` or create a union type. |
+| `src/app/menu/page.tsx` | No changes (data fetching stays the same — still fetch all tabs + all items). |
+
+Admin panel, API routes, and Supabase schema are **not touched** — this is purely a front-end rendering change.
+
+---
+
+## Acceptance criteria
+
+- All active menu items from all active tabs appear in a single centered carousel.
+- User can scroll left/right continuously and the carousel loops.
+- Clicking a tab smooth-scrolls to the first item in that tab's section.
+- The active tab highlight updates as the user manually scrolls through sections.
+- Section dividers (if implemented) appear between sections and are not interactive.
+- Flip cards work exactly as before (click to flip, click to flip back, auto-reset on scroll).
+- On mobile: touch-swipe works, cards are properly sized, tab bar is scrollable if it overflows.
+- Existing admin panel, data model, and API are unchanged.
+
+## Out of scope
+
+- Everything in `CLAUDE_CODE_TASK_PLAN.md` and `CLAUDE_CODE_FOLLOWUP_PLAN.md` that isn't this carousel change.
+- Coffee page — leave it using the current per-tab carousel for now (it can be migrated later if Mike likes how the menu page feels).
+
 # Common Good — Follow-up Task Plan
 
 **For:** Claude Code

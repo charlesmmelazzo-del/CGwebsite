@@ -23,6 +23,8 @@ export interface CarouselItemBase {
   type: CarouselItemType;
   order: number;
   active: boolean;
+  startDate?: string;  // ISO datetime — slide hidden before this
+  endDate?: string;    // ISO datetime — slide hidden after this
 }
 
 export interface CarouselTextItem extends CarouselItemBase {
@@ -179,6 +181,8 @@ export interface HomeSettings {
   backgroundImageUrl?: string;
   backgroundTheme: ThemeName;
   carouselItems: CarouselItem[];
+  autoAdvance?: boolean;         // default true
+  autoAdvanceInterval?: number;  // seconds, default 6
 }
 
 // ─── Page Builder — Section types ────────────────────────────────────────────

@@ -8,17 +8,24 @@ const DEFAULT_CAROUSEL: CarouselItem[] = [
   { id: "3", type: "text", order: 2, active: true, text: "A space to celebrate life — from special occasions to day-to-day." },
 ];
 
-export async function getHomeData(): Promise<{ bgUrl: string; carouselItems: CarouselItem[] }> {
+export async function getHomeData(): Promise<{
+  bgUrl: string;
+  carouselItems: CarouselItem[];
+  autoAdvance: boolean;
+  autoAdvanceInterval: number;
+}> {
   noStore();
   try {
     const sb = getSupabaseAdmin();
     const { data } = await sb.from("home_settings").select("*").eq("id", 1).single();
-    if (!data) return { bgUrl: "", carouselItems: DEFAULT_CAROUSEL };
+    if (!data) return { bgUrl: "", carouselItems: DEFAULT_CAROUSEL, autoAdvance: true, autoAdvanceInterval: 6 };
     return {
       bgUrl: data.bg_url ?? "",
       carouselItems: (data.carousel_items as CarouselItem[]) ?? DEFAULT_CAROUSEL,
+      autoAdvance: data.auto_advance ?? true,
+      autoAdvanceInterval: data.auto_advance_interval ?? 6,
     };
   } catch {
-    return { bgUrl: "", carouselItems: DEFAULT_CAROUSEL };
+    return { bgUrl: "", carouselItems: DEFAULT_CAROUSEL, autoAdvance: true, autoAdvanceInterval: 6 };
   }
 }

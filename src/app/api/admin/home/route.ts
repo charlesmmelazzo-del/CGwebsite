@@ -13,10 +13,12 @@ const DEFAULT_DATA = { bgUrl: "", carouselItems: DEFAULT_CAROUSEL };
 async function readData() {
   const sb = getSupabaseAdmin();
   const { data } = await sb.from("home_settings").select("*").eq("id", 1).single();
-  if (!data) return { ...DEFAULT_DATA };
+  if (!data) return { ...DEFAULT_DATA, autoAdvance: true, autoAdvanceInterval: 6 };
   return {
     bgUrl: data.bg_url ?? "",
     carouselItems: (data.carousel_items as CarouselItem[]) ?? DEFAULT_CAROUSEL,
+    autoAdvance: data.auto_advance ?? true,
+    autoAdvanceInterval: data.auto_advance_interval ?? 6,
   };
 }
 
@@ -38,6 +40,8 @@ export async function POST(req: NextRequest) {
         id: 1,
         bg_url: body.bgUrl ?? "",
         carousel_items: body.carouselItems ?? [],
+        auto_advance: body.autoAdvance ?? true,
+        auto_advance_interval: body.autoAdvanceInterval ?? 6,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "id" }

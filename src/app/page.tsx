@@ -2,9 +2,16 @@ import HomeCarousel from "@/components/home/HomeCarousel";
 import { getHomeData } from "@/lib/homedata";
 
 export default async function HomePage() {
-  const { bgUrl, carouselItems } = await getHomeData();
-  const activeItems = carouselItems
-    .filter((i) => i.active)
+  const { bgUrl, carouselItems, autoAdvance, autoAdvanceInterval } = await getHomeData();
+
+  const now = new Date();
+  const visibleItems = carouselItems
+    .filter((i) => {
+      if (!i.active) return false;
+      if (i.startDate && new Date(i.startDate) > now) return false;
+      if (i.endDate && new Date(i.endDate) < now) return false;
+      return true;
+    })
     .sort((a, b) => a.order - b.order);
 
   return (
@@ -23,17 +30,13 @@ export default async function HomePage() {
       {/* Gradient overlay so carousel text stays readable over any bg image */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60 pointer-events-none" />
 
-      {/* Botanical watermark */}
-      <div
-        className="absolute inset-0 flex items-center justify-center pointer-events-none"
-        style={{ opacity: 0.08 }}
-      >
-        {/* placeholder for botanical illustration */}
-      </div>
-
       {/* Carousel floats above background */}
       <div className="relative z-10 w-full max-w-4xl mx-auto px-4 py-16 animate-slide-up">
-        <HomeCarousel items={activeItems} />
+        <HomeCarousel
+          items={visibleItems}
+          autoAdvance={autoAdvance}
+          autoAdvanceInterval={autoAdvanceInterval}
+        />
       </div>
     </div>
   );

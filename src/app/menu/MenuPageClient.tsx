@@ -1,11 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import PageThemeWrapper from "@/components/layout/PageThemeWrapper";
 import MenuCarousel from "@/components/ui/MenuCarousel";
 import type { MenuTab, MenuItem, PageHeaderData } from "@/types";
 import { THEMES } from "@/lib/themes";
-import clsx from "clsx";
 
 interface Props {
   initialTabs: MenuTab[];
@@ -15,9 +13,17 @@ interface Props {
 
 export default function MenuPageClient({ initialTabs, initialItems, header }: Props) {
   const theme = THEMES.terracotta;
-  const activeTabs = initialTabs.filter((t) => t.active).sort((a, b) => a.order - b.order);
-  const [activeTabId, setActiveTabId] = useState(activeTabs[0]?.id ?? "");
-  const activeItems = initialItems.filter((i) => i.tabId === activeTabId && i.active);
+
+  const activeTabs = initialTabs
+    .filter((t) => t.active)
+    .sort((a, b) => a.order - b.order);
+
+  // One flat list: all items from all tabs, ordered by tab then item.order
+  const allItems = activeTabs.flatMap((tab) =>
+    initialItems
+      .filter((item) => item.tabId === tab.id && item.active)
+      .sort((a, b) => a.order - b.order)
+  );
 
   return (
     <PageThemeWrapper fixedTheme="terracotta" showIllustration bgImageUrl={header.bgImageUrl}>
@@ -46,31 +52,10 @@ export default function MenuPageClient({ initialTabs, initialItems, header }: Pr
           <div className="w-16 h-px mx-auto mt-4" style={{ backgroundColor: theme.muted }} />
         </header>
 
-        {/* Tab bar */}
-        {activeTabs.length > 0 && (
-          <div className="flex flex-wrap justify-center gap-1 px-4 mb-10 overflow-x-auto">
-            {activeTabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTabId(tab.id)}
-                className={clsx(
-                  "px-4 py-2 text-xs tracking-widest uppercase whitespace-nowrap transition-all duration-200",
-                  activeTabId === tab.id
-                    ? "border-b-2 border-[#C97D5A] text-[#C97D5A]"
-                    : "opacity-60 hover:opacity-90"
-                )}
-                style={{ color: activeTabId === tab.id ? "#C97D5A" : theme.text }}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Carousel */}
-        <div className="animate-fade-in px-4 pb-16">
+        <div className="pb-16">
           <MenuCarousel
-            items={activeItems}
+            items={allItems}
+            tabs={activeTabs}
             textColor={theme.text}
             mutedColor={theme.muted}
           />

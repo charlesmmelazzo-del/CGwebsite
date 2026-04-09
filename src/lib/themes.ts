@@ -30,7 +30,6 @@ export const THEMES: Record<ThemeName, Theme> = {
     bg: "#3B5040",
     text: "#A8C4A0",
     muted: "#6a8a72",
-    illustration: "/images/backgrounds/bg-green.png",
   },
   amber: {
     name: "amber",
@@ -38,7 +37,6 @@ export const THEMES: Record<ThemeName, Theme> = {
     bg: "#866515",
     text: "#D4B870",
     muted: "#a08030",
-    illustration: "/images/backgrounds/bg-amber.png",
   },
   terracotta: {
     name: "terracotta",
@@ -46,7 +44,6 @@ export const THEMES: Record<ThemeName, Theme> = {
     bg: "#9D5242",
     text: "#D4A898",
     muted: "#b07868",
-    illustration: "/images/backgrounds/bg-terracotta.png",
   },
   plum: {
     name: "plum",
@@ -61,7 +58,6 @@ export const THEMES: Record<ThemeName, Theme> = {
     bg: "#2F4A4E",
     text: "#90B8BC",
     muted: "#5a8a8e",
-    illustration: "/images/backgrounds/bg-teal.png",
   },
   blue: {
     name: "blue",

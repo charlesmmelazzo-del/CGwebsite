@@ -9,12 +9,16 @@ import { X } from "lucide-react";
 
 interface Props {
   items: CarouselItem[];
+  autoAdvance?: boolean;
+  autoAdvanceInterval?: number; // seconds
 }
 
-export default function HomeCarousel({ items }: Props) {
-  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true }, [
-    Autoplay({ delay: 5000, stopOnInteraction: false }),
-  ]);
+export default function HomeCarousel({ items, autoAdvance = true, autoAdvanceInterval = 6 }: Props) {
+  const plugins = autoAdvance
+    ? [Autoplay({ delay: autoAdvanceInterval * 1000, stopOnInteraction: true })]
+    : [];
+
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: items.length >= 3 }, plugins);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
 
@@ -29,15 +33,14 @@ export default function HomeCarousel({ items }: Props) {
     return () => { emblaApi.off("select", onSelect); };
   }, [emblaApi, onSelect]);
 
-  const active = items.filter((i) => i.active);
-  if (!active.length) return null;
+  if (!items.length) return null;
 
   return (
     <div className="relative w-full max-w-3xl mx-auto">
       {/* Carousel */}
       <div className="embla" ref={emblaRef}>
         <div className="embla__container">
-          {active.map((item) => (
+          {items.map((item) => (
             <div key={item.id} className="embla__slide px-4">
               <SlideContent item={item} onExpand={setExpandedImage} />
             </div>
@@ -46,14 +49,14 @@ export default function HomeCarousel({ items }: Props) {
       </div>
 
       {/* Dots */}
-      {active.length > 1 && (
+      {items.length > 1 && (
         <div className="flex justify-center gap-2 mt-4">
-          {active.map((_, i) => (
+          {items.map((_, i) => (
             <button
               key={i}
               onClick={() => emblaApi?.scrollTo(i)}
-              className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
-                i === selectedIndex ? "bg-[#C97D5A] w-4" : "bg-current opacity-30"
+              className={`h-1.5 rounded-full transition-all duration-300 ${
+                i === selectedIndex ? "bg-[#C97D5A] w-4" : "bg-current opacity-30 w-1.5"
               }`}
             />
           ))}
@@ -115,10 +118,7 @@ function SlideContent({
     const t = item as CarouselTextItem;
     const align = t.alignment ?? "center";
     return (
-      <div
-        className="py-10 px-6"
-        style={{ textAlign: align }}
-      >
+      <div className="py-10 px-6" style={{ textAlign: align }}>
         <p
           style={{
             fontFamily: t.fontFamily ?? "var(--font-display)",
@@ -279,7 +279,6 @@ function CarouselForm({ item }: { item: CarouselFormItem }) {
 
   return (
     <div className="py-6 px-4 max-w-md mx-auto">
-      {/* Header: image takes priority over title/description */}
       {item.headerImageUrl ? (
         <div className="mb-4 flex justify-center">
           <Image
@@ -309,8 +308,8 @@ function CarouselForm({ item }: { item: CarouselFormItem }) {
             <p
               className="mb-4 leading-relaxed opacity-70"
               style={{
-                fontSize: item.descriptionFontSize ? `${item.descriptionFontSize}px` : "0.875rem",
-                color:    item.descriptionColor ?? undefined,
+                fontSize:  item.descriptionFontSize ? `${item.descriptionFontSize}px` : "0.875rem",
+                color:     item.descriptionColor ?? undefined,
                 textAlign: item.titleAlignment ?? "center",
               }}
             >
