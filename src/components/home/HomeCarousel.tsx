@@ -48,18 +48,19 @@ export default function HomeCarousel({ items, autoAdvance = true, autoAdvanceInt
         </div>
       </div>
 
-      {/* Dots */}
+      {/* Scrollbar */}
       {items.length > 1 && (
-        <div className="flex justify-center gap-2 mt-4">
-          {items.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => emblaApi?.scrollTo(i)}
-              className={`h-1.5 rounded-full transition-all duration-300 ${
-                i === selectedIndex ? "bg-[#C97D5A] w-4" : "bg-current opacity-30 w-1.5"
-              }`}
-            />
-          ))}
+        <div className="px-6 mt-5">
+          <input
+            type="range"
+            min={0}
+            max={items.length - 1}
+            value={selectedIndex}
+            onChange={(e) => emblaApi?.scrollTo(Number(e.target.value))}
+            className="w-full cursor-pointer"
+            style={{ accentColor: "#C97D5A" }}
+            aria-label="Navigate carousel"
+          />
         </div>
       )}
 

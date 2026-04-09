@@ -211,12 +211,14 @@ export default function MenuCarousel({ items, tabs = [], textColor, mutedColor }
   const loop = slides.length >= 5;
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop, align: "center", skipSnaps: false });
   const [activeTabId, setActiveTabId] = useState(tabs[0]?.id ?? "");
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const [flippedId, setFlippedId] = useState<string | null>(null);
 
-  // Update active tab based on scroll position
+  // Update active tab + index based on scroll position
   const onSelect = useCallback(() => {
     if (!emblaApi) return;
     const idx = emblaApi.selectedScrollSnap();
+    setSelectedIndex(idx);
     setActiveTabId(getTabIdForIndex(idx, sectionIndices, tabs));
     setFlippedId(null);
   }, [emblaApi, sectionIndices, tabs]);
@@ -292,6 +294,22 @@ export default function MenuCarousel({ items, tabs = [], textColor, mutedColor }
           </div>
         </div>
       </div>
+
+      {/* ── Scrollbar ── */}
+      {slides.length > 1 && (
+        <div className="px-6 mt-4">
+          <input
+            type="range"
+            min={0}
+            max={slides.length - 1}
+            value={selectedIndex}
+            onChange={(e) => emblaApi?.scrollTo(Number(e.target.value))}
+            className="w-full cursor-pointer"
+            style={{ accentColor: "#C97D5A" }}
+            aria-label="Navigate menu"
+          />
+        </div>
+      )}
 
       {/* ── Section dots (one per visible tab) ── */}
       {visibleTabs.length > 1 && (
