@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { X, Heart, Trash2 } from "lucide-react";
+import { X, Heart, Trash2, ArrowLeft } from "lucide-react";
 import type { MenuItem } from "@/types";
 import EnlargedTileOverlay from "./EnlargedTileOverlay";
 
@@ -159,23 +159,31 @@ export default function FavoritesPanel({
         )}
 
         {/* Footer */}
-        {favoritedItems.length > 0 && (
-          <div
-            className="shrink-0 px-5 py-4"
-            style={{ borderTop: `1px solid ${textColor}15` }}
+        <div
+          className="shrink-0 px-5 py-4 flex flex-col gap-2"
+          style={{ borderTop: `1px solid ${textColor}15` }}
+        >
+          {/* Back to menu — always visible */}
+          <button
+            onClick={onClose}
+            className="w-full py-2.5 rounded-full text-xs tracking-widest uppercase transition-opacity hover:opacity-80 flex items-center justify-center gap-2"
+            style={{ backgroundColor: "#C97D5A", color: "#fff" }}
           >
+            <ArrowLeft size={14} />
+            Back to Menu
+          </button>
+
+          {/* Clear all — only when there are favorites */}
+          {favoritedItems.length > 0 && (
             <button
               onClick={onClearAll}
               className="w-full py-2.5 rounded-full text-xs tracking-widest uppercase transition-opacity hover:opacity-70"
-              style={{
-                border: `1px solid ${textColor}30`,
-                color: textColor,
-              }}
+              style={{ border: `1px solid ${textColor}30`, color: textColor }}
             >
               Clear All Favorites
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Enlarged overlay */}
