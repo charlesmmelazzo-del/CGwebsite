@@ -54,7 +54,7 @@ export default async function RootLayout({
         {fontCss && <style id="cg-font-loader" dangerouslySetInnerHTML={{ __html: fontCss }} />}
       </head>
       <body className={`${korinthFallback.variable} ${futuraFallback.variable} antialiased`}>
-        <Header config={header} />
+        <Header config={header} settings={settings} />
         {/*
           Inline style tag injects responsive padding that matches the live header height.
           This keeps it in sync even when the admin changes the header height slider.

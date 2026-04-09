@@ -3,9 +3,10 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Clock, MapPin, Phone, Mail } from "lucide-react";
 import { usePathname } from "next/navigation";
-import type { HeaderConfig } from "@/types";
+import type { HeaderConfig, SiteSettings } from "@/types";
+import { SITE_SETTINGS } from "@/lib/constants";
 
 function LogoImage({ size, textColor, logoUrl }: { size: number; textColor: string; logoUrl?: string }) {
   const [failed, setFailed] = useState(false);
@@ -42,7 +43,8 @@ function LogoImage({ size, textColor, logoUrl }: { size: number; textColor: stri
   );
 }
 
-export default function Header({ config }: { config: HeaderConfig }) {
+export default function Header({ config, settings }: { config: HeaderConfig; settings?: SiteSettings }) {
+  const s = settings ?? SITE_SETTINGS;
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
 
@@ -183,6 +185,74 @@ export default function Header({ config }: { config: HeaderConfig }) {
               {link.label}
             </Link>
           ))}
+
+          {/* ── Business info ─────────────────────────────────────────────── */}
+          <div
+            className="mt-5 pt-4 space-y-4"
+            style={{ borderTop: `1px solid ${config.borderColor}`, color: config.textColor, opacity: 0.6 }}
+          >
+            {/* Hours */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Clock size={12} style={{ color: config.activeColor }} />
+                <span className="text-[10px] tracking-widest uppercase" style={{ color: config.activeColor }}>
+                  Hours
+                </span>
+              </div>
+              {s.hours.map((h) => (
+                <div key={h.label} className="mb-2">
+                  <p className="text-[10px] tracking-wider uppercase opacity-80">{h.label}</p>
+                  {h.lines.map((line, i) => (
+                    <p key={i} className="text-xs leading-relaxed">{line}</p>
+                  ))}
+                </div>
+              ))}
+            </div>
+
+            {/* Address */}
+            <div className="flex items-start gap-2">
+              <MapPin size={12} className="mt-0.5 shrink-0" style={{ color: config.activeColor }} />
+              <div className="text-xs leading-relaxed">
+                <p>{s.address}</p>
+                <p>{s.addressLine2}</p>
+              </div>
+            </div>
+
+            {/* Phone */}
+            <a
+              href={`tel:${s.phone}`}
+              className="flex items-center gap-2 text-xs hover:opacity-80 transition-opacity"
+              style={{ color: config.textColor }}
+            >
+              <Phone size={12} style={{ color: config.activeColor }} />
+              <span>{s.phone}</span>
+            </a>
+
+            {/* Email */}
+            <a
+              href={`mailto:${s.email}`}
+              className="flex items-center gap-2 text-xs hover:opacity-80 transition-opacity"
+              style={{ color: config.textColor }}
+            >
+              <Mail size={12} style={{ color: config.activeColor }} />
+              <span>{s.email}</span>
+            </a>
+
+            {/* Social links */}
+            {s.socialLinks?.map((link) => (
+              <a
+                key={link.label}
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-xs hover:opacity-80 transition-opacity"
+                style={{ color: config.textColor }}
+              >
+                <span className="text-xs" style={{ color: config.activeColor }}>↗</span>
+                <span>{link.label}</span>
+              </a>
+            ))}
+          </div>
         </nav>
       )}
     </header>
