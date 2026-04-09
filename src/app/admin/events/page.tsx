@@ -4,8 +4,6 @@ import { useState, useEffect, useRef } from "react";
 import { Plus, Trash2, Calendar, Loader2, Save, GripVertical, FileText, Type } from "lucide-react";
 import type { CalendarEvent, HostSection, PageHeaderData } from "@/types";
 import { getPageDefault } from "@/lib/pagedefaults";
-import ImagePicker from "@/components/ui/ImagePicker";
-import clsx from "clsx";
 
 function newId() { return `e-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
 
@@ -353,7 +351,7 @@ export default function AdminEventsPage() {
             <div className="flex justify-center py-12 text-gray-400"><Loader2 size={18} className="animate-spin" /></div>
           ) : (
             <>
-              <p className="text-xs text-gray-400">These sections appear on the "Host Your Event" tab of the Events page. Add text blocks, pricing info, or a PDF download.</p>
+              <p className="text-xs text-gray-400">These sections appear on the &quot;Host Your Event&quot; tab of the Events page. Add text blocks, pricing info, or a PDF download.</p>
 
               {hostSections.length === 0 && (
                 <p className="text-gray-400 text-sm text-center py-8 border border-dashed border-gray-200 rounded-sm">No sections yet — add one below</p>
