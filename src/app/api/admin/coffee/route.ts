@@ -45,33 +45,53 @@ export async function POST(req: NextRequest) {
     const { tabs, items } = await req.json();
     const sb = getSupabaseAdmin();
 
-    // Delete-then-insert approach: avoids FK constraint issues entirely.
-    // Items must be deleted before tabs (FK references coffee_tabs).
-    const { error: delItemsErr } = await sb.from("coffee_items").delete().neq("id", "");
-    if (delItemsErr) throw delItemsErr;
+    const tabList: { id: string; label: string; order: number; active: boolean }[] = tabs ?? [];
+    const itemList: {
+      id: string; tabId: string; title: string; description?: string;
+      price?: string; carouselImageUrl?: string; menuPageImageUrl?: string;
+      alt?: string; tagLine?: string; ingredients?: string;
+      tastingNotes?: string; notableNotes?: string;
+      order: number; active: boolean; titleColor?: string;
+      descriptionColor?: string; priceColor?: string;
+    }[] = items ?? [];
 
-    const { error: delTabsErr } = await sb.from("coffee_tabs").delete().neq("id", "");
-    if (delTabsErr) throw delTabsErr;
+    console.log("[POST /api/admin/coffee] tabs:", tabList.map((t) => t.id));
+    console.log("[POST /api/admin/coffee] item tabIds:", itemList.map((i) => ({ id: i.id, tabId: i.tabId })));
 
-    if ((tabs ?? []).length) {
-      const { error } = await sb.from("coffee_tabs").insert(
-        tabs.map((t: { id: string; label: string; order: number; active: boolean }) => ({
-          id: t.id, label: t.label, order: t.order, active: t.active,
-        }))
-      );
-      if (error) throw error;
+    // Drop any items whose tabId has no matching tab (prevents FK violation)
+    const tabIdSet = new Set(tabList.map((t) => t.id));
+    const validItems = itemList.filter((i) => {
+      const ok = i.tabId && tabIdSet.has(i.tabId);
+      if (!ok) console.warn("[POST /api/admin/coffee] dropping orphan item:", i.id, "tabId:", i.tabId);
+      return ok;
+    });
+
+    // Delete-then-insert: items first (they reference tabs), then tabs.
+    const { error: delItemsErr } = await sb.from("coffee_items").delete().neq("id", "___never___");
+    if (delItemsErr) {
+      console.error("[POST /api/admin/coffee] delete items error:", delItemsErr);
+      throw delItemsErr;
     }
 
-    if ((items ?? []).length) {
+    const { error: delTabsErr } = await sb.from("coffee_tabs").delete().neq("id", "___never___");
+    if (delTabsErr) {
+      console.error("[POST /api/admin/coffee] delete tabs error:", delTabsErr);
+      throw delTabsErr;
+    }
+
+    if (tabList.length) {
+      const { error } = await sb.from("coffee_tabs").insert(
+        tabList.map((t) => ({ id: t.id, label: t.label, order: t.order, active: t.active }))
+      );
+      if (error) {
+        console.error("[POST /api/admin/coffee] insert tabs error:", error);
+        throw error;
+      }
+    }
+
+    if (validItems.length) {
       const { error } = await sb.from("coffee_items").insert(
-        items.map((i: {
-          id: string; tabId: string; title: string; description?: string;
-          price?: string; carouselImageUrl?: string; menuPageImageUrl?: string;
-          alt?: string; tagLine?: string; ingredients?: string;
-          tastingNotes?: string; notableNotes?: string;
-          order: number; active: boolean; titleColor?: string;
-          descriptionColor?: string; priceColor?: string;
-        }) => ({
+        validItems.map((i) => ({
           id: i.id, tab_id: i.tabId, title: i.title,
           description: i.description ?? null, price: i.price ?? null,
           carousel_image_url: i.carouselImageUrl ?? null,
@@ -88,13 +108,16 @@ export async function POST(req: NextRequest) {
           updated_at: new Date().toISOString(),
         }))
       );
-      if (error) throw error;
+      if (error) {
+        console.error("[POST /api/admin/coffee] insert items error:", error);
+        throw error;
+      }
     }
 
     return NextResponse.json({ success: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : (e as { message?: string })?.message ?? JSON.stringify(e);
-    console.error("[POST /api/admin/coffee]", msg, e);
+    console.error("[POST /api/admin/coffee] caught:", msg, e);
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }
