@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     console.log("[coffee POST] existing tabs:", existingTabIds.size, "existing items:", existingItemIds.size);
 
     // 2. Delete removed items FIRST (they hold FK refs to tabs)
-    const removedItemIds = [...existingItemIds].filter((id) => !newItemIds.has(id));
+    const removedItemIds = Array.from(existingItemIds).filter((id) => !newItemIds.has(id));
     if (removedItemIds.length > 0) {
       const { error } = await sb.from("coffee_items").delete().in("id", removedItemIds);
       if (error) {
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Delete removed tabs (safe now — their items are gone)
-    const removedTabIds = [...existingTabIds].filter((id) => !newTabIds.has(id));
+    const removedTabIds = Array.from(existingTabIds).filter((id) => !newTabIds.has(id));
     if (removedTabIds.length > 0) {
       // Also sweep any orphaned items referencing these tabs
       await sb.from("coffee_items").delete().in("tab_id", removedTabIds);
