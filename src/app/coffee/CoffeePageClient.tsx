@@ -145,24 +145,29 @@ function Lightbox({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
+      className="fixed inset-0 z-50 bg-black/95 flex flex-col"
       onClick={onClose}
     >
-      {/* Close button */}
-      <button
-        onClick={onClose}
-        className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
-        aria-label="Close"
+      {/* Top bar — X button always visible */}
+      <div
+        className="shrink-0 flex items-center justify-end px-4 py-3"
+        onClick={(e) => e.stopPropagation()}
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M18 6L6 18M6 6l12 12" />
-        </svg>
-      </button>
+        <button
+          onClick={onClose}
+          className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+          aria-label="Close"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
 
-      {/* Scrollable + zoomable container — native pinch-to-zoom on iOS/Android */}
+      {/* Scrollable + zoomable area — native pinch-to-zoom on iOS/Android */}
       <div
         ref={containerRef}
-        className="w-full h-full overflow-auto overscroll-contain"
+        className="flex-1 overflow-auto overscroll-contain"
         style={{
           touchAction: "pinch-zoom pan-x pan-y",
           WebkitOverflowScrolling: "touch",
@@ -189,10 +194,23 @@ function Lightbox({
         </div>
       </div>
 
-      {/* Hint */}
-      <p className="absolute bottom-6 left-0 right-0 text-center text-white/40 text-xs tracking-widest uppercase pointer-events-none">
-        Pinch to zoom · Tap background to close
-      </p>
+      {/* Bottom close bar — always visible, easy to tap after zooming */}
+      <div
+        className="shrink-0 flex items-center justify-center py-4"
+        style={{ background: "rgba(0,0,0,0.6)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="flex items-center gap-2 px-6 py-2.5 rounded-full text-white text-xs tracking-widest uppercase transition-colors"
+          style={{ backgroundColor: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)" }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+          Close
+        </button>
+      </div>
     </div>
   );
 }
