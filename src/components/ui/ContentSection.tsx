@@ -17,8 +17,7 @@ export default function ContentSectionBlock({ section, textColor, mutedColor }: 
   function handleButton() {
     if (!section.buttonUrl) return;
     if (section.buttonNewTab) {
-      // Try iframe first; if blocked, open tab
-      setModalUrl(section.buttonUrl);
+      window.open(section.buttonUrl, "_blank", "noopener,noreferrer");
     } else {
       setModalUrl(section.buttonUrl);
     }
