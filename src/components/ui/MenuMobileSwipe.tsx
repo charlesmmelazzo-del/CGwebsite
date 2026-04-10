@@ -3,7 +3,7 @@
 import { useState, useRef, useMemo, useEffect } from "react";
 import Image from "next/image";
 import { Heart, List, Undo2, ArrowRight } from "lucide-react";
-import { motion, useMotionValue, useTransform, animate, type PanInfo } from "framer-motion";
+import { motion, useMotionValue, useTransform, animate, type PanInfo, type MotionValue } from "framer-motion";
 import type { MenuItem, MenuTab } from "@/types";
 import clsx from "clsx";
 import EnlargedTileOverlay from "./EnlargedTileOverlay";
@@ -79,11 +79,11 @@ interface SwipeCardProps {
   onToggleFavorite: () => void;
   onSwipe: (dir: "left" | "right") => void;
   onTap: () => void;
+  x: MotionValue<number>;
 }
 
-function SwipeCard({ item, isFavorited, onToggleFavorite, onSwipe, onTap }: SwipeCardProps) {
+function SwipeCard({ item, isFavorited, onToggleFavorite, onSwipe, onTap, x }: SwipeCardProps) {
   const imgSrc = item.carouselImageUrl ?? item.imageUrl;
-  const x = useMotionValue(0);
   const rotate = useTransform(x, [-300, 0, 300], [-12, 0, 12]);
   const rightOpacity = useTransform(x, [20, 110], [0, 1], { clamp: true });
   const leftOpacity = useTransform(x, [-110, -20], [1, 0], { clamp: true });
@@ -210,6 +210,15 @@ export default function MenuMobileSwipe({
   const [enlargedItem, setEnlargedItem] = useState<MenuItem | null>(null);
   const [enlargedStartFlipped, setEnlargedStartFlipped] = useState(false);
 
+  // Shared MotionValue for the active card — lifted so buttons can drive it
+  const cardX = useMotionValue(0);
+  const isAnimating = useRef(false);
+
+  // Reset position whenever the card changes
+  useEffect(() => {
+    cardX.set(0);
+  }, [globalIndex, cardX]);
+
   // Flat list of ALL items across all tabs in tab order
   const allItems = useMemo(() => {
     return tabs.flatMap((tab) =>
@@ -267,8 +276,14 @@ export default function MenuMobileSwipe({
 
   function handleTabClick(tabId: string) {
     const bp = sectionBreakpoints.find((b) => b.tabId === tabId);
-    if (bp) setGlobalIndex(bp.startIndex);
-    setActiveTabId(tabId);
+    if (!bp || isAnimating.current) return;
+    isAnimating.current = true;
+    animate(cardX, -500, { duration: 0.3, ease: "easeOut" }).then(() => {
+      setGlobalIndex(bp.startIndex);
+      setActiveTabId(tabId);
+      cardX.set(0);
+      isAnimating.current = false;
+    });
   }
 
   function handleSwipe(_d: "left" | "right") {
@@ -277,11 +292,23 @@ export default function MenuMobileSwipe({
   }
 
   function handleNext() {
-    setGlobalIndex((prev) => prev + 1);
+    if (isAnimating.current || allItems.length === 0) return;
+    isAnimating.current = true;
+    animate(cardX, -500, { duration: 0.35, ease: "easeOut" }).then(() => {
+      setGlobalIndex((prev) => prev + 1);
+      cardX.set(0);
+      isAnimating.current = false;
+    });
   }
 
   function handlePrev() {
-    setGlobalIndex((prev) => Math.max(0, prev - 1));
+    if (isAnimating.current || globalIndex === 0) return;
+    isAnimating.current = true;
+    animate(cardX, 500, { duration: 0.35, ease: "easeOut" }).then(() => {
+      setGlobalIndex((prev) => Math.max(0, prev - 1));
+      cardX.set(0);
+      isAnimating.current = false;
+    });
   }
 
   return (
@@ -325,9 +352,10 @@ export default function MenuMobileSwipe({
             onToggleFavorite={() => onToggleFavorite(currentItem.id)}
             onSwipe={handleSwipe}
             onTap={() => {
-                setEnlargedStartFlipped(hasBackContent(currentItem));
-                setEnlargedItem(currentItem);
-              }}
+              setEnlargedStartFlipped(hasBackContent(currentItem));
+              setEnlargedItem(currentItem);
+            }}
+            x={cardX}
           />
         )}
       </div>

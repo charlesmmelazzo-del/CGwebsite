@@ -55,64 +55,68 @@ export async function POST(req: NextRequest) {
       descriptionColor?: string; priceColor?: string;
     }[] = items ?? [];
 
-    // Validate: drop items whose tabId doesn't match any tab in the payload
-    const tabIdSet = new Set(tabList.map((t) => t.id));
-    const validItems = itemList.filter((i) => i.tabId && tabIdSet.has(i.tabId));
+    console.log("[coffee POST] received tabs:", tabList.length, "items:", itemList.length);
+    console.log("[coffee POST] tab IDs:", tabList.map((t) => t.id));
 
-    // Step 1: Delete ALL existing items first (they hold FK references to tabs)
-    const { error: delItemsErr } = await sb
-      .from("coffee_items")
-      .delete()
-      .not("id", "is", null);
-    if (delItemsErr) {
-      console.error("[coffee POST] delete items error:", delItemsErr);
-      throw delItemsErr;
+    // 1. Get current state from DB
+    const [existingTabsRes, existingItemsRes] = await Promise.all([
+      sb.from("coffee_tabs").select("id"),
+      sb.from("coffee_items").select("id"),
+    ]);
+
+    const existingTabIds = new Set((existingTabsRes.data ?? []).map((r) => r.id));
+    const existingItemIds = new Set((existingItemsRes.data ?? []).map((r) => r.id));
+    const newTabIds = new Set(tabList.map((t) => t.id));
+    const newItemIds = new Set(itemList.map((i) => i.id));
+
+    console.log("[coffee POST] existing tabs:", existingTabIds.size, "existing items:", existingItemIds.size);
+
+    // 2. Delete removed items FIRST (they hold FK refs to tabs)
+    const removedItemIds = [...existingItemIds].filter((id) => !newItemIds.has(id));
+    if (removedItemIds.length > 0) {
+      const { error } = await sb.from("coffee_items").delete().in("id", removedItemIds);
+      if (error) {
+        console.error("[coffee POST] delete removed items error:", error);
+        throw error;
+      }
+      console.log("[coffee POST] deleted", removedItemIds.length, "removed items");
     }
 
-    // Step 2: Delete ALL existing tabs (safe now — no items reference them)
-    const { error: delTabsErr } = await sb
-      .from("coffee_tabs")
-      .delete()
-      .not("id", "is", null);
-    if (delTabsErr) {
-      console.error("[coffee POST] delete tabs error:", delTabsErr);
-      throw delTabsErr;
+    // 3. Delete removed tabs (safe now — their items are gone)
+    const removedTabIds = [...existingTabIds].filter((id) => !newTabIds.has(id));
+    if (removedTabIds.length > 0) {
+      // Also sweep any orphaned items referencing these tabs
+      await sb.from("coffee_items").delete().in("tab_id", removedTabIds);
+      const { error } = await sb.from("coffee_tabs").delete().in("id", removedTabIds);
+      if (error) {
+        console.error("[coffee POST] delete removed tabs error:", error);
+        throw error;
+      }
+      console.log("[coffee POST] deleted", removedTabIds.length, "removed tabs");
     }
 
-    // Step 3: Insert tabs fresh
-    if (tabList.length) {
-      const { data: insertedTabs, error: tabErr } = await sb
-        .from("coffee_tabs")
-        .insert(
-          tabList.map((t) => ({
-            id: t.id,
-            label: t.label,
-            order: t.order,
-            active: t.active,
-          }))
-        )
-        .select("id");
-
+    // 4. Upsert tabs
+    if (tabList.length > 0) {
+      const { error: tabErr } = await sb.from("coffee_tabs").upsert(
+        tabList.map((t) => ({
+          id: t.id,
+          label: t.label,
+          order: t.order,
+          active: t.active,
+        })),
+        { onConflict: "id" }
+      );
       if (tabErr) {
-        console.error("[coffee POST] insert tabs error:", tabErr);
+        console.error("[coffee POST] upsert tabs error:", tabErr);
         throw tabErr;
       }
-
-      // Step 3b: Verify every tab actually landed
-      const insertedIds = new Set((insertedTabs ?? []).map((r) => r.id));
-      const missingTabs = tabList.filter((t) => !insertedIds.has(t.id));
-      if (missingTabs.length) {
-        console.error("[coffee POST] tabs failed to insert:", missingTabs.map((t) => t.id));
-        throw new Error(
-          `Failed to insert ${missingTabs.length} tab(s). Check that the coffee_tabs 'id' column ` +
-          `is type TEXT or UUID with no server-side default that overrides the provided value.`
-        );
-      }
+      console.log("[coffee POST] upserted", tabList.length, "tabs OK");
     }
 
-    // Step 4: Insert items (tabs are confirmed in DB — FK will resolve)
-    if (validItems.length) {
-      const { error: itemErr } = await sb.from("coffee_items").insert(
+    // 5. Upsert items (only those whose tabId exists in payload)
+    const validItems = itemList.filter((i) => i.tabId && newTabIds.has(i.tabId));
+    if (validItems.length > 0) {
+      const { error: itemErr } = await sb.from("coffee_items").upsert(
         validItems.map((i) => ({
           id: i.id,
           tab_id: i.tabId,
@@ -131,13 +135,22 @@ export async function POST(req: NextRequest) {
           title_color: i.titleColor ?? null,
           description_color: i.descriptionColor ?? null,
           price_color: i.priceColor ?? null,
-        }))
+        })),
+        { onConflict: "id" }
       );
       if (itemErr) {
-        console.error("[coffee POST] insert items error:", itemErr);
+        console.error("[coffee POST] upsert items error:", itemErr);
         throw itemErr;
       }
+      console.log("[coffee POST] upserted", validItems.length, "items OK");
     }
+
+    // Verification read
+    const [verifyTabs, verifyItems] = await Promise.all([
+      sb.from("coffee_tabs").select("id").limit(50),
+      sb.from("coffee_items").select("id").limit(50),
+    ]);
+    console.log("[coffee POST] VERIFY — tabs in DB:", verifyTabs.data?.length, "items in DB:", verifyItems.data?.length);
 
     return NextResponse.json({ success: true });
   } catch (e) {
