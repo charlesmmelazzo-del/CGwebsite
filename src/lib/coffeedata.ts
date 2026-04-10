@@ -1,47 +1,36 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { getSupabaseAdmin } from "./supabase";
-import type { MenuTab, MenuItem } from "@/types";
 
-export interface CoffeeData {
-  tabs: MenuTab[];
-  items: MenuItem[];
+export interface CoffeeMenu {
+  id: string;
+  label: string;
+  imageUrl: string | null;
+  alt: string;
+  order: number;
+  active: boolean;
 }
 
-export async function getCoffeeData(): Promise<CoffeeData> {
+export async function getCoffeeMenus(): Promise<CoffeeMenu[]> {
   noStore();
   try {
     const sb = getSupabaseAdmin();
-    const [tabsRes, itemsRes] = await Promise.all([
-      sb.from("coffee_tabs").select("*").order("order"),
-      sb.from("coffee_items").select("*").order("order"),
-    ]);
-    const tabs: MenuTab[] = (tabsRes.data ?? []).map((r) => ({
+    const { data, error } = await sb
+      .from("coffee_menus")
+      .select("*")
+      .eq("active", true)
+      .order("order_num");
+
+    if (error) throw error;
+
+    return (data ?? []).map((r) => ({
       id: r.id,
       label: r.label,
-      order: r.order,
+      imageUrl: r.image_url,
+      alt: r.alt ?? "",
+      order: r.order_num,
       active: r.active,
     }));
-    const items: MenuItem[] = (itemsRes.data ?? []).map((r) => ({
-      id: r.id,
-      tabId: r.tab_id,
-      title: r.title,
-      description: r.description ?? undefined,
-      price: r.price ?? undefined,
-      carouselImageUrl: r.carousel_image_url ?? undefined,
-      menuPageImageUrl: r.menu_page_image_url ?? undefined,
-      alt: r.alt ?? undefined,
-      tagLine: r.tag_line ?? undefined,
-      ingredients: r.ingredients ?? undefined,
-      tastingNotes: r.tasting_notes ?? undefined,
-      notableNotes: r.notable_notes ?? undefined,
-      order: r.order,
-      active: r.active,
-      titleColor: r.title_color ?? undefined,
-      descriptionColor: r.description_color ?? undefined,
-      priceColor: r.price_color ?? undefined,
-    }));
-    return { tabs, items };
   } catch {
-    return { tabs: [], items: [] };
+    return [];
   }
 }

@@ -1,11 +1,11 @@
-import { getCoffeeData } from "@/lib/coffeedata";
+import { getCoffeeMenus } from "@/lib/coffeedata";
 import { getPageHeader } from "@/lib/pageheaders";
 import CoffeePageClient from "./CoffeePageClient";
 
 export default async function CoffeePage() {
-  const [{ tabs, items }, header] = await Promise.all([
-    getCoffeeData(),
+  const [menus, header] = await Promise.all([
+    getCoffeeMenus(),
     getPageHeader("coffee"),
   ]);
-  return <CoffeePageClient initialTabs={tabs} initialItems={items} header={header} />;
+  return <CoffeePageClient menus={menus} header={header} />;
 }
