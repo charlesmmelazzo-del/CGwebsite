@@ -12,8 +12,8 @@ import clsx from "clsx";
 
 function newId() { return `m-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
 
-// This component is reused for both menu and coffee admin pages
-export function MenuAdminPanel({
+// This component is used by the menu admin page
+function MenuAdminPanel({
   pageLabel,
   apiPath,
 }: {
