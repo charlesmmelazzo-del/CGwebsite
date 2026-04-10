@@ -60,8 +60,8 @@ export default async function RootLayout({
           This keeps it in sync even when the admin changes the header height slider.
         */}
         <style>{`
-          #cg-main { padding-top: ${mobilePad}px; }
-          @media (min-width: 768px) { #cg-main { padding-top: ${desktopPad}px; } }
+          #cg-main { padding-top: ${mobilePad}px; --header-h: ${mobilePad}px; }
+          @media (min-width: 768px) { #cg-main { padding-top: ${desktopPad}px; --header-h: ${desktopPad}px; } }
         `}</style>
         <main id="cg-main">{children}</main>
         <Footer config={footer} settings={settings} logoUrl={header.logoUrl} />

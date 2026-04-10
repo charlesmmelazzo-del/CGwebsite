@@ -181,3 +181,10 @@ p, span, a, li, td, th, label, input, textarea, button {
 .tab-bar-scroll::-webkit-scrollbar {
   display: none;
 }
+
+/* ─── Menu viewport — fits exactly in visible area below fixed header ──── */
+/* vh fallback for older browsers, dvh for modern (adjusts with browser chrome) */
+.menu-viewport {
+  height: calc(100vh - var(--header-h, 52px));
+  height: calc(100dvh - var(--header-h, 52px));
+}
