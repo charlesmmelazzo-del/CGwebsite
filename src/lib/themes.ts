@@ -89,3 +89,37 @@ export function getTheme(name: ThemeName): Theme {
 
 // Header/footer always use dark olive
 export const HEADER_THEME: Theme = THEMES.olive;
+
+export interface ResolvedTheme {
+  bg: string;
+  text: string;
+  muted: string;
+  label: string;
+}
+
+/**
+ * Resolve page header data into concrete theme colors.
+ * Priority: all 3 custom colors set → use them; otherwise fall back to named theme.
+ */
+export function resolveTheme(header: {
+  theme?: ThemeName;
+  customBg?: string;
+  customText?: string;
+  customMuted?: string;
+}): ResolvedTheme {
+  if (header.customBg && header.customText && header.customMuted) {
+    return {
+      bg: header.customBg,
+      text: header.customText,
+      muted: header.customMuted,
+      label: "Custom",
+    };
+  }
+  const base = THEMES[header.theme ?? "olive"];
+  return {
+    bg: header.customBg ?? base.bg,
+    text: header.customText ?? base.text,
+    muted: header.customMuted ?? base.muted,
+    label: base.label,
+  };
+}

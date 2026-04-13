@@ -8,6 +8,10 @@ interface Props {
   children: React.ReactNode;
   /** Force a specific theme — used for pages that have a fixed theme */
   fixedTheme?: ThemeName;
+  /** Custom color overrides — take priority over fixedTheme if all three are set */
+  customBg?: string;
+  customText?: string;
+  customMuted?: string;
   /** Show the subtle botanical illustration background */
   showIllustration?: boolean;
   /** Custom background image URL — overrides the theme background color */
@@ -17,6 +21,9 @@ interface Props {
 export default function PageThemeWrapper({
   children,
   fixedTheme,
+  customBg,
+  customText,
+  customMuted,
   showIllustration = true,
   bgImageUrl,
 }: Props) {
@@ -33,7 +40,11 @@ export default function PageThemeWrapper({
     setMounted(true);
   }, [fixedTheme]);
 
-  const theme = getTheme(themeName);
+  const base = getTheme(themeName);
+  const resolvedBg   = customBg   ?? base.bg;
+  const resolvedText = customText ?? base.text;
+  // Build a theme-shaped object so the rest of the JSX is unchanged
+  const theme = { ...base, bg: resolvedBg, text: resolvedText };
 
   if (!mounted) {
     return (

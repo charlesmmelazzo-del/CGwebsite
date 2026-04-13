@@ -22,7 +22,8 @@ import type {
   CtaSection, EventsSection, SpacerSection, CarouselSection, CarouselImageItem,
   CarouselItem, CarouselTextItem, CarouselFormItem, CarouselInstagramItem, FormField,
 } from "@/types";
-import { THEMES, type ThemeName } from "@/lib/themes";
+import { THEMES, resolveTheme, type ThemeName } from "@/lib/themes";
+import ThemeEditor from "@/components/ui/ThemeEditor";
 import ColorPicker from "@/components/ui/ColorPicker";
 import SliderInput from "@/components/ui/SliderInput";
 import ImagePicker from "@/components/ui/ImagePicker";
@@ -75,15 +76,6 @@ const SECTION_TYPES = [
   { type: "spacer"   as const, label: "Spacer",       icon: Minus },
 ];
 
-const THEME_OPTIONS: { value: ThemeName; label: string; bg: string }[] = [
-  { value: "olive",      label: "Dark Olive",    bg: "#1A1F17" },
-  { value: "green",      label: "Forest Green",  bg: "#3B5040" },
-  { value: "amber",      label: "Golden Amber",  bg: "#866515" },
-  { value: "terracotta", label: "Terracotta",    bg: "#9D5242" },
-  { value: "plum",       label: "Deep Plum",     bg: "#4E3456" },
-  { value: "teal",       label: "Dark Teal",     bg: "#2F4A4E" },
-  { value: "blue",       label: "Steel Blue",    bg: "#364260" },
-];
 
 const MOCK_EVENTS = [
   { date: "2026-04-12", title: "Spring Cocktail Night",   time: "7pm" },
@@ -951,7 +943,7 @@ function PagePreviewPanel({ page, viewport }: { page: PageDocument; viewport: "d
   const [scale, setScale]       = useState(1);
   const [containerH, setContainerH] = useState(500);
   const vpWidth = viewport === "desktop" ? 1280 : 375;
-  const theme = THEMES[page.theme ?? "olive"];
+  const theme = resolveTheme(page);
 
   useEffect(() => {
     if (!containerRef.current || !contentRef.current) return;
@@ -1303,20 +1295,10 @@ export default function AdminPagesPage() {
 
         {/* Theme selector */}
         {activePage && (
-          <div className="px-3 py-2 border-b border-gray-100 shrink-0 flex items-center gap-2">
-            <span className="text-[10px] tracking-widest uppercase text-gray-400">Theme</span>
-            <div className="flex gap-1.5 flex-wrap">
-              {THEME_OPTIONS.map((t) => (
-                <button
-                  key={t.value}
-                  onClick={() => updateActivePage({ theme: t.value })}
-                  title={t.label}
-                  className={clsx("w-4 h-4 rounded-full border-2 transition-all", activePage.theme === t.value ? "border-[#C97D5A] scale-110" : "border-transparent hover:border-gray-400")}
-                  style={{ background: t.bg }}
-                />
-              ))}
-            </div>
-          </div>
+          <ThemeStripToggle
+            page={activePage}
+            onUpdate={updateActivePage}
+          />
         )}
 
         {/* Panel body */}
@@ -1436,6 +1418,46 @@ export default function AdminPagesPage() {
 
       {/* New page modal */}
       {showNewPage && <NewPageModal onCreate={handleNewPage} onClose={() => setShowNewPage(false)} />}
+    </div>
+  );
+}
+
+/* ─── Collapsible theme editor strip ─────────────────────────────── */
+function ThemeStripToggle({
+  page,
+  onUpdate,
+}: {
+  page: PageDocument;
+  onUpdate: (updates: Partial<PageDocument>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const resolved = resolveTheme(page);
+
+  return (
+    <div className="border-b border-gray-100 shrink-0">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 transition-colors"
+      >
+        <span className="text-[10px] tracking-widest uppercase text-gray-400">Theme</span>
+        <div
+          className="w-4 h-4 rounded-full border border-gray-200 shrink-0"
+          style={{ backgroundColor: resolved.bg }}
+        />
+        <span className="text-[10px] text-gray-400 flex-1 text-left">{resolved.label}</span>
+        <span className="text-gray-300 text-xs">{open ? "▲" : "▼"}</span>
+      </button>
+      {open && (
+        <div className="px-3 pb-4 pt-1">
+          <ThemeEditor
+            theme={page.theme}
+            customBg={page.customBg}
+            customText={page.customText}
+            customMuted={page.customMuted}
+            onChange={(updates) => onUpdate(updates)}
+          />
+        </div>
+      )}
     </div>
   );
 }

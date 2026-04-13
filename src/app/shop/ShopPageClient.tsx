@@ -5,7 +5,7 @@ import PageThemeWrapper from "@/components/layout/PageThemeWrapper";
 import ContentSectionBlock from "@/components/ui/ContentSection";
 import type { ContentSection, PageHeaderData } from "@/types";
 import type { ShopTab } from "@/lib/pagedata";
-import { THEMES } from "@/lib/themes";
+import { resolveTheme } from "@/lib/themes";
 import type { ThemeName } from "@/lib/themes";
 import clsx from "clsx";
 
@@ -16,7 +16,7 @@ interface Props {
 
 export default function ShopPageClient({ header, shopTabs }: Props) {
   const themeName: ThemeName = header.theme ?? "teal";
-  const theme = THEMES[themeName];
+  const theme = resolveTheme(header);
   const tabs = shopTabs.length > 0 ? shopTabs : [];
   const [activeTab, setActiveTab] = useState(tabs[0]?.id ?? "");
 
@@ -36,7 +36,7 @@ export default function ShopPageClient({ header, shopTabs }: Props) {
     : [];
 
   return (
-    <PageThemeWrapper fixedTheme={themeName} showIllustration bgImageUrl={header.bgImageUrl}>
+    <PageThemeWrapper fixedTheme={themeName} customBg={header.customBg} customText={header.customText} customMuted={header.customMuted} showIllustration bgImageUrl={header.bgImageUrl}>
       <div className="min-h-screen py-16" style={{ color: theme.text }}>
         <header className="text-center mb-8 px-6">
           {header.title && (

@@ -280,6 +280,9 @@ export interface PageDocument {
   label: string;
   slug: string;
   theme?: ThemeName;
+  customBg?: string;
+  customText?: string;
+  customMuted?: string;
   sections: PageSection[];
   updatedAt: string;
 }
@@ -320,6 +323,10 @@ export interface PageHeaderData {
   tabs?: PageHeaderTab[];  // nav tabs within the page (events, shop)
   hostSections?: HostSection[];  // events page "Host Your Event" tab content
   theme?: ThemeName;       // page color palette; falls back to per-page default
+  // Custom color overrides — take priority over named theme if all three are set
+  customBg?: string;       // hex e.g. "#1A1F17"
+  customText?: string;     // hex e.g. "#8A9A78"
+  customMuted?: string;    // hex e.g. "#5a6a4a"
 }
 
 // ─── Site Config (Header / Footer) ───────────────────────────────────────────

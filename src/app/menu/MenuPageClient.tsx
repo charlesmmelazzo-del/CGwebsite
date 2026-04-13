@@ -9,7 +9,7 @@ import MenuListView from "@/components/ui/MenuListView";
 import FavoritesPanel from "@/components/ui/FavoritesPanel";
 import { getFavorites, toggleFavorite, setFavorites } from "@/lib/favorites";
 import type { MenuTab, MenuItem, PageHeaderData } from "@/types";
-import { THEMES } from "@/lib/themes";
+import { resolveTheme } from "@/lib/themes";
 import type { ThemeName } from "@/lib/themes";
 
 interface Props {
@@ -20,7 +20,7 @@ interface Props {
 
 export default function MenuPageClient({ initialTabs, initialItems, header }: Props) {
   const themeName: ThemeName = header.theme ?? "terracotta";
-  const theme = THEMES[themeName];
+  const theme = resolveTheme(header);
 
   const activeTabs = initialTabs
     .filter((t) => t.active)
@@ -46,7 +46,7 @@ export default function MenuPageClient({ initialTabs, initialItems, header }: Pr
   }
 
   return (
-    <PageThemeWrapper fixedTheme={themeName} showIllustration bgImageUrl={header.bgImageUrl}>
+    <PageThemeWrapper fixedTheme={themeName} customBg={header.customBg} customText={header.customText} customMuted={header.customMuted} showIllustration bgImageUrl={header.bgImageUrl}>
       {/*
         h-screen + overflow-hidden = viewport-locked layout.
         pt-[52px]/pt-[72px] clears the fixed nav bar.

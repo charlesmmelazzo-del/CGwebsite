@@ -1,6 +1,6 @@
 import PageThemeWrapper from "@/components/layout/PageThemeWrapper";
 import ContentSectionBlock from "@/components/ui/ContentSection";
-import { THEMES } from "@/lib/themes";
+import { resolveTheme } from "@/lib/themes";
 import type { ThemeName } from "@/lib/themes";
 import { getPageHeader } from "@/lib/pageheaders";
 import { getClubSections } from "@/lib/pagedata";
@@ -12,10 +12,10 @@ export default async function ClubPage() {
   ]);
 
   const themeName: ThemeName = header.theme ?? "plum";
-  const theme = THEMES[themeName];
+  const theme = resolveTheme(header);
 
   return (
-    <PageThemeWrapper fixedTheme={themeName} showIllustration={false} bgImageUrl={header.bgImageUrl}>
+    <PageThemeWrapper fixedTheme={themeName} customBg={header.customBg} customText={header.customText} customMuted={header.customMuted} showIllustration={false} bgImageUrl={header.bgImageUrl}>
       <div className="min-h-screen py-16" style={{ color: theme.text }}>
         <header className="text-center mb-12 px-6">
           {header.title && (

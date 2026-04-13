@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import Image from "next/image";
 import PageThemeWrapper from "@/components/layout/PageThemeWrapper";
 import type { PageHeaderData } from "@/types";
-import { THEMES } from "@/lib/themes";
+import { resolveTheme } from "@/lib/themes";
 import type { ThemeName } from "@/lib/themes";
 import clsx from "clsx";
 import type { CoffeeMenu } from "@/lib/coffeedata";
@@ -16,14 +16,14 @@ interface Props {
 
 export default function CoffeePageClient({ menus, header }: Props) {
   const themeName: ThemeName = header.theme ?? "olive";
-  const theme = THEMES[themeName];
+  const theme = resolveTheme(header);
   const [activeId, setActiveId] = useState(menus[0]?.id ?? "");
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
   const activeMenu = menus.find((m) => m.id === activeId);
 
   return (
-    <PageThemeWrapper fixedTheme={themeName} showIllustration={false} bgImageUrl={header.bgImageUrl}>
+    <PageThemeWrapper fixedTheme={themeName} customBg={header.customBg} customText={header.customText} customMuted={header.customMuted} showIllustration={false} bgImageUrl={header.bgImageUrl}>
       <div className="min-h-screen" style={{ color: theme.text }}>
         {/* Page title */}
         <header className="text-center pt-16 pb-6 px-6">
