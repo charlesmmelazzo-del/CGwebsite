@@ -41,10 +41,11 @@ export default function PageThemeWrapper({
   }, [fixedTheme]);
 
   const base = getTheme(themeName);
-  const resolvedBg   = customBg   ?? base.bg;
-  const resolvedText = customText ?? base.text;
+  const resolvedBg    = customBg    ?? base.bg;
+  const resolvedText  = customText  ?? base.text;
+  const resolvedMuted = customMuted ?? base.muted;
   // Build a theme-shaped object so the rest of the JSX is unchanged
-  const theme = { ...base, bg: resolvedBg, text: resolvedText };
+  const theme = { ...base, bg: resolvedBg, text: resolvedText, muted: resolvedMuted };
 
   if (!mounted) {
     return (

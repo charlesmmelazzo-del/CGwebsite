@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { sendFormNotification } from "@/lib/email";
 import { randomUUID } from "crypto";
 
 // ─── Simple in-memory rate limiter — limits form spam per IP ─────────────────
@@ -50,21 +51,26 @@ export async function POST(req: NextRequest) {
 
     const id = randomUUID();
 
+    const resolvedName = formName ?? formId;
+
     try {
       const sb = getSupabaseAdmin();
       const { error } = await sb.from("form_submissions").insert({
         id,
         form_id:      formId,
-        form_name:    formName ?? formId,
+        form_name:    resolvedName,
         data,
         submitted_at: new Date().toISOString(),
       });
       if (error) throw error;
     } catch (dbErr) {
-      // If Supabase is unavailable, log and return success anyway
-      // (don't expose DB errors to the public)
       console.error("[forms/submit] DB error:", dbErr);
     }
+
+    // Fire-and-forget email — never blocks or fails the response
+    sendFormNotification(resolvedName, data).catch((err) =>
+      console.error("[forms/submit] Email error:", err)
+    );
 
     return NextResponse.json({ success: true, id });
   } catch {
