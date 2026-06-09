@@ -22,7 +22,7 @@ import type {
   CtaSection, EventsSection, SpacerSection, CarouselSection, CarouselImageItem,
   CarouselItem, CarouselTextItem, CarouselFormItem, CarouselInstagramItem, FormField,
 } from "@/types";
-import { THEMES, resolveTheme, type ThemeName } from "@/lib/themes";
+import { resolveTheme, THEME_OPTIONS, type ThemeName, type ResolvedTheme } from "@/lib/themes";
 import ThemeEditor from "@/components/ui/ThemeEditor";
 import ColorPicker from "@/components/ui/ColorPicker";
 import SliderInput from "@/components/ui/SliderInput";
@@ -783,7 +783,7 @@ function aspectToCss(ar?: string): string {
   }
 }
 
-function TextSectionPreview({ section, theme }: { section: TextSection; theme: (typeof THEMES)[ThemeName] }) {
+function TextSectionPreview({ section, theme }: { section: TextSection; theme: ResolvedTheme }) {
   const align      = section.alignment ?? "left";
   const py         = section.paddingY  ?? 48;
   const px         = section.paddingX  ?? 64;
@@ -835,7 +835,7 @@ function ImageSectionPreview({ section }: { section: ImageSection }) {
   );
 }
 
-function CtaSectionPreview({ section, theme }: { section: CtaSection; theme: (typeof THEMES)[ThemeName] }) {
+function CtaSectionPreview({ section, theme }: { section: CtaSection; theme: ResolvedTheme }) {
   const py             = section.paddingY       ?? 64;
   const px             = section.paddingX       ?? 64;
   const headingSize    = section.headingSize    ?? 40;
@@ -859,7 +859,7 @@ function CtaSectionPreview({ section, theme }: { section: CtaSection; theme: (ty
   );
 }
 
-function EventsSectionPreview({ section, theme }: { section: EventsSection; theme: (typeof THEMES)[ThemeName] }) {
+function EventsSectionPreview({ section, theme }: { section: EventsSection; theme: ResolvedTheme }) {
   const max       = section.maxItems  ?? 5;
   const py        = section.paddingY  ?? 48;
   const px        = section.paddingX  ?? 64;
@@ -908,7 +908,7 @@ function SpacerSectionPreview({ section }: { section: SpacerSection }) {
   return <div style={{ height: section.height + "px" }} />;
 }
 
-function CarouselSectionPreview({ section, theme }: { section: CarouselSection; theme: (typeof THEMES)[ThemeName] }) {
+function CarouselSectionPreview({ section, theme }: { section: CarouselSection; theme: ResolvedTheme }) {
   const slides = section.slides ?? [];
   const active = slides.filter((s) => s.active).length;
   return (
@@ -924,7 +924,7 @@ function CarouselSectionPreview({ section, theme }: { section: CarouselSection; 
   );
 }
 
-function SectionPreview({ section, theme }: { section: PageSection; theme: (typeof THEMES)[ThemeName] }) {
+function SectionPreview({ section, theme }: { section: PageSection; theme: ResolvedTheme }) {
   switch (section.type) {
     case "text":     return <TextSectionPreview     section={section as TextSection}   theme={theme} />;
     case "image":    return <ImageSectionPreview    section={section as ImageSection} />;

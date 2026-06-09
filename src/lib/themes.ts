@@ -68,6 +68,14 @@ export const THEMES: Record<ThemeName, Theme> = {
   },
 };
 
+// Options for theme-picker UIs — derived from THEMES so colors stay in sync
+export const THEME_OPTIONS: { value: ThemeName; label: string; bg: string }[] =
+  (Object.keys(THEMES) as ThemeName[]).map((value) => ({
+    value,
+    label: THEMES[value].label,
+    bg: THEMES[value].bg,
+  }));
+
 // Themes used for random page rotation (excludes olive — that's header/home)
 export const PAGE_THEMES: ThemeName[] = [
   "green",
