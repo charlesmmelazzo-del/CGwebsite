@@ -10,6 +10,7 @@ export default function AdminSettingsPage() {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [saveError, setSaveError] = useState("");
 
   // Load settings from Supabase on mount
   useEffect(() => {
@@ -116,6 +117,7 @@ export default function AdminSettingsPage() {
 
   async function handleSave() {
     setSaving(true);
+    setSaveError("");
     try {
       const res = await fetch("/api/admin/settings", {
         method: "POST",
@@ -126,7 +128,7 @@ export default function AdminSettingsPage() {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch {
-      alert("Failed to save settings. Please try again.");
+      setSaveError("Failed to save settings. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -156,6 +158,12 @@ export default function AdminSettingsPage() {
           {saved ? "Saved!" : saving ? "Saving..." : "Save"}
         </button>
       </div>
+
+      {saveError && (
+        <div className="mb-6 p-3 bg-red-50 border border-red-200 text-red-600 text-xs rounded-sm">
+          {saveError}
+        </div>
+      )}
 
       <div className="space-y-8">
         {/* Contact */}

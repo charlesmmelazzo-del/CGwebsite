@@ -273,6 +273,7 @@ export default function EventsPageClient({
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
   const themeName: ThemeName = header.theme ?? "green";
   const theme = resolveTheme(header);
 
@@ -290,8 +291,9 @@ export default function EventsPageClient({
   async function handleHostSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+    setError(false);
     try {
-      await fetch("/api/forms/submit", {
+      const res = await fetch("/api/forms/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -300,9 +302,10 @@ export default function EventsPageClient({
           data: formValues,
         }),
       });
+      if (!res.ok) throw new Error("Submission failed");
       setSubmitted(true);
     } catch {
-      // silent
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -414,6 +417,11 @@ export default function EventsPageClient({
                       )}
                     </div>
                   ))}
+                  {error && (
+                    <p className="text-sm text-center opacity-80" style={{ color: theme.text }}>
+                      Something went wrong — please try again, or email us directly.
+                    </p>
+                  )}
                   <button
                     type="submit"
                     disabled={loading}

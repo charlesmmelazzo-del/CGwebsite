@@ -26,6 +26,7 @@ function MenuAdminPanel({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [editingItem, setEditingItem] = useState<Partial<MenuItem> | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor));
@@ -139,6 +140,7 @@ function MenuAdminPanel({
   async function handleSave() {
     setSaving(true);
     setSaved(false);
+    setSaveError("");
     try {
       const res = await fetch(apiPath, {
         method: "POST",
@@ -150,7 +152,7 @@ function MenuAdminPanel({
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
-      alert(`Failed to save: ${e}`);
+      setSaveError("Failed to save: " + (e instanceof Error ? e.message : String(e)));
     } finally {
       setSaving(false);
     }
@@ -182,6 +184,12 @@ function MenuAdminPanel({
           {saving ? "Saving..." : saved ? "Saved!" : "Save"}
         </button>
       </div>
+
+      {saveError && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-xs rounded-sm">
+          {saveError}
+        </div>
+      )}
 
       {/* Tabs row */}
       <div className="mb-4">

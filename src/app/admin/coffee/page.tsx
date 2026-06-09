@@ -37,6 +37,7 @@ export default function AdminCoffeePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor));
@@ -88,6 +89,7 @@ export default function AdminCoffeePage() {
   async function handleSave() {
     setSaving(true);
     setSaved(false);
+    setSaveError("");
     try {
       const res = await fetch("/api/admin/coffee", {
         method: "POST",
@@ -99,7 +101,7 @@ export default function AdminCoffeePage() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
-      alert(`Failed to save: ${e}`);
+      setSaveError("Failed to save: " + (e instanceof Error ? e.message : String(e)));
     } finally {
       setSaving(false);
     }
@@ -129,6 +131,12 @@ export default function AdminCoffeePage() {
           {saving ? "Saving…" : saved ? "Saved!" : "Save"}
         </button>
       </div>
+
+      {saveError && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-xs rounded-sm">
+          {saveError}
+        </div>
+      )}
 
       <div className="space-y-3 mb-4">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>

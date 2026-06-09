@@ -253,19 +253,22 @@ function CarouselForm({ item }: { item: CarouselFormItem }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+    setError(false);
     try {
-      await fetch("/api/forms/submit", {
+      const res = await fetch("/api/forms/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ formId: item.formId, formName: item.title, data: values }),
       });
+      if (!res.ok) throw new Error("Submission failed");
       setSubmitted(true);
     } catch {
-      // silent
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -347,6 +350,11 @@ function CarouselForm({ item }: { item: CarouselFormItem }) {
             )}
           </div>
         ))}
+        {error && (
+          <p className="text-sm text-center opacity-80" style={{ color: item.titleColor ?? undefined }}>
+            Something went wrong — please try again, or email us directly.
+          </p>
+        )}
         <button
           type="submit"
           disabled={loading}

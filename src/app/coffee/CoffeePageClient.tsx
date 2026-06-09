@@ -80,7 +80,19 @@ export default function CoffeePageClient({ menus, header }: Props) {
 
         {/* Menu image */}
         <div className="px-4 pb-16 max-w-3xl mx-auto">
-          {activeMenu?.imageUrl ? (
+          {menus.length === 0 ? (
+            <div
+              className="w-full aspect-[8.5/11] rounded-lg flex items-center justify-center"
+              style={{
+                backgroundColor: "rgba(255,255,255,0.05)",
+                border: `1px dashed ${theme.muted}40`,
+              }}
+            >
+              <p className="text-sm opacity-50 tracking-wider" style={{ color: theme.text }}>
+                Coffee menu coming soon
+              </p>
+            </div>
+          ) : activeMenu?.imageUrl ? (
             <button
               onClick={() => setLightboxOpen(true)}
               className="w-full block relative group cursor-zoom-in"
