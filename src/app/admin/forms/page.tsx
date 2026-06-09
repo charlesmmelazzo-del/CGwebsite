@@ -194,12 +194,21 @@ function SubmissionModal({
           submittedAt: submission.submittedAt,
         }),
       });
-      const json = await res.json();
+
+      // Parse the body defensively — a 404/500 may return HTML, not JSON
+      const raw = await res.text();
+      let json: { error?: string } = {};
+      try { json = raw ? JSON.parse(raw) : {}; } catch { /* non-JSON response */ }
+
       if (res.ok) {
         setResult({ ok: true, msg: `Sent to ${to}` });
         setRecipient("");
+      } else if (res.status === 401) {
+        setResult({ ok: false, msg: "Your admin session expired — please reload and log in again." });
+      } else if (res.status === 404) {
+        setResult({ ok: false, msg: "Email feature not deployed yet — wait for the deploy to finish, then retry." });
       } else {
-        setResult({ ok: false, msg: json.error ?? "Failed to send email." });
+        setResult({ ok: false, msg: json.error ?? `Failed to send email (status ${res.status}).` });
       }
     } catch {
       setResult({ ok: false, msg: "Network error — please try again." });
