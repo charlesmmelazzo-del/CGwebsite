@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { FormSubmission } from "@/types";
-import { Download, RefreshCw } from "lucide-react";
+import { Download, RefreshCw, Mail, X } from "lucide-react";
 
 const FORM_TABS = [
   { id: "all", label: "All Submissions" },
@@ -14,6 +14,7 @@ export default function AdminFormsPage() {
   const [submissions, setSubmissions] = useState<FormSubmission[]>([]);
   const [activeTab, setActiveTab] = useState("all");
   const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<FormSubmission | null>(null);
 
   async function load() {
     setLoading(true);
@@ -114,6 +115,9 @@ export default function AdminFormsPage() {
         </div>
       ) : (
         <div className="overflow-x-auto bg-white border border-gray-200 rounded-sm">
+          <p className="text-[11px] text-gray-400 px-4 py-2 border-b border-gray-100">
+            Click any row to view all details and email it.
+          </p>
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
@@ -128,7 +132,11 @@ export default function AdminFormsPage() {
             </thead>
             <tbody>
               {submissions.map((s) => (
-                <tr key={s.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                <tr
+                  key={s.id}
+                  onClick={() => setSelected(s)}
+                  className="border-b border-gray-100 hover:bg-[#C97D5A]/5 transition-colors cursor-pointer"
+                >
                   <td className="py-2.5 px-4 text-gray-500 whitespace-nowrap">
                     {new Date(s.submittedAt).toLocaleString()}
                   </td>
@@ -144,6 +152,148 @@ export default function AdminFormsPage() {
           </table>
         </div>
       )}
+
+      {selected && (
+        <SubmissionModal submission={selected} onClose={() => setSelected(null)} />
+      )}
+    </div>
+  );
+}
+
+// ─── Detail + email modal ────────────────────────────────────────────────────
+function SubmissionModal({
+  submission,
+  onClose,
+}: {
+  submission: FormSubmission;
+  onClose: () => void;
+}) {
+  const [showEmail, setShowEmail] = useState(false);
+  const [recipient, setRecipient] = useState("");
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  const entries = Object.entries(submission.data);
+
+  async function sendEmail() {
+    const to = recipient.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+      setResult({ ok: false, msg: "Please enter a valid email address." });
+      return;
+    }
+    setSending(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/admin/forms/email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to,
+          formName: submission.formName,
+          data: submission.data,
+          submittedAt: submission.submittedAt,
+        }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        setResult({ ok: true, msg: `Sent to ${to}` });
+        setRecipient("");
+      } else {
+        setResult({ ok: false, msg: json.error ?? "Failed to send email." });
+      }
+    } catch {
+      setResult({ ok: false, msg: "Network error — please try again." });
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-sm shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between px-6 py-4 border-b border-gray-200">
+          <div>
+            <h2 className="text-lg text-gray-800" style={{ fontFamily: "var(--font-display)" }}>
+              {submission.formName}
+            </h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {new Date(submission.submittedAt).toLocaleString()}
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-700 transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Data fields */}
+        <div className="px-6 py-4 overflow-y-auto">
+          <dl className="divide-y divide-gray-100">
+            {entries.length === 0 ? (
+              <p className="text-sm text-gray-400">No fields in this submission.</p>
+            ) : (
+              entries.map(([key, val]) => (
+                <div key={key} className="py-2.5 grid grid-cols-3 gap-3">
+                  <dt className="text-xs text-gray-400 uppercase tracking-wider capitalize col-span-1 break-words">
+                    {key.replace(/([A-Z])/g, " $1").replace(/_/g, " ").trim()}
+                  </dt>
+                  <dd className="text-sm text-gray-700 col-span-2 whitespace-pre-wrap break-words">
+                    {String(val ?? "—") || "—"}
+                  </dd>
+                </div>
+              ))
+            )}
+          </dl>
+        </div>
+
+        {/* Email action */}
+        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+          {!showEmail ? (
+            <button
+              onClick={() => setShowEmail(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-[#C97D5A] text-white text-xs tracking-wider uppercase hover:bg-[#b86d4a] transition-colors rounded-sm"
+            >
+              <Mail size={14} />
+              Email this submission
+            </button>
+          ) : (
+            <div>
+              <label className="block text-xs text-gray-400 uppercase tracking-wider mb-1.5">
+                Send to
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={recipient}
+                  onChange={(e) => setRecipient(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && !sending && sendEmail()}
+                  placeholder="name@example.com"
+                  autoFocus
+                  className="flex-1 px-3 py-2 border border-gray-300 text-sm rounded-sm focus:outline-none focus:border-[#C97D5A]"
+                />
+                <button
+                  onClick={sendEmail}
+                  disabled={sending}
+                  className="px-4 py-2 bg-[#C97D5A] text-white text-xs tracking-wider uppercase hover:bg-[#b86d4a] transition-colors rounded-sm disabled:opacity-50 whitespace-nowrap"
+                >
+                  {sending ? "Sending…" : "Send"}
+                </button>
+              </div>
+              {result && (
+                <p className={`text-xs mt-2 ${result.ok ? "text-green-600" : "text-red-500"}`}>
+                  {result.msg}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
