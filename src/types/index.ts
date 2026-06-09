@@ -13,6 +13,8 @@ export interface SiteSettings {
   addressLine2: string;
   hours: BusinessHours[];
   socialLinks?: { label: string; url: string }[];
+  /** Addresses that receive form-submission notification emails */
+  notificationEmails?: string[];
 }
 
 // ─── Carousel ────────────────────────────────────────────────────────────────

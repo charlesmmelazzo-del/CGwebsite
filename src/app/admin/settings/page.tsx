@@ -16,7 +16,14 @@ export default function AdminSettingsPage() {
     fetch("/api/admin/settings")
       .then((r) => r.json())
       .then((data) => {
-        if (data?.phone !== undefined) setSettings(data);
+        if (data?.phone !== undefined) {
+          setSettings({
+            ...data,
+            // Seed defaults for older settings rows that predate this field,
+            // so the admin sees the recipients that emails currently go to.
+            notificationEmails: data.notificationEmails ?? SITE_SETTINGS.notificationEmails,
+          });
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -84,6 +91,26 @@ export default function AdminSettingsPage() {
     setSettings((s) => ({
       ...s,
       socialLinks: (s.socialLinks ?? []).filter((_, i) => i !== index),
+    }));
+  }
+
+  function updateNotificationEmail(index: number, value: string) {
+    const emails = [...(settings.notificationEmails ?? [])];
+    emails[index] = value;
+    setSettings((s) => ({ ...s, notificationEmails: emails }));
+  }
+
+  function addNotificationEmail() {
+    setSettings((s) => ({
+      ...s,
+      notificationEmails: [...(s.notificationEmails ?? []), ""],
+    }));
+  }
+
+  function removeNotificationEmail(index: number) {
+    setSettings((s) => ({
+      ...s,
+      notificationEmails: (s.notificationEmails ?? []).filter((_, i) => i !== index),
     }));
   }
 
@@ -234,6 +261,39 @@ export default function AdminSettingsPage() {
               />
               <button
                 onClick={() => removeSocialLink(index)}
+                className="text-gray-300 hover:text-red-500 transition-colors"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+        </section>
+
+        {/* Form Notification Emails */}
+        <section>
+          <div className="flex items-center justify-between mb-2 border-b border-gray-200 pb-2">
+            <h2 className="text-sm tracking-widest uppercase text-gray-400">Form Notification Emails</h2>
+            <button onClick={addNotificationEmail} className="text-gray-400 hover:text-[#C97D5A] transition-colors">
+              <Plus size={16} />
+            </button>
+          </div>
+          <p className="text-xs text-gray-400 mb-4">
+            Every form submission on the site is emailed to these addresses.
+          </p>
+          {(settings.notificationEmails ?? []).length === 0 && (
+            <p className="text-gray-400 text-xs">No recipients — click + to add one. Submissions are still saved here.</p>
+          )}
+          {(settings.notificationEmails ?? []).map((email, index) => (
+            <div key={index} className="flex items-center gap-2 mb-2">
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => updateNotificationEmail(index, e.target.value)}
+                placeholder="name@example.com"
+                className="flex-1 bg-white border border-gray-200 text-gray-700 text-sm px-3 py-2 outline-none rounded-sm focus:border-[#C97D5A]/50"
+              />
+              <button
+                onClick={() => removeNotificationEmail(index)}
                 className="text-gray-300 hover:text-red-500 transition-colors"
               >
                 <Trash2 size={14} />

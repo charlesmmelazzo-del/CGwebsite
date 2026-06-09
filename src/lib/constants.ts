@@ -22,6 +22,11 @@ export const SITE_SETTINGS: SiteSettings = {
   socialLinks: [
     { label: "Instagram", url: "https://instagram.com/commongoodcocktailhouse" },
   ],
+  notificationEmails: [
+    "mike@cgcocktails.com",
+    "cheers@cgcocktails.com",
+    "hello@cgcocktails.com",
+  ],
 };
 
 export const NAV_LINKS = [

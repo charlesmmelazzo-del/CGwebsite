@@ -1,12 +1,28 @@
 import { Resend } from "resend";
+import { getSupabaseAdmin } from "@/lib/supabase";
+import { SITE_SETTINGS } from "@/lib/constants";
+import type { SiteSettings } from "@/types";
 
-const NOTIFICATION_RECIPIENTS = [
-  "mike@cgcocktails.com",
-  "cheers@cgcocktails.com",
-  "hello@cgcocktails.com",
-];
+// IMPORTANT: the "from" address must be on the domain verified in Resend.
+// Common Good's verified domain is commongoodcocktailhouse.com.
+const FROM_ADDRESS = "Common Good Website <forms@commongoodcocktailhouse.com>";
 
-const FROM_ADDRESS = "Common Good Website <forms@cgcocktails.com>";
+// Read the notification recipient list from site settings (admin-editable),
+// falling back to the defaults in constants if the DB is unavailable or empty.
+async function getNotificationRecipients(): Promise<string[]> {
+  try {
+    const sb = getSupabaseAdmin();
+    const { data } = await sb.from("site_settings").select("data").eq("id", 1).single();
+    const list = (data?.data as SiteSettings | undefined)?.notificationEmails;
+    const valid = Array.isArray(list)
+      ? list.filter((e) => typeof e === "string" && e.includes("@"))
+      : [];
+    if (valid.length > 0) return valid;
+  } catch (e) {
+    console.error("[email] failed to load notification recipients:", e);
+  }
+  return SITE_SETTINGS.notificationEmails ?? [];
+}
 
 function buildSubject(formName: string): string {
   const lower = formName.toLowerCase();
@@ -78,11 +94,17 @@ export async function sendFormNotification(
     return;
   }
 
+  const recipients = await getNotificationRecipients();
+  if (recipients.length === 0) {
+    console.warn("[email] No notification recipients configured — skipping");
+    return;
+  }
+
   const resend = new Resend(apiKey);
 
   const { error } = await resend.emails.send({
     from: FROM_ADDRESS,
-    to: NOTIFICATION_RECIPIENTS,
+    to: recipients,
     subject: buildSubject(formName),
     html: buildHtml(formName, data),
   });
