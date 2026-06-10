@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { SESSION_COOKIE, createSessionToken } from "@/lib/session";
 
 // ─── Admin password ────────────────────────────────────────────────────────────
 // Set ADMIN_PASSWORD environment variable on Railway.
@@ -47,8 +48,6 @@ function clearRateLimit(ip: string) {
 }
 
 // ─── Cookie settings ───────────────────────────────────────────────────────────
-const COOKIE_NAME    = "cg-admin-session";
-const COOKIE_VALUE   = "authenticated";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
 export async function POST(req: NextRequest) {
@@ -72,11 +71,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Incorrect password" }, { status: 401 });
   }
 
-  // Successful login — clear rate limit counter and set session cookie
+  // Successful login — clear rate limit counter and set a signed session cookie.
+  // The cookie value is an HMAC token (not a guessable constant), so it can't be
+  // forged by anyone reading the public source.
   clearRateLimit(ip);
 
+  const token = await createSessionToken(COOKIE_MAX_AGE);
+  if (!token) {
+    // No signing secret configured (ADMIN_PASSWORD/SESSION_SECRET missing).
+    return NextResponse.json({ error: "Server not configured for login" }, { status: 500 });
+  }
+
   const res = NextResponse.json({ success: true });
-  res.cookies.set(COOKIE_NAME, COOKIE_VALUE, {
+  res.cookies.set(SESSION_COOKIE, token, {
     httpOnly:  true,
     secure:    true,           // always require HTTPS (Next.js allows localhost exemption)
     sameSite:  "strict",       // blocks cross-site request forgery
@@ -88,6 +95,6 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE() {
   const res = NextResponse.json({ success: true });
-  res.cookies.set(COOKIE_NAME, "", { maxAge: 0, path: "/" });
+  res.cookies.set(SESSION_COOKIE, "", { maxAge: 0, path: "/" });
   return res;
 }

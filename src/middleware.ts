@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
 
-const COOKIE_NAME  = "cg-admin-session";
-const COOKIE_VALUE = "authenticated";
-
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Always allow the login page and the login API endpoint through
   if (pathname === "/admin/login") return NextResponse.next();
   if (pathname.startsWith("/api/admin/login")) return NextResponse.next();
 
-  const session = req.cookies.get(COOKIE_NAME)?.value;
-  const authenticated = session === COOKIE_VALUE;
+  const session = req.cookies.get(SESSION_COOKIE)?.value;
+  const authenticated = await verifySessionToken(session);
 
   // ── API routes (/api/admin/*) ──────────────────────────────────────────────
   // Return 401 JSON (not a redirect) so fetch() callers get a clean error

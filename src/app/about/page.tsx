@@ -1,9 +1,17 @@
+import type { Metadata } from "next";
 import PageThemeWrapper from "@/components/layout/PageThemeWrapper";
 import ContentSectionBlock from "@/components/ui/ContentSection";
 import { resolveTheme } from "@/lib/themes";
 import type { ThemeName } from "@/lib/themes";
 import { getPageHeader } from "@/lib/pageheaders";
 import { getAboutSections } from "@/lib/pagedata";
+
+export const metadata: Metadata = {
+  title: "About",
+  description:
+    "The story behind Common Good Cocktail House — a place in Glen Ellyn, IL to celebrate life, from special occasions to the everyday.",
+  alternates: { canonical: "/about" },
+};
 
 export default async function AboutPage() {
   const [sections, header] = await Promise.all([

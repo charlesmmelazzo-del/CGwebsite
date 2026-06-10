@@ -1,9 +1,17 @@
+import type { Metadata } from "next";
 import PageThemeWrapper from "@/components/layout/PageThemeWrapper";
 import ContentSectionBlock from "@/components/ui/ContentSection";
 import { resolveTheme } from "@/lib/themes";
 import type { ThemeName } from "@/lib/themes";
 import { getPageHeader } from "@/lib/pageheaders";
 import { getClubSections } from "@/lib/pagedata";
+
+export const metadata: Metadata = {
+  title: "Cocktail Club",
+  description:
+    "Join the Common Good Cocktail Club in Glen Ellyn, IL for priority access, exclusive spirits, rare bottles, and member-only perks.",
+  alternates: { canonical: "/club" },
+};
 
 export default async function ClubPage() {
   const [sections, header] = await Promise.all([

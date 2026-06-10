@@ -37,10 +37,31 @@ const nextConfig = {
           { key: "Referrer-Policy",        value: "strict-origin-when-cross-origin" },
           // Restrict browser features
           { key: "Permissions-Policy",     value: "camera=(), microphone=(), geolocation=()" },
+          // Content Security Policy — defense-in-depth against XSS/injection.
+          // Shipped as Report-Only so it logs violations to the browser console
+          // WITHOUT blocking anything (avoids breaking Google Fonts, framer-motion
+          // inline styles, or Next.js inline bootstrap scripts). Once the console
+          // is clean in production, rename this key to "Content-Security-Policy"
+          // to enforce it.
+          { key: "Content-Security-Policy-Report-Only", value: CSP },
         ],
       },
     ];
   },
 };
+
+// Image/connect sources mirror the `images.remotePatterns` allowlist above.
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com data:",
+  "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://res.cloudinary.com https://imagedelivery.net",
+  "connect-src 'self' https://*.supabase.co",
+  "frame-ancestors 'self'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "object-src 'none'",
+].join("; ");
 
 export default nextConfig;

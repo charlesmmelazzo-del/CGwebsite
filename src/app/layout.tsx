@@ -4,6 +4,8 @@ import "./globals.css";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { getSiteConfig, getSiteSettings, getFontCSS } from "@/lib/siteconfig";
+import { SITE_URL } from "@/lib/constants";
+import { buildBusinessJsonLd } from "@/lib/structuredData";
 
 const korinthFallback = Cormorant_Garamond({
   subsets: ["latin"],
@@ -21,14 +23,28 @@ const futuraFallback = Jost({
 });
 
 export const metadata: Metadata = {
-  title: "Common Good Cocktail House | Glen Ellyn, IL",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Common Good Cocktail House | Glen Ellyn, IL",
+    // Per-page titles render as e.g. "Menu | Common Good Cocktail House"
+    template: "%s | Common Good Cocktail House",
+  },
   description:
     "Modern, classic, upscale and seasonal cocktails in the heart of Glen Ellyn, Illinois. A space to celebrate life, from special occasions to day-to-day.",
   keywords: ["cocktail bar", "Glen Ellyn", "Illinois", "cocktail house", "bar"],
+  alternates: { canonical: "/" },
   openGraph: {
     title: "Common Good Cocktail House",
     description: "Modern cocktails in Glen Ellyn, IL",
+    url: SITE_URL,
+    siteName: "Common Good Cocktail House",
     type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Common Good Cocktail House",
+    description: "Modern cocktails in Glen Ellyn, IL",
   },
 };
 
@@ -52,6 +68,11 @@ export default async function RootLayout({
     <html lang="en">
       <head>
         {fontCss && <style id="cg-font-loader" dangerouslySetInnerHTML={{ __html: fontCss }} />}
+        {/* LocalBusiness structured data → Google local pack / Maps visibility */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(buildBusinessJsonLd(settings)) }}
+        />
       </head>
       <body className={`${korinthFallback.variable} ${futuraFallback.variable} antialiased`}>
         <Header config={header} settings={settings} />

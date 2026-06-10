@@ -1,5 +1,8 @@
 import type { SiteSettings } from "@/types";
 
+/** Canonical public origin — used for metadata, sitemap, robots, and JSON-LD. */
+export const SITE_URL = "https://commongoodcocktailhouse.com";
+
 export const SITE_SETTINGS: SiteSettings = {
   phone: "630-474-0932",
   email: "info@commongoodcocktailhouse.com",
