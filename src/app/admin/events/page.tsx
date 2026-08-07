@@ -1,11 +1,17 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Plus, Trash2, Calendar, Loader2, Save, GripVertical, FileText, Type } from "lucide-react";
+import { Plus, Trash2, Calendar, Loader2, Save, GripVertical, FileText, Type, Copy, Repeat } from "lucide-react";
 import type { CalendarEvent, HostSection, PageHeaderData } from "@/types";
 import { getPageDefault } from "@/lib/pagedefaults";
+import { WEEKDAY_NAMES, MAX_OCCURRENCES, DEFAULT_OCCURRENCES, describeRecurrence } from "@/lib/recurrence";
 
 function newId() { return `e-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
+
+function todayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 const labelCls = "block text-[10px] tracking-widest uppercase text-gray-400 mb-1";
 const inputCls = "w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm px-3 py-2 outline-none focus:border-[#C97D5A]/50 rounded-sm";
@@ -157,6 +163,10 @@ export default function AdminEventsPage() {
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [savingEvent, setSavingEvent] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  // Extra dates for creating the same event on multiple dates at once.
+  const [extraDates, setExtraDates] = useState<string[]>([]);
+  // True when the open modal was seeded by "duplicate" (affects only the heading).
+  const [duplicating, setDuplicating] = useState(false);
 
   // Host tab state
   const [hostSections, setHostSections] = useState<HostSection[]>([
@@ -188,16 +198,30 @@ export default function AdminEventsPage() {
   }, []);
 
   // ── Calendar handlers ──
-  function openNew() { setEditing({ title: "", start: "", description: "", location: "" }); }
-  function openEdit(event: CalendarEvent) { setEditing({ ...event }); }
+  function openNew() { setExtraDates([]); setDuplicating(false); setEditing({ title: "", start: "", description: "", location: "", recurrence: "none" }); }
+  function openEdit(event: CalendarEvent) { setExtraDates([]); setDuplicating(false); setEditing({ ...event }); }
+  function openDuplicate(event: CalendarEvent) {
+    // Copy every field except id and the dates — so it saves as a brand-new
+    // event and the user just picks the new date(s). The end date is dropped
+    // too, since it only makes sense relative to the original start date.
+    const { id: _id, start: _start, end: _end, ...rest } = event;
+    void _id; void _start; void _end;
+    setExtraDates([]);
+    setDuplicating(true);
+    setEditing({ ...rest, start: "" });
+  }
 
   async function saveEvent() {
-    if (!editing?.title || !editing?.start) return;
-    const event: CalendarEvent = {
-      id: editing.id ?? newId(),
+    if (!editing?.title) return;
+    const isWeekly = editing.recurrence === "weekly";
+    // A weekly series doesn't need an explicit first date — default to today.
+    const startDate = editing.start || (isWeekly ? todayISO() : "");
+    if (!startDate) return;
+
+    const base = {
       title: editing.title,
-      start: editing.start,
-      end: editing.end,
+      // A weekly occurrence is always a single day, so an end date is meaningless.
+      end: isWeekly ? undefined : editing.end,
       description: editing.description,
       location: editing.location,
       imageUrl: editing.imageUrl,
@@ -206,16 +230,38 @@ export default function AdminEventsPage() {
       linkUrl: editing.linkUrl,
       linkLabel: editing.linkLabel,
       linkNewTab: editing.linkNewTab ?? true,
+      recurrence: (isWeekly ? "weekly" : "none") as CalendarEvent["recurrence"],
+      recurrenceDay: isWeekly
+        ? editing.recurrenceDay ?? new Date(startDate + "T12:00:00").getDay()
+        : undefined,
+      recurrenceCount: isWeekly ? editing.recurrenceCount ?? DEFAULT_OCCURRENCES : undefined,
     };
+
+    // Editing an existing event saves just that one. A weekly series is always a
+    // single row — the site expands it. Otherwise create one event per date.
+    let toSave: CalendarEvent[];
+    if (editing.id) {
+      toSave = [{ id: editing.id, start: startDate, ...base }];
+    } else if (isWeekly) {
+      toSave = [{ id: newId(), start: startDate, ...base }];
+    } else {
+      const dates = Array.from(new Set([startDate, ...extraDates].filter(Boolean)));
+      toSave = dates.map((start) => ({ id: newId(), start, ...base }));
+    }
+
     setSavingEvent(true);
     try {
-      const res = await fetch("/api/admin/events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(event),
-      });
-      if (!res.ok) throw new Error("Save failed");
-      setEvents((prev) => editing.id ? prev.map((e) => e.id === event.id ? event : e) : [...prev, event]);
+      for (const event of toSave) {
+        const res = await fetch("/api/admin/events", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(event),
+        });
+        if (!res.ok) throw new Error("Save failed");
+      }
+      setEvents((prev) => editing.id
+        ? prev.map((e) => e.id === toSave[0].id ? toSave[0] : e)
+        : [...prev, ...toSave]);
       setEditing(null);
     } catch {
       alert("Failed to save event. Please try again.");
@@ -279,6 +325,8 @@ export default function AdminEventsPage() {
     }
   }
 
+  const isWeekly = editing?.recurrence === "weekly";
+
   return (
     <div className="max-w-2xl">
       {/* Page header */}
@@ -323,20 +371,31 @@ export default function AdminEventsPage() {
           {!loadingEvents && events.length === 0 && (
             <p className="text-gray-400 text-sm text-center py-8">No events yet — click Add Event to create one</p>
           )}
-          {!loadingEvents && events.sort((a, b) => a.start.localeCompare(b.start)).map((event) => (
+          {!loadingEvents && [...events].sort((a, b) => a.start.localeCompare(b.start)).map((event) => (
             <div
               key={event.id}
               className="flex items-start gap-3 p-4 bg-white border border-gray-200 cursor-pointer hover:border-[#C97D5A]/40 transition-colors rounded-sm"
               onClick={() => openEdit(event)}
             >
-              <Calendar size={15} className="text-[#C97D5A] mt-0.5 shrink-0" />
+              {event.recurrence === "weekly"
+                ? <Repeat size={15} className="text-[#C97D5A] mt-0.5 shrink-0" />
+                : <Calendar size={15} className="text-[#C97D5A] mt-0.5 shrink-0" />}
               <div className="flex-1 min-w-0">
                 <p className="text-gray-800 text-sm tracking-wider">{event.title}</p>
                 <p className="text-gray-400 text-xs mt-0.5">
-                  {new Date(event.start + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "long", day: "numeric", year: "numeric" })}
+                  {event.recurrence === "weekly"
+                    ? describeRecurrence(event)
+                    : new Date(event.start + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "long", day: "numeric", year: "numeric" })}
                 </p>
                 {event.description && <p className="text-gray-400 text-xs mt-1 truncate">{event.description}</p>}
               </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); openDuplicate(event); }}
+                title="Duplicate this event to a new date"
+                className="text-gray-300 hover:text-[#C97D5A] transition-colors shrink-0"
+              >
+                <Copy size={14} />
+              </button>
               <button
                 onClick={(e) => { e.stopPropagation(); removeEvent(event.id); }}
                 disabled={deletingId === event.id}
@@ -399,17 +458,145 @@ export default function AdminEventsPage() {
           <div className="bg-white border border-gray-200 shadow-xl w-full max-w-lg rounded-sm flex flex-col max-h-[90dvh]">
             <div className="p-6 pb-4 shrink-0">
               <h2 className="text-lg text-gray-800 tracking-wider" style={{ fontFamily: "var(--font-display)" }}>
-                {editing.id ? "Edit Event" : "New Event"}
+                {editing.id ? "Edit Event" : duplicating ? "Duplicate Event" : "New Event"}
               </h2>
+              {duplicating && (
+                <p className="text-xs text-gray-400 mt-1">
+                  Everything was copied from the original — just pick the new date(s) below.
+                </p>
+              )}
             </div>
             <div className="overflow-y-auto px-6 pb-4 space-y-3 flex-1">
               {([
                 ["title", "Event Name *", "text"],
-                ["start", "Date *", "date"],
-                ["end", "End Date", "date"],
+              ] as [keyof CalendarEvent, string, string][]).map(([field, label, type]) => (
+                <div key={field}>
+                  <label className={labelCls}>{label}</label>
+                  <input
+                    type={type}
+                    value={(editing[field] as string) ?? ""}
+                    onChange={(e) => setEditing((v) => ({ ...v, [field]: e.target.value }))}
+                    className={inputCls}
+                  />
+                </div>
+              ))}
+
+              {/* Repeat settings */}
+              <div className="pt-1">
+                <label className={labelCls}>Repeats</label>
+                <select
+                  value={editing.recurrence ?? "none"}
+                  onChange={(e) => {
+                    const recurrence = e.target.value as CalendarEvent["recurrence"];
+                    setEditing((v) => ({
+                      ...v,
+                      recurrence,
+                      // Seed the weekday from the chosen date so the default matches
+                      // what they already picked.
+                      recurrenceDay: recurrence === "weekly"
+                        ? v?.recurrenceDay ?? (v?.start ? new Date(v.start + "T12:00:00").getDay() : new Date().getDay())
+                        : undefined,
+                      recurrenceCount: recurrence === "weekly"
+                        ? v?.recurrenceCount ?? DEFAULT_OCCURRENCES
+                        : undefined,
+                    }));
+                  }}
+                  className={inputCls}
+                >
+                  <option value="none">Does not repeat — one date</option>
+                  <option value="weekly">Every week on a set day</option>
+                </select>
+
+                {isWeekly && (
+                  <div className="grid grid-cols-2 gap-3 mt-3">
+                    <div>
+                      <label className={labelCls}>Day of Week</label>
+                      <select
+                        value={editing.recurrenceDay ?? new Date().getDay()}
+                        onChange={(e) => setEditing((v) => ({ ...v, recurrenceDay: Number(e.target.value) }))}
+                        className={inputCls}
+                      >
+                        {WEEKDAY_NAMES.map((name, i) => (
+                          <option key={name} value={i}>{name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelCls}>How Many Dates to Show</label>
+                      <select
+                        value={editing.recurrenceCount ?? DEFAULT_OCCURRENCES}
+                        onChange={(e) => setEditing((v) => ({ ...v, recurrenceCount: Number(e.target.value) }))}
+                        className={inputCls}
+                      >
+                        {Array.from({ length: MAX_OCCURRENCES }, (_, i) => i + 1).map((n) => (
+                          <option key={n} value={n}>{n === 1 ? "1 date" : `${n} dates`}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <p className="col-span-2 text-[11px] text-gray-400 leading-relaxed">
+                      The site shows only the next{" "}
+                      <strong className="text-gray-500">{editing.recurrenceCount ?? DEFAULT_OCCURRENCES}</strong>{" "}
+                      {WEEKDAY_NAMES[editing.recurrenceDay ?? new Date().getDay()]}
+                      {(editing.recurrenceCount ?? DEFAULT_OCCURRENCES) === 1 ? "" : "s"} at a time, and rolls
+                      forward automatically each week. It stays one entry here — no long list to clean up.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Date(s) — when creating a one-off, allow multiple dates at once */}
+              <div>
+                <label className={labelCls}>
+                  {isWeekly ? "Start Repeating On" : editing.id ? "Date *" : "Date(s) *"}
+                </label>
+                <input
+                  type="date"
+                  value={editing.start ?? ""}
+                  onChange={(e) => setEditing((v) => ({ ...v, start: e.target.value }))}
+                  className={inputCls}
+                />
+                {isWeekly && (
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    Leave blank to start this week.
+                  </p>
+                )}
+                {!editing.id && !isWeekly && (
+                  <div className="space-y-2 mt-2">
+                    {extraDates.map((d, i) => (
+                      <div key={i} className="flex gap-2 items-center">
+                        <input
+                          type="date"
+                          value={d}
+                          onChange={(e) => setExtraDates((arr) => arr.map((x, j) => j === i ? e.target.value : x))}
+                          className={inputCls}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setExtraDates((arr) => arr.filter((_, j) => j !== i))}
+                          className="text-gray-300 hover:text-red-500 transition-colors shrink-0"
+                          title="Remove this date"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setExtraDates((arr) => [...arr, ""])}
+                      className="flex items-center gap-1.5 text-xs tracking-wider text-[#C97D5A] hover:underline uppercase"
+                    >
+                      <Plus size={12} /> Add another date
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {(([
+                // A weekly occurrence is always a single day — no end date.
+                ...(isWeekly ? [] : [["end", "End Date", "date"]]),
                 ["location", "Location", "text"],
                 ["imageUrl", "Image URL", "text"],
-              ] as [keyof CalendarEvent, string, string][]).map(([field, label, type]) => (
+              ] as [keyof CalendarEvent, string, string][])).map(([field, label, type]) => (
                 <div key={field}>
                   <label className={labelCls}>{label}</label>
                   <input
@@ -468,7 +655,7 @@ export default function AdminEventsPage() {
                 </div>
               </div>
               <div className="pt-2 border-t border-gray-100">
-                <p className="text-[10px] tracking-widest uppercase text-gray-400 mb-2">Visibility Schedule <span className="normal-case opacity-60">(optional — leave blank to always show)</span></p>
+                <p className="text-[10px] tracking-widest uppercase text-gray-400 mb-2">Visibility Schedule <span className="normal-case opacity-60">(optional — leave blank to {isWeekly ? "repeat forever" : "always show"})</span></p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className={labelCls}>Show From</label>
@@ -480,7 +667,7 @@ export default function AdminEventsPage() {
                     />
                   </div>
                   <div>
-                    <label className={labelCls}>Hide After</label>
+                    <label className={labelCls}>{isWeekly ? "Stop Repeating After" : "Hide After"}</label>
                     <input
                       type="date"
                       value={editing.visibleUntil ?? ""}
@@ -498,7 +685,13 @@ export default function AdminEventsPage() {
                 className="flex-1 py-2.5 bg-[#C97D5A] text-white text-xs tracking-widest uppercase hover:bg-[#b86d4a] transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
               >
                 {savingEvent && <Loader2 size={13} className="animate-spin" />}
-                {savingEvent ? "Saving..." : (editing.id ? "Update" : "Add") + " Event"}
+                {(() => {
+                  if (savingEvent) return "Saving...";
+                  if (editing.id) return "Update Event";
+                  if (isWeekly) return "Add Recurring Event";
+                  const count = Array.from(new Set([editing.start, ...extraDates].filter(Boolean))).length;
+                  return count > 1 ? `Add ${count} Events` : "Add Event";
+                })()}
               </button>
               <button onClick={() => setEditing(null)} disabled={savingEvent} className="px-5 py-2.5 border border-gray-200 text-gray-500 text-xs tracking-widest uppercase hover:border-gray-400 transition-colors">
                 Cancel

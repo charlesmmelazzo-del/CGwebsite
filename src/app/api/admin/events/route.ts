@@ -20,6 +20,9 @@ export async function GET() {
         linkUrl: r.link_url ?? undefined,
         linkLabel: r.link_label ?? undefined,
         linkNewTab: r.link_new_tab ?? true,
+        recurrence: r.recurrence ?? "none",
+        recurrenceDay: r.recurrence_day ?? undefined,
+        recurrenceCount: r.recurrence_count ?? undefined,
       }))
     );
   } catch (e) {
@@ -35,6 +38,7 @@ export async function POST(req: NextRequest) {
     if (!event.id || !event.title || !event.start) {
       return NextResponse.json({ success: false, error: "id, title, and start are required" }, { status: 400 });
     }
+    const isWeekly = event.recurrence === "weekly";
     const sb = getSupabaseAdmin();
     const { error } = await sb.from("events").upsert(
       {
@@ -50,6 +54,9 @@ export async function POST(req: NextRequest) {
         link_url: event.linkUrl ?? null,
         link_label: event.linkLabel ?? null,
         link_new_tab: event.linkNewTab ?? true,
+        recurrence: isWeekly ? "weekly" : "none",
+        recurrence_day: isWeekly ? event.recurrenceDay ?? null : null,
+        recurrence_count: isWeekly ? event.recurrenceCount ?? 2 : null,
       },
       { onConflict: "id" }
     );

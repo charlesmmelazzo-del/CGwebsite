@@ -150,6 +150,14 @@ export interface CalendarEvent {
   linkUrl?: string;
   linkLabel?: string;     // defaults to "More Info" when linkUrl is set
   linkNewTab?: boolean;   // default true
+  // ─── Weekly recurrence ───
+  // A recurring event is stored as ONE row. The public site expands it into the
+  // next `recurrenceCount` occurrences at read time, so a weekly event never
+  // becomes hundreds of rows. `start` is the date the series begins.
+  recurrence?: "none" | "weekly";
+  recurrenceDay?: number;    // 0 = Sunday … 6 = Saturday
+  recurrenceCount?: number;  // how many upcoming occurrences to show at once
+  seriesId?: string;         // set only on expanded occurrences → the parent row's id
 }
 
 // ─── Menu / Coffee ───────────────────────────────────────────────────────────
