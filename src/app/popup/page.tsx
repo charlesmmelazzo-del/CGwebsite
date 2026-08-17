@@ -40,7 +40,7 @@ export default async function PopupHomePage() {
     );
   }
 
-  const { cocktails, votingOpen, voteBlockReason, ballot, results } = await loadExperience(
+  const { cocktails, votingOpen, isLive, voteBlockReason, ballot, results } = await loadExperience(
     live,
     viewer
   );
@@ -51,6 +51,7 @@ export default async function PopupHomePage() {
       cocktails={cocktails}
       viewer={viewer}
       votingOpen={votingOpen}
+      isLive={isLive}
       voteBlockReason={voteBlockReason}
       initialBallot={ballot}
       initialResults={results}

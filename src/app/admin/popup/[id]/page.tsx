@@ -32,6 +32,7 @@ import {
 import ColorPicker from "@/components/ui/ColorPicker";
 import ImagePicker from "@/components/ui/ImagePicker";
 import { listTemplates } from "@/components/popup/templates/registry";
+import { listGames } from "@/lib/popup/games";
 import type { LeaderboardEntry, PopupCocktail, PopupMenu, PopupStatus } from "@/lib/popup/types";
 
 type EditableCocktail = Partial<PopupCocktail> & { id: string };
@@ -364,6 +365,11 @@ export default function PopupEditorPage({ params }: { params: { id: string } }) 
       {/* ── Results ──────────────────────────────────────────────────────── */}
       {!isNew && menu.id && <ResultsPanel menuId={menu.id} slug={menu.slug ?? ""} />}
 
+      {/* ── Game winners ─────────────────────────────────────────────────── */}
+      {!isNew && menu.id && cocktails.some((c) => c.gameKey) && (
+        <WinnersPanel menuId={menu.id} slug={menu.slug ?? ""} status={menu.status ?? "draft"} />
+      )}
+
       {!isNew && (
         <button
           onClick={remove}
@@ -606,11 +612,40 @@ function CocktailCard({
             onChange={(v) => onUpdate({ ingredients: v })}
             multiline
           />
+          <TextField
+            label="The story"
+            value={cocktail.story ?? ""}
+            onChange={(v) => onUpdate({ story: v })}
+            multiline
+            rows={6}
+            hint="A paragraph or more. Blank lines start a new paragraph."
+          />
           <ImagePicker
             label="Image"
             value={cocktail.imageUrl}
             onChange={(url) => onUpdate({ imageUrl: url })}
           />
+
+          <label className="block mb-3">
+            <span className="block text-[10px] tracking-widest uppercase text-gray-400 mb-1.5">
+              Mini game
+            </span>
+            <select
+              value={cocktail.gameKey ?? ""}
+              onChange={(e) => onUpdate({ gameKey: e.target.value || undefined })}
+              className="w-full px-3 py-2 border border-gray-200 text-sm bg-white focus:outline-none focus:border-gray-400"
+            >
+              <option value="">No game yet — shows &ldquo;coming soon&rdquo;</option>
+              {listGames().map((g) => (
+                <option key={g.key} value={g.key}>
+                  {g.title}
+                </option>
+              ))}
+            </select>
+            <span className="block mt-1 text-[10px] text-gray-400">
+              Only used by arcade-style templates. New games appear here as we build them.
+            </span>
+          </label>
           <label className="flex items-center gap-2.5">
             <input
               type="checkbox"
@@ -711,6 +746,125 @@ function ResultsPanel({ menuId, slug }: { menuId: string; slug: string }) {
   );
 }
 
+// ─── Game winners (gift cards) ───────────────────────────────────────────────
+
+interface WinnerRow {
+  gameKey: string;
+  cocktailName: string;
+  totalPlayers: number;
+  winner: {
+    name: string;
+    email: string;
+    score: number;
+    achievedAt: string;
+    emailVerified: boolean;
+  } | null;
+}
+
+/**
+ * Who to send the $15 gift cards to.
+ *
+ * Deliberately a list to work from rather than an automatic send: real money is
+ * involved, and the owner should look at a winning score before paying out.
+ */
+function WinnersPanel({
+  menuId,
+  slug,
+  status,
+}: {
+  menuId: string;
+  slug: string;
+  status: string;
+}) {
+  const [rows, setRows] = useState<WinnerRow[]>([]);
+  const [sandbox, setSandbox] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(
+      `/api/admin/popup/winners?menuId=${encodeURIComponent(menuId)}${sandbox ? "&sandbox=1" : ""}`
+    )
+      .then((r) => r.json())
+      .then((d) => setRows(d.winners ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [menuId, sandbox]);
+
+  return (
+    <Section title="Game Winners — Gift Cards" defaultOpen>
+      <p className="text-[11px] text-gray-400 leading-relaxed mb-4">
+        The top scorer on each game. {status === "archived"
+          ? "This pop-up has closed, so these are final."
+          : "This pop-up is still running — these can still change."}{" "}
+        Send the $15 gift cards yourself; nothing is emailed automatically.
+      </p>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <label className="flex items-center gap-2.5">
+          <input
+            type="checkbox"
+            checked={sandbox}
+            onChange={(e) => setSandbox(e.target.checked)}
+            className="accent-[#C97D5A]"
+          />
+          <span className="text-xs text-gray-600">Show sandbox test scores instead</span>
+        </label>
+        <a
+          href={`/api/admin/popup/winners?menuId=${encodeURIComponent(menuId)}&format=csv${sandbox ? "&sandbox=1" : ""}`}
+          download={`${slug}-game-winners.csv`}
+          className="flex items-center gap-1.5 text-[11px] tracking-wider uppercase text-gray-400 hover:text-[#C97D5A] transition-colors"
+        >
+          <Download size={12} /> Export CSV
+        </a>
+      </div>
+
+      {loading ? (
+        <p className="text-xs text-gray-400 py-6 text-center">Loading…</p>
+      ) : rows.length === 0 ? (
+        <p className="text-xs text-gray-400 py-6 text-center border border-dashed border-gray-200">
+          No cocktails on this pop-up have a game attached yet.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {rows.map((r) => (
+            <div key={r.gameKey} className="border border-gray-200 p-3.5">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <span className="text-sm text-gray-800">{r.cocktailName}</span>
+                <span className="text-[10px] tracking-wider uppercase text-gray-400">
+                  {r.totalPlayers} {r.totalPlayers === 1 ? "player" : "players"}
+                </span>
+              </div>
+
+              {r.winner ? (
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <span className="text-sm text-gray-800">{r.winner.name}</span>
+                  <a
+                    href={`mailto:${r.winner.email}`}
+                    className="text-xs text-[#C97D5A] hover:underline break-all"
+                  >
+                    {r.winner.email}
+                  </a>
+                  <span className="text-sm tabular-nums text-gray-600">
+                    {r.winner.score.toLocaleString()} pts
+                  </span>
+                  {!r.winner.emailVerified && (
+                    <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-[10px] tracking-wider uppercase">
+                      Email not confirmed
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-gray-400">Nobody has played this one yet.</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </Section>
+  );
+}
+
 // ─── Small shared pieces ─────────────────────────────────────────────────────
 
 function Section({
@@ -748,6 +902,7 @@ function TextField({
   placeholder,
   hint,
   multiline,
+  rows = 3,
 }: {
   label: string;
   value: string;
@@ -755,6 +910,7 @@ function TextField({
   placeholder?: string;
   hint?: string;
   multiline?: boolean;
+  rows?: number;
 }) {
   const cls =
     "w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:border-gray-400";
@@ -765,7 +921,7 @@ function TextField({
       </span>
       {multiline ? (
         <textarea
-          rows={3}
+          rows={rows}
           value={value}
           placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}

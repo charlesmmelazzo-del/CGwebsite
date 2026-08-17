@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getAllMenus, getCocktails, getMenuById, mapMenu } from "@/lib/popup/menus";
 import { getVoterCount } from "@/lib/popup/voting";
+import { isPlayableGame } from "@/lib/popup/games";
 import type { PopupCocktail } from "@/lib/popup/types";
 
 // Protected by the middleware matcher on /api/admin/:path*.
@@ -131,7 +132,11 @@ export async function POST(req: NextRequest) {
         tagline: c.tagline || null,
         description: c.description || null,
         ingredients: c.ingredients || null,
+        story: c.story || null,
         image_url: c.imageUrl || null,
+        // Only accept a game key we actually have a game for, so a typo can't
+        // leave a cocktail pointing at nothing.
+        game_key: c.gameKey && isPlayableGame(c.gameKey) ? c.gameKey : null,
         order: i,
         active: c.active !== false,
         meta: c.meta ?? {},

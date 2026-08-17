@@ -32,7 +32,7 @@ export default async function SandboxPage({ params }: { params: { slug: string }
   if (!menu) notFound();
 
   const viewer = await getViewer();
-  const { cocktails, votingOpen, voteBlockReason, ballot, results } = await loadExperience(
+  const { cocktails, votingOpen, isLive, voteBlockReason, ballot, results } = await loadExperience(
     menu,
     viewer,
     { isSandbox: true }
@@ -67,6 +67,7 @@ export default async function SandboxPage({ params }: { params: { slug: string }
         cocktails={cocktails}
         viewer={viewer}
         votingOpen={votingOpen}
+        isLive={isLive}
         voteBlockReason={voteBlockReason}
         initialBallot={ballot}
         initialResults={results}

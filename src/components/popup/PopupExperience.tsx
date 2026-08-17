@@ -27,6 +27,7 @@ export default function PopupExperience({
   cocktails,
   viewer,
   votingOpen,
+  isLive,
   voteBlockReason,
   initialBallot,
   initialResults,
@@ -36,6 +37,7 @@ export default function PopupExperience({
   cocktails: PopupCocktail[];
   viewer: PopupViewer | null;
   votingOpen: boolean;
+  isLive: boolean;
   voteBlockReason: VoteBlockReason | null;
   initialBallot: PopupVote[];
   initialResults: LeaderboardEntry[];
@@ -162,6 +164,7 @@ export default function PopupExperience({
         cocktails={cocktails}
         viewer={viewer}
         votingOpen={votingOpen}
+        isLive={isLive}
         voteBlockReason={voteBlockReason}
         myVotes={ballot}
         results={results}

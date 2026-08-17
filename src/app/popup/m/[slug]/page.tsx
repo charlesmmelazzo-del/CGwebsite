@@ -27,7 +27,7 @@ export default async function ArchivedPopupPage({ params }: { params: { slug: st
 
   if (menu.status === "draft" || menu.status === "scheduled") notFound();
 
-  const { cocktails, votingOpen, voteBlockReason, ballot, results } = await loadExperience(
+  const { cocktails, votingOpen, isLive, voteBlockReason, ballot, results } = await loadExperience(
     menu,
     viewer
   );
@@ -38,6 +38,7 @@ export default async function ArchivedPopupPage({ params }: { params: { slug: st
       cocktails={cocktails}
       viewer={viewer}
       votingOpen={votingOpen}
+      isLive={isLive}
       voteBlockReason={voteBlockReason}
       initialBallot={ballot}
       initialResults={results}

@@ -1,0 +1,77 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+import { GAME_H, GAME_W } from "./arcade";
+
+/**
+ * The screen. A fixed 224x288 buffer scaled up with smoothing off, so the
+ * pixels stay hard-edged at any size.
+ *
+ * The frame callback is held in a ref rather than being a loop dependency, so
+ * a game can close over fresh React state without tearing down and restarting
+ * the animation loop on every render. Games keep their mutable state in refs
+ * and never re-render per frame — at 60fps on a phone that matters.
+ */
+export default function ArcadeCanvas({
+  onFrame,
+  running,
+  className,
+}: {
+  /** Called once per animation frame. dt is seconds since the last frame. */
+  onFrame: (ctx: CanvasRenderingContext2D, dt: number, t: number) => void;
+  running: boolean;
+  className?: string;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const frameRef = useRef(onFrame);
+  frameRef.current = onFrame;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d", { alpha: false });
+    if (!ctx) return;
+    ctx.imageSmoothingEnabled = false;
+
+    if (!running) return;
+
+    let raf = 0;
+    let last = performance.now();
+    let elapsed = 0;
+
+    const loop = (now: number) => {
+      // Clamp dt: switching tabs or a slow frame must not teleport a player
+      // through a floor or skip a whole rhythm note.
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      elapsed += dt;
+
+      ctx.imageSmoothingEnabled = false;
+      frameRef.current(ctx, dt, elapsed);
+
+      raf = requestAnimationFrame(loop);
+    };
+
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [running]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={GAME_W}
+      height={GAME_H}
+      className={className}
+      style={{
+        imageRendering: "pixelated",
+        width: "100%",
+        height: "auto",
+        aspectRatio: `${GAME_W} / ${GAME_H}`,
+        display: "block",
+        background: "#000",
+        touchAction: "manipulation",
+      }}
+    />
+  );
+}

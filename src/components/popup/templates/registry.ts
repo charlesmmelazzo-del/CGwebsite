@@ -14,6 +14,7 @@
 import type { ComponentType } from "react";
 import type { PopupTemplateProps } from "@/lib/popup/types";
 import ClassicTemplate from "./ClassicTemplate";
+import HighScoresTemplate from "./HighScoresTemplate";
 
 export interface PopupTemplate {
   key: string;
@@ -32,6 +33,14 @@ export const TEMPLATES: Record<string, PopupTemplate> = {
       "A clean card grid — image, name, tagline and ingredients — with voting and the live leaderboard. The neutral baseline.",
     component: ClassicTemplate,
     defaultConfig: { showIngredients: true, showLeaderboard: true },
+  },
+  "high-scores": {
+    key: "high-scores",
+    label: "High Scores (Arcade)",
+    description:
+      "Golden-age arcade cabinets. Each cocktail opens to its full story plus a mini game with a high score board — top score wins a gift card.",
+    component: HighScoresTemplate,
+    defaultConfig: {},
   },
 };
 

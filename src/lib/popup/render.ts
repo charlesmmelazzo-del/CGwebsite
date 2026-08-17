@@ -15,6 +15,8 @@ import type {
 export interface LoadedExperience {
   cocktails: PopupCocktail[];
   votingOpen: boolean;
+  /** Is this the pop-up that's live right now? Gates game scoring. */
+  isLive: boolean;
   voteBlockReason: VoteBlockReason | null;
   ballot: PopupVote[];
   results: LeaderboardEntry[];
@@ -55,5 +57,16 @@ export async function loadExperience(
     getLeaderboard(menu, cocktails, isSandbox),
   ]);
 
-  return { cocktails, votingOpen: reason === null, voteBlockReason: reason, ballot, results };
+  // In the sandbox the pop-up is treated as live so games and scoring can be
+  // exercised before launch; those scores are written with is_test.
+  const isLive = isSandbox || Boolean(live && live.id === menu.id);
+
+  return {
+    cocktails,
+    votingOpen: reason === null,
+    isLive,
+    voteBlockReason: reason,
+    ballot,
+    results,
+  };
 }

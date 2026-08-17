@@ -38,14 +38,45 @@ export interface PopupCocktail {
   menuId: string;
   name: string;
   tagline?: string;
+  /** Short flavor description. */
   description?: string;
   ingredients?: string;
+  /** Long-form paragraph shown beneath the tasting notes. */
+  story?: string;
   imageUrl?: string;
+  /** Which mini game belongs to this cocktail (games registry key). */
+  gameKey?: string;
   order: number;
   active: boolean;
   /** Template-specific payload — trivia questions, mini-game config, etc. */
   meta: Record<string, unknown>;
 }
+
+// ─── Arcade scores ───────────────────────────────────────────────────────────
+
+export interface GameScoreEntry {
+  /** Best score this guest has reached on this game. */
+  score: number;
+  /** Display name — first name plus last initial, never a full email. */
+  name: string;
+  /** 1-based position. Ties share a position. */
+  position: number;
+  /** True for the signed-in viewer's own row. */
+  isYou: boolean;
+  achievedAt: string;
+}
+
+export interface GameBoard {
+  gameKey: string;
+  entries: GameScoreEntry[];
+  /** The viewer's own best, even when it's off the bottom of the board. */
+  yourBest: number | null;
+  yourPosition: number | null;
+  totalPlayers: number;
+}
+
+/** Why a play-through's score won't count toward the prize. */
+export type ScoreBlockReason = "not_signed_in" | "email_unverified" | "scoring_closed";
 
 export interface PopupProfile {
   id: string;
@@ -117,6 +148,13 @@ export interface PopupTemplateProps {
   viewer: PopupViewer | null;
   /** True only on the currently live pop-up with voting enabled. */
   votingOpen: boolean;
+  /**
+   * Whether this is the pop-up that's live right now. Distinct from votingOpen,
+   * which also depends on the viewer being signed in and confirmed — a game
+   * leaderboard stays open to an anonymous visitor's eyes but freezes the
+   * moment the pop-up itself closes.
+   */
+  isLive: boolean;
   /** Why voting is unavailable, when it is. */
   voteBlockReason: VoteBlockReason | null;
   /** This guest's current ballot. */
