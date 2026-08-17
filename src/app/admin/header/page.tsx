@@ -444,6 +444,30 @@ export default function AdminHeaderPage() {
                 <span className={labelCls}>Copyright Text</span>
                 <input className={inputCls} value={config.footer.copyrightText ?? ""} onChange={(e) => updateFooter({ copyrightText: e.target.value })} />
               </section>
+
+              {/* Pop Up Zone — footer-only by design, never in the header nav */}
+              <section>
+                <p className="text-[10px] tracking-widest uppercase text-gray-500 mb-3 font-medium">Pop Up Zone Link</p>
+                <label className="flex items-center gap-2 text-xs text-gray-500 mb-3">
+                  <input
+                    type="checkbox"
+                    checked={config.footer.showPopupLink !== false}
+                    onChange={(e) => updateFooter({ showPopupLink: e.target.checked })}
+                    className="accent-[#C97D5A]"
+                  />
+                  Show the Pop Up Zone link in the footer
+                </label>
+                <span className={labelCls}>Link Label</span>
+                <input
+                  className={inputCls}
+                  value={config.footer.popupLinkLabel ?? ""}
+                  placeholder="Common Good Pop Up Zone"
+                  onChange={(e) => updateFooter({ popupLinkLabel: e.target.value })}
+                />
+                <p className="mt-2 text-[10px] text-gray-400 leading-relaxed">
+                  Links to /popup. Kept out of the header nav on purpose — the zone is its own place.
+                </p>
+              </section>
             </div>
           )}
         </div>

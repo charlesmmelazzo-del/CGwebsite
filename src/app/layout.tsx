@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Cormorant_Garamond, Jost } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
+import ZoneWatcher from "@/components/layout/ZoneWatcher";
 import { getSiteConfig, getSiteSettings, getFontCSS } from "@/lib/siteconfig";
 import { SITE_URL } from "@/lib/constants";
 import { buildBusinessJsonLd } from "@/lib/structuredData";
@@ -64,6 +66,18 @@ export default async function RootLayout({
   const desktopPad = header.headerHeight       ?? 72;
   const mobilePad  = header.mobileHeaderHeight ?? 52;
 
+  // The Pop Up Zone renders in its own standalone shell (see src/app/popup/layout.tsx):
+  // its templates take over the whole viewport, so the site header and footer
+  // are suppressed there.
+  //
+  // The chrome is always RENDERED and hidden with CSS rather than conditionally
+  // rendered, because the App Router keeps this root layout mounted across
+  // client-side navigations — it would not re-run when a guest clicks from the
+  // footer into /popup (or back out again), leaving the wrong chrome on screen.
+  // The data-zone attribute below is correct on first paint (so there's no
+  // flash), and ZoneWatcher keeps it in sync on every soft navigation after.
+  const standalone = (headers().get("x-pathname") ?? "").startsWith("/popup");
+
   return (
     <html lang="en">
       <head>
@@ -74,7 +88,11 @@ export default async function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(buildBusinessJsonLd(settings)) }}
         />
       </head>
-      <body className={`${korinthFallback.variable} ${futuraFallback.variable} antialiased`}>
+      <body
+        data-zone={standalone ? "popup" : undefined}
+        className={`${korinthFallback.variable} ${futuraFallback.variable} antialiased`}
+      >
+        <ZoneWatcher />
         <Header config={header} settings={settings} />
         {/*
           Inline style tag injects responsive padding that matches the live header height.

@@ -22,6 +22,7 @@ import {
   Layout,
   ImageIcon,
   Files,
+  Sparkles,
 } from "lucide-react";
 
 type NavItem = { href: string; label: string; icon: typeof Home; exact?: boolean };
@@ -48,6 +49,12 @@ const NAV: NavGroup[] = [
     items: [
       { href: "/admin/menu",   label: "Cocktail Menu", icon: UtensilsCrossed },
       { href: "/admin/coffee", label: "Coffee Menu",   icon: Coffee },
+    ],
+  },
+  {
+    group: "Pop Up Zone",
+    items: [
+      { href: "/admin/popup", label: "Pop Ups", icon: Sparkles },
     ],
   },
   {

@@ -1,7 +1,8 @@
 import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/constants";
 
-// Static list of public routes. Admin/API routes are intentionally excluded.
+// Static list of public routes. Admin, API and the Pop Up Zone (/popup) are
+// intentionally excluded — the zone is reached from the footer, not search.
 export default function sitemap(): MetadataRoute.Sitemap {
   const routes = ["", "/menu", "/coffee", "/events", "/about", "/club", "/shop"];
   const lastModified = new Date();

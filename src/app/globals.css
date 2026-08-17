@@ -188,3 +188,19 @@ p, span, a, li, td, th, label, input, textarea, button {
   height: calc(100vh - var(--header-h, 52px));
   height: calc(100dvh - var(--header-h, 52px));
 }
+
+/* ─── Pop Up Zone shell ──────────────────────────────────────────────────── */
+/* The zone renders in its own chrome (src/components/popup/PopupBar.tsx), so
+   the site header and footer are hidden while inside it. Driven by the
+   `data-zone` attribute on <body>: set server-side for the first paint, kept in
+   sync across client-side navigations by ZoneWatcher. Hiding with CSS rather
+   than conditional rendering is what makes it survive soft navigation in and
+   back out of the zone — the root layout stays mounted and never re-decides. */
+body[data-zone="popup"] > header,
+body[data-zone="popup"] > footer {
+  display: none;
+}
+body[data-zone="popup"] #cg-main {
+  padding-top: 0;
+  --header-h: 0px;
+}

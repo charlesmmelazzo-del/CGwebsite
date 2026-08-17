@@ -373,6 +373,9 @@ export interface FooterConfig {
   showContact: boolean;
   showSocialLinks: boolean;
   copyrightText?: string;
+  /** Pop Up Zone link — deliberately footer-only, never in the header nav. */
+  showPopupLink?: boolean;
+  popupLinkLabel?: string;
 }
 
 export interface SiteConfig {

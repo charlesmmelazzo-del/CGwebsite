@@ -6,7 +6,9 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: ["/admin", "/api"],
+      // /popup is the Pop Up Zone — a members' area reached from the footer,
+      // not something to surface in search. (Also noindex'd in its layout.)
+      disallow: ["/admin", "/api", "/popup"],
     },
     sitemap: `${SITE_URL}/sitemap.xml`,
   };

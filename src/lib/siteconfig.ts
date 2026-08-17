@@ -33,6 +33,8 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
     showContact: true,
     showSocialLinks: true,
     copyrightText: "© 2025 Common Good Cocktail House",
+    showPopupLink: true,
+    popupLinkLabel: "Common Good Pop Up Zone",
   },
   updatedAt: new Date().toISOString(),
 };
