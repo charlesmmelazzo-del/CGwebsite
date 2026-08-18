@@ -22,6 +22,13 @@ export interface GameShellProps {
   scoringOpen: boolean;
   isSandbox?: boolean;
   accent?: string;
+  /** Skip the attract screen — used when the player asked for the game itself. */
+  autoStart?: boolean;
+  /**
+   * Where "quit" goes. Without it the cabinet falls back to its own attract
+   * screen; with it, leaving the game closes whatever opened it.
+   */
+  onExit?: () => void;
 }
 
 /**
@@ -41,11 +48,13 @@ export default function GameShell({
   scoringOpen,
   isSandbox = false,
   accent = P.yellow,
+  autoStart = false,
+  onExit,
 }: GameShellProps) {
   const meta = getGameMeta(gameKey);
   const Game = getGameComponent(gameKey);
 
-  const [phase, setPhase] = useState<Phase>("attract");
+  const [phase, setPhase] = useState<Phase>(autoStart ? "playing" : "attract");
   const [score, setScore] = useState(0);
   const [board, setBoard] = useState<GameBoard | null>(null);
   const [saving, setSaving] = useState(false);
@@ -86,14 +95,19 @@ export default function GameShell({
     };
   }, [fullscreen]);
 
+  const leave = useCallback(() => {
+    if (onExit) onExit();
+    else setPhase("attract");
+  }, [onExit]);
+
   useEffect(() => {
     if (!fullscreen) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setPhase("attract");
+      if (e.key === "Escape") leave();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [fullscreen]);
+  }, [fullscreen, leave]);
 
   const handleGameOver = useCallback(
     async (finalScore: number, detail?: Record<string, unknown>) => {
@@ -183,7 +197,7 @@ export default function GameShell({
             viewerId={viewerId}
             emailVerified={emailVerified}
             onReplay={() => setPhase("playing")}
-            onQuit={() => setPhase("attract")}
+            onQuit={leave}
           />
         )}
       </div>
@@ -198,7 +212,7 @@ export default function GameShell({
       <div className="min-h-full flex flex-col items-center justify-center p-2 sm:p-4">
         <div className="w-full max-w-[420px] mb-2 flex justify-end">
           <button
-            onClick={() => setPhase("attract")}
+            onClick={leave}
             className="px-3 py-1.5 text-[10px] tracking-[0.25em] uppercase text-white/45 hover:text-white/90 transition-colors"
           >
             {phase === "playing" ? "Quit" : "Close"}

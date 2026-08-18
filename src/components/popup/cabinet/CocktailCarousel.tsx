@@ -40,6 +40,7 @@ export default function CocktailCarousel({
   rankByCocktail,
   myTopPick,
   onOpen,
+  onPlay,
   onVote,
 }: {
   cocktails: PopupCocktail[];
@@ -51,6 +52,7 @@ export default function CocktailCarousel({
   rankByCocktail: Map<string, number>;
   myTopPick?: string;
   onOpen: (id: string) => void;
+  onPlay: (id: string) => void;
   onVote: (id: string) => void;
 }) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
@@ -94,7 +96,7 @@ export default function CocktailCarousel({
                 active={selected === i}
                 rank={rankByCocktail.get(c.id)}
                 onOpen={() => onOpen(c.id)}
-                onPlay={() => onOpen(c.id)}
+                onPlay={() => onPlay(c.id)}
               />
             </Slide>
           ))}

@@ -2,13 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { Check, X } from "lucide-react";
+import { X } from "lucide-react";
 import GameShell from "../games/GameShell";
 import CabinetFrame from "../CabinetFrame";
 import CocktailCarousel from "../cabinet/CocktailCarousel";
 import { C } from "../cabinet/theme";
-import { VOTE_BLOCK_MESSAGE } from "@/lib/popup/access";
-import { getGameMeta } from "@/lib/popup/games";
 import type { PopupCocktail, PopupTemplateProps } from "@/lib/popup/types";
 
 /**
@@ -99,6 +97,12 @@ export default function HighScoresTemplate({
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
+  // Two independent overlays: `openId` is the cocktail's info card, `playingId`
+  // is a game running full screen. "Play game" goes straight to the second
+  // without passing through the first.
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const playing = cocktails.find((c) => c.id === playingId) ?? null;
+
   const rankByCocktail = new Map(myVotes.map((v) => [v.cocktailId, v.rank]));
   const myTopPick = myVotes.find((v) => v.rank === 1)?.cocktailId;
 
@@ -143,6 +147,7 @@ export default function HighScoresTemplate({
               rankByCocktail={rankByCocktail}
               myTopPick={myTopPick}
               onOpen={(id) => setOpenId(id)}
+              onPlay={(id) => setPlayingId(id)}
               onVote={(id) => toggleVote(id)}
             />
           )}
@@ -150,21 +155,24 @@ export default function HighScoresTemplate({
       </div>
 
 
-      {open && (
-        <CocktailDetail
-          cocktail={open}
+      {playing?.gameKey && (
+        <GameShell
+          key={playing.id}
           menuId={menu.id}
-          viewer={viewer}
-          isLive={isLive}
+          cocktailId={playing.id}
+          cocktailName={playing.name}
+          gameKey={playing.gameKey}
+          viewerId={viewer?.userId ?? null}
+          emailVerified={viewer?.emailVerified ?? false}
+          scoringOpen={isLive}
           isSandbox={isSandbox}
-          votingOpen={votingOpen}
-          voteBlockReason={voteBlockReason}
-          voteBusy={voteBusy}
-          rank={rankByCocktail.get(open.id)}
-          onVote={() => toggleVote(open.id)}
-          onClose={() => setOpenId(null)}
+          accent="#FFD500"
+          autoStart
+          onExit={() => setPlayingId(null)}
         />
       )}
+
+      {open && <CocktailDetail cocktail={open} onClose={() => setOpenId(null)} />}
     </div>
   );
 }
@@ -219,32 +227,11 @@ function ArcadeBackdrop() {
 
 function CocktailDetail({
   cocktail,
-  menuId,
-  viewer,
-  isLive,
-  isSandbox,
-  votingOpen,
-  voteBlockReason,
-  voteBusy,
-  rank,
-  onVote,
   onClose,
 }: {
   cocktail: PopupCocktail;
-  menuId: string;
-  viewer: PopupTemplateProps["viewer"];
-  isLive: boolean;
-  isSandbox: boolean;
-  votingOpen: boolean;
-  voteBlockReason: PopupTemplateProps["voteBlockReason"];
-  voteBusy: boolean;
-  rank?: number;
-  onVote: () => void;
   onClose: () => void;
 }) {
-  const game = getGameMeta(cocktail.gameKey);
-  const picked = rank !== undefined;
-
   return (
     // Fully opaque, not 97%: at 97% the ranking modal showed through it and the
     // two overlays read as one broken screen.
@@ -326,68 +313,7 @@ function CocktailDetail({
           </DetailSection>
         )}
 
-        {/* Vote */}
-        <button
-          onClick={onVote}
-          disabled={voteBusy || (!votingOpen && !picked)}
-          className={`mt-7 w-full py-4 border-[3px] border-[#100810] text-[11px] tracking-[0.25em] uppercase font-black transition-transform active:translate-y-[2px] disabled:opacity-40 ${
-            picked ? "text-[#100810]" : "text-white/80"
-          }`}
-          style={{
-            background: picked ? "#FFD500" : "#1B1030",
-            boxShadow: picked ? "4px 5px 0 #8A6A00" : "4px 5px 0 #100810",
-          }}
-        >
-          {picked ? (
-            <span className="inline-flex items-center gap-2">
-              <Check size={14} />
-              {rank === 1 ? "Your favorite" : `Ranked #${rank}`}
-            </span>
-          ) : votingOpen ? (
-            "Vote for this cocktail"
-          ) : voteBlockReason ? (
-            VOTE_BLOCK_MESSAGE[voteBlockReason]
-          ) : (
-            "Voting closed"
-          )}
-        </button>
 
-        {/* The game */}
-        <div className="mt-10">
-          <h3
-            style={marquee({ fill: "#3CE0E0", stroke: 2, shadow1: "#0A4A6A" })}
-            className="text-center text-lg font-black tracking-[0.2em] uppercase mb-4"
-          >
-            {game ? "Play for the high score" : "Mini game"}
-          </h3>
-
-          {game ? (
-            <GameShell
-              menuId={menuId}
-              cocktailId={cocktail.id}
-              cocktailName={cocktail.name}
-              gameKey={cocktail.gameKey!}
-              viewerId={viewer?.userId ?? null}
-              emailVerified={viewer?.emailVerified ?? false}
-              scoringOpen={isLive}
-              isSandbox={isSandbox}
-              accent="#FFD500"
-            />
-          ) : (
-            <div className="border-[3px] border-dashed border-white/20 p-10 text-center">
-              <p
-                style={marquee({ fill: "#FFFFFF", stroke: 1 })}
-                className="text-[11px] tracking-[0.3em] uppercase font-black"
-              >
-                Coming Soon
-              </p>
-              <p className="mt-3 text-xs text-white/35 leading-relaxed">
-                This cocktail&apos;s game is still in the workshop. Check back before the pop-up
-                ends.
-              </p>
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );

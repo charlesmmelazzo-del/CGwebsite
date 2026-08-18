@@ -182,7 +182,12 @@ function MarqueeArt({ flip = false }: { flip?: boolean }) {
       className="hidden sm:flex shrink-0 items-end gap-2"
       style={{ transform: flip ? "scaleX(-1)" : undefined }}
     >
-      <BartenderArt px={3} mood={flip ? "ok" : "happy"} />
+      {/* Arms down with the tin stood beside him. An overhead shake needs the
+          forearms to pass either side of a head that fills the sprite's whole
+          width — there is nowhere for them to go, so it reads as a floating
+          tin however the pieces are spaced. */}
+      <BartenderArt px={3} mood={flip ? "ok" : "happy"} holdingTin={false} />
+      <SpriteArt sprite={TIN} colors={TIN_COLORS} px={3} className="mb-1" />
       <SpriteArt sprite={GUEST} colors={GUEST_SWAPS[flip ? 1 : 0]} px={3} className="mb-1" />
     </div>
   );
