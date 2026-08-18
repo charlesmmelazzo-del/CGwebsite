@@ -141,6 +141,30 @@ function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
 }
 
+/**
+ * Keep a bubble inside the tank, turning it around if it has hit a side.
+ *
+ * Position is clamped as well as the velocity flipped. Flipping alone lets a
+ * bubble that arrives fast sit outside the wall for a frame and flip again on
+ * the next — it sticks to the edge, jittering.
+ */
+function bounceOffWalls(b: Bubble): void {
+  if (b.x < BUBBLE_R) {
+    b.x = BUBBLE_R;
+    b.vx = Math.abs(b.vx);
+  } else if (b.x > GAME_W - BUBBLE_R) {
+    b.x = GAME_W - BUBBLE_R;
+    b.vx = -Math.abs(b.vx);
+  }
+  if (b.y < TANK_TOP + BUBBLE_R) {
+    b.y = TANK_TOP + BUBBLE_R;
+    b.vy = Math.abs(b.vy);
+  } else if (b.y > TANK_BOTTOM - BUBBLE_R) {
+    b.y = TANK_BOTTOM - BUBBLE_R;
+    b.vy = -Math.abs(b.vy);
+  }
+}
+
 function dist2(ax: number, ay: number, bx: number, by: number): number {
   const dx = ax - bx;
   const dy = ay - by;
@@ -174,25 +198,7 @@ export function updateBubbles(st: BubbleState, dt: number): void {
 
     b.x += b.vx * dt;
     b.y += b.vy * dt;
-
-    // ── Walls ──────────────────────────────────────────────────────────────
-    // Position is clamped as well as the velocity flipped. Flipping alone lets
-    // a bubble that arrives fast sit outside the wall for a frame, and on the
-    // next frame it flips again — it sticks to the edge, jittering.
-    if (b.x < BUBBLE_R) {
-      b.x = BUBBLE_R;
-      b.vx = Math.abs(b.vx);
-    } else if (b.x > GAME_W - BUBBLE_R) {
-      b.x = GAME_W - BUBBLE_R;
-      b.vx = -Math.abs(b.vx);
-    }
-    if (b.y < TANK_TOP + BUBBLE_R) {
-      b.y = TANK_TOP + BUBBLE_R;
-      b.vy = Math.abs(b.vy);
-    } else if (b.y > TANK_BOTTOM - BUBBLE_R) {
-      b.y = TANK_BOTTOM - BUBBLE_R;
-      b.vy = -Math.abs(b.vy);
-    }
+    bounceOffWalls(b);
   }
 
   // ── Bubble against bubble ────────────────────────────────────────────────
@@ -228,6 +234,13 @@ export function updateBubbles(st: BubbleState, dt: number): void {
         b.vx += diff * nx;
         b.vy += diff * ny;
       }
+
+      // Separating a pair can shove one of them through a wall — the wall pass
+      // has already run this frame, so without this the bubble sits outside the
+      // tank until the next one. Re-clamping here keeps "inside the tank" true
+      // at the END of every update, which is when anything looks at it.
+      bounceOffWalls(a);
+      bounceOffWalls(b);
     }
   }
 
