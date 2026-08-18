@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { X } from "lucide-react";
 import GameShell from "../games/GameShell";
-import CabinetFrame from "../CabinetFrame";
+import StartScreen from "../StartScreen";
 import CocktailCarousel from "../cabinet/CocktailCarousel";
 import { C } from "../cabinet/theme";
 import type { PopupCocktail, PopupTemplateProps } from "@/lib/popup/types";
@@ -103,6 +103,11 @@ export default function HighScoresTemplate({
   const [playingId, setPlayingId] = useState<string | null>(null);
   const playing = cocktails.find((c) => c.id === playingId) ?? null;
 
+  // The attract screen, shown on EVERY load rather than once per session. It
+  // carries the logo, what the pop-up is, and the prize, so none of that has to
+  // sit permanently above the cocktails taking up the screen.
+  const [started, setStarted] = useState(false);
+
   const rankByCocktail = new Map(myVotes.map((v) => [v.cocktailId, v.rank]));
   const myTopPick = myVotes.find((v) => v.rank === 1)?.cocktailId;
 
@@ -110,48 +115,55 @@ export default function HighScoresTemplate({
     <div className="min-h-screen bg-[#05030F] text-white relative overflow-hidden">
       <ArcadeBackdrop />
 
-      <div className="relative px-2 sm:px-6 py-6 sm:py-12">
-        <CabinetFrame
-          title={menu.title || "High Scores"}
-          subtitle={menu.subtitle}
-          notice={
-            !isLive ? (
-              <p
-                className="text-[10px] tracking-[0.25em] uppercase"
-                style={{ color: C.magenta }}
-              >
-                ★ This pop-up has closed — boards are final ★
-              </p>
-            ) : undefined
-          }
-        >
-          {voteError && (
-            <p className="mb-4 text-center text-xs" style={{ color: C.magenta }}>
-              {voteError}
-            </p>
-          )}
+      {/*
+        Nothing above the games. The logo and the explanation live on the attract
+        screen, so once it's cleared the screen is the cocktails, their demos and
+        the arrows to move between them — which is the whole point of moving them.
+      */}
+      <div className="relative px-1 sm:px-6 py-3 sm:py-6">
+        {!isLive && (
+          <p
+            className="mb-3 text-center text-[10px] tracking-[0.25em] uppercase"
+            style={{ color: C.magenta }}
+          >
+            ★ This pop-up has closed — boards are final ★
+          </p>
+        )}
 
-          {cocktails.length === 0 ? (
-            <p className="text-center text-sm text-white/40 py-16">
-              No cocktails on this pop-up yet.
-            </p>
-          ) : (
-            <CocktailCarousel
-              cocktails={cocktails}
-              results={results}
-              viewer={viewer}
-              votingOpen={votingOpen}
-              voteBlockReason={voteBlockReason}
-              voteBusy={voteBusy}
-              rankByCocktail={rankByCocktail}
-              myTopPick={myTopPick}
-              onOpen={(id) => setOpenId(id)}
-              onPlay={(id) => setPlayingId(id)}
-              onVote={(id) => toggleVote(id)}
-            />
-          )}
-        </CabinetFrame>
+        {voteError && (
+          <p className="mb-3 text-center text-xs" style={{ color: C.magenta }}>
+            {voteError}
+          </p>
+        )}
+
+        {cocktails.length === 0 ? (
+          <p className="text-center text-sm text-white/40 py-16">
+            No cocktails on this pop-up yet.
+          </p>
+        ) : (
+          <CocktailCarousel
+            cocktails={cocktails}
+            results={results}
+            viewer={viewer}
+            votingOpen={votingOpen}
+            voteBlockReason={voteBlockReason}
+            voteBusy={voteBusy}
+            rankByCocktail={rankByCocktail}
+            myTopPick={myTopPick}
+            onOpen={(id) => setOpenId(id)}
+            onPlay={(id) => setPlayingId(id)}
+            onVote={(id) => toggleVote(id)}
+          />
+        )}
       </div>
+
+      {!started && (
+        <StartScreen
+          subtitle={menu.subtitle}
+          description={menu.description}
+          onStart={() => setStarted(true)}
+        />
+      )}
 
 
       {playing?.gameKey && (
