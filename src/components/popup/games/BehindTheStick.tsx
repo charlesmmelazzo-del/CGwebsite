@@ -57,6 +57,7 @@ import {
 import type { ArcadeGameProps } from "./registry";
 import { INGREDIENTS, ING_BY_KEY, colorFor } from "./ingredients";
 import { artworkUrl, ingredientArt, warmIngredientArt } from "./ingredientImages";
+import { drawCharacter, warmCharacterArt, type Mood as ArtMood } from "./characterArt";
 import {
   BUBBLE_R,
   live as liveBubbles,
@@ -900,6 +901,7 @@ export default function BehindTheStick({ onGameOver, demo = false }: ArcadeGameP
   const logoRef = useRef<HTMLImageElement | null>(null);
   useEffect(() => {
     warmIngredientArt();
+    warmCharacterArt();
     const img = new window.Image();
     img.src = "/popup/art/logo-behind-the-stick.png";
     img.onload = () => {
@@ -1120,23 +1122,44 @@ export default function BehindTheStick({ onGameOver, demo = false }: ArcadeGameP
       // a round, and at 1x he was a 20-pixel figure lost in the middle of the
       // screen. An INTEGER scale on purpose — 1.5 or 1.7 lands sprite pixels on
       // fractional device pixels and opens hairline seams through the art.
-      ctx.save();
-      ctx.translate(112, 168);
-      ctx.scale(2, 2);
-      ctx.imageSmoothingEnabled = false;
-      drawBartender(
-        ctx,
-        0,
-        0,
-        st.phase === "over" ? "panic" : st.mood,
-        pose,
-        t,
-        st.phase === "shake"
-          ? { count: st.shakeCount, since: st.phaseT - st.lastTapT }
-          : undefined,
-        st.phase === "stir" ? st.revs : undefined
-      );
-      ctx.restore();
+      const mood = st.phase === "over" ? "panic" : st.mood;
+      // The four game moods collapse onto the three heads that were drawn.
+      const artMood: ArtMood =
+        mood === "panic" ? "sad" : mood === "worried" ? "worried" : "happy";
+
+      // The tin alternates on each tap, so the drawn bartender shakes at
+      // exactly the rate the player is tapping — same rule the pixel one used.
+      const tapping = st.phase === "shake" && st.phaseT - st.lastTapT < 0.5;
+      const shakeLift = tapping && st.shakeCount % 2 === 1 ? 1 : 0;
+
+      const drewArt = drawCharacter(ctx, "bartender", 112, 176, 104, {
+        mood: artMood,
+        pose: pose === "stir" ? "idle" : (pose as "idle" | "shake" | "serve"),
+        shakeLift,
+      });
+
+      // Until the parts load, the pixel bartender stands in. Drawn at 2x, an
+      // INTEGER scale — 1.5 lands sprite pixels on fractional device pixels and
+      // opens hairline seams through the art.
+      if (!drewArt) {
+        ctx.save();
+        ctx.translate(112, 168);
+        ctx.scale(2, 2);
+        ctx.imageSmoothingEnabled = false;
+        drawBartender(
+          ctx,
+          0,
+          0,
+          mood,
+          pose,
+          t,
+          st.phase === "shake"
+            ? { count: st.shakeCount, since: st.phaseT - st.lastTapT }
+            : undefined,
+          st.phase === "stir" ? st.revs : undefined
+        );
+        ctx.restore();
+      }
       // The tin stays outside the transform so it keeps its place on the bar
       // rather than floating up with him.
       if (pose === "idle") drawTin(ctx, 172, 140, st.tinFill);
@@ -1145,10 +1168,23 @@ export default function BehindTheStick({ onGameOver, demo = false }: ArcadeGameP
       // rhythm phase competes with the only thing the player is watching, and
       // it stops the bartender being drawn big enough to read. One guest steps
       // in only to take the drink, or to ask where it is.
-      if (st.phase === "serve") {
-        drawGuest(ctx, 176, 214, "happy", t, P.teal, "#005058");
-      } else if (st.phase === "over") {
-        drawGuest(ctx, 176, 214, "angry", t, P.red, "#7A0F0A");
+      if (st.phase === "serve" || st.phase === "over") {
+        const happy = st.phase === "serve";
+        const drewGuest = drawCharacter(ctx, "guest", 182, 214, 74, {
+          mood: happy ? "happy" : "sad",
+          facing: -1,
+        });
+        if (!drewGuest) {
+          drawGuest(
+            ctx,
+            176,
+            214,
+            happy ? "happy" : "angry",
+            t,
+            happy ? P.teal : P.red,
+            happy ? "#005058" : "#7A0F0A"
+          );
+        }
       }
       drawBarFront(ctx);
 
