@@ -12,12 +12,16 @@ import {
   PTS_MISS,
   PTS_PERFECT,
   PTS_STRAY,
+  ORDER_SECONDS,
   READY_SECONDS,
   SHAKE_SECONDS,
+  beginPour,
   update,
   WINDOW_X,
   type State,
 } from "../behindTheStickCore";
+import { getCocktail } from "../cocktails";
+import { colorFor } from "../ingredients";
 
 let passed = 0;
 function check(name: string, fn: () => void) {
@@ -42,19 +46,55 @@ function run(st: State, seconds: number, pick = always("whiskey"), each?: (st: S
   }
 }
 
-function start(): State {
-  const st = freshState();
-  run(st, READY_SECONDS + 0.1);
+/**
+ * A round now opens with the order and a trip to the shelves before anything
+ * is poured. The platformer has its own simulation and its own tests, so these
+ * skip it the way the component will once the recipe is complete.
+ *
+ * Defaults to a shaken drink, since most of these check the pour and the shake.
+ */
+function start(cocktailKey = "whiskey-sour"): State {
+  const drink = getCocktail(cocktailKey);
+  assert.ok(drink, `no such cocktail: ${cocktailKey}`);
+  const st = freshState(colorFor, drink!);
+  run(st, READY_SECONDS + ORDER_SECONDS + 0.1);
+  assert.strictEqual(st.phase, "gather", `expected the shelves, got ${st.phase}`);
+  beginPour(st);
   return st;
 }
 
 console.log("\nPhases:");
 
-check("starts in ready and moves to pour", () => {
-  const st = freshState();
+check("a round opens with the order, then the shelves, then the pour", () => {
+  const st = freshState(colorFor, getCocktail("whiskey-sour")!);
   assert.strictEqual(st.phase, "ready");
   run(st, READY_SECONDS + 0.1);
+  assert.strictEqual(st.phase, "order", "never announced the drink");
+  run(st, ORDER_SECONDS + 0.1);
+  assert.strictEqual(st.phase, "gather", "never sent him to the shelves");
+  // The shelves hold the game open until the recipe is complete.
+  run(st, 5);
+  assert.strictEqual(st.phase, "gather", "left the shelves on a timer");
+  beginPour(st);
   assert.strictEqual(st.phase, "pour");
+});
+
+check("notes only ever call for ingredients in the round's recipe", () => {
+  const drink = getCocktail("negroni")!;
+  const st = freshState(colorFor, drink);
+  run(st, READY_SECONDS + ORDER_SECONDS + 0.1);
+  beginPour(st);
+  // No pick function: the core must default to the recipe on its own.
+  for (let i = 0; i < 60 * 12; i++) {
+    update(st, DT);
+    for (const n of st.notes) {
+      assert.ok(
+        drink.recipe.includes(n.ing as never),
+        `a Negroni asked for ${n.ing}`
+      );
+    }
+    if (phaseOf(st) !== "pour") break;
+  }
 });
 
 check("notes spawn and travel to the right", () => {
@@ -212,33 +252,43 @@ check("not shaking at all is a game over", () => {
 
 check("clearing a shake advances the round and resets strikes", () => {
   const st = start();
+  const firstDrink = st.cocktail.key;
   clearRound(st);
   let acc = 0;
+  // A cleared round now returns to the order screen, not straight to the pour.
   for (let i = 0; i < 60 * 12; i++) {
     acc += DT;
     if (acc >= 60 / 200) { st.shakeTaps++; acc -= 60 / 200; }
     update(st, DT, always("whiskey"));
-    if (phaseOf(st) === "pour") break;
+    if (phaseOf(st) === "order") break;
   }
-  assert.strictEqual(st.phase, "pour");
+  assert.strictEqual(st.phase, "order");
   assert.strictEqual(st.round, 2);
   assert.strictEqual(st.strikes, 0);
   assert.strictEqual(st.spawned, 0, "the new round should start with no notes spawned");
+  assert.notStrictEqual(st.cocktail.key, firstDrink, "poured the same drink twice running");
+
+  // And the new round runs the same way the first one did.
+  run(st, ORDER_SECONDS + 0.1);
+  assert.strictEqual(st.phase, "gather");
+  beginPour(st);
+  assert.strictEqual(st.phase, "pour");
 });
 
-check("round two demands a stir at 80 RPM", () => {
-  const st = start();
+check("a stirred drink finishes with a stir, whatever the round", () => {
+  // The finish now comes from the drink, not from whether the round is odd.
+  // A Manhattan is stirred, so round one must ask for a stir.
+  const st = start("manhattan");
   clearRound(st);
-  let acc = 0;
-  for (let i = 0; i < 60 * 12; i++) {
-    acc += DT;
-    if (acc >= 60 / 200) { st.shakeTaps++; acc -= 60 / 200; }
-    update(st, DT, always("whiskey"));
-    if (phaseOf(st) === "pour") break;
-  }
-  clearRound(st);
-  assert.strictEqual(st.phase, "stir", `expected stir in round 2, got ${st.phase}`);
+  assert.strictEqual(st.phase, "stir", `a Manhattan asked for ${st.phase}`);
   assert.strictEqual(st.target, 80);
+});
+
+check("a shaken drink finishes with a shake, whatever the round", () => {
+  const st = start("daiquiri");
+  clearRound(st);
+  assert.strictEqual(st.phase, "shake", `a Daiquiri asked for ${st.phase}`);
+  assert.strictEqual(st.target, 120);
 });
 
 console.log("\nStir input:");

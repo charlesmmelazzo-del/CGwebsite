@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import ArcadeCanvas from "./ArcadeCanvas";
 import CRTScreen from "./CRTScreen";
-import { ArcadeButton, useArcadeKeys } from "./controls";
+import { useArcadeKeys } from "./controls";
 import {
   blink,
   clamp,
@@ -11,13 +11,13 @@ import {
   drawSprite,
   drawText,
   drawTextMarquee,
+  GAME_H,
   GAME_W,
   meter,
   outline,
   P,
   pad,
   rect,
-  type Sprite,
 } from "./arcade";
 import {
   applyStirAngle,
@@ -37,6 +37,7 @@ import {
   type Mood,
   type Phase,
   type State,
+  beginPour,
 } from "./behindTheStickCore";
 import {
   ARM,
@@ -52,6 +53,15 @@ import {
   TIN_COLORS,
 } from "./sprites";
 import type { ArcadeGameProps } from "./registry";
+import { INGREDIENTS, ING_BY_KEY, colorFor } from "./ingredients";
+import {
+  GROUND_Y as G_GROUND,
+  freshGatherState,
+  remaining,
+  updateGather,
+  type GatherInput,
+  type GatherState,
+} from "./gatherCore";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // BEHIND THE STICK — the presentation layer.
@@ -62,143 +72,6 @@ import type { ArcadeGameProps } from "./registry";
 //
 // All the rules live in behindTheStickCore.ts. This file draws and listens.
 // ═══════════════════════════════════════════════════════════════════════════
-
-// ─── Ingredient art ──────────────────────────────────────────────────────────
-
-const BOTTLE: Sprite = [
-  "....ccc....",
-  "....ccc....",
-  "....ggg....",
-  "....ggg....",
-  "...ggggg...",
-  "..ggggggg..",
-  "..ggggggg..",
-  "..glllllg..",
-  "..glllllg..",
-  "..glllllg..",
-  "..ggggggg..",
-  "..ggggggg..",
-  "..ggggggg..",
-  "..ggggggg..",
-  "..bbbbbbb..",
-];
-
-const CITRUS: Sprite = [
-  "...........",
-  "...fffff...",
-  "..fffffff..",
-  ".fffffffff.",
-  ".ffffwffff.",
-  "ffffwwwffff",
-  "fffwwwwwfff",
-  "ffwwwwwwwff",
-  "fffwwwwwfff",
-  "ffffwwwffff",
-  ".ffffwffff.",
-  ".fffffffff.",
-  "..fffffff..",
-  "...fffff...",
-  "...........",
-];
-
-const JAR: Sprite = [
-  "...ddd.....",
-  "....d......",
-  "....d......",
-  "..hhhhhhh..",
-  ".hhhhhhhhh.",
-  ".hhhhhhhhh.",
-  ".hhhhhhhhh.",
-  ".hhhhhhhhh.",
-  ".hhhhhhhhh.",
-  ".hhhhhhhhh.",
-  ".hhhhhhhhh.",
-  ".hhhhhhhhh.",
-  "..hhhhhhh..",
-  "..bbbbbbb..",
-  "...........",
-];
-
-const DASHER: Sprite = [
-  "...........",
-  "....ccc....",
-  "....ccc....",
-  "....ggg....",
-  "...ggggg...",
-  "...ggggg...",
-  "...glllg...",
-  "...glllg...",
-  "...glllg...",
-  "...ggggg...",
-  "...ggggg...",
-  "...ggggg...",
-  "...bbbbb...",
-  "...........",
-  "...........",
-];
-
-interface Ingredient {
-  key: string;
-  label: string;
-  /** Signature colour — the button and the note share it, so matching is fast. */
-  color: string;
-  sprite: Sprite;
-  colors: Record<string, string>;
-}
-
-/**
- * Seven ingredients, each a distinct colour AND a distinct silhouette. Colour
- * alone isn't enough at speed on a small screen, and shape alone isn't either —
- * you need both to read a note in a fifth of a second.
- */
-const INGREDIENTS: Ingredient[] = [
-  {
-    key: "whiskey",
-    label: "Whiskey",
-    color: P.amber,
-    sprite: BOTTLE,
-    colors: { c: P.yellow, g: P.amber, l: P.bone, b: P.brown },
-  },
-  {
-    key: "gin",
-    label: "Gin",
-    color: P.cyan,
-    sprite: BOTTLE,
-    colors: { c: P.white, g: P.cyan, l: P.white, b: P.teal },
-  },
-  {
-    key: "tequila",
-    label: "Tequila",
-    color: P.bone,
-    sprite: BOTTLE,
-    colors: { c: P.grey, g: P.bone, l: P.lime, b: P.grey },
-  },
-  {
-    key: "lemon",
-    label: "Lemon",
-    color: P.yellow,
-    sprite: CITRUS,
-    colors: { f: P.yellow, w: P.bone },
-  },
-  { key: "lime", label: "Lime", color: P.green, sprite: CITRUS, colors: { f: P.green, w: P.lime } },
-  {
-    key: "honey",
-    label: "Honey",
-    color: P.orange,
-    sprite: JAR,
-    colors: { d: P.tan, h: P.orange, b: P.brown },
-  },
-  {
-    key: "bitters",
-    label: "Bitters",
-    color: P.red,
-    sprite: DASHER,
-    colors: { c: P.bone, g: P.red, l: P.bone, b: P.crimson },
-  },
-];
-
-const ING_BY_KEY = new Map(INGREDIENTS.map((i) => [i.key, i]));
-const colorFor = (key: string) => ING_BY_KEY.get(key)?.color ?? P.white;
 
 // ─── Scene ───────────────────────────────────────────────────────────────────
 
@@ -442,15 +315,35 @@ function drawStir(ctx: CanvasRenderingContext2D, st: State) {
   const ok = rpm >= st.target;
 
   const cx = 112;
-  const cy = 108;
-  const r = 34;
-  for (let a = 0; a < 32; a++) {
-    const ang = (a / 32) * Math.PI * 2;
+  const cy = 104;
+  const r = 38;
+
+  // The path the dot runs on. Drawn as a dotted ring so it reads as a track to
+  // follow rather than as the rim of a glass.
+  for (let a = 0; a < 40; a++) {
+    const ang = (a / 40) * Math.PI * 2;
     rect(ctx, cx + Math.cos(ang) * r - 1, cy + Math.sin(ang) * r - 1, 2, 2, P.slate);
   }
+
+  // The drink itself, turning inside the ring: a mixing glass with the liquid
+  // swirling round at whatever rate the player is actually managing.
+  rect(ctx, cx - 15, cy - 18, 30, 36, "#100810");
+  rect(ctx, cx - 13, cy - 16, 26, 32, "#7FA8C0");
+  rect(ctx, cx - 11, cy - 4, 22, 18, P.amber);
+  // Surface, tilted by the swirl.
+  const swirl = Math.sin(st.revs * Math.PI * 2) * 3;
+  rect(ctx, cx - 11, cy - 5 + swirl, 22, 2, ok ? P.lime : P.tan);
+  // The spoon, following the dot round.
   const lead = st.lastAngle ?? -Math.PI / 2;
-  rect(ctx, cx + Math.cos(lead) * r - 2, cy + Math.sin(lead) * r - 2, 5, 5, ok ? P.lime : P.yellow);
-  drawText(ctx, "DRAG IN A CIRCLE", cx, cy - 4, P.white, 1, "center");
+  rect(ctx, cx + Math.cos(lead) * 8 - 1, cy - 22, 2, 26, "#C8C8D0");
+
+  // The dot the player drags.
+  const dx = cx + Math.cos(lead) * r;
+  const dy = cy + Math.sin(lead) * r;
+  rect(ctx, dx - 4, dy - 4, 8, 8, P.black);
+  rect(ctx, dx - 3, dy - 3, 6, 6, ok ? P.lime : P.yellow);
+
+  drawText(ctx, "DRAG THE DOT", cx, cy + 46, P.white, 1, "center");
 
   // Same treatment as the shake: one instruction, one verdict, no readout.
   rect(ctx, 0, RAIL_Y - 6, GAME_W, RAIL_H + 12, "#101020");
@@ -500,10 +393,326 @@ function drawHud(ctx: CanvasRenderingContext2D, st: State) {
   }
 }
 
+/**
+ * The order. A held card naming the drink and listing what goes in it, so the
+ * player knows what they are hunting for before the shelves appear.
+ */
+function drawOrder(ctx: CanvasRenderingContext2D, st: State, t: number) {
+  clear(ctx, "#12081F");
+
+  drawTextMarquee(ctx, "ORDER UP!", 112, 44, P.yellow, 2, "center", P.black, P.crimson);
+
+  // The name, split across two lines when it won't fit on one.
+  const name = st.cocktail.name.toUpperCase();
+  const lines = name.length > 13 ? splitName(name) : [name];
+  lines.forEach((line, i) => {
+    drawTextMarquee(ctx, line, 112, 84 + i * 20, P.cyan, 2, "center", P.black, "#0A4A6A");
+  });
+
+  drawText(ctx, "YOU NEED", 112, 140, P.white, 1, "center");
+
+  // The recipe, as the bottles themselves rather than a list of words — the
+  // player is about to be looking for these shapes on a shelf.
+  st.cocktail.recipe.forEach((key, i) => {
+    const ing = ING_BY_KEY.get(key);
+    if (!ing) return;
+    const x = 34 + i * 46;
+    drawSprite(ctx, ing.sprite, x, 156, ing.colors, 1);
+    drawText(ctx, ing.label.toUpperCase().slice(0, 7), x + 5, 176, ing.color, 1, "center");
+  });
+
+  if (blink(t, 2)) {
+    drawText(ctx, "GET THE INGREDIENTS", 112, 214, P.lime, 1, "center");
+  }
+}
+
+/** Break a long drink name at a space, nearest the middle. */
+function splitName(name: string): string[] {
+  const mid = name.length / 2;
+  let best = -1;
+  for (let i = 0; i < name.length; i++) {
+    if (name[i] === " " && (best < 0 || Math.abs(i - mid) < Math.abs(best - mid))) best = i;
+  }
+  if (best < 0) return [name];
+  return [name.slice(0, best), name.slice(best + 1)];
+}
+
+/**
+ * The shelves. Everything the bar stocks, floating in three rows, with the
+ * recipe ticking off along the bottom as it's collected.
+ */
+function drawGather(ctx: CanvasRenderingContext2D, gs: GatherState, t: number) {
+  clear(ctx, "#0E0A20");
+
+  // Back wall, so the shelves read as being in a room.
+  for (let y = 0; y < 5; y++) {
+    rect(ctx, 0, 20 + y * 34, GAME_W, 1, "#1E1638");
+  }
+
+  // ── The stock ───────────────────────────────────────────────────────────
+  for (const item of gs.items) {
+    if (item.taken) continue;
+    const ing = ING_BY_KEY.get(item.key);
+    if (!ing) continue;
+    const bob = Math.sin(t * 2 + item.bob) * 2;
+    const needed = gs.needed.includes(item.key);
+
+    // A quiet halo under the ones this drink actually wants. The recipe is on
+    // screen anyway; this is a reading aid, not the answer.
+    if (needed) {
+      outline(
+        ctx,
+        Math.round(item.x - 8),
+        Math.round(item.y - 9 + bob),
+        16,
+        18,
+        blink(t, 2) ? P.lime : "#2A5A10"
+      );
+    }
+    drawSprite(
+      ctx,
+      ing.sprite,
+      Math.round(item.x - 5),
+      Math.round(item.y - 7 + bob),
+      ing.colors,
+      1
+    );
+  }
+
+  // ── The bartender ───────────────────────────────────────────────────────
+  const running = Math.abs(gs.vx) > 1 && gs.onGround;
+  const step = running && Math.floor(t * 8) % 2 === 0;
+  drawBartender(
+    ctx,
+    Math.round(gs.x),
+    Math.round(gs.y) + (step ? 1 : 0),
+    "ok",
+    gs.onGround ? "idle" : "serve",
+    t
+  );
+
+  // Floor
+  rect(ctx, 0, G_GROUND, GAME_W, 4, P.wood);
+  rect(ctx, 0, G_GROUND, GAME_W, 1, P.tan);
+
+  // ── Feedback on the last grab ───────────────────────────────────────────
+  if (gs.flash) {
+    const ing = ING_BY_KEY.get(gs.flash.key);
+    drawText(
+      ctx,
+      gs.flash.good ? `+${ing?.label.toUpperCase() ?? "OK"}` : "NOT THAT ONE",
+      112,
+      G_GROUND - 44,
+      gs.flash.good ? P.lime : P.red,
+      1,
+      "center"
+    );
+  }
+
+  // ── The recipe, ticking off ─────────────────────────────────────────────
+  rect(ctx, 0, G_GROUND + 4, GAME_W, GAME_H - G_GROUND - 4, "#100A1C");
+  drawText(ctx, "RECIPE", 6, G_GROUND + 9, P.white, 1);
+
+  gs.needed.forEach((key, i) => {
+    const ing = ING_BY_KEY.get(key);
+    if (!ing) return;
+    const has = gs.collected.includes(key);
+    const x = 8 + i * 54;
+    const y = G_GROUND + 18;
+    drawSprite(ctx, ing.sprite, x, y, ing.colors, 1);
+    // A tick through the ones already in hand.
+    if (has) {
+      rect(ctx, x - 1, y + 7, 13, 2, P.lime);
+      drawText(ctx, "OK", x + 14, y + 5, P.lime, 1);
+    }
+  });
+
+  const left = remaining(gs).length;
+  if (left === 0) {
+    drawTextMarquee(ctx, "TO THE BAR!", 112, 120, P.lime, 2, "center", P.black, "#00551C");
+  }
+}
+
+
+// ─── The pad ─────────────────────────────────────────────────────────────────
+
+/**
+ * A home-console controller: D-pad on the left, action button on the right,
+ * both on a moulded grey body with the shoulders a real pad has.
+ *
+ * Directions are HELD, not tapped, so every control here is a pointerdown /
+ * pointerup pair. `setPointerCapture` matters more than it looks: without it,
+ * sliding a thumb off the edge of a button never fires pointerup and the
+ * bartender runs into the wall forever.
+ */
+function GamePad({
+  onDir,
+  onJump,
+}: {
+  onDir: (d: "left" | "right" | null) => void;
+  onJump: (down: boolean) => void;
+}) {
+  const hold = (fn: () => void) => (e: React.PointerEvent) => {
+    e.preventDefault();
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    fn();
+  };
+  const release = (fn: () => void) => (e: React.PointerEvent) => {
+    e.preventDefault();
+    fn();
+  };
+
+  const dpadFace =
+    "absolute bg-[#2A2A32] active:bg-[#4A4A58] transition-colors select-none";
+
+  return (
+    <div
+      className="h-24 flex items-center justify-between px-3 rounded-xl"
+      style={{
+        background: "linear-gradient(180deg,#C8C8CE,#9A9AA4)",
+        boxShadow: "inset 0 2px 0 rgba(255,255,255,0.5), inset 0 -3px 0 rgba(0,0,0,0.3)",
+        touchAction: "none",
+      }}
+    >
+      {/* D-pad */}
+      <div className="relative w-[76px] h-[76px]">
+        <div className="absolute left-[26px] top-0 w-[24px] h-[76px] rounded-[3px] bg-[#1A1A20]" />
+        <div className="absolute top-[26px] left-0 h-[24px] w-[76px] rounded-[3px] bg-[#1A1A20]" />
+        <button
+          aria-label="Left"
+          className={`${dpadFace} left-[2px] top-[28px] w-[22px] h-[20px] rounded-l-[3px]`}
+          onPointerDown={hold(() => onDir("left"))}
+          onPointerUp={release(() => onDir(null))}
+          onPointerCancel={release(() => onDir(null))}
+          onPointerLeave={release(() => onDir(null))}
+        />
+        <button
+          aria-label="Right"
+          className={`${dpadFace} right-[2px] top-[28px] w-[22px] h-[20px] rounded-r-[3px]`}
+          onPointerDown={hold(() => onDir("right"))}
+          onPointerUp={release(() => onDir(null))}
+          onPointerCancel={release(() => onDir(null))}
+          onPointerLeave={release(() => onDir(null))}
+        />
+        {/* The up and down faces are dead. A real pad has four, and a pad with
+            two would read as broken rather than as deliberate. */}
+        <div className={`${dpadFace} left-[28px] top-[2px] w-[20px] h-[22px] rounded-t-[3px] opacity-60`} />
+        <div className={`${dpadFace} left-[28px] bottom-[2px] w-[20px] h-[22px] rounded-b-[3px] opacity-60`} />
+        <div className="absolute left-[32px] top-[32px] w-[12px] h-[12px] rounded-full bg-[#111]" />
+      </div>
+
+      <p className="hidden sm:block text-[7px] tracking-[0.2em] uppercase text-black/45 text-center leading-tight">
+        arrows
+        <br />
+        + space
+      </p>
+
+      {/* Action button */}
+      <button
+        aria-label="Jump"
+        onPointerDown={hold(() => onJump(true))}
+        onPointerUp={release(() => onJump(false))}
+        onPointerCancel={release(() => onJump(false))}
+        onPointerLeave={release(() => onJump(false))}
+        className="select-none w-[62px] h-[62px] rounded-full text-black text-[10px] font-black tracking-[0.1em] uppercase active:translate-y-[3px] active:shadow-[0_1px_0_#7A0F0A] transition-transform"
+        style={{
+          background: "radial-gradient(circle at 36% 30%, #FF8A80 0%, #E42B20 55%, #C01810 100%)",
+          boxShadow: "0 4px 0 #7A0F0A, inset 0 0 0 2px #8A1810",
+        }}
+      >
+        Jump
+      </button>
+    </div>
+  );
+}
+
+// ─── The pour deck ───────────────────────────────────────────────────────────
+
+/**
+ * The round's four ingredients as round cabinet buttons, two down each side.
+ *
+ * Offset diagonally rather than stacked square: on a phone both thumbs come in
+ * from the bottom corners, and a straight column means the lower button is
+ * under the hand that's reaching for the upper one. The gap in the middle is
+ * where the screen shows through above.
+ */
+function PourDeck({
+  recipe,
+  iconUrls,
+  disabled,
+  onPress,
+}: {
+  recipe: readonly string[];
+  iconUrls: Record<string, string>;
+  disabled: boolean;
+  onPress: (key: string) => void;
+}) {
+  const left = recipe.slice(0, 2);
+  const right = recipe.slice(2, 4);
+
+  const column = (keys: readonly string[], side: "left" | "right") => (
+    <div className="flex flex-col gap-2">
+      {keys.map((key, i) => {
+        const ing = ING_BY_KEY.get(key);
+        if (!ing) return null;
+        // Second button steps inward, so the pair sits on a diagonal.
+        const indent = i === 1 ? (side === "left" ? "ml-7" : "mr-7") : "";
+        return (
+          <button
+            key={key}
+            type="button"
+            aria-label={ing.label}
+            disabled={disabled}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              onPress(key);
+            }}
+            className={`${indent} select-none w-[62px] h-[62px] rounded-full border-[3px] border-black flex flex-col items-center justify-center gap-0.5 disabled:opacity-30 active:translate-y-[3px] transition-transform`}
+            style={{
+              background: `radial-gradient(circle at 36% 30%, #FFFFFF 0%, ${ing.color} 52%, ${ing.color} 100%)`,
+              boxShadow: `0 4px 0 rgba(0,0,0,0.55)`,
+              touchAction: "manipulation",
+            }}
+          >
+            {/* Fixed box either way, so the icon appearing after mount doesn't
+                shift the button under the player's thumb. */}
+            <span style={{ width: 15, height: 20 }} className="flex items-center">
+              {iconUrls[key] && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={iconUrls[key]}
+                  alt=""
+                  width={11}
+                  height={15}
+                  style={{ imageRendering: "pixelated", width: 15, height: 20 }}
+                />
+              )}
+            </span>
+            <span className="text-[7px] font-black tracking-wider text-black/80 uppercase leading-none">
+              {ing.label.slice(0, 6)}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  return (
+    <div className="h-24 flex items-center justify-between px-1">
+      {column(left, "left")}
+      {column(right, "right")}
+    </div>
+  );
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
   const s = useRef<State>(freshState(colorFor));
+  // The platformer has its own simulation. It is rebuilt at the start of each
+  // gather phase, from the round's own recipe.
+  const g = useRef<GatherState | null>(null);
+  const gIn = useRef<GatherInput>({ left: false, right: false, jump: false });
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const endedRef = useRef(false);
 
@@ -539,14 +748,34 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
     true,
     (key) => {
       const st = s.current;
+
+      // The shelves: arrows to run, space to jump. Held, so the release
+      // handler below matters as much as this one.
+      if (st.phase === "gather") {
+        if (key === "ArrowLeft") gIn.current.left = true;
+        else if (key === "ArrowRight") gIn.current.right = true;
+        else if (key === " " || key === "Spacebar" || key === "ArrowUp") gIn.current.jump = true;
+        return;
+      }
+
       if (st.phase === "shake" && (key === " " || key === "Spacebar")) {
         st.shakeTaps++;
         return;
       }
-      const idx = "1234567".indexOf(key);
-      if (idx >= 0) press(INGREDIENTS[idx].key);
+
+      // Number keys map onto the pour deck, so 1-4 are this drink's own four
+      // ingredients rather than fixed positions in a list that no longer shows.
+      const idx = "1234".indexOf(key);
+      if (idx >= 0) {
+        const key4 = st.cocktail.recipe[idx];
+        if (key4) press(key4);
+      }
     },
-    () => {}
+    (key) => {
+      if (key === "ArrowLeft") gIn.current.left = false;
+      else if (key === "ArrowRight") gIn.current.right = false;
+      else if (key === " " || key === "Spacebar" || key === "ArrowUp") gIn.current.jump = false;
+    }
   );
 
   useEffect(() => {
@@ -574,6 +803,19 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
     (ctx: CanvasRenderingContext2D, dt: number, t: number) => {
       const st = s.current;
 
+      // ── The shelves ───────────────────────────────────────────────────
+      if (st.phase === "gather") {
+        if (!g.current) g.current = freshGatherState(st.cocktail.recipe);
+        updateGather(g.current, dt, gIn.current);
+        if (g.current.done) {
+          st.score += g.current.score;
+          g.current = null;
+          beginPour(st);
+        }
+      } else if (st.phase !== "order" && g.current) {
+        g.current = null;
+      }
+
       const { finished } = update(st, dt);
       if (finished && !endedRef.current) {
         endedRef.current = true;
@@ -592,6 +834,15 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
       }
 
       // ── Draw ──────────────────────────────────────────────────────────
+      if (st.phase === "order") {
+        drawOrder(ctx, st, t);
+        return;
+      }
+      if (st.phase === "gather" && g.current) {
+        drawGather(ctx, g.current, t);
+        return;
+      }
+
       drawBackbar(ctx, t);
 
       const pose =
@@ -602,10 +853,18 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
             : st.phase === "serve"
               ? "serve"
               : "idle";
+      // Drawn at 2x now the crowd is gone. He is the only thing to watch during
+      // a round, and at 1x he was a 20-pixel figure lost in the middle of the
+      // screen. An INTEGER scale on purpose — 1.5 or 1.7 lands sprite pixels on
+      // fractional device pixels and opens hairline seams through the art.
+      ctx.save();
+      ctx.translate(112, 168);
+      ctx.scale(2, 2);
+      ctx.imageSmoothingEnabled = false;
       drawBartender(
         ctx,
-        112,
-        144,
+        0,
+        0,
         st.phase === "over" ? "panic" : st.mood,
         pose,
         t,
@@ -614,21 +873,20 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
           : undefined,
         st.phase === "stir" ? st.revs : undefined
       );
-      if (pose === "idle") drawTin(ctx, 152, 130, st.tinFill);
+      ctx.restore();
+      // The tin stays outside the transform so it keeps its place on the bar
+      // rather than floating up with him.
+      if (pose === "idle") drawTin(ctx, 172, 140, st.tinFill);
 
-      // A crowd, so the bar reads as busy rather than two people in a void
-      drawGuest(ctx, 34, 214, st.phase === "over" ? "angry" : "wait", t, P.blue, "#16257A");
-      drawGuest(ctx, 76, 214, st.phase === "over" ? "angry" : "wait", t, P.purple, "#4A1470");
-      drawGuest(ctx, 132, 214, "wait", t, P.orange, "#8A3F00");
-      drawGuest(
-        ctx,
-        190,
-        214,
-        st.phase === "serve" ? "happy" : st.phase === "over" ? "angry" : "wait",
-        t,
-        P.teal,
-        "#005058"
-      );
+      // No crowd while the drink is being built. A wall of guests during the
+      // rhythm phase competes with the only thing the player is watching, and
+      // it stops the bartender being drawn big enough to read. One guest steps
+      // in only to take the drink, or to ask where it is.
+      if (st.phase === "serve") {
+        drawGuest(ctx, 176, 214, "happy", t, P.teal, "#005058");
+      } else if (st.phase === "over") {
+        drawGuest(ctx, 176, 214, "angry", t, P.red, "#7A0F0A");
+      }
       drawBarFront(ctx);
 
       if (st.phase === "pour" || st.phase === "ready") drawRail(ctx, st, t);
@@ -670,10 +928,21 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
       </div>
 
       <div className="p-2 bg-black">
-        {uiPhase === "shake" ? (
-          // Deliberately not an ArcadeButton: this one is round, thumb-sized
-          // and the only thing on screen, because it is the only input that
-          // matters during a shake.
+        {uiPhase === "gather" ? (
+          // ── The pad ──────────────────────────────────────────────────────
+          // A home-console controller: D-pad left, action button right, both
+          // sat on a moulded body. Held rather than tapped, so these are
+          // pointer-down/up pairs and not clicks.
+          <GamePad
+            onDir={(d) => {
+              gIn.current.left = d === "left";
+              gIn.current.right = d === "right";
+            }}
+            onJump={(down) => {
+              gIn.current.jump = down;
+            }}
+          />
+        ) : uiPhase === "shake" ? (
           <div className="h-24 flex items-center justify-center">
             <button
               type="button"
@@ -690,50 +959,20 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
             </button>
           </div>
         ) : uiPhase === "stir" ? (
-          <div className="h-24 flex items-center justify-center border-2 border-dashed border-white/25 text-center px-4">
-            <p className="text-[11px] tracking-widest uppercase text-white/60 leading-relaxed">
-              Drag your finger in circles
-              <br />
-              <span className="text-white/35">on the screen above</span>
-            </p>
-          </div>
+          <p className="h-24 flex items-center justify-center text-center text-[11px] tracking-widest uppercase text-white/50 leading-relaxed px-4">
+            Drag the dot around the glass
+          </p>
         ) : (
-          <div className="grid grid-cols-4 gap-1.5">
-            {INGREDIENTS.map((ing) => (
-              <ArcadeButton
-                key={ing.key}
-                ariaLabel={ing.label}
-                color={ing.color}
-                disabled={uiPhase !== "pour"}
-                onPress={() => press(ing.key)}
-                className="h-16"
-                label={
-                  <span className="flex flex-col items-center gap-1">
-                    {/* Fixed box either way, so the icon appearing after mount
-                        doesn't shift the button under the player's thumb. */}
-                    <span style={{ width: 15, height: 20 }} className="flex items-center">
-                      {iconUrls[ing.key] && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={iconUrls[ing.key]}
-                          alt=""
-                          width={11}
-                          height={15}
-                          style={{ imageRendering: "pixelated", width: 15, height: 20 }}
-                        />
-                      )}
-                    </span>
-                    <span className="text-[8px] tracking-wider">{ing.label.toUpperCase()}</span>
-                  </span>
-                }
-              />
-            ))}
-            <div className="h-16 flex items-center justify-center text-[7px] tracking-widest uppercase text-white/20 text-center leading-tight">
-              keys
-              <br />
-              1-7
-            </div>
-          </div>
+          // ── The pour deck ────────────────────────────────────────────────
+          // Only this drink's four ingredients, as round cabinet buttons, two
+          // per side and offset so a thumb reaching from each corner of a
+          // phone lands on one without covering the other.
+          <PourDeck
+            recipe={s.current.cocktail.recipe}
+            iconUrls={iconUrls}
+            disabled={uiPhase !== "pour"}
+            onPress={press}
+          />
         )}
       </div>
     </div>

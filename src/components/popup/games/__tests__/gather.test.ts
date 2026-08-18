@@ -22,6 +22,7 @@ import {
   updateGather,
   type GatherState,
 } from "../gatherCore";
+import { INGREDIENTS, ING_BY_KEY, ingredient } from "../ingredients";
 
 let passed = 0;
 function check(name: string, fn: () => void) {
@@ -110,6 +111,48 @@ check("the spawn pool covers every ingredient the book uses", () => {
   const pool = new Set(ingredientsInUse());
   for (const c of COCKTAILS) {
     for (const k of c.recipe) assert.ok(pool.has(k), `${k} is used but never spawns`);
+  }
+});
+
+console.log("\nThe stock:");
+
+check("every ingredient in the book has a sprite", () => {
+  for (const k of INGREDIENT_KEYS) {
+    assert.ok(ING_BY_KEY.has(k), `no sprite defined for ${k}`);
+  }
+});
+
+check("every sprite is a rectangle of equal-length rows", () => {
+  for (const i of INGREDIENTS) {
+    const w = i.sprite[0].length;
+    for (const row of i.sprite) {
+      assert.strictEqual(row.length, w, `${i.key} has a ragged row`);
+    }
+  }
+});
+
+check("every sprite pixel uses a declared colour key", () => {
+  for (const i of INGREDIENTS) {
+    for (const row of i.sprite) {
+      for (const ch of row) {
+        if (ch === "." || ch === " ") continue;
+        assert.ok(i.colors[ch], `${i.key} uses "${ch}" with no colour`);
+      }
+    }
+  }
+});
+
+check("no recipe asks for two ingredients with the same silhouette", () => {
+  // The rule that makes a note readable at speed. A Negroni wants vermouth and
+  // aperitivo together; if both were the same bottle outline the player would
+  // be reading colour alone, at a fifth of a second, on a phone.
+  for (const c of COCKTAILS) {
+    const shapes = c.recipe.map((k) => ingredient(k).shape);
+    assert.strictEqual(
+      new Set(shapes).size,
+      shapes.length,
+      `${c.name} repeats a silhouette: ${shapes.join(", ")}`
+    );
   }
 });
 

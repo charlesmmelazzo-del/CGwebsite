@@ -9,6 +9,9 @@
 // really do trigger a shake, or that three misses really do end the round, is
 // to step the simulation directly. See the tests that drive `update`.
 
+import type { Cocktail } from "./cocktails";
+import { pickCocktail } from "./cocktails";
+
 export const RAIL_Y = 240;
 export const RAIL_H = 40;
 export const WINDOW_X = 112;
@@ -33,6 +36,8 @@ export const RATE_STEP = 10;
 export const GRACE_SECONDS = 1.2;
 export const SLOW_TOLERANCE = 1.2;
 export const READY_SECONDS = 1.6;
+/** How long "Order up!" holds before the shelves. */
+export const ORDER_SECONDS = 2.2;
 export const SERVE_SECONDS = 2.2;
 export const OVER_SECONDS = 2.6;
 
@@ -46,7 +51,23 @@ export const INGREDIENT_KEYS = [
   "bitters",
 ] as const;
 
-export type Phase = "ready" | "pour" | "shake" | "stir" | "serve" | "over";
+/**
+ * A round runs: order -> gather -> pour -> shake|stir -> serve.
+ *
+ * "gather" is inert here — the platformer has its own simulation in
+ * gatherCore.ts, and the component steps that one and calls beginPour() when
+ * the recipe is complete. Keeping it in this enum anyway means the drawing
+ * code has a single phase to switch on.
+ */
+export type Phase =
+  | "ready"
+  | "order"
+  | "gather"
+  | "pour"
+  | "shake"
+  | "stir"
+  | "serve"
+  | "over";
 export type Mood = "happy" | "ok" | "worried" | "panic";
 
 export interface Note {
@@ -73,6 +94,8 @@ export interface Pop {
 }
 
 export interface State {
+  /** The drink this round is building. Decides the notes and the finish. */
+  cocktail: Cocktail;
   phase: Phase;
   t: number;
   phaseT: number;
@@ -119,8 +142,12 @@ export interface State {
   colorFor: (key: string) => string;
 }
 
-export function freshState(colorFor: (key: string) => string = () => "#FFFFFF"): State {
+export function freshState(
+  colorFor: (key: string) => string = () => "#FFFFFF",
+  cocktail: Cocktail = pickCocktail()
+): State {
   return {
+    cocktail,
     phase: "ready",
     t: 0,
     phaseT: 0,
@@ -179,9 +206,9 @@ function strike(st: State, x: number, color: string) {
   addPop(st, x, RAIL_Y - 8, "MISS", "#E42B20");
 }
 
-/** Alternate shake and stir, and demand more each time round. */
+/** Finish the drink the way the drink is finished, and demand more each round. */
 function startMinigame(st: State) {
-  const isShake = st.round % 2 === 1;
+  const isShake = st.cocktail.finish === "shake";
   st.notes = [];
   st.taps = [];
   st.revs = 0;
@@ -196,6 +223,17 @@ function startMinigame(st: State) {
   st.banner = isShake ? "SHAKE IT!" : "STIR IT!";
   st.bannerTimer = 1.4;
   setPhase(st, isShake ? "shake" : "stir");
+}
+
+/**
+ * Leave the shelves and start pouring. Called by the component once the
+ * gather phase reports its recipe complete.
+ */
+export function beginPour(st: State): void {
+  if (st.phase !== "gather") return;
+  setPhase(st, "pour");
+  st.banner = `ROUND ${st.round}`;
+  st.bannerTimer = 1.2;
 }
 
 /** Taps per minute over the rolling window. */
@@ -225,8 +263,13 @@ export interface UpdateResult {
 export function update(
   st: State,
   dt: number,
+  /**
+   * Which ingredient the next note carries. Defaults to the round's own
+   * recipe — a note for something that isn't in the glass would be unpourable,
+   * and the pour buttons only show the four the drink actually needs.
+   */
   pickIngredient: () => string = () =>
-    INGREDIENT_KEYS[Math.floor(Math.random() * INGREDIENT_KEYS.length)]
+    st.cocktail.recipe[Math.floor(Math.random() * st.cocktail.recipe.length)]
 ): UpdateResult {
   st.t += dt;
   st.phaseT += dt;
@@ -240,10 +283,14 @@ export function update(
 
   if (st.phase === "ready") {
     if (st.phaseT > READY_SECONDS) {
-      setPhase(st, "pour");
-      st.banner = "ROUND 1";
-      st.bannerTimer = 1.2;
+      setPhase(st, "order");
+      st.banner = "ORDER UP!";
+      st.bannerTimer = 1.4;
     }
+  } else if (st.phase === "order") {
+    if (st.phaseT > ORDER_SECONDS) setPhase(st, "gather");
+  } else if (st.phase === "gather") {
+    // Inert. gatherCore runs the platformer; the component calls beginPour().
   } else if (st.phase === "pour") {
     st.spawnTimer -= dt;
     if (st.spawnTimer <= 0 && st.spawned < NOTES_PER_ROUND) {
@@ -367,9 +414,11 @@ export function update(
       st.gap = Math.max(0.55, st.gap - 0.06);
       st.mood = "ok";
       st.score += 250 * (st.round - 1);
-      st.banner = `ROUND ${st.round}`;
-      st.bannerTimer = 1.3;
-      setPhase(st, "pour");
+      // A different drink every round, never the same one twice running.
+      st.cocktail = pickCocktail(st.cocktail.key);
+      st.banner = "ORDER UP!";
+      st.bannerTimer = 1.4;
+      setPhase(st, "order");
     }
   } else if (st.phase === "over") {
     if (st.phaseT > OVER_SECONDS) finished = true;
