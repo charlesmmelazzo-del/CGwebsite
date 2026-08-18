@@ -73,12 +73,21 @@ export default function StartScreen({
 
       <div className="relative w-full max-w-2xl flex flex-col items-center text-center">
         {/* The logo carries the whole screen, so it gets the width. */}
+        {/*
+          unoptimized on purpose. Next's optimizer fetches the source image
+          from the server side, and that fetch carries no credentials — so on
+          the password-gated preview our own middleware 401s it and the
+          optimizer answers 400, leaving a broken image. Serving the file
+          directly lets the browser fetch it with the session it already has.
+          It is one logo; there is nothing to optimise that is worth this.
+        */}
         <Image
           src="/popup/art/logo-high-scores.png"
           alt="High Scores"
           width={1672}
           height={941}
           priority
+          unoptimized
           className="w-full max-w-lg h-auto"
         />
 
