@@ -17,6 +17,25 @@ export const GAME_W = 224;
 export const GAME_H = 288;
 
 /**
+ * Device pixels per game pixel.
+ *
+ * The games think in a 224x288 grid and always will — every rail position,
+ * shelf height and hit window in this codebase is written in those units, and
+ * rewriting them to a bigger grid would be a large change with one benefit.
+ *
+ * The BUFFER, though, is independent of the grid. At 2 the canvas is 448x576
+ * and the context carries a matching transform, so drawing code keeps writing
+ * 224x288 coordinates while the art it draws has four times the pixels to land
+ * on. The chunky pixel sprites are unaffected — a fillRect at an integer
+ * coordinate times two is still an exact rectangle — while the hand-drawn
+ * bartender finally has room to be detailed.
+ *
+ * Anything drawing a bitmap should resample at height * PIXEL_SCALE and then
+ * draw it at its logical size, so it lands 1:1 on device pixels.
+ */
+export const PIXEL_SCALE = 2;
+
+/**
  * Saturated primaries pulled from the era's hardware palettes — Midway and
  * Atari boards had a small fixed set of colors and it's a big part of why
  * those games look the way they do. Resist adding tasteful modern shades.

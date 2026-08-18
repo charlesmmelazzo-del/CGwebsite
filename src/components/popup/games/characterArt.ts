@@ -22,6 +22,8 @@
 // Nothing here blocks on a load. Until a part arrives the caller's fallback
 // draws instead — a frame loop that waits on a fetch is a frozen game.
 
+import { PIXEL_SCALE } from "./arcade";
+
 export type Mood = "happy" | "worried" | "sad";
 export type Pose = "idle" | "shake" | "serve";
 
@@ -114,7 +116,14 @@ export function warmCharacterArt(): void {
   for (const p of GUEST_PARTS) load("guest", p);
 }
 
-/** A part resampled so its HEIGHT is `h`, or null if it isn't ready. */
+/**
+ * A part resampled so its height is `h` GAME pixels, or null if not ready.
+ *
+ * The canvas it returns is h * PIXEL_SCALE tall — resampled at the density the
+ * buffer actually has, then drawn back down to `h` logical units by the caller.
+ * Resampling at logical size instead would throw away exactly the detail this
+ * whole change exists to keep.
+ */
 function partAt(who: CharacterName, part: PartName, h: number): HTMLCanvasElement | null {
   const key = `${who}/${part}@${Math.round(h)}`;
   const hit = scaled.get(key);
@@ -123,7 +132,7 @@ function partAt(who: CharacterName, part: PartName, h: number): HTMLCanvasElemen
   const src = trimmed.get(`${who}/${part}`);
   if (!src) return null;
 
-  const height = Math.max(1, Math.round(h));
+  const height = Math.max(1, Math.round(h * PIXEL_SCALE));
   const width = Math.max(1, Math.round((src.w / src.h) * height));
   const c = document.createElement("canvas");
   c.width = width;
@@ -194,32 +203,37 @@ export function drawCharacter(
     ctx.translate(-cx, 0);
   }
 
-  const put = (c: HTMLCanvasElement, centreX: number, topY: number) =>
-    ctx.drawImage(c, Math.round(centreX - c.width / 2), Math.round(topY));
+  // Draw at LOGICAL size: the source is PIXEL_SCALE times denser, and the
+  // context carries the matching transform, so this lands 1:1 on device pixels.
+  const put = (c: HTMLCanvasElement, centreX: number, topY: number) => {
+    const w = c.width / PIXEL_SCALE;
+    const h2 = c.height / PIXEL_SCALE;
+    ctx.drawImage(c, centreX - w / 2, topY, w, h2);
+  };
 
   // Bottom up, so each part covers the seam of the one below it.
-  const legsTop = baseY - legs.height;
+  const legsTop = baseY - legs.height / PIXEL_SCALE;
   put(legs, cx, legsTop);
 
-  const torsoTop = legsTop - torso.height * (1 - P.torsoOverlap);
+  const torsoTop = legsTop - (torso.height / PIXEL_SCALE) * (1 - P.torsoOverlap);
   put(torso, cx, torsoTop);
 
   // Arms belong in front of the torso, and go overhead for a shake.
   if (arms) {
     const armsTop =
       pose === "shake"
-        ? torsoTop - arms.height * (0.62 + shakeLift * 0.1)
-        : torsoTop + torso.height * 0.06;
+        ? torsoTop - (arms.height / PIXEL_SCALE) * (0.62 + shakeLift * 0.1)
+        : torsoTop + (torso.height / PIXEL_SCALE) * 0.06;
     put(arms, cx, armsTop);
   }
 
-  const headTop = torsoTop - head.height * (1 - P.headOverlap);
+  const headTop = torsoTop - (head.height / PIXEL_SCALE) * (1 - P.headOverlap);
   put(head, cx, headTop);
 
   // The tin, held above the raised hands.
   if (who === "bartender" && pose === "shake") {
     const tin = partAt("bartender", "shaker", height * 0.3);
-    if (tin) put(tin, cx, headTop - tin.height * (0.78 + shakeLift * 0.12));
+    if (tin) put(tin, cx, headTop - (tin.height / PIXEL_SCALE) * (0.78 + shakeLift * 0.12));
   }
 
   ctx.restore();

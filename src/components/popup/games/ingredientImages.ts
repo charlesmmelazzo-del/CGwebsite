@@ -15,6 +15,8 @@
 // ingredients.ts, so a missing file is a slightly plainer bottle rather than a
 // hole. Only honey has no artwork, and no drink calls for it.
 
+import { PIXEL_SCALE } from "./arcade";
+
 const AVAILABLE_KEYS = [
   "absinthe",
   "aperitivo",
@@ -48,6 +50,7 @@ const sources = new Map<string, HTMLImageElement>();
 /** Resampled copies, keyed "ingredient@height". */
 const scaled = new Map<string, HTMLCanvasElement>();
 
+
 let warmed = false;
 
 /**
@@ -75,7 +78,9 @@ export function warmIngredientArt(): void {
  * spacing the artist drew.
  */
 export function ingredientArt(key: string, height: number): HTMLCanvasElement | null {
-  const h = Math.max(1, Math.round(height));
+  // Resampled at the buffer's real density; the caller draws it back down to
+  // `height` logical units, so it lands 1:1 on device pixels.
+  const h = Math.max(1, Math.round(height * PIXEL_SCALE));
   const cacheKey = `${key}@${h}`;
   const cached = scaled.get(cacheKey);
   if (cached) return cached;

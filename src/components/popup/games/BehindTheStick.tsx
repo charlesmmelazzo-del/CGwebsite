@@ -13,6 +13,7 @@ import {
   drawTextMarquee,
   GAME_H,
   GAME_W,
+  PIXEL_SCALE,
   meter,
   outline,
   P,
@@ -476,7 +477,13 @@ function drawBoot(
     const scale = Math.min(maxW / logo.naturalWidth, 150 / logo.naturalHeight);
     const w = Math.round(logo.naturalWidth * scale);
     const h = Math.round(logo.naturalHeight * scale);
-    ctx.drawImage(logo, Math.round((GAME_W - w) / 2), Math.round(96 - h / 2), w, h);
+    // Smoothing on for this one draw. The source is far larger than the space
+    // it lands in, and the buffer-wide nearest-neighbour setting would sample
+    // it down to a handful of surviving rows.
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(logo, (GAME_W - w) / 2, 96 - h / 2, w, h);
+    ctx.imageSmoothingEnabled = false;
   } else {
     drawTextMarquee(ctx, "BEHIND", 112, 62, P.yellow, 3, "center", P.black, P.crimson);
     drawTextMarquee(ctx, "THE STICK", 112, 104, P.red, 3, "center", P.black, "#3A0000");
@@ -805,7 +812,11 @@ function drawIngredient(
 ) {
   const art = ingredientArt(key, h);
   if (art) {
-    ctx.drawImage(art, Math.round(cx - art.width / 2), Math.round(cy - art.height / 2));
+    // The cached canvas is PIXEL_SCALE times denser than the grid, so it is
+    // drawn back down to logical size and lands 1:1 on device pixels.
+    const w = art.width / PIXEL_SCALE;
+    const hh = art.height / PIXEL_SCALE;
+    ctx.drawImage(art, cx - w / 2, cy - hh / 2, w, hh);
     return;
   }
   const ing = ING_BY_KEY.get(key);

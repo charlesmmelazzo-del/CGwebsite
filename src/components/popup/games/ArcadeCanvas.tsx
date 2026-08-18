@@ -1,11 +1,16 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { GAME_H, GAME_W } from "./arcade";
+import { GAME_H, GAME_W, PIXEL_SCALE } from "./arcade";
 
 /**
- * The screen. A fixed 224x288 buffer scaled up with smoothing off, so the
- * pixels stay hard-edged at any size.
+ * The screen. A fixed 224x288 coordinate grid, on a buffer PIXEL_SCALE times
+ * denser, scaled up with smoothing off so the pixels stay hard-edged.
+ *
+ * The transform is re-applied every frame rather than once on setup: anything
+ * that calls ctx.setTransform or ctx.resetTransform mid-frame — and the
+ * character compositor does, to mirror a sprite — would otherwise leave the
+ * next frame drawing at 1:1 in the corner of a double-sized buffer.
  *
  * The frame callback is held in a ref rather than being a loop dependency, so
  * a game can close over fresh React state without tearing down and restarting
@@ -57,6 +62,7 @@ export default function ArcadeCanvas({
       last = now;
       elapsed += dt;
 
+      ctx.setTransform(PIXEL_SCALE, 0, 0, PIXEL_SCALE, 0, 0);
       ctx.imageSmoothingEnabled = false;
       frameRef.current(ctx, dt, elapsed);
 
@@ -70,8 +76,8 @@ export default function ArcadeCanvas({
   return (
     <canvas
       ref={canvasRef}
-      width={GAME_W}
-      height={GAME_H}
+      width={GAME_W * PIXEL_SCALE}
+      height={GAME_H * PIXEL_SCALE}
       className={className}
       style={{
         imageRendering: "pixelated",
