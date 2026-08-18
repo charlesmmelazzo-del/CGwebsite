@@ -21,6 +21,7 @@ import {
   BARTENDER_HEADS,
   BARTENDER_TORSO,
   GUEST,
+  guestColors,
   ROLLING_BOTTLE,
   BOTTLE_COLORS,
   SHELF_BOTTLE,
@@ -28,6 +29,16 @@ import {
   TIN,
   TIN_COLORS,
 } from "./games/sprites";
+
+/**
+ * Guests wear their own palette — GUEST declares f/F for the shirt, which the
+ * bartender's map has no entry for, so borrowing his leaves them shirtless.
+ */
+export const GUEST_SWAPS = [
+  guestColors(P.cyan, "#0A5A6A"),
+  guestColors(P.amber, "#8A5000"),
+  guestColors(P.magenta, "#8A2070"),
+];
 
 /**
  * One sprite's worth of <rect>s, in sprite pixel coordinates.
@@ -117,11 +128,16 @@ export function BartenderArt({
   className?: string;
 }) {
   const head = BARTENDER_HEADS[mood] ?? BARTENDER_HEADS.ok;
-  // Head 20x14 over torso 20x12, arms 4x9 hung off each shoulder, tin above.
+  // Head 20x14 over torso 20x12, arms 4x9 off each shoulder, tin overhead.
   // Laid out on a 22-wide grid so the arms have somewhere to go.
+  //
+  // The tin sits at y0-15 and the raised arms at y14-23, so the hands meet the
+  // base of the tin. Spaced any further apart it reads as a floating tin
+  // rather than a bartender holding one.
   const W = 22;
-  const H = holdingTin ? 42 : 26;
-  const top = holdingTin ? 16 : 0;
+  const H = holdingTin ? 44 : 26;
+  const top = holdingTin ? 18 : 0;
+  const armY = holdingTin ? 14 : top + 16;
 
   return (
     <svg
@@ -132,20 +148,15 @@ export function BartenderArt({
       shapeRendering="crispEdges"
       className={className}
     >
-      {holdingTin && (
-        <g transform="translate(5,0)">{spriteRects(TIN, TIN_COLORS, "tin")}</g>
-      )}
+      {/* Head and torso first, then arms and tin over them — the same paint
+          order the game uses, so the arms read as in front of the body. */}
       <g transform={`translate(1,${top})`}>{spriteRects(head, BARTENDER_COLORS, "head")}</g>
       <g transform={`translate(1,${top + 14})`}>
         {spriteRects(BARTENDER_TORSO, BARTENDER_COLORS, "torso")}
       </g>
-      {/* Arms raised when he's holding the tin, at rest when he isn't. */}
-      <g transform={`translate(0,${top + (holdingTin ? 8 : 16)})`}>
-        {spriteRects(ARM, BARTENDER_COLORS, "armL")}
-      </g>
-      <g transform={`translate(18,${top + (holdingTin ? 8 : 16)})`}>
-        {spriteRects(ARM, BARTENDER_COLORS, "armR")}
-      </g>
+      <g transform={`translate(0,${armY})`}>{spriteRects(ARM, BARTENDER_COLORS, "armL")}</g>
+      <g transform={`translate(18,${armY})`}>{spriteRects(ARM, BARTENDER_COLORS, "armR")}</g>
+      {holdingTin && <g transform="translate(5,0)">{spriteRects(TIN, TIN_COLORS, "tin")}</g>}
     </svg>
   );
 }

@@ -12,9 +12,8 @@
 // never in your eyeline while you play, and on a phone those columns would eat
 // a third of the width the cocktails need.
 
-import { BartenderArt, BottleRow, SpriteArt } from "./CabinetArt";
+import { BartenderArt, BottleRow, GUEST_SWAPS, SpriteArt } from "./CabinetArt";
 import { GUEST, ROLLING_BOTTLE, BOTTLE_COLORS, TIN, TIN_COLORS } from "./CabinetArt";
-import { BARTENDER_COLORS } from "./games/sprites";
 
 const TRIM = "#100810";
 
@@ -103,7 +102,7 @@ function MarqueeArt({ flip = false }: { flip?: boolean }) {
       style={{ transform: flip ? "scaleX(-1)" : undefined }}
     >
       <BartenderArt px={3} mood={flip ? "ok" : "happy"} />
-      <SpriteArt sprite={GUEST} colors={BARTENDER_COLORS} px={3} className="mb-1" />
+      <SpriteArt sprite={GUEST} colors={GUEST_SWAPS[flip ? 1 : 0]} px={3} className="mb-1" />
     </div>
   );
 }
@@ -117,18 +116,23 @@ function SideArt({ flip = false }: { flip?: boolean }) {
   return (
     <div
       aria-hidden
-      className="hidden lg:flex w-16 shrink-0 flex-col items-center gap-8 py-10"
+      className="hidden lg:flex w-16 shrink-0 flex-col items-center gap-9 py-10"
       style={{
         background:
           "linear-gradient(180deg, #E42B20 0%, #FF7B00 22%, #8828C8 55%, #2038EC 80%, #0C0620 100%)",
         transform: flip ? "scaleX(-1)" : undefined,
       }}
     >
-      <SpriteArt sprite={TIN} colors={TIN_COLORS} px={3} />
-      <BartenderArt px={2} mood="ok" holdingTin={false} />
-      <SpriteArt sprite={ROLLING_BOTTLE} colors={BOTTLE_COLORS} px={3} />
-      <SpriteArt sprite={GUEST} colors={BARTENDER_COLORS} px={2} />
-      <SpriteArt sprite={TIN} colors={TIN_COLORS} px={2} />
+      {/* Repeated so a long pop-up doesn't leave most of the panel bare. The
+          run is short enough that the repeat isn't obvious at a glance. */}
+      {[0, 1, 2].map((n) => (
+        <div key={n} className="flex flex-col items-center gap-9">
+          <SpriteArt sprite={TIN} colors={TIN_COLORS} px={3} />
+          <BartenderArt px={2} mood="ok" holdingTin={false} />
+          <SpriteArt sprite={ROLLING_BOTTLE} colors={BOTTLE_COLORS} px={3} />
+          <SpriteArt sprite={GUEST} colors={GUEST_SWAPS[n % GUEST_SWAPS.length]} px={2} />
+        </div>
+      ))}
     </div>
   );
 }
