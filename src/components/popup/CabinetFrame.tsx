@@ -55,7 +55,7 @@ export default function CabinetFrame({
           <SpeedStripes className="absolute left-0 top-[22%] w-[26%] opacity-95" />
           <SpeedStripes className="absolute right-0 top-[22%] w-[26%] opacity-95" />
 
-          <div className="relative flex items-center justify-center gap-1 sm:gap-3 px-2 py-3">
+          <div className="relative flex items-end justify-center gap-1 sm:gap-3 px-2 pt-6 pb-3">
             {/* ── Left: the shaker and his bottles ── */}
             <div className="hidden md:flex shrink-0 items-end">
               <BartenderShaking size={158} />

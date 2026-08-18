@@ -136,6 +136,8 @@ export function BartenderStirring({ size = 150 }: { size?: number }) {
         strokeWidth={4}
         strokeLinejoin="round"
       />
+      {/* Hair tie, on the tail behind the head — not across her face. */}
+      <path d="M27 54 l8 4" stroke={INK.red} strokeWidth={6} strokeLinecap="round" />
       <path
         d="M56 22 c-16 0 -26 10 -26 24 c0 14 10 24 26 24 c16 0 26 -10 26 -24 c0 -14 -10 -24 -26 -24 z"
         fill={INK.cream}
@@ -149,7 +151,6 @@ export function BartenderStirring({ size = 150 }: { size?: number }) {
         strokeWidth={4}
         strokeLinejoin="round"
       />
-      <path d="M30 44 h10" stroke={INK.red} strokeWidth={6} strokeLinecap="round" />
       <circle cx="66" cy="44" r="4" fill={K} />
       <path d="M72 56 c-5 4 -12 4 -16 1" stroke={K} strokeWidth={3.5} fill="none" strokeLinecap="round" />
 
