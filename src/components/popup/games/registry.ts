@@ -19,8 +19,26 @@ export interface ArcadeGameProps {
   /**
    * Call once when the run ends. `detail` is stored alongside the score and is
    * what the owner looks at if a winning number seems too good to be true.
+   *
+   * NEVER called in demo mode.
    */
   onGameOver: (score: number, detail?: Record<string, unknown>) => void;
+
+  /**
+   * Attract mode. The game plays ITSELF, on a loop, for someone browsing the
+   * carousel — exactly what a cabinet did with nobody standing at it.
+   *
+   * A game in demo mode must:
+   *   * drive itself, ignoring every real input
+   *   * hide its controls, so nothing invites a tap that will not register
+   *   * restart on game over rather than reporting a score
+   *   * never call onGameOver, so a demo cannot land on a leaderboard
+   *
+   * The bot lives inside the game, next to the rules it is playing against.
+   * A central bot would have to know every game's internals and would rot the
+   * moment a game changed. See GameDemo.tsx for the wrapper that mounts these.
+   */
+  demo?: boolean;
 }
 
 const COMPONENTS: Record<string, ComponentType<ArcadeGameProps>> = {

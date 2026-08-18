@@ -58,6 +58,7 @@ import type { ArcadeGameProps } from "./registry";
 import { INGREDIENTS, ING_BY_KEY, colorFor } from "./ingredients";
 import {
   BUBBLE_R,
+  live as liveBubbles,
   TANK_BOTTOM,
   TANK_TOP,
   freshBubbleState,
@@ -785,9 +786,83 @@ function StirDial({
   );
 }
 
+// ─── The demo bot ────────────────────────────────────────────────────────────
+
+/**
+ * Plays the game, badly on purpose.
+ *
+ * A demo that plays perfectly is a worse advert than one that fumbles: nobody
+ * watching a flawless run learns that missing is possible, and the strike
+ * counter never moves. So this hits most notes and drops the occasional one,
+ * and shakes a little above the target rather than at some impossible rate.
+ *
+ * It is deliberately not clever. A demo bot that models the game properly is a
+ * second implementation of the rules that has to be kept in step with the
+ * first; this one only reads state the player can also see.
+ */
+function runDemoBot(
+  st: State,
+  bubbles: BubbleState | null,
+  dt: number,
+  memo: { nextTap: number; stirAngle: number; shakeAcc: number; noteSeen: Set<number> }
+) {
+  switch (st.phase) {
+    case "gather": {
+      if (!bubbles) break;
+      memo.nextTap -= dt;
+      if (memo.nextTap > 0) break;
+      memo.nextTap = 0.55;
+      // Take a needed one most of the time, and now and then a wrong one, so
+      // the "NOT THAT ONE" feedback gets shown to whoever is watching.
+      const wanted = liveBubbles(bubbles).filter(
+        (b) => bubbles.needed.includes(b.key) && !bubbles.collected.includes(b.key)
+      );
+      const wrong = liveBubbles(bubbles).filter((b) => !bubbles.needed.includes(b.key));
+      const pickWrong = wrong.length > 0 && bubbles.collected.length > 0 && Math.random() < 0.18;
+      const target = pickWrong ? wrong[0] : wanted[0];
+      if (target) tapBubbles(bubbles, target.x, target.y);
+      break;
+    }
+
+    case "pour": {
+      for (const n of st.notes) {
+        if (n.judged || memo.noteSeen.has(n.id)) continue;
+        if (Math.abs(n.x - WINDOW_X) > GOOD_HALF) continue;
+        memo.noteSeen.add(n.id);
+        // One in seven goes past untouched. Three of those is a game over,
+        // which is exactly the thing worth showing.
+        if (Math.random() < 0.86) st.presses.push(n.ing);
+      }
+      break;
+    }
+
+    case "shake": {
+      // A shade above the target, so the meter reads GOOD! without pinning.
+      const perSecond = (st.target + 18) / 60;
+      memo.shakeAcc += dt * perSecond;
+      while (memo.shakeAcc >= 1) {
+        st.shakeTaps++;
+        memo.shakeAcc -= 1;
+      }
+      break;
+    }
+
+    case "stir": {
+      const radiansPerSecond = ((st.target + 12) / 60) * Math.PI * 2;
+      memo.stirAngle += radiansPerSecond * dt;
+      applyStirAngle(st, memo.stirAngle);
+      break;
+    }
+
+    default:
+      // Cards and the serve run themselves.
+      break;
+  }
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
+export default function BehindTheStick({ onGameOver, demo = false }: ArcadeGameProps) {
   const s = useRef<State>(freshState(colorFor));
   // Bubble Buster has its own simulation, rebuilt at the start of each gather
   // phase from the round's own recipe.
@@ -795,6 +870,8 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
 
   // The title art. Loaded imperatively because the canvas draws it directly;
   // a React <Image> would be a second copy the frame loop can't reach.
+  const botMemo = useRef({ nextTap: 0.6, stirAngle: 0, shakeAcc: 0, noteSeen: new Set<number>() });
+
   const logoRef = useRef<HTMLImageElement | null>(null);
   useEffect(() => {
     const img = new window.Image();
@@ -903,7 +980,22 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
         g.current = null;
       }
 
+      // The bot moves before the rules do, so a press it makes this frame is
+      // judged this frame — the same order a real press arrives in.
+      if (demo) runDemoBot(st, g.current, dt, botMemo.current);
+
       const { finished } = update(st, dt);
+
+      // A demo loops instead of ending. It must never report a score: a
+      // leaderboard entry from a game nobody played would be indistinguishable
+      // from a cheated one.
+      if (finished && demo) {
+        s.current = freshState(colorFor);
+        g.current = null;
+        botMemo.current = { nextTap: 0.6, stirAngle: 0, shakeAcc: 0, noteSeen: new Set<number>() };
+        return;
+      }
+
       if (finished && !endedRef.current) {
         endedRef.current = true;
         onGameOver(Math.max(0, Math.round(st.score)), {
@@ -1053,12 +1145,13 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
         drawTextMarquee(ctx, st.banner, 112, 96, P.yellow, 2, "center", P.black, P.crimson);
       }
     },
-    [onGameOver]
+    [onGameOver, demo]
   );
 
   // Cards and Bubble Buster take the whole cabinet; only the phases that are
   // actually played with a control keep the 60/40 split.
   const fullScreenPhase =
+    demo ||
     uiPhase === "boot" ||
     uiPhase === "howto" ||
     uiPhase === "order" ||
@@ -1081,7 +1174,7 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
     <div className="flex flex-col" style={{ height: "min(78vh, 640px)" }}>
       <div
         className={`min-h-0 flex items-center justify-center bg-black px-2 pt-2 ${
-          fullScreenPhase ? "flex-1" : "flex-[3]"
+          fullScreenPhase || demo ? "flex-1" : "flex-[3]"
         }`}
         onPointerDown={onTankTap}
         onContextMenu={(e) => e.preventDefault()}
@@ -1092,13 +1185,14 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
       </div>
 
       {/*
-        The deck only exists when something is played on it. A card explaining
+        The deck only exists when something is played on it.
+        In demo mode there is never a deck — see ArcadeGameProps.demo. A card explaining
         the game, or a tank you tap directly, has no controls — leaving an empty
         40% strip under them wastes the screen and makes the card look cropped.
       */}
       <div
-        hidden={fullScreenPhase}
-        className={`${fullScreenPhase ? "hidden" : "flex"} flex-[2] min-h-0 p-2 bg-black select-none items-center justify-center`}
+        hidden={fullScreenPhase || demo}
+        className={`${fullScreenPhase || demo ? "hidden" : "flex"} flex-[2] min-h-0 p-2 bg-black select-none items-center justify-center`}
         style={{
           touchAction: "none",
           WebkitUserSelect: "none",
