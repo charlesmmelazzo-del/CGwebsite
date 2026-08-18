@@ -17,30 +17,46 @@ import type { ReactNode } from "react";
 export default function CRTScreen({
   children,
   glow = "#57C7FF",
+  className = "",
+  fill = false,
 }: {
   children: ReactNode;
   /** Colour of the ambient light the tube throws onto its bezel. */
   glow?: string;
+  className?: string;
+  /**
+   * Stretch to the parent instead of hugging the picture.
+   *
+   * Percentage heights need a definite height to resolve against. Without this,
+   * every wrapper here is auto-height, a canvas asking for height:100% inside
+   * gets "auto", and it falls back to its intrinsic 224x288 — a stamp in the
+   * middle of the screen no matter how much room the layout gave it.
+   */
+  fill?: boolean;
 }) {
   return (
     <div
-      className="relative overflow-hidden"
+      className={`relative overflow-hidden ${fill ? "w-full h-full" : ""} ${className}`}
       style={{
         // The plastic surround, and the tube's own light spilling onto it.
         background: "#05050A",
         padding: "10px",
+        boxSizing: "border-box",
         boxShadow: `inset 0 0 22px rgba(0,0,0,0.95), 0 0 26px -6px ${glow}55`,
         borderRadius: "14px",
       }}
     >
-      <div className="relative" style={{ borderRadius: "8px", overflow: "hidden" }}>
+      <div
+        className={fill ? "relative w-full h-full" : "relative"}
+        style={{ borderRadius: "8px", overflow: "hidden" }}
+      >
         {/*
           Bloom: a slightly blurred, brightened copy of the picture bleeding out
           from underneath. Cheap stand-in for phosphor glow, and it's what stops
           the art looking like flat vector shapes.
         */}
         <div
-          className="relative"
+          className={fill ? "relative w-full h-full" : "relative"}
           style={{ filter: "saturate(1.25) contrast(1.08) brightness(1.04)" }}
         >
           {children}

@@ -24,10 +24,13 @@ export default function ArcadeCanvas({
   className?: string;
   /**
    * "width" fills the container and takes whatever height the aspect needs.
-   * "height" does the opposite — for a fixed-height row where the screen has to
-   * letterbox rather than push the controls off the bottom.
+   *
+   * "contain" fills the container in BOTH directions and expects the parent to
+   * already be the right shape. The parent owns the aspect ratio in that mode —
+   * a canvas cannot letterbox itself the way an <img> can, so something above it
+   * has to be 224:288 or the picture stretches.
    */
-  fit?: "width" | "height";
+  fit?: "width" | "contain";
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const frameRef = useRef(onFrame);
@@ -72,11 +75,11 @@ export default function ArcadeCanvas({
       className={className}
       style={{
         imageRendering: "pixelated",
-        width: fit === "width" ? "100%" : "auto",
+        width: "100%",
         height: fit === "width" ? "auto" : "100%",
-        maxWidth: "100%",
-        maxHeight: "100%",
-        aspectRatio: `${GAME_W} / ${GAME_H}`,
+        // Only in width mode: in contain mode the PARENT holds the shape, and
+        // an aspect-ratio here would fight the height it is being given.
+        aspectRatio: fit === "width" ? `${GAME_W} / ${GAME_H}` : undefined,
         display: "block",
         background: "#000",
         // A game surface must never behave like a document. Without these, a

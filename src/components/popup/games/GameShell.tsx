@@ -160,7 +160,7 @@ export default function GameShell({
   }
 
   const cabinet = (
-    <div className="w-full max-w-[420px] mx-auto">
+    <div className={`w-full mx-auto ${fullscreen ? "max-w-[560px] flex-1 min-h-0 flex flex-col" : "max-w-[420px]"}`}>
       {/* ── Marquee ──────────────────────────────────────────────────────── */}
       <div
         style={{ borderColor: accent }}
@@ -172,7 +172,10 @@ export default function GameShell({
       </div>
 
       {/* ── Screen ───────────────────────────────────────────────────────── */}
-      <div style={{ borderColor: accent }} className="border-2 bg-black">
+      <div
+        style={{ borderColor: accent }}
+        className={`border-2 bg-black ${fullscreen ? "flex-1 min-h-0" : ""}`}
+      >
         {phase === "playing" ? (
           <Game onGameOver={handleGameOver} />
         ) : phase === "attract" ? (
@@ -209,8 +212,14 @@ export default function GameShell({
   return (
     <div className="fixed inset-0 z-[70] bg-black overflow-y-auto overscroll-contain">
       {/* Centred when it fits, scrollable when the score board makes it tall. */}
-      <div className="min-h-full flex flex-col items-center justify-center p-2 sm:p-4">
-        <div className="w-full max-w-[420px] mb-2 flex justify-end">
+      {/*
+        h-full, not min-h-full: the game inside sizes itself from its parent's
+        height, and a min-height leaves that percentage with nothing definite to
+        resolve against — which is how the screen ended up rendering at its
+        intrinsic 224px in the middle of an empty page.
+      */}
+      <div className="h-full min-h-full flex flex-col items-center justify-center p-2 sm:p-4">
+        <div className="w-full max-w-[560px] mb-2 flex justify-end">
           <button
             onClick={leave}
             className="px-3 py-1.5 text-[10px] tracking-[0.25em] uppercase text-white/45 hover:text-white/90 transition-colors"

@@ -63,7 +63,10 @@ export default function GameDemo({
         // Pointer events off: a demo that reacts to a tap looks like a game
         // that has stopped responding. Taps belong to the carousel underneath,
         // and to the Play button that starts the real thing.
-        <div className="pointer-events-none">
+        // The aspect box gives the game a definite height to fill. Without one,
+        // its percentage heights resolve to auto and the screen collapses to
+        // its intrinsic 224px.
+        <div className="pointer-events-none w-full aspect-[224/288]">
           <Game onGameOver={() => {}} demo />
         </div>
       ) : (

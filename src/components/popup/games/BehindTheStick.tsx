@@ -1197,7 +1197,10 @@ export default function BehindTheStick({ onGameOver, demo = false }: ArcadeGameP
       controls appearing over the animation, in a place nothing else ever
       appears, read as a glitch rather than as a control.
     */
-    <div className="flex flex-col" style={{ height: "min(78vh, 640px)" }}>
+    // h-full, not a viewport height. The cabinet around this owns how tall the
+    // game is; picking a height here meant the screen and its container each
+    // had an opinion, and the loser was the picture.
+    <div className="flex flex-col h-full w-full" style={{ minHeight: 0 }}>
       <div
         className={`min-h-0 flex items-center justify-center bg-black px-2 pt-2 ${
           fullScreenPhase || demo ? "flex-1" : "flex-[3]"
@@ -1205,9 +1208,20 @@ export default function BehindTheStick({ onGameOver, demo = false }: ArcadeGameP
         onPointerDown={onTankTap}
         onContextMenu={(e) => e.preventDefault()}
       >
-        <CRTScreen glow="#FFA000">
-          <ArcadeCanvas onFrame={onFrame} running fit="height" />
-        </CRTScreen>
+        {/*
+          The aspect box lives HERE, not on the canvas. Sized by height first so
+          the screen grows to whatever the row gives it, with max-width pulling
+          it back on a narrow phone — aspect-ratio then shrinks the height to
+          match, so the picture always fits both ways round without distorting.
+        */}
+        <div
+          className="h-full max-h-full max-w-full"
+          style={{ aspectRatio: `${GAME_W} / ${GAME_H}` }}
+        >
+          <CRTScreen glow="#FFA000" fill>
+            <ArcadeCanvas onFrame={onFrame} running fit="contain" />
+          </CRTScreen>
+        </div>
       </div>
 
       {/*
