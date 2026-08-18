@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { Check, X } from "lucide-react";
 import GameShell from "../games/GameShell";
-import Leaderboard from "../Leaderboard";
 import CabinetFrame from "../CabinetFrame";
+import CocktailCarousel from "../cabinet/CocktailCarousel";
+import { C } from "../cabinet/theme";
 import { VOTE_BLOCK_MESSAGE } from "@/lib/popup/access";
 import { getGameMeta } from "@/lib/popup/games";
 import type { PopupCocktail, PopupTemplateProps } from "@/lib/popup/types";
@@ -108,116 +108,47 @@ export default function HighScoresTemplate({
 
       <div className="relative px-2 sm:px-6 py-6 sm:py-12">
         <CabinetFrame
-          panel={
-            /* Instruction card, where a cabinet keeps it: on the deck. */
-            <div
-              className="border-[3px] border-[#100810] px-3 py-1.5 sm:px-5 sm:py-2.5"
-              style={{ background: "#FFD500", boxShadow: "4px 5px 0 rgba(0,0,0,0.5)" }}
-            >
-              <p className="text-[8px] sm:text-[11px] tracking-[0.2em] uppercase text-[#100810] font-black text-center">
-                High score wins a $15 gift card
-              </p>
-            </div>
-          }
-          title={
-            <>
-              <p className="text-[9px] sm:text-[10px] tracking-[0.45em] uppercase text-[#3CE0E0]">
-                Common Good Presents
-              </p>
-
-              <h1
-                style={{
-                  ...marquee({ fill: "#FFD500", stroke: 3, shadow1: "#E42B20", shadow2: "#8828C8" }),
-                  fontFamily: "var(--font-display, system-ui)",
-                }}
-                className="mt-4 text-[2.1rem] leading-[0.95] sm:text-6xl font-black tracking-tight uppercase"
+          title={menu.title || "High Scores"}
+          subtitle={menu.subtitle}
+          description={menu.description}
+          notice={
+            !isLive ? (
+              <p
+                className="text-[10px] tracking-[0.25em] uppercase"
+                style={{ color: C.magenta }}
               >
-                {menu.title || "High Scores"}
-              </h1>
-
-              {menu.subtitle && (
-                <p
-                  style={marquee({ fill: "#FFFFFF", stroke: 2 })}
-                  className="mt-4 text-[10px] sm:text-xs tracking-[0.35em] uppercase"
-                >
-                  {menu.subtitle}
-                </p>
-              )}
-
-              {menu.description && (
-                <p className="mt-5 max-w-md mx-auto text-xs sm:text-sm text-white/65 leading-relaxed">
-                  {menu.description}
-                </p>
-              )}
-
-              {!isLive && (
-                <p className="mt-5 text-[10px] tracking-[0.25em] uppercase text-[#E42B20]">
-                  ★ This pop-up has closed — boards are final ★
-                </p>
-              )}
-            </>
+                ★ This pop-up has closed — boards are final ★
+              </p>
+            ) : undefined
           }
         >
-          {/* ── Voting status ──────────────────────────────────────────── */}
-          <p className="text-center text-[11px] text-white/55 leading-relaxed mb-7 tracking-wide">
-            {votingOpen
-              ? myVotes.length === 0
-                ? "Play the games. Then vote for the drink you liked best."
-                : myVotes.length === 1
-                  ? "Vote locked in — tap another cabinet to rank a second favorite."
-                  : `You've ranked ${myVotes.length} favorites.`
-              : voteBlockReason
-                ? VOTE_BLOCK_MESSAGE[voteBlockReason]
-                : "Voting is closed."}
-          </p>
-          {voteError && <p className="mb-4 text-center text-xs text-[#FF9CB0]">{voteError}</p>}
+          {voteError && (
+            <p className="mb-4 text-center text-xs" style={{ color: C.magenta }}>
+              {voteError}
+            </p>
+          )}
 
-          {/* ── Cabinets ───────────────────────────────────────────────── */}
           {cocktails.length === 0 ? (
             <p className="text-center text-sm text-white/40 py-16">
               No cocktails on this pop-up yet.
             </p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
-              {cocktails.map((c, i) => (
-                <Cabinet
-                  key={c.id}
-                  cocktail={c}
-                  index={i}
-                  rank={rankByCocktail.get(c.id)}
-                  onOpen={() => setOpenId(c.id)}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* ── Standings ──────────────────────────────────────────────── */}
-          {cocktails.length > 0 && (
-            <div className="mt-14 sm:mt-20 max-w-xl mx-auto">
-              <h2
-                style={marquee({ fill: "#3CE0E0", stroke: 2, shadow1: "#0A4A6A" })}
-                className="text-center text-xl sm:text-2xl font-black tracking-[0.2em] uppercase mb-5"
-              >
-                Cocktail Standings
-              </h2>
-              <div
-                className="border-[3px] border-[#100810] bg-black/70 p-4"
-                style={{ boxShadow: "5px 6px 0 #1B1030" }}
-              >
-                <Leaderboard results={results} accent="#FFD500" myTopPick={myTopPick} />
-              </div>
-              {!viewer && (
-                <p className="mt-5 text-center text-xs text-white/40">
-                  <Link href="/popup/signup" className="text-[#FFD500] underline hover:opacity-80">
-                    Create an account
-                  </Link>{" "}
-                  to vote and get on the high score boards.
-                </p>
-              )}
-            </div>
+            <CocktailCarousel
+              cocktails={cocktails}
+              results={results}
+              viewer={viewer}
+              votingOpen={votingOpen}
+              voteBlockReason={voteBlockReason}
+              voteBusy={voteBusy}
+              rankByCocktail={rankByCocktail}
+              myTopPick={myTopPick}
+              onOpen={(id) => setOpenId(id)}
+              onVote={(id) => toggleVote(id)}
+            />
           )}
         </CabinetFrame>
       </div>
+
 
       {open && (
         <CocktailDetail
@@ -282,131 +213,7 @@ function ArcadeBackdrop() {
 
 // ─── Cabinet card ────────────────────────────────────────────────────────────
 
-/** Each cabinet gets its own marquee colour, like a row in an arcade. */
-const CABINET_HUES: { marquee: string; shadow: string; ink: string }[] = [
-  { marquee: "#E42B20", shadow: "#7A0F0A", ink: "#FFD500" },
-  { marquee: "#3CE0E0", shadow: "#0A5A6A", ink: "#100810" },
-  { marquee: "#FFD500", shadow: "#8A6A00", ink: "#100810" },
-  { marquee: "#8828C8", shadow: "#3A0A5A", ink: "#FFD500" },
-  { marquee: "#00B83C", shadow: "#00551C", ink: "#100810" },
-  { marquee: "#FF7B00", shadow: "#8A3F00", ink: "#100810" },
-];
 
-function Cabinet({
-  cocktail,
-  index,
-  rank,
-  onOpen,
-}: {
-  cocktail: PopupCocktail;
-  index: number;
-  rank?: number;
-  onOpen: () => void;
-}) {
-  const hue = CABINET_HUES[index % CABINET_HUES.length];
-  const game = getGameMeta(cocktail.gameKey);
-
-  return (
-    <button
-      onClick={onOpen}
-      className="group block w-full text-left active:translate-y-[2px] transition-transform"
-      style={{ filter: "drop-shadow(5px 7px 0 rgba(0,0,0,0.75))" }}
-    >
-      {/* Lit marquee */}
-      <div
-        className="border-[3px] border-b-0 border-[#100810] px-3 py-2 relative overflow-hidden"
-        style={{ background: hue.marquee }}
-      >
-        <div
-          aria-hidden
-          className="absolute inset-0"
-          style={{ background: "linear-gradient(to bottom, rgba(255,255,255,0.26), rgba(0,0,0,0.22))" }}
-        />
-        <p
-          className="relative text-[11px] tracking-[0.18em] uppercase font-black truncate text-center"
-          style={{ color: hue.ink, textShadow: `1px 1px 0 ${hue.shadow}` }}
-        >
-          {cocktail.name}
-        </p>
-      </div>
-
-      {/* Bezel + screen */}
-      <div className="border-[3px] border-[#100810] bg-[#0A0A12] p-2.5">
-        <div className="relative aspect-[4/3] bg-black overflow-hidden border-2 border-[#000]">
-          {cocktail.imageUrl ? (
-            <Image
-              src={cocktail.imageUrl}
-              alt={cocktail.name}
-              fill
-              unoptimized
-              className="object-cover group-hover:scale-[1.03] transition-transform duration-500"
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <p
-                style={marquee({ fill: hue.marquee, stroke: 1 })}
-                className="text-[11px] tracking-[0.3em] uppercase font-black animate-pulse"
-              >
-                Insert Coin
-              </p>
-            </div>
-          )}
-
-          {/* Curved glass + scanlines over the artwork */}
-          <div
-            aria-hidden
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              backgroundImage:
-                "repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,0.35) 3px, rgba(0,0,0,0.35) 4px)",
-            }}
-          />
-          <div
-            aria-hidden
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              background:
-                "radial-gradient(115% 115% at 50% 45%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.6) 100%)",
-            }}
-          />
-
-          {rank !== undefined && (
-            <span
-              className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center text-[12px] font-black tabular-nums border-2 border-[#100810]"
-              style={{ background: "#FFD500", color: "#100810" }}
-              title={`Your #${rank} pick`}
-            >
-              {rank}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Control panel */}
-      <div className="border-[3px] border-t-0 border-[#100810] bg-[#15151F] px-3 py-2.5">
-        <div className="flex items-center gap-2.5">
-          {/* Joystick and two buttons */}
-          <span className="flex items-center gap-1.5 shrink-0" aria-hidden>
-            <span className="w-2.5 h-2.5 rounded-full bg-[#E42B20] border border-black/70" />
-            <span className="w-2 h-2 rounded-full bg-[#3CE0E0] border border-black/70" />
-            <span className="w-2 h-2 rounded-full bg-[#FFD500] border border-black/70" />
-          </span>
-          <span
-            className="text-[8px] tracking-[0.18em] uppercase truncate"
-            style={{ color: game ? hue.marquee : "rgba(255,255,255,0.28)" }}
-          >
-            {game ? game.title : "Game coming soon"}
-          </span>
-        </div>
-        {cocktail.tagline && (
-          <p className="mt-1.5 text-[10px] text-white/45 leading-snug line-clamp-2">
-            {cocktail.tagline}
-          </p>
-        )}
-      </div>
-    </button>
-  );
-}
 
 // ─── Detail overlay ──────────────────────────────────────────────────────────
 
