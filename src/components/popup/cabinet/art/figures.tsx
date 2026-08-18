@@ -4,92 +4,88 @@
 // keyline, no gradients — deliberately a different medium from the pixel
 // bartender in games/sprites.ts.
 //
-// Both are drawn facing right on a 120x140 viewBox and mirrored by the caller,
-// so the pair reads as two people working the same bar rather than one drawing
-// used twice.
+// Drawn BOLD on purpose. The first attempt at these carried a detailed profile,
+// separate arm strokes and a rotated tin, and at the size the marquee actually
+// renders them it all collapsed into a smiley face under a stack of grey bars.
+// Screen-printed cabinet art survives being small because it is built from a
+// few large silhouettes with a heavy keyline, so that is what these are: one
+// body shape, one head shape, one prop, nothing thinner than 4 units.
+//
+// Both face right on a 120x150 viewBox; the caller mirrors for the pair.
 
 import { INK } from "./props";
 
 const K = INK.black;
 
-/** Motion arcs. What sells a shake on a printed marquee is the streaks, not the pose. */
-function Streaks({ x, y, flip = false }: { x: number; y: number; flip?: boolean }) {
-  return (
-    <g transform={`translate(${x} ${y}) ${flip ? "scale(-1 1)" : ""}`} aria-hidden>
-      <path d="M0 0 q10 -8 20 -2" stroke={K} strokeWidth={3} fill="none" strokeLinecap="round" />
-      <path d="M2 9 q12 -9 24 -3" stroke={K} strokeWidth={3} fill="none" strokeLinecap="round" />
-      <path d="M6 18 q9 -6 17 -2" stroke={K} strokeWidth={2.5} fill="none" strokeLinecap="round" />
-    </g>
-  );
-}
-
 /**
- * The shaker: arms up, tin overhead, motion streaks either side.
+ * The shaker: tin held high in both hands, motion streaks either side.
  *
- * Illustration solves what the pixel sprite could not — a drawn figure can put
- * its forearms wherever the pose needs them, so "holding the tin overhead"
- * reads immediately here where the 20px sprite had nowhere to put the arms.
+ * Illustration solves what the 20px sprite could not — a drawn figure puts its
+ * arms wherever the pose needs them, so the overhead shake finally reads.
  */
 export function BartenderShaking({ size = 150 }: { size?: number }) {
   return (
-    <svg aria-hidden viewBox="0 0 120 140" width={size * (120 / 140)} height={size}>
-      {/* ── Tin, overhead, mid-shake ── */}
-      <g transform="rotate(-14 62 26)">
-        <path d="M50 6 h24 v7 h-24 z" fill={INK.silver} stroke={K} strokeWidth={3} />
-        <path d="M47 13 h30 v8 h-30 z" fill={INK.steel} stroke={K} strokeWidth={3} />
-        <path d="M48 21 h28 l-5 34 h-18 z" fill={INK.silver} stroke={K} strokeWidth={3} strokeLinejoin="round" />
-        <path d="M55 26 l-3 26" stroke={INK.cream} strokeWidth={3} strokeLinecap="round" />
+    <svg aria-hidden viewBox="0 0 120 150" width={size * (120 / 150)} height={size}>
+      {/* ── Motion streaks, clear of the tin so they read as movement ── */}
+      <g stroke={INK.cream} strokeWidth={4} strokeLinecap="round" fill="none">
+        <path d="M22 20 h14 M18 31 h18 M24 42 h12" />
+        <path d="M98 20 h-14 M102 31 h-18 M96 42 h-12" />
       </g>
-      <Streaks x={26} y={14} />
-      <Streaks x={100} y={16} flip />
 
-      {/* ── Arms up to the tin ── */}
+      {/* ── The tin: one solid tapered shape ── */}
       <path
-        d="M40 84 c-2 -22 6 -34 16 -40"
+        d="M46 8 h28 v10 h-28 z"
+        fill={INK.silver}
         stroke={K}
-        strokeWidth={13}
-        fill="none"
-        strokeLinecap="round"
-      />
-      <path
-        d="M40 84 c-2 -22 6 -34 16 -40"
-        stroke={INK.yellow}
-        strokeWidth={8}
-        fill="none"
-        strokeLinecap="round"
-      />
-      <path d="M78 84 c4 -22 -2 -34 -10 -40" stroke={K} strokeWidth={13} fill="none" strokeLinecap="round" />
-      <path d="M78 84 c4 -22 -2 -34 -10 -40" stroke={INK.yellow} strokeWidth={8} fill="none" strokeLinecap="round" />
-
-      {/* ── Head, in profile ── */}
-      {/* Pompadour — the silhouette that dates the drawing */}
-      <path
-        d="M40 60 c-3 -20 6 -32 22 -32 c8 0 14 3 17 8 c4 -6 10 -6 12 -2 c-4 0 -6 3 -6 6 c0 14 -4 22 -12 26 z"
-        fill={INK.yellow}
-        stroke={K}
-        strokeWidth={3.5}
+        strokeWidth={4}
         strokeLinejoin="round"
       />
       <path
-        d="M44 52 c0 -12 8 -20 19 -20 c11 0 18 8 18 19 c0 12 -8 20 -19 20 c-11 0 -18 -8 -18 -19 z"
+        d="M43 18 h34 l-6 38 h-22 z"
+        fill={INK.silver}
+        stroke={K}
+        strokeWidth={4}
+        strokeLinejoin="round"
+      />
+      <path d="M52 24 l-3 27" stroke={INK.steel} strokeWidth={5} strokeLinecap="round" />
+
+      {/* ── Body: torso and both raised arms as ONE silhouette ── */}
+      <path
+        d="M60 60
+           c-9 0 -15 4 -15 11
+           l-11 -6 c-4 -2 -8 0 -9 4 c-1 4 1 7 5 9 l15 8
+           v56 h30
+           v-56 l15 -8 c4 -2 6 -5 5 -9 c-1 -4 -5 -6 -9 -4 l-11 6
+           c0 -7 -6 -11 -15 -11 z"
+        fill={INK.yellow}
+        stroke={K}
+        strokeWidth={4}
+        strokeLinejoin="round"
+      />
+
+      {/* ── Head: one mass, with the pompadour built into the silhouette ── */}
+      <path
+        d="M60 22 c-16 0 -26 10 -26 24 c0 14 10 24 26 24 c16 0 26 -10 26 -24 c0 -14 -10 -24 -26 -24 z"
         fill={INK.cream}
         stroke={K}
-        strokeWidth={3.5}
+        strokeWidth={4}
       />
-      <circle cx="70" cy="48" r="3" fill={K} />
-      <path d="M74 60 c-4 3 -9 3 -12 1" stroke={K} strokeWidth={2.5} fill="none" strokeLinecap="round" />
-
-      {/* ── Bow tie and torso ── */}
-      <path d="M50 78 l10 6 l-10 6 z M70 78 l-10 6 l10 6 z" fill={INK.red} stroke={K} strokeWidth={2.5} />
       <path
-        d="M38 138 v-34 c0 -12 8 -20 22 -20 c14 0 22 8 22 20 v34 z"
+        d="M34 44 c-2 -18 8 -30 26 -30 c10 0 17 4 21 10 c-8 -2 -14 0 -18 5 c-6 -4 -18 -3 -24 4 c-3 3 -5 7 -5 11 z"
         fill={INK.yellow}
         stroke={K}
-        strokeWidth={3.5}
+        strokeWidth={4}
         strokeLinejoin="round"
       />
-      {/* Shirt front, so the vest reads as a vest */}
-      <path d="M53 90 h14 v48 h-14 z" fill={INK.cream} stroke={K} strokeWidth={3} />
+      <circle cx="70" cy="44" r="4" fill={K} />
+      <path d="M76 56 c-5 4 -12 4 -16 1" stroke={K} strokeWidth={3.5} fill="none" strokeLinecap="round" />
+
+      {/* ── Bow tie, sat on the collar ── */}
+      <path d="M48 76 l12 7 l-12 7 z M72 76 l-12 7 l12 7 z" fill={INK.red} stroke={K} strokeWidth={3} />
+      <circle cx="60" cy="83" r="3.5" fill={INK.red} stroke={K} strokeWidth={2.5} />
+
+      {/* ── Shirt front, so the yellow reads as a waistcoat ── */}
+      <path d="M52 92 h16 v56 h-16 z" fill={INK.cream} stroke={K} strokeWidth={3.5} />
     </svg>
   );
 }
@@ -97,61 +93,69 @@ export function BartenderShaking({ size = 150 }: { size?: number }) {
 /**
  * The stirrer: mixing glass on the bar, bar spoon turning in it.
  *
- * Deliberately a different person from the shaker — ponytail, shirtsleeves,
- * different posture — because two mirrored copies of one figure is exactly
- * what makes cabinet art look cheap.
+ * A different person from the shaker — ponytail, shirtsleeves, one arm out
+ * rather than two up. Two mirrored copies of one figure is exactly what makes
+ * cabinet art look cheap.
  */
 export function BartenderStirring({ size = 150 }: { size?: number }) {
   return (
-    <svg aria-hidden viewBox="0 0 120 140" width={size * (120 / 140)} height={size}>
-      {/* ── Head, ponytail, in profile ── */}
+    <svg aria-hidden viewBox="0 0 120 150" width={size * (120 / 150)} height={size}>
+      {/* ── Mixing glass, and the spoon standing in it ── */}
       <path
-        d="M42 58 c-4 -22 6 -34 22 -34 c15 0 22 10 22 24 c0 6 -1 11 -3 15 z"
-        fill={K}
+        d="M84 74 h30 l-5 62 h-20 z"
+        fill={INK.silver}
         stroke={K}
-        strokeWidth={3}
+        strokeWidth={4}
         strokeLinejoin="round"
       />
-      {/* The tail, swung back */}
+      <path d="M87 98 h24 l-3 36 h-18 z" fill={INK.teal} stroke={K} strokeWidth={3} />
+      <path d="M99 40 v50" stroke={K} strokeWidth={8} strokeLinecap="round" />
+      <path d="M99 40 v50" stroke={INK.silver} strokeWidth={4} strokeLinecap="round" />
+      <circle cx="99" cy="36" r="7" fill={INK.silver} stroke={K} strokeWidth={4} />
+
+      {/* ── Body: torso with one arm reaching to the spoon ── */}
       <path
-        d="M42 40 c-12 -2 -20 6 -22 18 c-1 8 2 14 7 17 c-2 -10 1 -20 8 -25 z"
-        fill={K}
-        stroke={K}
-        strokeWidth={3}
-        strokeLinejoin="round"
-      />
-      <path d="M20 56 h12" stroke={INK.red} strokeWidth={5} strokeLinecap="round" />
-      <path
-        d="M47 50 c0 -12 8 -19 18 -19 c11 0 18 8 18 19 c0 11 -8 19 -18 19 c-11 0 -18 -8 -18 -19 z"
+        d="M56 62
+           c-10 0 -16 5 -16 12
+           v74 h32
+           v-46 l18 -14 c4 -3 5 -7 2 -10 c-3 -4 -7 -4 -11 -1 l-9 7
+           v-10 c0 -7 -6 -12 -16 -12 z"
         fill={INK.cream}
         stroke={K}
-        strokeWidth={3.5}
-      />
-      <circle cx="72" cy="47" r="3" fill={K} />
-      <path d="M76 58 c-4 3 -9 3 -12 1" stroke={K} strokeWidth={2.5} fill="none" strokeLinecap="round" />
-
-      {/* ── Bow tie, waistcoat over shirtsleeves ── */}
-      <path d="M52 76 l10 6 l-10 6 z M72 76 l-10 6 l10 6 z" fill={INK.red} stroke={K} strokeWidth={2.5} />
-      <path
-        d="M40 138 v-34 c0 -12 9 -20 22 -20 c13 0 22 8 22 20 v34 z"
-        fill={INK.cream}
-        stroke={K}
-        strokeWidth={3.5}
+        strokeWidth={4}
         strokeLinejoin="round"
       />
-      <path d="M50 88 v50 M74 88 v50" stroke={K} strokeWidth={3} />
-      <path d="M50 88 c6 6 18 6 24 0 v50 h-24 z" fill={K} opacity={0.92} />
+      {/* Waistcoat over the shirt */}
+      <path d="M46 78 c6 7 18 7 24 0 v70 h-24 z" fill={K} />
 
-      {/* ── The arm out to the spoon ── */}
-      <path d="M78 96 c14 -4 20 -14 22 -26" stroke={K} strokeWidth={13} fill="none" strokeLinecap="round" />
-      <path d="M78 96 c14 -4 20 -14 22 -26" stroke={INK.cream} strokeWidth={8} fill="none" strokeLinecap="round" />
+      {/* ── Head, and the ponytail swung out behind ── */}
+      <path
+        d="M26 52 c-8 4 -12 14 -9 24 c2 7 7 11 12 12 c-5 -8 -5 -18 -1 -26 z"
+        fill={K}
+        stroke={K}
+        strokeWidth={4}
+        strokeLinejoin="round"
+      />
+      <path
+        d="M56 22 c-16 0 -26 10 -26 24 c0 14 10 24 26 24 c16 0 26 -10 26 -24 c0 -14 -10 -24 -26 -24 z"
+        fill={INK.cream}
+        stroke={K}
+        strokeWidth={4}
+      />
+      <path
+        d="M30 46 c0 -16 11 -26 26 -26 c15 0 25 9 26 22 c-6 -8 -14 -12 -26 -12 c-12 0 -20 5 -26 16 z"
+        fill={K}
+        stroke={K}
+        strokeWidth={4}
+        strokeLinejoin="round"
+      />
+      <path d="M30 44 h10" stroke={INK.red} strokeWidth={6} strokeLinecap="round" />
+      <circle cx="66" cy="44" r="4" fill={K} />
+      <path d="M72 56 c-5 4 -12 4 -16 1" stroke={K} strokeWidth={3.5} fill="none" strokeLinecap="round" />
 
-      {/* ── Mixing glass and spoon ── */}
-      <path d="M88 74 h26 l-4 60 h-18 z" fill={INK.silver} stroke={K} strokeWidth={3.5} strokeLinejoin="round" />
-      <path d="M90 96 h22 l-2 38 h-18 z" fill={INK.teal} stroke={K} strokeWidth={2.5} />
-      <path d="M101 48 l-3 44" stroke={K} strokeWidth={6} strokeLinecap="round" />
-      <path d="M101 48 l-3 44" stroke={INK.silver} strokeWidth={3} strokeLinecap="round" />
-      <circle cx="102" cy="45" r="6" fill={INK.silver} stroke={K} strokeWidth={3} />
+      {/* ── Bow tie ── */}
+      <path d="M44 76 l12 7 l-12 7 z M68 76 l-12 7 l12 7 z" fill={INK.red} stroke={K} strokeWidth={3} />
+      <circle cx="56" cy="83" r="3.5" fill={INK.red} stroke={K} strokeWidth={2.5} />
     </svg>
   );
 }

@@ -58,7 +58,7 @@ export default function CabinetFrame({
           <div className="relative flex items-center justify-center gap-1 sm:gap-3 px-2 py-3">
             {/* ── Left: the shaker and his bottles ── */}
             <div className="hidden md:flex shrink-0 items-end">
-              <BartenderShaking size={132} />
+              <BartenderShaking size={158} />
               <div className="flex items-end -ml-3">
                 <Bottle size={56} body={INK.amber} label={INK.cream} device={INK.green} />
                 <Jigger size={38} className="ml-1" />
@@ -105,7 +105,7 @@ export default function CabinetFrame({
                 <Bottle size={52} body={INK.brown} label={INK.cream} device={INK.red} className="ml-0.5" />
                 <Lemon size={30} className="ml-1" />
               </div>
-              <BartenderStirring size={132} />
+              <BartenderStirring size={158} />
             </div>
           </div>
 
