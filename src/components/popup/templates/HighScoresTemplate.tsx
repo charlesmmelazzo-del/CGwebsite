@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Check, X } from "lucide-react";
 import GameShell from "../games/GameShell";
 import Leaderboard from "../Leaderboard";
+import CabinetFrame from "../CabinetFrame";
 import { VOTE_BLOCK_MESSAGE } from "@/lib/popup/access";
 import { getGameMeta } from "@/lib/popup/games";
 import type { PopupCocktail, PopupTemplateProps } from "@/lib/popup/types";
@@ -105,114 +106,117 @@ export default function HighScoresTemplate({
     <div className="min-h-screen bg-[#05030F] text-white relative overflow-hidden">
       <ArcadeBackdrop />
 
-      <div className="relative max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
-        {/* ── Marquee ──────────────────────────────────────────────────── */}
-        <header className="relative text-center mb-10 sm:mb-16">
-          <Starburst />
-
-          <p className="relative text-[9px] sm:text-[10px] tracking-[0.45em] uppercase text-[#3CE0E0]">
-            Common Good Presents
-          </p>
-
-          <h1
-            style={{
-              ...marquee({ fill: "#FFD500", stroke: 3, shadow1: "#E42B20", shadow2: "#8828C8" }),
-              fontFamily: "var(--font-display, system-ui)",
-            }}
-            className="relative mt-4 text-[2.6rem] leading-[0.95] sm:text-7xl font-black tracking-tight uppercase"
-          >
-            {menu.title || "High Scores"}
-          </h1>
-
-          {menu.subtitle && (
-            <p
-              style={marquee({ fill: "#FFFFFF", stroke: 2 })}
-              className="relative mt-5 text-[10px] sm:text-xs tracking-[0.35em] uppercase"
-            >
-              {menu.subtitle}
-            </p>
-          )}
-
-          {menu.description && (
-            <p className="relative mt-5 max-w-md mx-auto text-xs sm:text-sm text-white/65 leading-relaxed">
-              {menu.description}
-            </p>
-          )}
-
-          {/* Prize plate, styled like a coin-door instruction strip */}
-          <div className="relative mt-7 inline-block">
+      <div className="relative px-2 sm:px-6 py-6 sm:py-12">
+        <CabinetFrame
+          panel={
+            /* Instruction card, where a cabinet keeps it: on the deck. */
             <div
-              className="border-[3px] border-[#100810] px-5 py-2.5"
-              style={{ background: "#FFD500", boxShadow: "5px 6px 0 #8828C8" }}
+              className="border-[3px] border-[#100810] px-3 py-1.5 sm:px-5 sm:py-2.5"
+              style={{ background: "#FFD500", boxShadow: "4px 5px 0 rgba(0,0,0,0.5)" }}
             >
-              <p className="text-[9px] sm:text-[11px] tracking-[0.2em] uppercase text-[#100810] font-black">
+              <p className="text-[8px] sm:text-[11px] tracking-[0.2em] uppercase text-[#100810] font-black text-center">
                 High score wins a $15 gift card
               </p>
             </div>
-          </div>
-
-          {!isLive && (
-            <p className="relative mt-5 text-[10px] tracking-[0.25em] uppercase text-[#E42B20]">
-              ★ This pop-up has closed — boards are final ★
-            </p>
-          )}
-        </header>
-
-        {/* ── Voting status ────────────────────────────────────────────── */}
-        <p className="relative text-center text-[11px] text-white/55 leading-relaxed mb-7 tracking-wide">
-          {votingOpen
-            ? myVotes.length === 0
-              ? "Play the games. Then vote for the drink you liked best."
-              : myVotes.length === 1
-                ? "Vote locked in — tap another cabinet to rank a second favorite."
-                : `You've ranked ${myVotes.length} favorites.`
-            : voteBlockReason
-              ? VOTE_BLOCK_MESSAGE[voteBlockReason]
-              : "Voting is closed."}
-        </p>
-        {voteError && <p className="mb-4 text-center text-xs text-[#FF9CB0]">{voteError}</p>}
-
-        {/* ── Cabinets ─────────────────────────────────────────────────── */}
-        {cocktails.length === 0 ? (
-          <p className="text-center text-sm text-white/40 py-16">
-            No cocktails on this pop-up yet.
-          </p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
-            {cocktails.map((c, i) => (
-              <Cabinet
-                key={c.id}
-                cocktail={c}
-                index={i}
-                rank={rankByCocktail.get(c.id)}
-                onOpen={() => setOpenId(c.id)}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* ── Standings ────────────────────────────────────────────────── */}
-        {cocktails.length > 0 && (
-          <div className="mt-14 sm:mt-20 max-w-xl mx-auto">
-            <h2
-              style={marquee({ fill: "#3CE0E0", stroke: 2, shadow1: "#0A4A6A" })}
-              className="text-center text-xl sm:text-2xl font-black tracking-[0.2em] uppercase mb-5"
-            >
-              Cocktail Standings
-            </h2>
-            <div className="border-[3px] border-[#100810] bg-black/70 p-4" style={{ boxShadow: "5px 6px 0 #1B1030" }}>
-              <Leaderboard results={results} accent="#FFD500" myTopPick={myTopPick} />
-            </div>
-            {!viewer && (
-              <p className="mt-5 text-center text-xs text-white/40">
-                <Link href="/popup/signup" className="text-[#FFD500] underline hover:opacity-80">
-                  Create an account
-                </Link>{" "}
-                to vote and get on the high score boards.
+          }
+          title={
+            <>
+              <p className="text-[9px] sm:text-[10px] tracking-[0.45em] uppercase text-[#3CE0E0]">
+                Common Good Presents
               </p>
-            )}
-          </div>
-        )}
+
+              <h1
+                style={{
+                  ...marquee({ fill: "#FFD500", stroke: 3, shadow1: "#E42B20", shadow2: "#8828C8" }),
+                  fontFamily: "var(--font-display, system-ui)",
+                }}
+                className="mt-4 text-[2.1rem] leading-[0.95] sm:text-6xl font-black tracking-tight uppercase"
+              >
+                {menu.title || "High Scores"}
+              </h1>
+
+              {menu.subtitle && (
+                <p
+                  style={marquee({ fill: "#FFFFFF", stroke: 2 })}
+                  className="mt-4 text-[10px] sm:text-xs tracking-[0.35em] uppercase"
+                >
+                  {menu.subtitle}
+                </p>
+              )}
+
+              {menu.description && (
+                <p className="mt-5 max-w-md mx-auto text-xs sm:text-sm text-white/65 leading-relaxed">
+                  {menu.description}
+                </p>
+              )}
+
+              {!isLive && (
+                <p className="mt-5 text-[10px] tracking-[0.25em] uppercase text-[#E42B20]">
+                  ★ This pop-up has closed — boards are final ★
+                </p>
+              )}
+            </>
+          }
+        >
+          {/* ── Voting status ──────────────────────────────────────────── */}
+          <p className="text-center text-[11px] text-white/55 leading-relaxed mb-7 tracking-wide">
+            {votingOpen
+              ? myVotes.length === 0
+                ? "Play the games. Then vote for the drink you liked best."
+                : myVotes.length === 1
+                  ? "Vote locked in — tap another cabinet to rank a second favorite."
+                  : `You've ranked ${myVotes.length} favorites.`
+              : voteBlockReason
+                ? VOTE_BLOCK_MESSAGE[voteBlockReason]
+                : "Voting is closed."}
+          </p>
+          {voteError && <p className="mb-4 text-center text-xs text-[#FF9CB0]">{voteError}</p>}
+
+          {/* ── Cabinets ───────────────────────────────────────────────── */}
+          {cocktails.length === 0 ? (
+            <p className="text-center text-sm text-white/40 py-16">
+              No cocktails on this pop-up yet.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+              {cocktails.map((c, i) => (
+                <Cabinet
+                  key={c.id}
+                  cocktail={c}
+                  index={i}
+                  rank={rankByCocktail.get(c.id)}
+                  onOpen={() => setOpenId(c.id)}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* ── Standings ──────────────────────────────────────────────── */}
+          {cocktails.length > 0 && (
+            <div className="mt-14 sm:mt-20 max-w-xl mx-auto">
+              <h2
+                style={marquee({ fill: "#3CE0E0", stroke: 2, shadow1: "#0A4A6A" })}
+                className="text-center text-xl sm:text-2xl font-black tracking-[0.2em] uppercase mb-5"
+              >
+                Cocktail Standings
+              </h2>
+              <div
+                className="border-[3px] border-[#100810] bg-black/70 p-4"
+                style={{ boxShadow: "5px 6px 0 #1B1030" }}
+              >
+                <Leaderboard results={results} accent="#FFD500" myTopPick={myTopPick} />
+              </div>
+              {!viewer && (
+                <p className="mt-5 text-center text-xs text-white/40">
+                  <Link href="/popup/signup" className="text-[#FFD500] underline hover:opacity-80">
+                    Create an account
+                  </Link>{" "}
+                  to vote and get on the high score boards.
+                </p>
+              )}
+            </div>
+          )}
+        </CabinetFrame>
       </div>
 
       {open && (
@@ -275,21 +279,6 @@ function ArcadeBackdrop() {
   );
 }
 
-/** Radiating light behind the title, straight off a 1981 flyer. */
-function Starburst() {
-  return (
-    <div
-      aria-hidden
-      className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[130%] aspect-square opacity-[0.30]"
-      style={{
-        background:
-          "repeating-conic-gradient(from 0deg at 50% 50%, rgba(255,213,0,0.55) 0deg 5deg, rgba(0,0,0,0) 5deg 11deg)",
-        maskImage: "radial-gradient(circle at 50% 50%, black 5%, transparent 62%)",
-        WebkitMaskImage: "radial-gradient(circle at 50% 50%, black 5%, transparent 62%)",
-      }}
-    />
-  );
-}
 
 // ─── Cabinet card ────────────────────────────────────────────────────────────
 
