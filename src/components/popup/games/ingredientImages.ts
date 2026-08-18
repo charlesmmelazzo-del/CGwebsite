@@ -13,7 +13,7 @@
 //
 // Anything without artwork falls back to the string-art sprite in
 // ingredients.ts, so a missing file is a slightly plainer bottle rather than a
-// hole. sugar and honey have no artwork today.
+// hole. Only honey has no artwork, and no drink calls for it.
 
 const AVAILABLE_KEYS = [
   "absinthe",
@@ -27,6 +27,7 @@ const AVAILABLE_KEYS = [
   "lime",
   "liqueur",
   "rum",
+  "sugar",
   "tequila",
   "vermouth",
   "whiskey",
