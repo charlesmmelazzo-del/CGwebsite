@@ -19,14 +19,12 @@ import { airbrush, lamp, shade, withAlpha, C, R } from "./cabinet/theme";
 export default function CabinetFrame({
   title,
   subtitle,
-  description,
   notice,
   children,
 }: {
   /** The pop-up's name — the marquee logo. */
   title: string;
   subtitle?: string;
-  description?: string;
   /** Shown under the banner when the pop-up has closed. */
   notice?: ReactNode;
   /** The screen. */
@@ -45,19 +43,21 @@ export default function CabinetFrame({
       >
         <Sunburst />
 
-        <div className="relative px-4 pt-7 pb-32 sm:px-10 sm:pt-9 sm:pb-14">
-          <div className="flex items-center justify-center gap-3 sm:gap-7">
-            <MarqueeArt />
+        <div className="relative px-4 py-6 sm:px-8 sm:py-7">
+          {/*
+            Roundel, logo, roundel. Both messages sit in the same lit-plate
+            shape flanking the title, which is what lets the marquee stay this
+            short — as stacked banners they cost twice the height.
+          */}
+          <div className="flex items-center justify-center gap-3 sm:gap-6">
+            <Roundel
+              color={C.plum}
+              ink={C.cream}
+              rotate={6}
+              text="Explore the cocktails, order one to receive tickets to play its corresponding game, vote for your favorites"
+            />
 
             <div className="min-w-0 flex-1 text-center">
-              <p
-                className="text-[9px] sm:text-[11px] tracking-[0.45em] uppercase"
-                style={{ color: C.teal }}
-              >
-                Common Good Presents
-              </p>
-
-              {/* The logo carries the header — as big as the box allows. */}
               <h1
                 style={{
                   fontFamily: "var(--font-display, system-ui)",
@@ -72,54 +72,30 @@ export default function CabinetFrame({
                   ].join(", "),
                   WebkitTextStroke: `2px ${C.ink}`,
                 }}
-                className="mt-3 text-[3.1rem] leading-[0.86] sm:text-[6.5rem] font-black tracking-[-0.02em] uppercase"
+                className="text-[2.7rem] leading-[0.86] sm:text-[5.6rem] font-black tracking-[-0.02em] uppercase"
               >
                 {title}
               </h1>
 
               {subtitle && (
                 <p
-                  className="mt-3 text-[10px] sm:text-xs tracking-[0.4em] uppercase"
+                  className="mt-2.5 text-[9px] sm:text-[11px] tracking-[0.4em] uppercase"
                   style={{ color: C.cream }}
                 >
                   {subtitle}
                 </p>
               )}
+
+              {notice && <div className="mt-3">{notice}</div>}
             </div>
 
-            <MarqueeArt flip />
+            <Roundel
+              color={C.gold}
+              ink={C.ink}
+              rotate={-7}
+              text="High score in each game at the end of the pop up wins a $15 gift card!"
+            />
           </div>
-
-          {/* ── Banner ──────────────────────────────────────────────────── */}
-          <div
-            className="relative mx-auto mt-7 max-w-2xl px-5 py-3 sm:px-8 sm:py-3.5"
-            style={{
-              borderRadius: R.chip,
-              background: lamp(C.plum),
-              boxShadow: `inset 0 0 0 2px ${withAlpha(C.gold, 0.55)}, 0 5px 0 ${withAlpha("#000000", 0.45)}`,
-            }}
-          >
-            <p
-              className="text-center text-[10px] sm:text-[12px] leading-relaxed tracking-[0.1em] uppercase font-bold"
-              style={{ color: C.cream }}
-            >
-              Explore the cocktails, order one to receive tickets to play its
-              corresponding game, vote for your favorites
-            </p>
-          </div>
-
-          {description && (
-            <p
-              className="relative mx-auto mt-4 max-w-lg text-center text-xs sm:text-sm leading-relaxed"
-              style={{ color: withAlpha(C.cream, 0.75) }}
-            >
-              {description}
-            </p>
-          )}
-
-          {notice && <div className="relative mt-4 text-center">{notice}</div>}
-
-          <PrizeBadge />
         </div>
 
         {/* Tube lighting along the bottom edge of the marquee */}
@@ -144,54 +120,48 @@ export default function CabinetFrame({
 }
 
 /**
- * The gift-card notice, as a lit roundel in the corner of the marquee — the
- * spot a cabinet used for its "FREE PLAY" or licensing sticker.
+ * A lit plate, the shape a cabinet used for its "FREE PLAY" or licensing
+ * sticker. Sat slightly off-square, as if applied by hand.
+ *
+ * Hidden below `sm` — two of these either side of the logo leave a phone no
+ * room for the logo itself, and the same information is on the page below.
  */
-function PrizeBadge() {
+function Roundel({
+  text,
+  color,
+  ink,
+  rotate,
+}: {
+  text: string;
+  color: string;
+  ink: string;
+  rotate: number;
+}) {
   return (
     <div
-      className="absolute right-3 bottom-4 sm:right-6 sm:bottom-4 w-[124px] h-[124px] sm:w-[140px] sm:h-[140px] flex items-center justify-center text-center"
+      className="hidden sm:flex shrink-0 w-[132px] h-[132px] lg:w-[150px] lg:h-[150px] items-center justify-center text-center"
       style={{
         borderRadius: "999px",
-        background: lamp(C.gold),
+        background: lamp(color),
         boxShadow: [
-          `inset 0 0 0 3px ${shade(C.gold, 0.45)}`,
-          `inset 0 0 22px ${withAlpha("#FFFFFF", 0.45)}`,
-          `0 0 26px ${withAlpha(C.gold, 0.5)}`,
-          `0 6px 0 ${shade(C.gold, 0.55)}`,
+          `inset 0 0 0 3px ${shade(color, 0.45)}`,
+          `inset 0 0 22px ${withAlpha("#FFFFFF", 0.4)}`,
+          `0 0 26px ${withAlpha(color, 0.45)}`,
+          `0 6px 0 ${shade(color, 0.55)}`,
         ].join(", "),
-        // Sat slightly off-square, like a sticker applied by hand.
-        transform: "rotate(-7deg)",
+        transform: `rotate(${rotate}deg)`,
       }}
     >
       <p
-        className="px-4 text-[8.5px] sm:text-[9.5px] leading-[1.35] tracking-[0.06em] uppercase font-black"
-        style={{ color: C.ink }}
+        className="px-4 text-[8.5px] lg:text-[9.5px] leading-[1.35] tracking-[0.05em] uppercase font-black"
+        style={{ color: ink }}
       >
-        High score in each game at the end of the pop up wins a $15 gift card!
+        {text}
       </p>
     </div>
   );
 }
 
-/** Characters flanking the logo. Hidden on the narrowest screens. */
-function MarqueeArt({ flip = false }: { flip?: boolean }) {
-  return (
-    <div
-      aria-hidden
-      className="hidden sm:flex shrink-0 items-end gap-2"
-      style={{ transform: flip ? "scaleX(-1)" : undefined }}
-    >
-      {/* Arms down with the tin stood beside him. An overhead shake needs the
-          forearms to pass either side of a head that fills the sprite's whole
-          width — there is nowhere for them to go, so it reads as a floating
-          tin however the pieces are spaced. */}
-      <BartenderArt px={3} mood={flip ? "ok" : "happy"} holdingTin={false} />
-      <SpriteArt sprite={TIN} colors={TIN_COLORS} px={3} className="mb-1" />
-      <SpriteArt sprite={GUEST} colors={GUEST_SWAPS[flip ? 1 : 0]} px={3} className="mb-1" />
-    </div>
-  );
-}
 
 /**
  * Side art. A real cabinet's is one bold sprayed field running the height of

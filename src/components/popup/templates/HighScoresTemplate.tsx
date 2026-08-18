@@ -114,7 +114,6 @@ export default function HighScoresTemplate({
         <CabinetFrame
           title={menu.title || "High Scores"}
           subtitle={menu.subtitle}
-          description={menu.description}
           notice={
             !isLive ? (
               <p
