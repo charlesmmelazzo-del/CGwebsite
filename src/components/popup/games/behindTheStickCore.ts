@@ -106,6 +106,15 @@ export interface State {
   presses: string[];
   shakeTaps: number;
 
+  /**
+   * Tap bookkeeping the view animates off, so the bartender moves with the
+   * player rather than on a fixed timer. `shakeCount` flips the arms up and
+   * down one tap at a time; `lastTapT` lets a tap decay back to rest if the
+   * player stops. Neither affects scoring.
+   */
+  shakeCount: number;
+  lastTapT: number;
+
   /** Colour to splash when an ingredient hits the floor, looked up by the view. */
   colorFor: (key: string) => string;
 }
@@ -142,6 +151,8 @@ export function freshState(colorFor: (key: string) => string = () => "#FFFFFF"):
     bestRpm: 0,
     presses: [],
     shakeTaps: 0,
+    shakeCount: 0,
+    lastTapT: -99,
     colorFor,
   };
 }
@@ -178,6 +189,8 @@ function startMinigame(st: State) {
   st.slowFor = 0;
   st.lastAngle = null;
   st.shakeTaps = 0;
+  st.shakeCount = 0;
+  st.lastTapT = -99;
   const step = Math.floor((st.round - 1) / 2) * RATE_STEP;
   st.target = isShake ? START_BPM + step : START_RPM + step;
   st.banner = isShake ? "SHAKE IT!" : "STIR IT!";
@@ -296,7 +309,11 @@ export function update(
     }
   } else if (st.phase === "shake") {
     for (let i = 0; i < st.shakeTaps; i++) st.taps.push(st.phaseT);
-    if (st.shakeTaps > 0) st.score += PTS_SHAKE * st.shakeTaps;
+    if (st.shakeTaps > 0) {
+      st.score += PTS_SHAKE * st.shakeTaps;
+      st.shakeCount += st.shakeTaps;
+      st.lastTapT = st.phaseT;
+    }
     st.shakeTaps = 0;
 
     st.taps = st.taps.filter((x) => x > st.phaseT - 1.5);

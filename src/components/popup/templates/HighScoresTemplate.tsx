@@ -450,7 +450,12 @@ function CocktailDetail({
   const picked = rank !== undefined;
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#05030F]/97 overflow-y-auto overscroll-contain">
+    // Fully opaque, not 97%: at 97% the ranking modal showed through it and the
+    // two overlays read as one broken screen.
+    //
+    // Overlay stack for this template, all of which must clear PopupBar (z-40):
+    //   detail card z-50  <  ranking modal z-60  <  running game z-70
+    <div className="fixed inset-0 z-50 bg-[#05030F] overflow-y-auto overscroll-contain">
       <div className="min-h-full max-w-lg mx-auto px-4 py-4 pb-20">
         <div className="sticky top-0 z-10 -mx-4 px-4 py-2.5 bg-[#05030F]/95 backdrop-blur flex justify-between items-center border-b-2 border-[#100810]">
           <p className="text-[10px] tracking-[0.28em] uppercase text-[#FFD500] truncate font-bold">

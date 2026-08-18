@@ -69,6 +69,32 @@ export default function GameShell({
     if (meta) void loadBoard();
   }, [meta, loadBoard]);
 
+  // ── Full-screen play ──────────────────────────────────────────────────────
+  // A canvas game sitting in the page flow is unplayable: the page scrolls
+  // under the player's thumb, and on a phone the cabinet is a stamp in the
+  // middle of a long article. From the moment a round starts until they leave
+  // the score screen, the cabinet owns the viewport.
+  const fullscreen = phase === "playing" || phase === "over";
+
+  useEffect(() => {
+    if (!fullscreen) return;
+    const body = document.body;
+    const previous = body.style.overflow;
+    body.style.overflow = "hidden";
+    return () => {
+      body.style.overflow = previous;
+    };
+  }, [fullscreen]);
+
+  useEffect(() => {
+    if (!fullscreen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setPhase("attract");
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [fullscreen]);
+
   const handleGameOver = useCallback(
     async (finalScore: number, detail?: Record<string, unknown>) => {
       setScore(finalScore);
@@ -119,7 +145,7 @@ export default function GameShell({
     );
   }
 
-  return (
+  const cabinet = (
     <div className="w-full max-w-[420px] mx-auto">
       {/* ── Marquee ──────────────────────────────────────────────────────── */}
       <div
@@ -160,6 +186,25 @@ export default function GameShell({
             onQuit={() => setPhase("attract")}
           />
         )}
+      </div>
+    </div>
+  );
+
+  if (!fullscreen) return cabinet;
+
+  return (
+    <div className="fixed inset-0 z-[70] bg-black overflow-y-auto overscroll-contain">
+      {/* Centred when it fits, scrollable when the score board makes it tall. */}
+      <div className="min-h-full flex flex-col items-center justify-center p-2 sm:p-4">
+        <div className="w-full max-w-[420px] mb-2 flex justify-end">
+          <button
+            onClick={() => setPhase("attract")}
+            className="px-3 py-1.5 text-[10px] tracking-[0.25em] uppercase text-white/45 hover:text-white/90 transition-colors"
+          >
+            {phase === "playing" ? "Quit" : "Close"}
+          </button>
+        </div>
+        {cabinet}
       </div>
     </div>
   );

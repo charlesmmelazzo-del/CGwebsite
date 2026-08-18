@@ -97,7 +97,9 @@ export default function RankingModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-6"
+      // Above the cocktail detail card (z-50), below a running game (z-70).
+      // Keep those three in step when adding another overlay.
+      className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-label="Rank your favorites"

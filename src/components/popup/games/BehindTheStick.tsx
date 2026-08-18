@@ -293,7 +293,15 @@ function drawBartender(
   baseY: number,
   mood: Mood,
   pose: "idle" | "shake" | "stir" | "serve",
-  t: number
+  t: number,
+  /**
+   * Live shake input. `count` flips the tin over one tap at a time and `since`
+   * is seconds since the last tap, so the sprite moves at exactly the rate the
+   * player is tapping and settles when they stop. Absent outside the shake.
+   */
+  shake?: { count: number; since: number },
+  /** Completed revolutions this stir, for the same reason as `shake`. */
+  stir?: number
 ) {
   const C = BARTENDER_COLORS;
   // Sprite is 20 wide; torso sits 12 tall with the head's 14 above it.
@@ -301,7 +309,11 @@ function drawBartender(
   const torsoY = baseY - 12;
   const headY = torsoY - 14;
 
-  const bob = pose === "shake" ? (Math.floor(t * 13) % 2 === 0 ? -1 : 1) : 0;
+  // Resting once the player has gone quiet for half a second, so a stalled
+  // shake reads as stalled rather than carrying on without them.
+  const resting = !shake || shake.since > 0.5;
+  const shakeUp = !!shake && shake.count % 2 === 1;
+  const bob = pose === "shake" && !resting ? (shakeUp ? -1 : 1) : 0;
 
   drawSprite(ctx, BARTENDER_HEADS[mood] ?? BARTENDER_HEADS.ok, x, headY + bob, C, 1);
   drawSprite(ctx, BARTENDER_TORSO, x, torsoY, C, 1);
@@ -309,13 +321,16 @@ function drawBartender(
   // Arms. 4 wide, 9 tall, hung off each shoulder.
   const armY = torsoY + 2;
   if (pose === "shake") {
-    // Both arms up, tin overhead, whole thing jerking with the shake
-    const lift = Math.floor(t * 13) % 2 === 0 ? 0 : 3;
+    // Both arms up, tin overhead. The lift alternates on each tap, so the
+    // tin visibly travels once per tap however fast or slow that is.
+    const lift = resting ? 2 : shakeUp ? 0 : 4;
     drawSprite(ctx, ARM, x - 1, armY - 8 + lift, C, 1);
     drawSprite(ctx, ARM, x + 17, armY - 8 + lift, C, 1);
     drawSprite(ctx, TIN, cx - 6, headY - 16 + lift, TIN_COLORS, 1);
   } else if (pose === "stir") {
-    const sway = Math.floor(t * 6) % 2 === 0 ? 0 : 2;
+    // Sways once per half-turn the player actually makes, so a stalled hand
+    // stalls the spoon — the same principle as the shake above.
+    const sway = stir === undefined ? 0 : Math.floor(stir * 2) % 2 === 0 ? 0 : 2;
     drawSprite(ctx, ARM, x - 1, armY, C, 1);
     drawSprite(ctx, ARM, x + 15 + sway, armY - 4, C, 1);
     // Mixing glass on the bar, and the spoon in it
@@ -391,34 +406,35 @@ function drawRail(ctx: CanvasRenderingContext2D, st: State, t: number) {
 }
 
 function drawShake(ctx: CanvasRenderingContext2D, st: State) {
-  const bpm = currentBpm(st);
-  const ok = bpm >= st.target;
+  const ok = currentBpm(st) >= st.target;
+  const settling = st.phaseT <= GRACE_SECONDS;
 
   rect(ctx, 0, RAIL_Y - 6, GAME_W, RAIL_H + 12, "#101020");
-  drawText(ctx, "TAP SHAKE FAST", 112, RAIL_Y - 2, P.white, 1, "center");
-  meter(ctx, 32, RAIL_Y + 10, 160, 8, clamp(bpm / (st.target * 1.4), 0, 1), ok ? P.lime : P.red);
-  rect(ctx, 32 + 160 / 1.4, RAIL_Y + 7, 1, 14, P.yellow);
-  drawText(
-    ctx,
-    `${Math.round(bpm)} / ${st.target} BPM`,
-    112,
-    RAIL_Y + 23,
-    ok ? P.lime : P.red,
-    1,
-    "center"
-  );
-  if (!ok && st.phaseT > GRACE_SECONDS) {
-    drawTextMarquee(ctx, "FASTER!", 112, 96, P.red, 2, "center", P.black, "#3A0000");
+
+  // One word for what to do. Deliberately no rate meter and no BPM readout:
+  // the only thing a player can act on is "keep going" or "speed up", so a
+  // number they have to interpret mid-shake is noise.
+  drawTextMarquee(ctx, "SHAKE", 112, RAIL_Y + 2, P.yellow, 2, "center", P.black, "#8A6A00");
+
+  // One word for how it is going, held back through the grace period so the
+  // first thing a player sees is not a scolding.
+  if (!settling) {
+    drawTextMarquee(
+      ctx,
+      ok ? "GOOD!" : "GO FASTER!",
+      112,
+      96,
+      ok ? P.lime : P.red,
+      2,
+      "center",
+      P.black,
+      ok ? "#00551C" : "#3A0000"
+    );
   }
-  drawText(
-    ctx,
-    Math.max(0, SHAKE_SECONDS + GRACE_SECONDS - st.phaseT).toFixed(1),
-    208,
-    RAIL_Y - 2,
-    P.yellow,
-    1,
-    "right"
-  );
+
+  // How much shaking is left, as a bar rather than a ticking number.
+  const total = SHAKE_SECONDS + GRACE_SECONDS;
+  meter(ctx, 52, RAIL_Y + 26, 120, 4, clamp((total - st.phaseT) / total, 0, 1), P.cyan);
 }
 
 function drawStir(ctx: CanvasRenderingContext2D, st: State) {
@@ -436,30 +452,26 @@ function drawStir(ctx: CanvasRenderingContext2D, st: State) {
   rect(ctx, cx + Math.cos(lead) * r - 2, cy + Math.sin(lead) * r - 2, 5, 5, ok ? P.lime : P.yellow);
   drawText(ctx, "DRAG IN A CIRCLE", cx, cy - 4, P.white, 1, "center");
 
+  // Same treatment as the shake: one instruction, one verdict, no readout.
   rect(ctx, 0, RAIL_Y - 6, GAME_W, RAIL_H + 12, "#101020");
-  meter(ctx, 32, RAIL_Y + 10, 160, 8, clamp(rpm / (st.target * 1.4), 0, 1), ok ? P.lime : P.red);
-  rect(ctx, 32 + 160 / 1.4, RAIL_Y + 7, 1, 14, P.yellow);
-  drawText(
-    ctx,
-    `${Math.round(rpm)} / ${st.target} RPM`,
-    112,
-    RAIL_Y + 23,
-    ok ? P.lime : P.red,
-    1,
-    "center"
-  );
-  if (!ok && st.phaseT > GRACE_SECONDS) {
-    drawTextMarquee(ctx, "STIR FASTER!", 112, 60, P.red, 2, "center", P.black, "#3A0000");
+  drawTextMarquee(ctx, "STIR", 112, RAIL_Y + 2, P.yellow, 2, "center", P.black, "#8A6A00");
+
+  if (st.phaseT > GRACE_SECONDS) {
+    drawTextMarquee(
+      ctx,
+      ok ? "GOOD!" : "GO FASTER!",
+      112,
+      60,
+      ok ? P.lime : P.red,
+      2,
+      "center",
+      P.black,
+      ok ? "#00551C" : "#3A0000"
+    );
   }
-  drawText(
-    ctx,
-    Math.max(0, STIR_SECONDS + GRACE_SECONDS - st.phaseT).toFixed(1),
-    208,
-    RAIL_Y - 2,
-    P.yellow,
-    1,
-    "right"
-  );
+
+  const total = STIR_SECONDS + GRACE_SECONDS;
+  meter(ctx, 52, RAIL_Y + 26, 120, 4, clamp((total - st.phaseT) / total, 0, 1), P.cyan);
 }
 
 function drawServe(ctx: CanvasRenderingContext2D, st: State) {
@@ -590,7 +602,18 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
             : st.phase === "serve"
               ? "serve"
               : "idle";
-      drawBartender(ctx, 112, 144, st.phase === "over" ? "panic" : st.mood, pose, t);
+      drawBartender(
+        ctx,
+        112,
+        144,
+        st.phase === "over" ? "panic" : st.mood,
+        pose,
+        t,
+        st.phase === "shake"
+          ? { count: st.shakeCount, since: st.phaseT - st.lastTapT }
+          : undefined,
+        st.phase === "stir" ? st.revs : undefined
+      );
       if (pose === "idle") drawTin(ctx, 152, 130, st.tinFill);
 
       // A crowd, so the bar reads as busy rather than two people in a void
@@ -648,13 +671,24 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
 
       <div className="p-2 bg-black">
         {uiPhase === "shake" ? (
-          <ArcadeButton
-            label="SHAKE!"
-            sublabel="tap as fast as you can"
-            onPress={tapShake}
-            color={P.lime}
-            className="w-full h-24"
-          />
+          // Deliberately not an ArcadeButton: this one is round, thumb-sized
+          // and the only thing on screen, because it is the only input that
+          // matters during a shake.
+          <div className="h-24 flex items-center justify-center">
+            <button
+              type="button"
+              aria-label="Shake"
+              // pointerdown, not click — a rapid tap must register on contact.
+              onPointerDown={(e) => {
+                e.preventDefault();
+                tapShake();
+              }}
+              style={{ background: P.lime, touchAction: "manipulation" }}
+              className="select-none w-[84px] h-[84px] rounded-full border-[3px] border-black text-black text-[13px] font-black tracking-[0.12em] uppercase shadow-[0_5px_0_#00551C] active:translate-y-[4px] active:shadow-[0_1px_0_#00551C] transition-transform"
+            >
+              Shake
+            </button>
+          </div>
         ) : uiPhase === "stir" ? (
           <div className="h-24 flex items-center justify-center border-2 border-dashed border-white/25 text-center px-4">
             <p className="text-[11px] tracking-widest uppercase text-white/60 leading-relaxed">
