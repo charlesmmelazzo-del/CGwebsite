@@ -56,6 +56,7 @@ import {
 } from "./sprites";
 import type { ArcadeGameProps } from "./registry";
 import { INGREDIENTS, ING_BY_KEY, colorFor } from "./ingredients";
+import { artworkUrl, ingredientArt, warmIngredientArt } from "./ingredientImages";
 import {
   BUBBLE_R,
   live as liveBubbles,
@@ -276,9 +277,7 @@ function drawRail(ctx: CanvasRenderingContext2D, st: State, t: number) {
 
   for (const n of st.notes) {
     if (n.judged) continue;
-    const ing = ING_BY_KEY.get(n.ing);
-    if (!ing) continue;
-    drawSprite(ctx, ing.sprite, Math.round(n.x - 5), RAIL_Y + 13, ing.colors, 1);
+    drawIngredient(ctx, n.ing, n.x, RAIL_Y + 20, 18);
   }
 }
 
@@ -509,8 +508,8 @@ function drawOrderCard(ctx: CanvasRenderingContext2D, st: State, t: number) {
     const ing = ING_BY_KEY.get(key);
     if (!ing) return;
     const x = 34 + i * 46;
-    drawSprite(ctx, ing.sprite, x, 176, ing.colors, 1);
-    drawText(ctx, ing.label.toUpperCase().slice(0, 7), x + 5, 196, ing.color, 1, "center");
+    drawIngredient(ctx, key, x + 5, 172, 30);
+    drawText(ctx, ing.label.toUpperCase().slice(0, 7), x + 5, 194, ing.color, 1, "center");
   });
 }
 
@@ -550,7 +549,9 @@ function drawBubbles(ctx: CanvasRenderingContext2D, bs: BubbleState, t: number) 
     ring(ctx, x, y, BUBBLE_R, needed && blink(t, 2.5) ? P.lime : "#5A6A9A");
     rect(ctx, x - 5, y - BUBBLE_R + 2, 3, 2, P.white);
 
-    drawSprite(ctx, ing.sprite, x - 5, y - 7, ing.colors, 1);
+    // Slightly taller than the bubble, so the bottle fills it rather than
+    // floating in the middle of a ring.
+    drawIngredient(ctx, b.key, x, y, BUBBLE_R * 2 - 2);
   }
 
   // ── Feedback ─────────────────────────────────────────────────────────────
@@ -577,10 +578,10 @@ function drawBubbles(ctx: CanvasRenderingContext2D, bs: BubbleState, t: number) 
     const has = bs.collected.includes(key);
     const x = 8 + i * 54;
     const y = TANK_BOTTOM + 16;
-    drawSprite(ctx, ing.sprite, x, y, ing.colors, 1);
+    drawIngredient(ctx, key, x + 5, y + 7, 22);
     if (has) {
-      rect(ctx, x - 1, y + 7, 13, 2, P.lime);
-      drawText(ctx, "OK", x + 14, y + 5, P.lime, 1);
+      rect(ctx, x - 3, y + 14, 17, 2, P.lime);
+      drawText(ctx, "OK", x + 18, y + 5, P.lime, 1);
     }
   });
 }
@@ -652,17 +653,18 @@ function PourDeck({
                 Fixed box either way, so the icon appearing after mount doesn't
                 shift the target under a thumb. */}
             <span style={{ width: 54, height: 74 }} className="flex items-end justify-center">
-              {iconUrls[key] && (
+              {/* The owner's artwork where it exists; the generated icon
+                  otherwise, so an ingredient without a file still has a face. */}
+              {(artworkUrl(key) ?? iconUrls[key]) && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={iconUrls[key]}
+                  src={artworkUrl(key) ?? iconUrls[key]}
                   alt=""
-                  width={11}
-                  height={15}
                   style={{
-                    imageRendering: "pixelated",
+                    imageRendering: artworkUrl(key) ? "auto" : "pixelated",
                     width: 54,
                     height: 74,
+                    objectFit: "contain",
                     filter: `drop-shadow(0 3px 0 rgba(0,0,0,0.6))`,
                   }}
                 />
@@ -786,6 +788,29 @@ function StirDial({
   );
 }
 
+/**
+ * Draw an ingredient at a given height, artwork if we have it and the
+ * string-art sprite if we don't.
+ *
+ * `h` is the height in game pixels; the string-art sprites are 15 tall, so
+ * passing 15 keeps the two paths the same size on screen.
+ */
+function drawIngredient(
+  ctx: CanvasRenderingContext2D,
+  key: string,
+  cx: number,
+  cy: number,
+  h = 15
+) {
+  const art = ingredientArt(key, h);
+  if (art) {
+    ctx.drawImage(art, Math.round(cx - art.width / 2), Math.round(cy - art.height / 2));
+    return;
+  }
+  const ing = ING_BY_KEY.get(key);
+  if (ing) drawSprite(ctx, ing.sprite, Math.round(cx - 5), Math.round(cy - 7), ing.colors, 1);
+}
+
 // ─── The demo bot ────────────────────────────────────────────────────────────
 
 /**
@@ -874,6 +899,7 @@ export default function BehindTheStick({ onGameOver, demo = false }: ArcadeGameP
 
   const logoRef = useRef<HTMLImageElement | null>(null);
   useEffect(() => {
+    warmIngredientArt();
     const img = new window.Image();
     img.src = "/popup/art/logo-behind-the-stick.png";
     img.onload = () => {
