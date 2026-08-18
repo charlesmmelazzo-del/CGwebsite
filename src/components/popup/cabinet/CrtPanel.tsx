@@ -9,6 +9,8 @@
 
 import type { ReactNode } from "react";
 import { withAlpha, C, R } from "./theme";
+import { BartenderArt, GUEST_SWAPS, SpriteArt } from "../CabinetArt";
+import { GUEST } from "../CabinetArt";
 
 export default function CrtPanel({
   children,
@@ -44,6 +46,23 @@ export default function CrtPanel({
           boxShadow: `inset 0 0 60px ${withAlpha("#000000", 0.95)}`,
         }}
       >
+        {/*
+          Pixel accents in the bezel corners, as on the reference artwork: the
+          game's own sprites, small, framing the screen the game plays in. The
+          illustration does the heavy lifting elsewhere — these are the nod to
+          what is actually running on the tube.
+        */}
+        <div aria-hidden className="hidden sm:block absolute left-2 top-2 z-20 opacity-80">
+          <BartenderArt px={2} mood="happy" holdingTin={false} />
+        </div>
+        <div
+          aria-hidden
+          className="hidden sm:block absolute right-2 top-2 z-20 opacity-80"
+          style={{ transform: "scaleX(-1)" }}
+        >
+          <SpriteArt sprite={GUEST} colors={GUEST_SWAPS[0]} px={2} />
+        </div>
+
         <div className="relative z-10">{children}</div>
 
         {/* Scanlines, at page scale rather than sprite scale. */}

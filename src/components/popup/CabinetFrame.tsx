@@ -12,9 +12,20 @@
 // a third of the width the cocktails need.
 
 import type { ReactNode } from "react";
-import { BartenderArt, BottleRow, GUEST_SWAPS, SpriteArt } from "./CabinetArt";
-import { GUEST, ROLLING_BOTTLE, BOTTLE_COLORS, TIN, TIN_COLORS } from "./CabinetArt";
-import { airbrush, lamp, shade, withAlpha, C, R } from "./cabinet/theme";
+import { lamp, shade, withAlpha, C, R } from "./cabinet/theme";
+import NotchedFrame, { MarqueeWord, SpeedStripes } from "./cabinet/art/Frame";
+import { BartenderShaking, BartenderStirring } from "./cabinet/art/figures";
+import {
+  BarSpoon,
+  Bottle,
+  Cherries,
+  CitrusWheel,
+  INK,
+  Jigger,
+  Lemon,
+  Martini,
+  Shaker,
+} from "./cabinet/art/props";
 
 export default function CabinetFrame({
   title,
@@ -33,62 +44,87 @@ export default function CabinetFrame({
   return (
     <div className="relative mx-auto w-full max-w-5xl">
       {/* ── Marquee ─────────────────────────────────────────────────────── */}
-      <header
-        className="relative overflow-hidden"
-        style={{
-          borderRadius: R.cabinet,
-          background: airbrush(),
-          boxShadow: `inset 0 0 0 3px ${withAlpha(C.gold, 0.35)}, inset 0 0 60px ${withAlpha(C.magenta, 0.25)}, 0 10px 0 ${withAlpha("#000000", 0.5)}`,
-        }}
-      >
-        <Sunburst />
+      {/*
+        Printed marquee art, not a lit plastic panel: black ground, parallel
+        yellow/red/blue strokes with cut corners, speed stripes running off
+        both edges, and drawn figures either side of two-tone lettering.
+      */}
+      <NotchedFrame style={{ boxShadow: `0 10px 0 ${withAlpha("#000000", 0.5)}` }}>
+        <div className="relative overflow-hidden">
+          {/* Stripes sit behind everything and run off both edges. */}
+          <SpeedStripes className="absolute left-0 top-[22%] w-[26%] opacity-95" />
+          <SpeedStripes className="absolute right-0 top-[22%] w-[26%] opacity-95" />
 
-        <div className="relative px-4 py-6 sm:px-8 sm:py-7">
-          {/*
-            Roundel, logo, roundel. Both messages sit in the same lit-plate
-            shape flanking the title, which is what lets the marquee stay this
-            short — as stacked banners they cost twice the height.
-          */}
-          <div className="flex items-center justify-center gap-3 sm:gap-6">
+          <div className="relative flex items-center justify-center gap-1 sm:gap-3 px-2 py-3">
+            {/* ── Left: the shaker and his bottles ── */}
+            <div className="hidden md:flex shrink-0 items-end">
+              <BartenderShaking size={132} />
+              <div className="flex items-end -ml-3">
+                <Bottle size={56} body={INK.amber} label={INK.cream} device={INK.green} />
+                <Jigger size={38} className="ml-1" />
+                <CitrusWheel size={30} className="ml-1" />
+                <CitrusWheel size={28} peel={INK.orange} flesh="#FFB74D" className="ml-0.5" />
+              </div>
+            </div>
+
+            {/* ── Logo ── */}
+            <div className="min-w-0 flex-1 text-center py-2">
+              <MarqueeWord
+                fill={INK.yellow}
+                keyline={INK.red}
+                className="text-[3rem] sm:text-[4.6rem]"
+              >
+                {title.split(" ")[0] || title}
+              </MarqueeWord>
+              {title.split(" ").length > 1 && (
+                <MarqueeWord
+                  fill={INK.blue}
+                  keyline={INK.yellow}
+                  className="text-[3rem] sm:text-[4.6rem] mt-1"
+                >
+                  {title.split(" ").slice(1).join(" ")}
+                </MarqueeWord>
+              )}
+
+              {subtitle && (
+                <p
+                  className="mt-3 text-[9px] sm:text-[11px] tracking-[0.4em] uppercase"
+                  style={{ color: INK.cream }}
+                >
+                  {subtitle}
+                </p>
+              )}
+              {notice && <div className="mt-2">{notice}</div>}
+            </div>
+
+            {/* ── Right: the stirrer and her bottles ── */}
+            <div className="hidden md:flex shrink-0 items-end">
+              <div className="flex items-end mr-1">
+                <Cherries size={34} />
+                <Bottle size={56} body={INK.green} label={INK.cream} device={INK.red} className="ml-1" />
+                <Bottle size={52} body={INK.brown} label={INK.cream} device={INK.red} className="ml-0.5" />
+                <Lemon size={30} className="ml-1" />
+              </div>
+              <BartenderStirring size={132} />
+            </div>
+          </div>
+
+          {/* The two roundels keep their corners of the panel. */}
+          <div className="flex items-center justify-between gap-3 px-2 pb-1">
             <Roundel
               color={C.plum}
               ink={C.cream}
               rotate={6}
               text="Explore the cocktails, order one to receive tickets to play its corresponding game, vote for your favorites"
             />
-
-            <div className="min-w-0 flex-1 text-center">
-              <h1
-                style={{
-                  fontFamily: "var(--font-display, system-ui)",
-                  color: C.gold,
-                  // Screened marquee lettering: a warm glow, a hard keyline,
-                  // then two offset shadows in the poster's own colours.
-                  textShadow: [
-                    `0 0 18px ${withAlpha(C.gold, 0.55)}`,
-                    `2px 2px 0 ${C.ink}`,
-                    `5px 6px 0 ${C.magenta}`,
-                    `8px 10px 0 ${shade(C.plum, 0.15)}`,
-                  ].join(", "),
-                  WebkitTextStroke: `2px ${C.ink}`,
-                }}
-                className="text-[2.7rem] leading-[0.86] sm:text-[5.6rem] font-black tracking-[-0.02em] uppercase"
-              >
-                {title}
-              </h1>
-
-              {subtitle && (
-                <p
-                  className="mt-2.5 text-[9px] sm:text-[11px] tracking-[0.4em] uppercase"
-                  style={{ color: C.cream }}
-                >
-                  {subtitle}
-                </p>
-              )}
-
-              {notice && <div className="mt-3">{notice}</div>}
+            {/* Pixel accents along the bottom, as on the reference bezel. */}
+            <div className="hidden sm:flex items-end gap-3 opacity-90">
+              <Shaker size={26} tilt={-12} />
+              <Martini size={26} />
+              <Shaker size={22} tilt={10} />
+              <Martini size={24} />
+              <BarSpoon size={26} />
             </div>
-
             <Roundel
               color={C.gold}
               ink={C.ink}
@@ -97,17 +133,7 @@ export default function CabinetFrame({
             />
           </div>
         </div>
-
-        {/* Tube lighting along the bottom edge of the marquee */}
-        <div
-          aria-hidden
-          className="h-[4px] w-full"
-          style={{
-            background: `linear-gradient(90deg, ${C.gold}, ${C.sunset}, ${C.magenta}, ${C.plum}, ${C.teal})`,
-            filter: "blur(0.4px)",
-          }}
-        />
-      </header>
+      </NotchedFrame>
 
       {/* ── Body: side art either side of the screen ────────────────────── */}
       <div className="flex mt-4 gap-3">
@@ -162,59 +188,36 @@ function Roundel({
   );
 }
 
-
 /**
- * Side art. A real cabinet's is one bold sprayed field running the height of
- * the panel, so this is a colour wash with characters down it rather than a
- * scatter of little pictures.
+ * Side art. On a real cabinet this was the same printed artwork as the
+ * marquee, so it gets the same treatment: black ground, speed stripes, and
+ * drawn props down the panel rather than a colour wash.
  */
 function SideArt({ flip = false }: { flip?: boolean }) {
   return (
     <div
       aria-hidden
-      className="hidden lg:flex w-16 shrink-0 flex-col items-center gap-9 py-10 overflow-hidden"
+      className="hidden lg:flex w-20 shrink-0 flex-col items-center gap-7 py-8 overflow-hidden"
       style={{
         borderRadius: R.panel,
-        background: airbrush({ clouds: [C.sunset, C.magenta, C.teal], intensity: 0.6 }),
-        boxShadow: `inset 0 0 0 2px ${withAlpha(C.gold, 0.28)}`,
+        background: INK.black,
+        boxShadow: `inset 0 0 0 3px ${INK.yellow}, inset 0 0 0 6px ${INK.black}, inset 0 0 0 9px ${INK.red}`,
         transform: flip ? "scaleX(-1)" : undefined,
       }}
     >
-      {/* Repeated so a long pop-up doesn't leave most of the panel bare. The
-          run is short enough that the repeat isn't obvious at a glance. */}
-      {[0, 1, 2].map((n) => (
-        <div key={n} className="flex flex-col items-center gap-9">
-          <SpriteArt sprite={TIN} colors={TIN_COLORS} px={3} />
-          <BartenderArt px={2} mood="ok" holdingTin={false} />
-          <SpriteArt sprite={ROLLING_BOTTLE} colors={BOTTLE_COLORS} px={3} />
-          <SpriteArt sprite={GUEST} colors={GUEST_SWAPS[n % GUEST_SWAPS.length]} px={2} />
-        </div>
-      ))}
+      <SpeedStripes className="w-full" height={5} />
+      <Shaker size={44} tilt={-8} />
+      <Cherries size={36} />
+      <Bottle size={44} body={INK.green} device={INK.red} />
+      <CitrusWheel size={32} />
+      <Jigger size={34} />
+      <Lemon size={30} />
+      <Bottle size={44} body={INK.amber} device={INK.green} />
+      <CitrusWheel size={32} peel={INK.orange} flesh="#FFB74D" />
+      <Martini size={38} />
+      <BarSpoon size={40} />
+      <SpeedStripes className="w-full mt-auto" height={5} />
     </div>
   );
 }
 
-/**
- * Radiating light behind the logo. Softened at both ends so the rays fade in
- * rather than starting as hard wedges — sprayed, not printed.
- */
-function Sunburst() {
-  return (
-    <>
-      <div
-        aria-hidden
-        className="pointer-events-none absolute left-1/2 top-[38%] -translate-x-1/2 -translate-y-1/2 w-[150%] aspect-square opacity-[0.22]"
-        style={{
-          background: `repeating-conic-gradient(from 0deg at 50% 50%, ${withAlpha(C.gold, 0.7)} 0deg 5deg, transparent 5deg 12deg)`,
-          maskImage:
-            "radial-gradient(circle at 50% 50%, transparent 6%, black 22%, transparent 70%)",
-          WebkitMaskImage:
-            "radial-gradient(circle at 50% 50%, transparent 6%, black 22%, transparent 70%)",
-          filter: "blur(1.2px)",
-        }}
-      />
-      {/* Bottle line along the very bottom, behind the badge. */}
-      <BottleRow count={9} px={3} className="absolute left-5 bottom-4 opacity-70" />
-    </>
-  );
-}
