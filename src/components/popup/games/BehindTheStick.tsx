@@ -37,7 +37,9 @@ import {
   type Mood,
   type Phase,
   type State,
-  beginPour,
+  beginBuild,
+  cardRemaining,
+  CARD_SECONDS,
 } from "./behindTheStickCore";
 import {
   ARM,
@@ -55,14 +57,14 @@ import {
 import type { ArcadeGameProps } from "./registry";
 import { INGREDIENTS, ING_BY_KEY, colorFor } from "./ingredients";
 import {
-  GROUND_Y as G_GROUND,
-  cameraX,
-  freshGatherState,
-  remaining,
-  updateGather,
-  type GatherInput,
-  type GatherState,
-} from "./gatherCore";
+  BUBBLE_R,
+  TANK_BOTTOM,
+  TANK_TOP,
+  freshBubbleState,
+  tapBubbles,
+  updateBubbles,
+  type BubbleState,
+} from "./bubbleCore";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // BEHIND THE STICK — the presentation layer.
@@ -383,250 +385,208 @@ function drawHud(ctx: CanvasRenderingContext2D, st: State) {
 }
 
 /**
- * The order. A held card naming the drink and listing what goes in it, so the
- * player knows what they are hunting for before the shelves appear.
+ * Every screen that explains something, drawn the same way.
+ *
+ * One layout for all of them so a card never looks like a different kind of
+ * screen: heading, lines, and a countdown along the bottom. The countdown is
+ * the important part — without it a card that sits for four seconds reads as
+ * the game having frozen, and people start tapping.
  */
-function drawOrder(ctx: CanvasRenderingContext2D, st: State, t: number) {
-  clear(ctx, "#12081F");
+function drawCard(
+  ctx: CanvasRenderingContext2D,
+  opts: {
+    heading: string;
+    headingColor?: string;
+    sub?: string;
+    lines: string[];
+    remaining: number;
+    total: number;
+    flash?: boolean;
+    t: number;
+  }
+) {
+  const { heading, sub, lines, remaining, total, t } = opts;
+  const headingColor = opts.headingColor ?? P.yellow;
 
-  drawTextMarquee(ctx, "ORDER UP!", 112, 44, P.yellow, 2, "center", P.black, P.crimson);
+  // A flashing card alternates its ground, which is what "full screen flashing"
+  // looked like on hardware that had no alpha to fade with.
+  const lit = opts.flash ? blink(t, 3) : false;
+  clear(ctx, lit ? "#2A1040" : "#12081F");
 
-  // The name, split across two lines when it won't fit on one.
+  drawTextMarquee(ctx, heading, 112, 34, headingColor, 2, "center", P.black, P.crimson);
+
+  if (sub) {
+    drawTextMarquee(ctx, sub, 112, 66, P.cyan, 2, "center", P.black, "#0A4A6A");
+  }
+
+  let y = sub ? 104 : 84;
+  for (const line of lines) {
+    for (const wrapped of wrapText(line, 30)) {
+      drawText(ctx, wrapped, 112, y, P.white, 1, "center");
+      y += 11;
+    }
+    y += 5;
+  }
+
+  // ── Countdown ────────────────────────────────────────────────────────────
+  const secs = Math.ceil(remaining);
+  drawText(ctx, `${secs}`, 112, GAME_H - 26, P.yellow, 1, "center");
+  meter(ctx, 52, GAME_H - 14, 120, 5, clamp(remaining / total, 0, 1), P.yellow);
+}
+
+/** Greedy wrap at whole words, for the 5x7 font's ~30 characters a line. */
+function wrapText(text: string, width: number): string[] {
+  const out: string[] = [];
+  let line = "";
+  for (const word of text.split(" ")) {
+    if (line.length === 0) line = word;
+    else if (line.length + 1 + word.length <= width) line += ` ${word}`;
+    else {
+      out.push(line);
+      line = word;
+    }
+  }
+  if (line) out.push(line);
+  return out;
+}
+
+/**
+ * The title card on boot.
+ *
+ * Falls back to drawn lettering when the logo image hasn't loaded — the canvas
+ * cannot wait on a network fetch, and a blank three seconds would look broken.
+ */
+function drawBoot(
+  ctx: CanvasRenderingContext2D,
+  t: number,
+  logo: HTMLImageElement | null
+) {
+  clear(ctx, P.black);
+
+  if (logo && logo.complete && logo.naturalWidth > 0) {
+    const maxW = GAME_W - 16;
+    const scale = Math.min(maxW / logo.naturalWidth, 150 / logo.naturalHeight);
+    const w = Math.round(logo.naturalWidth * scale);
+    const h = Math.round(logo.naturalHeight * scale);
+    ctx.drawImage(logo, Math.round((GAME_W - w) / 2), Math.round(96 - h / 2), w, h);
+  } else {
+    drawTextMarquee(ctx, "BEHIND", 112, 62, P.yellow, 3, "center", P.black, P.crimson);
+    drawTextMarquee(ctx, "THE STICK", 112, 104, P.red, 3, "center", P.black, "#3A0000");
+  }
+
+  if (blink(t, 2)) {
+    drawText(ctx, "COMMON GOOD COCKTAIL HOUSE", 112, 196, P.cyan, 1, "center");
+  }
+}
+
+/** The order card: the drink, and the four bottles to go and find. */
+function drawOrderCard(ctx: CanvasRenderingContext2D, st: State, t: number) {
   const name = st.cocktail.name.toUpperCase();
-  const lines = name.length > 13 ? splitName(name) : [name];
-  lines.forEach((line, i) => {
-    drawTextMarquee(ctx, line, 112, 84 + i * 20, P.cyan, 2, "center", P.black, "#0A4A6A");
+  drawCard(ctx, {
+    heading: "ORDER UP!",
+    sub: name.length > 13 ? undefined : name,
+    lines:
+      name.length > 13
+        ? [name, "Tap the right ingredients to select them!", "Avoid wrong ingredients or you lose points!"]
+        : ["Tap the right ingredients to select them!", "Avoid wrong ingredients or you lose points!"],
+    remaining: cardRemaining(st),
+    total: CARD_SECONDS,
+    flash: true,
+    t,
   });
 
-  drawText(ctx, "YOU NEED", 112, 140, P.white, 1, "center");
-
-  // The recipe, as the bottles themselves rather than a list of words — the
-  // player is about to be looking for these shapes on a shelf.
+  // The recipe as the bottles themselves — the shapes the player is about to
+  // hunt for, not a list of words.
   st.cocktail.recipe.forEach((key, i) => {
     const ing = ING_BY_KEY.get(key);
     if (!ing) return;
     const x = 34 + i * 46;
-    drawSprite(ctx, ing.sprite, x, 156, ing.colors, 1);
-    drawText(ctx, ing.label.toUpperCase().slice(0, 7), x + 5, 176, ing.color, 1, "center");
+    drawSprite(ctx, ing.sprite, x, 176, ing.colors, 1);
+    drawText(ctx, ing.label.toUpperCase().slice(0, 7), x + 5, 196, ing.color, 1, "center");
   });
-
-  if (blink(t, 2)) {
-    drawText(ctx, "GET THE INGREDIENTS", 112, 214, P.lime, 1, "center");
-  }
 }
 
-/** Break a long drink name at a space, nearest the middle. */
-function splitName(name: string): string[] {
-  const mid = name.length / 2;
-  let best = -1;
-  for (let i = 0; i < name.length; i++) {
-    if (name[i] === " " && (best < 0 || Math.abs(i - mid) < Math.abs(best - mid))) best = i;
-  }
-  if (best < 0) return [name];
-  return [name.slice(0, best), name.slice(best + 1)];
-}
 
 /**
- * The shelves. Everything the bar stocks, floating in three rows, with the
- * recipe ticking off along the bottom as it's collected.
+ * Bubble Buster. The bar's stock drifting in a tank, the recipe underneath.
  */
-function drawGather(ctx: CanvasRenderingContext2D, gs: GatherState, t: number) {
-  clear(ctx, "#0E0A20");
+function drawBubbles(ctx: CanvasRenderingContext2D, bs: BubbleState, t: number) {
+  clear(ctx, "#0A0820");
 
-  // Everything in the room is drawn relative to the camera. World coordinates
-  // in, screen coordinates out.
-  const cam = cameraX(gs);
-  const sx = (worldX: number) => Math.round(worldX - cam);
-
-  // Back wall. Parallax at a third of the camera's speed, which is what makes
-  // the run read as movement through a room rather than items sliding past.
-  for (let y = 0; y < 5; y++) {
-    rect(ctx, 0, 20 + y * 34, GAME_W, 1, "#1E1638");
-  }
-  for (let i = 0; i < 14; i++) {
-    const x = Math.round(i * 60 - ((cam / 3) % 60));
-    rect(ctx, x, 24, 2, 200, "#191238");
+  // Tank glass, so the play area has an edge the bounces make sense against.
+  outline(ctx, 0, TANK_TOP, GAME_W, TANK_BOTTOM - TANK_TOP, "#2A2258");
+  for (let i = 0; i < 6; i++) {
+    rect(ctx, 0, TANK_TOP + 10 + i * 30, GAME_W, 1, "#150F33");
   }
 
-  // ── The stock ───────────────────────────────────────────────────────────
-  for (const item of gs.items) {
-    if (item.taken) continue;
-    const ing = ING_BY_KEY.get(item.key);
+  for (const b of bs.bubbles) {
+    if (b.popped) continue;
+    const ing = ING_BY_KEY.get(b.key);
     if (!ing) continue;
-    const bob = Math.sin(t * 2 + item.bob) * 2;
-    const needed = gs.needed.includes(item.key);
+    const x = Math.round(b.x);
+    const y = Math.round(b.y);
+    const needed = bs.needed.includes(b.key) && !bs.collected.includes(b.key);
 
-    // A quiet halo under the ones this drink actually wants. The recipe is on
-    // screen anyway; this is a reading aid, not the answer.
-    // Off-screen items cost nothing to skip, and the world is three screens wide.
-    const ix = sx(item.x);
-    if (ix < -20 || ix > GAME_W + 20) continue;
-
-    if (needed) {
-      outline(ctx, ix - 8, Math.round(item.y - 9 + bob), 16, 18, blink(t, 2) ? P.lime : "#2A5A10");
+    // ── Popping ────────────────────────────────────────────────────────────
+    // A ring that expands and thins, which reads as a burst without needing
+    // any extra sprites.
+    if (b.popping > 0) {
+      const k = 1 - b.popping / 0.35;
+      const r = Math.round(BUBBLE_R + k * 9);
+      ring(ctx, x, y, r, k < 0.5 ? P.white : P.slate);
+      continue;
     }
-    drawSprite(ctx, ing.sprite, ix - 5, Math.round(item.y - 7 + bob), ing.colors, 1);
 
-    // A little shelf bracket under each, so they read as stock rather than as
-    // floating pickups.
-    rect(ctx, ix - 9, Math.round(item.y + 9 + bob), 18, 2, "#3A2A18");
+    // The bubble itself: a ring with a highlight, so it reads as glass rather
+    // than as a disc the ingredient is stuck to.
+    ring(ctx, x, y, BUBBLE_R, needed && blink(t, 2.5) ? P.lime : "#5A6A9A");
+    rect(ctx, x - 5, y - BUBBLE_R + 2, 3, 2, P.white);
+
+    drawSprite(ctx, ing.sprite, x - 5, y - 7, ing.colors, 1);
   }
 
-  // ── The bartender ───────────────────────────────────────────────────────
-  const running = Math.abs(gs.vx) > 1 && gs.onGround;
-  const step = running && Math.floor(t * 8) % 2 === 0;
-  drawBartender(
-    ctx,
-    sx(gs.x),
-    Math.round(gs.y) + (step ? 1 : 0),
-    "ok",
-    gs.onGround ? "idle" : "serve",
-    t
-  );
-
-  // Floor, and the walls at each end so the room has a readable extent.
-  rect(ctx, 0, G_GROUND, GAME_W, 4, P.wood);
-  rect(ctx, 0, G_GROUND, GAME_W, 1, P.tan);
-  if (cam < 6) rect(ctx, sx(0) - 4, 24, 4, G_GROUND - 24, "#2A1E10");
-  if (cam > gs.worldW - GAME_W - 6) rect(ctx, sx(gs.worldW), 24, 4, G_GROUND - 24, "#2A1E10");
-
-  // How much room is left in each direction, so a player who can only see one
-  // screen of a three-screen bar knows there is more of it.
-  if (cam > 4) drawText(ctx, "<", 4, G_GROUND - 30, blink(t, 3) ? P.yellow : P.tan, 1);
-  if (cam < gs.worldW - GAME_W - 4) {
-    drawText(ctx, ">", GAME_W - 8, G_GROUND - 30, blink(t, 3) ? P.yellow : P.tan, 1);
-  }
-
-  // ── Feedback on the last grab ───────────────────────────────────────────
-  if (gs.flash) {
-    const ing = ING_BY_KEY.get(gs.flash.key);
+  // ── Feedback ─────────────────────────────────────────────────────────────
+  if (bs.flash) {
+    const ing = ING_BY_KEY.get(bs.flash.key);
     drawText(
       ctx,
-      gs.flash.good ? `+${ing?.label.toUpperCase() ?? "OK"}` : "NOT THAT ONE",
+      bs.flash.good ? `+${ing?.label.toUpperCase() ?? "OK"}` : "NOT THAT ONE",
       112,
-      G_GROUND - 44,
-      gs.flash.good ? P.lime : P.red,
+      TANK_TOP + 6,
+      bs.flash.good ? P.lime : P.red,
       1,
       "center"
     );
   }
 
-  // ── The recipe, ticking off ─────────────────────────────────────────────
-  rect(ctx, 0, G_GROUND + 4, GAME_W, GAME_H - G_GROUND - 4, "#100A1C");
-  drawText(ctx, "RECIPE", 6, G_GROUND + 9, P.white, 1);
+  // ── The recipe, ticking off ──────────────────────────────────────────────
+  rect(ctx, 0, TANK_BOTTOM + 2, GAME_W, GAME_H - TANK_BOTTOM - 2, "#100A1C");
+  drawText(ctx, "RECIPE", 6, TANK_BOTTOM + 8, P.white, 1);
 
-  gs.needed.forEach((key, i) => {
+  bs.needed.forEach((key, i) => {
     const ing = ING_BY_KEY.get(key);
     if (!ing) return;
-    const has = gs.collected.includes(key);
+    const has = bs.collected.includes(key);
     const x = 8 + i * 54;
-    const y = G_GROUND + 18;
+    const y = TANK_BOTTOM + 18;
     drawSprite(ctx, ing.sprite, x, y, ing.colors, 1);
-    // A tick through the ones already in hand.
     if (has) {
       rect(ctx, x - 1, y + 7, 13, 2, P.lime);
       drawText(ctx, "OK", x + 14, y + 5, P.lime, 1);
     }
   });
+}
 
-  const left = remaining(gs).length;
-  if (left === 0) {
-    drawTextMarquee(ctx, "TO THE BAR!", 112, 120, P.lime, 2, "center", P.black, "#00551C");
+/** A one-pixel circle, drawn the way the rest of the art is: as rects. */
+function ring(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, color: string) {
+  const steps = Math.max(10, Math.round(r * 2.2));
+  for (let i = 0; i < steps; i++) {
+    const a = (i / steps) * Math.PI * 2;
+    rect(ctx, Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r), 1, 1, color);
   }
 }
 
 
-// ─── The pad ─────────────────────────────────────────────────────────────────
-
-/**
- * A home-console controller: D-pad on the left, action button on the right,
- * both on a moulded grey body with the shoulders a real pad has.
- *
- * Directions are HELD, not tapped, so every control here is a pointerdown /
- * pointerup pair. `setPointerCapture` matters more than it looks: without it,
- * sliding a thumb off the edge of a button never fires pointerup and the
- * bartender runs into the wall forever.
- */
-function GamePad({
-  onDir,
-  onJump,
-}: {
-  onDir: (d: "left" | "right" | null) => void;
-  onJump: (down: boolean) => void;
-}) {
-  const hold = (fn: () => void) => (e: React.PointerEvent) => {
-    e.preventDefault();
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-    fn();
-  };
-  const release = (fn: () => void) => (e: React.PointerEvent) => {
-    e.preventDefault();
-    fn();
-  };
-
-  const dpadFace =
-    "absolute bg-[#2A2A32] active:bg-[#4A4A58] transition-colors select-none";
-
-  return (
-    <div
-      className="w-full max-w-sm flex items-center justify-between px-4 py-3 rounded-2xl"
-      style={{
-        background: "linear-gradient(180deg,#C8C8CE,#9A9AA4)",
-        boxShadow: "inset 0 2px 0 rgba(255,255,255,0.5), inset 0 -3px 0 rgba(0,0,0,0.3)",
-        touchAction: "none",
-      }}
-    >
-      {/* D-pad */}
-      <div className="relative w-[76px] h-[76px]">
-        <div className="absolute left-[26px] top-0 w-[24px] h-[76px] rounded-[3px] bg-[#1A1A20]" />
-        <div className="absolute top-[26px] left-0 h-[24px] w-[76px] rounded-[3px] bg-[#1A1A20]" />
-        <button
-          aria-label="Left"
-          className={`${dpadFace} left-[2px] top-[28px] w-[22px] h-[20px] rounded-l-[3px]`}
-          onPointerDown={hold(() => onDir("left"))}
-          onPointerUp={release(() => onDir(null))}
-          onPointerCancel={release(() => onDir(null))}
-          onPointerLeave={release(() => onDir(null))}
-        />
-        <button
-          aria-label="Right"
-          className={`${dpadFace} right-[2px] top-[28px] w-[22px] h-[20px] rounded-r-[3px]`}
-          onPointerDown={hold(() => onDir("right"))}
-          onPointerUp={release(() => onDir(null))}
-          onPointerCancel={release(() => onDir(null))}
-          onPointerLeave={release(() => onDir(null))}
-        />
-        {/* The up and down faces are dead. A real pad has four, and a pad with
-            two would read as broken rather than as deliberate. */}
-        <div className={`${dpadFace} left-[28px] top-[2px] w-[20px] h-[22px] rounded-t-[3px] opacity-60`} />
-        <div className={`${dpadFace} left-[28px] bottom-[2px] w-[20px] h-[22px] rounded-b-[3px] opacity-60`} />
-        <div className="absolute left-[32px] top-[32px] w-[12px] h-[12px] rounded-full bg-[#111]" />
-      </div>
-
-      <p className="hidden sm:block text-[7px] tracking-[0.2em] uppercase text-black/45 text-center leading-tight">
-        arrows
-        <br />
-        + space
-      </p>
-
-      {/* Action button */}
-      <button
-        aria-label="Jump"
-        onPointerDown={hold(() => onJump(true))}
-        onPointerUp={release(() => onJump(false))}
-        onPointerCancel={release(() => onJump(false))}
-        onPointerLeave={release(() => onJump(false))}
-        className="select-none w-[62px] h-[62px] rounded-full text-black text-[10px] font-black tracking-[0.1em] uppercase active:translate-y-[3px] active:shadow-[0_1px_0_#7A0F0A] transition-transform"
-        style={{
-          background: "radial-gradient(circle at 36% 30%, #FF8A80 0%, #E42B20 55%, #C01810 100%)",
-          boxShadow: "0 4px 0 #7A0F0A, inset 0 0 0 2px #8A1810",
-        }}
-      >
-        Jump
-      </button>
-    </div>
-  );
-}
 
 // ─── The pour deck ───────────────────────────────────────────────────────────
 
@@ -657,7 +617,8 @@ function PourDeck({
       {keys.map((key, i) => {
         const ing = ING_BY_KEY.get(key);
         if (!ing) return null;
-        // Second button steps inward, so the pair sits on a diagonal.
+        // Second one steps inward, so the pair sits on a diagonal and a thumb
+        // reaching for the upper never covers the lower.
         const indent = i === 1 ? (side === "left" ? "ml-9" : "mr-9") : "";
         return (
           <button
@@ -669,19 +630,20 @@ function PourDeck({
               e.preventDefault();
               onPress(key);
             }}
-            className={`${indent} select-none w-[84px] h-[84px] rounded-full border-[4px] border-black flex flex-col items-center justify-center gap-1 disabled:opacity-30 active:translate-y-[4px] transition-transform`}
+            onContextMenu={(e) => e.preventDefault()}
+            className={`${indent} select-none flex flex-col items-center justify-end gap-1 px-1 disabled:opacity-30 active:translate-y-[3px] transition-transform`}
             style={{
-              background: `radial-gradient(circle at 36% 30%, #FFFFFF 0%, ${ing.color} 52%, ${ing.color} 100%)`,
-              boxShadow: `0 5px 0 rgba(0,0,0,0.55)`,
               touchAction: "none",
               WebkitTouchCallout: "none",
               WebkitTapHighlightColor: "transparent",
             }}
-            onContextMenu={(e) => e.preventDefault()}
           >
-            {/* Fixed box either way, so the icon appearing after mount doesn't
-                shift the button under the player's thumb. */}
-            <span style={{ width: 15, height: 20 }} className="flex items-center">
+            {/* The sprite IS the control. A drawn button around a drawn bottle
+                was two frames around one picture; the bottle is what the player
+                is matching against the rail, so show that and nothing else.
+                Fixed box either way, so the icon appearing after mount doesn't
+                shift the target under a thumb. */}
+            <span style={{ width: 54, height: 74 }} className="flex items-end justify-center">
               {iconUrls[key] && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -689,14 +651,23 @@ function PourDeck({
                   alt=""
                   width={11}
                   height={15}
-                  style={{ imageRendering: "pixelated", width: 15, height: 20 }}
+                  style={{
+                    imageRendering: "pixelated",
+                    width: 54,
+                    height: 74,
+                    filter: `drop-shadow(0 3px 0 rgba(0,0,0,0.6))`,
+                  }}
                 />
               )}
             </span>
-            {/* Not truncated. slice(0,6) turned Liqueur into "Liqueu" and
-                Vermouth into "Vermou" — the button has room, the label just
-                needs to be allowed to use it. */}
-            <span className="text-[8px] font-black tracking-tight text-black/80 uppercase leading-none text-center px-0.5">
+            <span
+              className="text-[10px] font-black uppercase leading-none tracking-tight"
+              style={{
+                color: ing.color,
+                fontFamily: "var(--font-pixel, ui-monospace, monospace)",
+                textShadow: "2px 2px 0 #000",
+              }}
+            >
               {ing.label}
             </span>
           </button>
@@ -811,16 +782,26 @@ function StirDial({
 
 export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
   const s = useRef<State>(freshState(colorFor));
-  // The platformer has its own simulation. It is rebuilt at the start of each
-  // gather phase, from the round's own recipe.
-  const g = useRef<GatherState | null>(null);
-  const gIn = useRef<GatherInput>({ left: false, right: false, jump: false });
+  // Bubble Buster has its own simulation, rebuilt at the start of each gather
+  // phase from the round's own recipe.
+  const g = useRef<BubbleState | null>(null);
+
+  // The title art. Loaded imperatively because the canvas draws it directly;
+  // a React <Image> would be a second copy the frame loop can't reach.
+  const logoRef = useRef<HTMLImageElement | null>(null);
+  useEffect(() => {
+    const img = new window.Image();
+    img.src = "/popup/art/logo-behind-the-stick.png";
+    img.onload = () => {
+      logoRef.current = img;
+    };
+  }, []);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const endedRef = useRef(false);
 
   // Mirrored into React only so the right controls render — never per frame.
-  const [uiPhase, setUiPhase] = useState<Phase>("ready");
-  const uiPhaseRef = useRef<Phase>("ready");
+  const [uiPhase, setUiPhase] = useState<Phase>("boot");
+  const uiPhaseRef = useRef<Phase>("boot");
 
   const press = useCallback((key: string) => {
     if (s.current.phase === "pour") s.current.presses.push(key);
@@ -828,6 +809,28 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
 
   const tapShake = useCallback(() => {
     if (s.current.phase === "shake") s.current.shakeTaps++;
+  }, []);
+
+  /**
+   * A tap in the tank.
+   *
+   * The canvas is letterboxed inside its row, so a click at the row's
+   * coordinates is not a click in game space. Read the CANVAS rect rather than
+   * the container's and scale by the 224x288 buffer, or every tap lands off by
+   * however much black is either side of the picture.
+   */
+  const onTankTap = useCallback((e: React.PointerEvent) => {
+    const st = s.current;
+    if (st.phase !== "gather" || !g.current) return;
+    const canvas = (e.currentTarget as HTMLElement).querySelector("canvas");
+    if (!canvas) return;
+    const r = canvas.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) return;
+    tapBubbles(
+      g.current,
+      ((e.clientX - r.left) / r.width) * GAME_W,
+      ((e.clientY - r.top) / r.height) * GAME_H
+    );
   }, []);
 
   const endStir = useCallback(() => {
@@ -838,15 +841,6 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
     true,
     (key) => {
       const st = s.current;
-
-      // The shelves: arrows to run, space to jump. Held, so the release
-      // handler below matters as much as this one.
-      if (st.phase === "gather") {
-        if (key === "ArrowLeft") gIn.current.left = true;
-        else if (key === "ArrowRight") gIn.current.right = true;
-        else if (key === " " || key === "Spacebar" || key === "ArrowUp") gIn.current.jump = true;
-        return;
-      }
 
       if (st.phase === "shake" && (key === " " || key === "Spacebar")) {
         st.shakeTaps++;
@@ -861,11 +855,7 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
         if (key4) press(key4);
       }
     },
-    (key) => {
-      if (key === "ArrowLeft") gIn.current.left = false;
-      else if (key === "ArrowRight") gIn.current.right = false;
-      else if (key === " " || key === "Spacebar" || key === "ArrowUp") gIn.current.jump = false;
-    }
+    () => {}
   );
 
   useEffect(() => {
@@ -895,12 +885,12 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
 
       // ── The shelves ───────────────────────────────────────────────────
       if (st.phase === "gather") {
-        if (!g.current) g.current = freshGatherState(st.cocktail.recipe);
-        updateGather(g.current, dt, gIn.current);
+        if (!g.current) g.current = freshBubbleState(st.cocktail.recipe);
+        updateBubbles(g.current, dt);
         if (g.current.done) {
           st.score += g.current.score;
           g.current = null;
-          beginPour(st);
+          beginBuild(st);
         }
       } else if (st.phase !== "order" && g.current) {
         g.current = null;
@@ -924,12 +914,70 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
       }
 
       // ── Draw ──────────────────────────────────────────────────────────
+      if (st.phase === "boot") {
+        drawBoot(ctx, t, logoRef.current);
+        return;
+      }
+      if (st.phase === "howto") {
+        drawCard(ctx, {
+          heading: "HOW TO PLAY",
+          lines: [
+            "You are tonight's guest bartender!",
+            "As drinks are ordered you will grab the ingredients the recipe needs.",
+            "Then tap the ingredients in rhythm to put them in your shaker or mixing glass.",
+            "Then shake or stir fast enough to make the drink properly!",
+            "Good luck!",
+          ],
+          remaining: cardRemaining(st),
+          total: CARD_SECONDS,
+          t,
+        });
+        return;
+      }
       if (st.phase === "order") {
-        drawOrder(ctx, st, t);
+        drawOrderCard(ctx, st, t);
+        return;
+      }
+      if (st.phase === "build") {
+        drawCard(ctx, {
+          heading: "LET'S BUILD",
+          sub: "THAT DRINK!",
+          lines: [
+            "Tap the right ingredient in time as they slide across the bar to toss them in.",
+            "Tap at the wrong time and you will spill!",
+            "Spill too many and it's game over!",
+          ],
+          remaining: cardRemaining(st),
+          total: CARD_SECONDS,
+          flash: true,
+          t,
+        });
+        return;
+      }
+      if (st.phase === "make") {
+        drawCard(ctx, {
+          heading: "NOW MAKE",
+          sub: "THAT DRINK!",
+          headingColor: P.lime,
+          lines:
+            st.cocktail.finish === "shake"
+              ? [
+                  "Tap as fast as you can to shake it properly!",
+                  "The faster you shake, the more points you get!",
+                ]
+              : [
+                  "Stir around the circle!",
+                  "The faster you stir, the more points you get!",
+                ],
+          remaining: cardRemaining(st),
+          total: CARD_SECONDS,
+          flash: true,
+          t,
+        });
         return;
       }
       if (st.phase === "gather" && g.current) {
-        drawGather(ctx, g.current, t);
+        drawBubbles(ctx, g.current, t);
         return;
       }
 
@@ -979,7 +1027,7 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
       }
       drawBarFront(ctx);
 
-      if (st.phase === "pour" || st.phase === "ready") drawRail(ctx, st, t);
+      if (st.phase === "pour") drawRail(ctx, st, t);
       else if (st.phase === "shake") drawShake(ctx, st);
       else if (st.phase === "stir") drawStir(ctx, st);
       else if (st.phase === "serve") drawServe(ctx, st);
@@ -1012,7 +1060,11 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
       appears, read as a glitch rather than as a control.
     */
     <div className="flex flex-col" style={{ height: "min(78vh, 640px)" }}>
-      <div className="flex-[3] min-h-0 flex items-center justify-center bg-black px-2 pt-2">
+      <div
+        className="flex-[3] min-h-0 flex items-center justify-center bg-black px-2 pt-2"
+        onPointerDown={onTankTap}
+        onContextMenu={(e) => e.preventDefault()}
+      >
         <CRTScreen glow="#FFA000">
           <ArcadeCanvas onFrame={onFrame} running fit="height" />
         </CRTScreen>
@@ -1028,20 +1080,16 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
         }}
         onContextMenu={(e) => e.preventDefault()}
       >
-        {uiPhase === "gather" ? (
-          // ── The pad ──────────────────────────────────────────────────────
-          // A home-console controller: D-pad left, action button right, both
-          // sat on a moulded body. Held rather than tapped, so these are
-          // pointer-down/up pairs and not clicks.
-          <GamePad
-            onDir={(d) => {
-              gIn.current.left = d === "left";
-              gIn.current.right = d === "right";
-            }}
-            onJump={(down) => {
-              gIn.current.jump = down;
-            }}
-          />
+        {uiPhase === "boot" || uiPhase === "howto" || uiPhase === "order" ||
+        uiPhase === "build" || uiPhase === "make" ? (
+          // Cards run on their own timer. Nothing to press.
+          <p className="text-center text-[10px] tracking-[0.3em] uppercase text-white/35">
+            {uiPhase === "boot" ? "" : `${Math.ceil(cardRemaining(s.current))}`}
+          </p>
+        ) : uiPhase === "gather" ? (
+          <p className="text-center text-[11px] tracking-[0.2em] uppercase text-white/55 leading-relaxed px-6">
+            Tap the ingredients the recipe needs
+          </p>
         ) : uiPhase === "shake" ? (
           <div className="flex items-center justify-center">
             <button

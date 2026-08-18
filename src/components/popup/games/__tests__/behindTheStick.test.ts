@@ -12,10 +12,11 @@ import {
   PTS_MISS,
   PTS_PERFECT,
   PTS_STRAY,
-  ORDER_SECONDS,
-  READY_SECONDS,
+  BOOT_SECONDS,
+  CARD_SECONDS,
   SHAKE_SECONDS,
-  beginPour,
+  beginBuild,
+  cardRemaining,
   update,
   WINDOW_X,
   type State,
@@ -53,37 +54,86 @@ function run(st: State, seconds: number, pick = always("whiskey"), each?: (st: S
  *
  * Defaults to a shaken drink, since most of these check the pour and the shake.
  */
+/**
+ * Fast-forward to the pour.
+ *
+ * A round now opens with the title, the how-to, the order card, Bubble Buster
+ * and the build card before a single note appears. The tank has its own
+ * simulation and its own tests, so this skips it the way the component will
+ * once the recipe is popped; the cards are simply waited out.
+ *
+ * Defaults to a shaken drink, since most of these check the pour and the shake.
+ */
 function start(cocktailKey = "whiskey-sour"): State {
   const drink = getCocktail(cocktailKey);
   assert.ok(drink, `no such cocktail: ${cocktailKey}`);
   const st = freshState(colorFor, drink!);
-  run(st, READY_SECONDS + ORDER_SECONDS + 0.1);
-  assert.strictEqual(st.phase, "gather", `expected the shelves, got ${st.phase}`);
-  beginPour(st);
+  // boot -> howto -> order -> gather
+  run(st, BOOT_SECONDS + CARD_SECONDS * 2 + 0.2);
+  assert.strictEqual(st.phase, "gather", `expected the tank, got ${st.phase}`);
+  beginBuild(st);
+  // build card -> pour
+  run(st, CARD_SECONDS + 0.1);
+  assert.strictEqual(st.phase, "pour", `expected the pour, got ${st.phase}`);
   return st;
 }
 
 console.log("\nPhases:");
 
-check("a round opens with the order, then the shelves, then the pour", () => {
+check("the game boots into the title, then the how-to, then the first order", () => {
   const st = freshState(colorFor, getCocktail("whiskey-sour")!);
-  assert.strictEqual(st.phase, "ready");
-  run(st, READY_SECONDS + 0.1);
+  assert.strictEqual(st.phase, "boot");
+  run(st, BOOT_SECONDS + 0.1);
+  assert.strictEqual(st.phase, "howto", "never explained itself");
+  run(st, CARD_SECONDS + 0.1);
   assert.strictEqual(st.phase, "order", "never announced the drink");
-  run(st, ORDER_SECONDS + 0.1);
-  assert.strictEqual(st.phase, "gather", "never sent him to the shelves");
-  // The shelves hold the game open until the recipe is complete.
-  run(st, 5);
-  assert.strictEqual(st.phase, "gather", "left the shelves on a timer");
-  beginPour(st);
+  run(st, CARD_SECONDS + 0.1);
+  assert.strictEqual(st.phase, "gather", "never opened the tank");
+
+  // The tank holds the game open until the recipe is complete — no timer.
+  run(st, 8);
+  assert.strictEqual(st.phase, "gather", "left the tank on a timer");
+
+  beginBuild(st);
+  assert.strictEqual(st.phase, "build", "skipped the build card");
+  run(st, CARD_SECONDS + 0.1);
   assert.strictEqual(st.phase, "pour");
+});
+
+check("every card holds for its countdown and then moves on by itself", () => {
+  const st = freshState(colorFor, getCocktail("whiskey-sour")!);
+  run(st, BOOT_SECONDS + 0.1);
+  // Just short of the four seconds, the how-to is still up.
+  run(st, CARD_SECONDS - 0.3);
+  assert.strictEqual(st.phase, "howto", "left early");
+  assert.ok(cardRemaining(st) > 0 && cardRemaining(st) < 0.5, `countdown read ${cardRemaining(st)}`);
+  run(st, 0.4);
+  assert.strictEqual(st.phase, "order");
+});
+
+check("a cleared pour goes through the make card before the shake", () => {
+  const st = start("daiquiri");
+  let hits = 0;
+  for (let i = 0; i < 60 * 90 && hits < NOTES_PER_ROUND; i++) {
+    update(st, DT, always("whiskey"));
+    if (phaseOf(st) !== "pour") break;
+    const n = st.notes.find((x) => !x.judged && Math.abs(x.x - WINDOW_X) <= PERFECT_HALF);
+    if (n) {
+      st.presses.push("whiskey");
+      update(st, DT, always("whiskey"));
+      hits++;
+    }
+  }
+  assert.strictEqual(st.phase, "make", `went straight to ${st.phase}`);
+  run(st, CARD_SECONDS + 0.1);
+  assert.strictEqual(st.phase, "shake");
 });
 
 check("notes only ever call for ingredients in the round's recipe", () => {
   const drink = getCocktail("negroni")!;
   const st = freshState(colorFor, drink);
-  run(st, READY_SECONDS + ORDER_SECONDS + 0.1);
-  beginPour(st);
+  run(st, BOOT_SECONDS + CARD_SECONDS * 2 + 0.2);
+  beginBuild(st);
   // No pick function: the core must default to the recipe on its own.
   for (let i = 0; i < 60 * 12; i++) {
     update(st, DT);
@@ -204,6 +254,9 @@ function clearRound(st: State) {
       hits++;
     }
   }
+  // A cleared pour lands on the "make that drink" card, not on the minigame.
+  // Wait it out so callers see the shake or stir it introduces.
+  if (phaseOf(st) === "make") run(st, CARD_SECONDS + 0.1);
   return hits;
 }
 
@@ -255,23 +308,25 @@ check("clearing a shake advances the round and resets strikes", () => {
   const firstDrink = st.cocktail.key;
   clearRound(st);
   let acc = 0;
-  // A cleared round now returns to the order screen, not straight to the pour.
-  for (let i = 0; i < 60 * 12; i++) {
+  // A cleared round returns to the order card — the title and how-to are
+  // boot-only, so round two opens straight on the next drink.
+  for (let i = 0; i < 60 * 20; i++) {
     acc += DT;
     if (acc >= 60 / 200) { st.shakeTaps++; acc -= 60 / 200; }
     update(st, DT, always("whiskey"));
     if (phaseOf(st) === "order") break;
   }
-  assert.strictEqual(st.phase, "order");
+  assert.strictEqual(st.phase, "order", `round two opened on ${st.phase}`);
   assert.strictEqual(st.round, 2);
   assert.strictEqual(st.strikes, 0);
   assert.strictEqual(st.spawned, 0, "the new round should start with no notes spawned");
   assert.notStrictEqual(st.cocktail.key, firstDrink, "poured the same drink twice running");
 
   // And the new round runs the same way the first one did.
-  run(st, ORDER_SECONDS + 0.1);
+  run(st, CARD_SECONDS + 0.1);
   assert.strictEqual(st.phase, "gather");
-  beginPour(st);
+  beginBuild(st);
+  run(st, CARD_SECONDS + 0.1);
   assert.strictEqual(st.phase, "pour");
 });
 

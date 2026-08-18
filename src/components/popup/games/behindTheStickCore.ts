@@ -35,9 +35,15 @@ export const START_RPM = 80;
 export const RATE_STEP = 10;
 export const GRACE_SECONDS = 1.2;
 export const SLOW_TOLERANCE = 1.2;
-export const READY_SECONDS = 1.6;
-/** How long "Order up!" holds before the shelves. */
-export const ORDER_SECONDS = 2.2;
+/** The title card on boot. */
+export const BOOT_SECONDS = 3;
+/**
+ * Every card that explains something holds for the same four seconds, with a
+ * countdown so the player can see it is going to pass on its own. One number
+ * for all of them: a card that lingers longer than the one before reads as the
+ * game having stalled.
+ */
+export const CARD_SECONDS = 4;
 export const SERVE_SECONDS = 2.2;
 export const OVER_SECONDS = 2.6;
 
@@ -60,10 +66,13 @@ export const INGREDIENT_KEYS = [
  * code has a single phase to switch on.
  */
 export type Phase =
-  | "ready"
+  | "boot"
+  | "howto"
   | "order"
   | "gather"
+  | "build"
   | "pour"
+  | "make"
   | "shake"
   | "stir"
   | "serve"
@@ -148,7 +157,7 @@ export function freshState(
 ): State {
   return {
     cocktail,
-    phase: "ready",
+    phase: "boot",
     t: 0,
     phaseT: 0,
     score: 0,
@@ -226,14 +235,18 @@ function startMinigame(st: State) {
 }
 
 /**
- * Leave the shelves and start pouring. Called by the component once the
- * gather phase reports its recipe complete.
+ * Leave the tank. Called by the component once Bubble Buster reports its
+ * recipe complete; the build card then leads into the pour.
  */
-export function beginPour(st: State): void {
+export function beginBuild(st: State): void {
   if (st.phase !== "gather") return;
-  setPhase(st, "pour");
-  st.banner = `ROUND ${st.round}`;
-  st.bannerTimer = 1.2;
+  setPhase(st, "build");
+}
+
+/** Seconds left on whichever card is showing, for the countdown. */
+export function cardRemaining(st: State): number {
+  const total = st.phase === "boot" ? BOOT_SECONDS : CARD_SECONDS;
+  return Math.max(0, total - st.phaseT);
 }
 
 /** Taps per minute over the rolling window. */
@@ -281,16 +294,22 @@ export function update(
 
   let finished = false;
 
-  if (st.phase === "ready") {
-    if (st.phaseT > READY_SECONDS) {
-      setPhase(st, "order");
-      st.banner = "ORDER UP!";
-      st.bannerTimer = 1.4;
-    }
+  if (st.phase === "boot") {
+    if (st.phaseT > BOOT_SECONDS) setPhase(st, "howto");
+  } else if (st.phase === "howto") {
+    if (st.phaseT > CARD_SECONDS) setPhase(st, "order");
   } else if (st.phase === "order") {
-    if (st.phaseT > ORDER_SECONDS) setPhase(st, "gather");
+    if (st.phaseT > CARD_SECONDS) setPhase(st, "gather");
   } else if (st.phase === "gather") {
-    // Inert. gatherCore runs the platformer; the component calls beginPour().
+    // Inert. bubbleCore runs the tank; the component calls beginBuild().
+  } else if (st.phase === "build") {
+    if (st.phaseT > CARD_SECONDS) {
+      setPhase(st, "pour");
+      st.banner = `ROUND ${st.round}`;
+      st.bannerTimer = 1.2;
+    }
+  } else if (st.phase === "make") {
+    if (st.phaseT > CARD_SECONDS) startMinigame(st);
   } else if (st.phase === "pour") {
     st.spawnTimer -= dt;
     if (st.spawnTimer <= 0 && st.spawned < NOTES_PER_ROUND) {
@@ -352,7 +371,8 @@ export function update(
       st.banner = "";
       setPhase(st, "over");
     } else if (st.notesJudged >= NOTES_PER_ROUND) {
-      startMinigame(st);
+      // The card first, then the shake or stir it explains.
+      setPhase(st, "make");
     }
   } else if (st.phase === "shake") {
     for (let i = 0; i < st.shakeTaps; i++) st.taps.push(st.phaseT);
@@ -416,8 +436,7 @@ export function update(
       st.score += 250 * (st.round - 1);
       // A different drink every round, never the same one twice running.
       st.cocktail = pickCocktail(st.cocktail.key);
-      st.banner = "ORDER UP!";
-      st.bannerTimer = 1.4;
+      // Straight to the next order — the title and the how-to are boot-only.
       setPhase(st, "order");
     }
   } else if (st.phase === "over") {

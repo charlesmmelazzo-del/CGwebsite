@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:games": "tsx src/components/popup/games/__tests__/sprites.test.ts && tsx src/components/popup/games/__tests__/behindTheStick.test.ts && tsx src/components/popup/games/__tests__/topShelf.test.ts && tsx src/components/popup/games/__tests__/gather.test.ts"
+    "test:games": "tsx src/components/popup/games/__tests__/sprites.test.ts && tsx src/components/popup/games/__tests__/behindTheStick.test.ts && tsx src/components/popup/games/__tests__/topShelf.test.ts && tsx src/components/popup/games/__tests__/game.test.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
