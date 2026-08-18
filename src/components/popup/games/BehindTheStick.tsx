@@ -56,6 +56,7 @@ import type { ArcadeGameProps } from "./registry";
 import { INGREDIENTS, ING_BY_KEY, colorFor } from "./ingredients";
 import {
   GROUND_Y as G_GROUND,
+  cameraX,
   freshGatherState,
   remaining,
   updateGather,
@@ -315,35 +316,23 @@ function drawStir(ctx: CanvasRenderingContext2D, st: State) {
   const ok = rpm >= st.target;
 
   const cx = 112;
-  const cy = 104;
-  const r = 38;
+  const cy = 116;
 
-  // The path the dot runs on. Drawn as a dotted ring so it reads as a track to
-  // follow rather than as the rim of a glass.
-  for (let a = 0; a < 40; a++) {
-    const ang = (a / 40) * Math.PI * 2;
-    rect(ctx, cx + Math.cos(ang) * r - 1, cy + Math.sin(ang) * r - 1, 2, 2, P.slate);
-  }
+  // The drink only. The dial that turns it is on the deck below, so drawing a
+  // track and a dot up here too would be two controls for one action.
+  rect(ctx, cx - 22, cy - 26, 44, 52, "#100810");
+  rect(ctx, cx - 19, cy - 23, 38, 46, "#7FA8C0");
+  rect(ctx, cx - 16, cy - 4, 32, 24, P.amber);
 
-  // The drink itself, turning inside the ring: a mixing glass with the liquid
-  // swirling round at whatever rate the player is actually managing.
-  rect(ctx, cx - 15, cy - 18, 30, 36, "#100810");
-  rect(ctx, cx - 13, cy - 16, 26, 32, "#7FA8C0");
-  rect(ctx, cx - 11, cy - 4, 22, 18, P.amber);
-  // Surface, tilted by the swirl.
-  const swirl = Math.sin(st.revs * Math.PI * 2) * 3;
-  rect(ctx, cx - 11, cy - 5 + swirl, 22, 2, ok ? P.lime : P.tan);
-  // The spoon, following the dot round.
+  // Surface, tilted by the swirl the player is actually managing.
+  const swirl = Math.sin(st.revs * Math.PI * 2) * 4;
+  rect(ctx, cx - 16, cy - 6 + swirl, 32, 3, ok ? P.lime : P.tan);
+  rect(ctx, cx - 16, cy - 2 - swirl, 32, 2, "#B07830");
+
+  // The spoon, following the dial round.
   const lead = st.lastAngle ?? -Math.PI / 2;
-  rect(ctx, cx + Math.cos(lead) * 8 - 1, cy - 22, 2, 26, "#C8C8D0");
-
-  // The dot the player drags.
-  const dx = cx + Math.cos(lead) * r;
-  const dy = cy + Math.sin(lead) * r;
-  rect(ctx, dx - 4, dy - 4, 8, 8, P.black);
-  rect(ctx, dx - 3, dy - 3, 6, 6, ok ? P.lime : P.yellow);
-
-  drawText(ctx, "DRAG THE DOT", cx, cy + 46, P.white, 1, "center");
+  rect(ctx, cx + Math.round(Math.cos(lead) * 11) - 1, cy - 34, 3, 36, "#C8C8D0");
+  rect(ctx, cx + Math.round(Math.cos(lead) * 11) - 2, cy - 36, 5, 4, P.white);
 
   // Same treatment as the shake: one instruction, one verdict, no readout.
   rect(ctx, 0, RAIL_Y - 6, GAME_W, RAIL_H + 12, "#101020");
@@ -444,9 +433,19 @@ function splitName(name: string): string[] {
 function drawGather(ctx: CanvasRenderingContext2D, gs: GatherState, t: number) {
   clear(ctx, "#0E0A20");
 
-  // Back wall, so the shelves read as being in a room.
+  // Everything in the room is drawn relative to the camera. World coordinates
+  // in, screen coordinates out.
+  const cam = cameraX(gs);
+  const sx = (worldX: number) => Math.round(worldX - cam);
+
+  // Back wall. Parallax at a third of the camera's speed, which is what makes
+  // the run read as movement through a room rather than items sliding past.
   for (let y = 0; y < 5; y++) {
     rect(ctx, 0, 20 + y * 34, GAME_W, 1, "#1E1638");
+  }
+  for (let i = 0; i < 14; i++) {
+    const x = Math.round(i * 60 - ((cam / 3) % 60));
+    rect(ctx, x, 24, 2, 200, "#191238");
   }
 
   // ── The stock ───────────────────────────────────────────────────────────
@@ -459,24 +458,18 @@ function drawGather(ctx: CanvasRenderingContext2D, gs: GatherState, t: number) {
 
     // A quiet halo under the ones this drink actually wants. The recipe is on
     // screen anyway; this is a reading aid, not the answer.
+    // Off-screen items cost nothing to skip, and the world is three screens wide.
+    const ix = sx(item.x);
+    if (ix < -20 || ix > GAME_W + 20) continue;
+
     if (needed) {
-      outline(
-        ctx,
-        Math.round(item.x - 8),
-        Math.round(item.y - 9 + bob),
-        16,
-        18,
-        blink(t, 2) ? P.lime : "#2A5A10"
-      );
+      outline(ctx, ix - 8, Math.round(item.y - 9 + bob), 16, 18, blink(t, 2) ? P.lime : "#2A5A10");
     }
-    drawSprite(
-      ctx,
-      ing.sprite,
-      Math.round(item.x - 5),
-      Math.round(item.y - 7 + bob),
-      ing.colors,
-      1
-    );
+    drawSprite(ctx, ing.sprite, ix - 5, Math.round(item.y - 7 + bob), ing.colors, 1);
+
+    // A little shelf bracket under each, so they read as stock rather than as
+    // floating pickups.
+    rect(ctx, ix - 9, Math.round(item.y + 9 + bob), 18, 2, "#3A2A18");
   }
 
   // ── The bartender ───────────────────────────────────────────────────────
@@ -484,16 +477,25 @@ function drawGather(ctx: CanvasRenderingContext2D, gs: GatherState, t: number) {
   const step = running && Math.floor(t * 8) % 2 === 0;
   drawBartender(
     ctx,
-    Math.round(gs.x),
+    sx(gs.x),
     Math.round(gs.y) + (step ? 1 : 0),
     "ok",
     gs.onGround ? "idle" : "serve",
     t
   );
 
-  // Floor
+  // Floor, and the walls at each end so the room has a readable extent.
   rect(ctx, 0, G_GROUND, GAME_W, 4, P.wood);
   rect(ctx, 0, G_GROUND, GAME_W, 1, P.tan);
+  if (cam < 6) rect(ctx, sx(0) - 4, 24, 4, G_GROUND - 24, "#2A1E10");
+  if (cam > gs.worldW - GAME_W - 6) rect(ctx, sx(gs.worldW), 24, 4, G_GROUND - 24, "#2A1E10");
+
+  // How much room is left in each direction, so a player who can only see one
+  // screen of a three-screen bar knows there is more of it.
+  if (cam > 4) drawText(ctx, "<", 4, G_GROUND - 30, blink(t, 3) ? P.yellow : P.tan, 1);
+  if (cam < gs.worldW - GAME_W - 4) {
+    drawText(ctx, ">", GAME_W - 8, G_GROUND - 30, blink(t, 3) ? P.yellow : P.tan, 1);
+  }
 
   // ── Feedback on the last grab ───────────────────────────────────────────
   if (gs.flash) {
@@ -567,7 +569,7 @@ function GamePad({
 
   return (
     <div
-      className="h-24 flex items-center justify-between px-3 rounded-xl"
+      className="w-full max-w-sm flex items-center justify-between px-4 py-3 rounded-2xl"
       style={{
         background: "linear-gradient(180deg,#C8C8CE,#9A9AA4)",
         boxShadow: "inset 0 2px 0 rgba(255,255,255,0.5), inset 0 -3px 0 rgba(0,0,0,0.3)",
@@ -651,12 +653,12 @@ function PourDeck({
   const right = recipe.slice(2, 4);
 
   const column = (keys: readonly string[], side: "left" | "right") => (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
       {keys.map((key, i) => {
         const ing = ING_BY_KEY.get(key);
         if (!ing) return null;
         // Second button steps inward, so the pair sits on a diagonal.
-        const indent = i === 1 ? (side === "left" ? "ml-7" : "mr-7") : "";
+        const indent = i === 1 ? (side === "left" ? "ml-9" : "mr-9") : "";
         return (
           <button
             key={key}
@@ -667,12 +669,15 @@ function PourDeck({
               e.preventDefault();
               onPress(key);
             }}
-            className={`${indent} select-none w-[62px] h-[62px] rounded-full border-[3px] border-black flex flex-col items-center justify-center gap-0.5 disabled:opacity-30 active:translate-y-[3px] transition-transform`}
+            className={`${indent} select-none w-[84px] h-[84px] rounded-full border-[4px] border-black flex flex-col items-center justify-center gap-1 disabled:opacity-30 active:translate-y-[4px] transition-transform`}
             style={{
               background: `radial-gradient(circle at 36% 30%, #FFFFFF 0%, ${ing.color} 52%, ${ing.color} 100%)`,
-              boxShadow: `0 4px 0 rgba(0,0,0,0.55)`,
-              touchAction: "manipulation",
+              boxShadow: `0 5px 0 rgba(0,0,0,0.55)`,
+              touchAction: "none",
+              WebkitTouchCallout: "none",
+              WebkitTapHighlightColor: "transparent",
             }}
+            onContextMenu={(e) => e.preventDefault()}
           >
             {/* Fixed box either way, so the icon appearing after mount doesn't
                 shift the button under the player's thumb. */}
@@ -688,8 +693,11 @@ function PourDeck({
                 />
               )}
             </span>
-            <span className="text-[7px] font-black tracking-wider text-black/80 uppercase leading-none">
-              {ing.label.slice(0, 6)}
+            {/* Not truncated. slice(0,6) turned Liqueur into "Liqueu" and
+                Vermouth into "Vermou" — the button has room, the label just
+                needs to be allowed to use it. */}
+            <span className="text-[8px] font-black tracking-tight text-black/80 uppercase leading-none text-center px-0.5">
+              {ing.label}
             </span>
           </button>
         );
@@ -698,9 +706,103 @@ function PourDeck({
   );
 
   return (
-    <div className="h-24 flex items-center justify-between px-1">
+    <div className="w-full flex items-center justify-between px-1 sm:px-4">
       {column(left, "left")}
       {column(right, "right")}
+    </div>
+  );
+}
+
+
+// ─── The stir dial ───────────────────────────────────────────────────────────
+
+/**
+ * A dot on a circular track, on the deck where every other control lives.
+ *
+ * The stir used to be read off the canvas itself — drag anywhere on the screen
+ * and the angle to its centre counted. That put a control in the one region of
+ * the cabinet that is otherwise pure animation, with no visible thing to grab,
+ * which reads as the game glitching rather than as an instruction.
+ *
+ * Pointer capture is what makes it usable: a stir is a continuous circular
+ * drag, and without capture the first time the thumb leaves the 120px dial the
+ * events stop arriving and the drink stops turning mid-lap.
+ */
+function StirDial({
+  wrapRef,
+  onAngle,
+  onRelease,
+}: {
+  wrapRef: React.RefObject<HTMLDivElement>;
+  onAngle: (angle: number) => void;
+  onRelease: () => void;
+}) {
+  const [angle, setAngle] = useState(-Math.PI / 2);
+  const [down, setDown] = useState(false);
+
+  const track = (e: React.PointerEvent) => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const a = Math.atan2(
+      e.clientY - (r.top + r.height / 2),
+      e.clientX - (r.left + r.width / 2)
+    );
+    setAngle(a);
+    onAngle(a);
+  };
+
+  const R = 52;
+  const dotX = Math.cos(angle) * R;
+  const dotY = Math.sin(angle) * R;
+
+  return (
+    <div
+      ref={wrapRef}
+      className="relative w-[132px] h-[132px] touch-none"
+      onPointerDown={(e) => {
+        e.preventDefault();
+        (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+        setDown(true);
+        track(e);
+      }}
+      onPointerMove={(e) => {
+        if (!down) return;
+        e.preventDefault();
+        track(e);
+      }}
+      onPointerUp={() => {
+        setDown(false);
+        onRelease();
+      }}
+      onPointerCancel={() => {
+        setDown(false);
+        onRelease();
+      }}
+      onContextMenu={(e) => e.preventDefault()}
+      style={{ WebkitTouchCallout: "none", WebkitTapHighlightColor: "transparent" }}
+    >
+      {/* The track */}
+      <div
+        aria-hidden
+        className="absolute inset-0 rounded-full border-[3px] border-dashed border-white/30"
+      />
+      <p className="absolute inset-0 flex items-center justify-center text-center text-[8px] tracking-[0.2em] uppercase text-white/40 leading-tight pointer-events-none">
+        stir
+      </p>
+      {/* The dot */}
+      <div
+        aria-hidden
+        className="absolute w-[34px] h-[34px] rounded-full border-[3px] border-black"
+        style={{
+          left: "50%",
+          top: "50%",
+          transform: `translate(-50%,-50%) translate(${dotX}px, ${dotY}px) scale(${down ? 1.12 : 1})`,
+          background: `radial-gradient(circle at 36% 30%, #FFFFFF 0%, ${P.lime} 55%, ${P.green} 100%)`,
+          boxShadow: "0 3px 0 rgba(0,0,0,0.5)",
+          transition: "transform 40ms linear",
+        }}
+      />
     </div>
   );
 }
@@ -726,18 +828,6 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
 
   const tapShake = useCallback(() => {
     if (s.current.phase === "shake") s.current.shakeTaps++;
-  }, []);
-
-  const onStirMove = useCallback((e: React.PointerEvent) => {
-    const st = s.current;
-    if (st.phase !== "stir") return;
-    const el = wrapRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    applyStirAngle(
-      st,
-      Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2))
-    );
   }, []);
 
   const endStir = useCallback(() => {
@@ -912,22 +1002,32 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
   );
 
   return (
-    <div>
-      <div
-        ref={wrapRef}
-        onPointerMove={onStirMove}
-        onPointerDown={onStirMove}
-        onPointerUp={endStir}
-        onPointerCancel={endStir}
-        onPointerLeave={endStir}
-        style={{ touchAction: uiPhase === "stir" ? "none" : "auto" }}
-      >
+    /*
+      A cabinet has a screen and a deck, and they don't move. 60% of the height
+      is the screen — animation and information only — and the bottom 40% is
+      where every control lives, whatever the phase.
+      
+      This is why the stir dial is down here rather than drawn on the canvas:
+      controls appearing over the animation, in a place nothing else ever
+      appears, read as a glitch rather than as a control.
+    */
+    <div className="flex flex-col" style={{ height: "min(78vh, 640px)" }}>
+      <div className="flex-[3] min-h-0 flex items-center justify-center bg-black px-2 pt-2">
         <CRTScreen glow="#FFA000">
-          <ArcadeCanvas onFrame={onFrame} running />
+          <ArcadeCanvas onFrame={onFrame} running fit="height" />
         </CRTScreen>
       </div>
 
-      <div className="p-2 bg-black">
+      <div
+        className="flex-[2] min-h-0 p-2 bg-black select-none flex items-center justify-center"
+        style={{
+          touchAction: "none",
+          WebkitUserSelect: "none",
+          WebkitTouchCallout: "none",
+          WebkitTapHighlightColor: "transparent",
+        }}
+        onContextMenu={(e) => e.preventDefault()}
+      >
         {uiPhase === "gather" ? (
           // ── The pad ──────────────────────────────────────────────────────
           // A home-console controller: D-pad left, action button right, both
@@ -943,7 +1043,7 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
             }}
           />
         ) : uiPhase === "shake" ? (
-          <div className="h-24 flex items-center justify-center">
+          <div className="flex items-center justify-center">
             <button
               type="button"
               aria-label="Shake"
@@ -952,16 +1052,24 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
                 e.preventDefault();
                 tapShake();
               }}
-              style={{ background: P.lime, touchAction: "manipulation" }}
-              className="select-none w-[84px] h-[84px] rounded-full border-[3px] border-black text-black text-[13px] font-black tracking-[0.12em] uppercase shadow-[0_5px_0_#00551C] active:translate-y-[4px] active:shadow-[0_1px_0_#00551C] transition-transform"
+              onContextMenu={(e) => e.preventDefault()}
+              style={{
+                background: P.lime,
+                touchAction: "none",
+                WebkitTouchCallout: "none",
+                WebkitTapHighlightColor: "transparent",
+              }}
+              className="select-none w-[112px] h-[112px] rounded-full border-[4px] border-black text-black text-[15px] font-black tracking-[0.12em] uppercase shadow-[0_6px_0_#00551C] active:translate-y-[5px] active:shadow-[0_1px_0_#00551C] transition-transform"
             >
               Shake
             </button>
           </div>
         ) : uiPhase === "stir" ? (
-          <p className="h-24 flex items-center justify-center text-center text-[11px] tracking-widest uppercase text-white/50 leading-relaxed px-4">
-            Drag the dot around the glass
-          </p>
+          <StirDial
+            wrapRef={wrapRef}
+            onAngle={(a) => applyStirAngle(s.current, a)}
+            onRelease={endStir}
+          />
         ) : (
           // ── The pour deck ────────────────────────────────────────────────
           // Only this drink's four ingredients, as round cabinet buttons, two

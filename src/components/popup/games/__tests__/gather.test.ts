@@ -16,7 +16,10 @@ import {
   PLAYER_H,
   PTS_RIGHT,
   PTS_WRONG,
+  ITEM_SPACING,
+  PLAYER_W,
   SHELF_ROWS,
+  cameraX,
   freshGatherState,
   remaining,
   updateGather,
@@ -175,12 +178,48 @@ check("running moves him and turns him around", () => {
   assert.strictEqual(st.facing, -1);
 });
 
-check("he cannot run off either end of the bar", () => {
+check("he cannot run off either end of the room", () => {
   const st = freshGatherState(["gin"], fixed(0.5));
-  run(st, 10, { left: true, right: false, jump: false });
+  run(st, 20, { left: true, right: false, jump: false });
   assert.ok(st.x >= 0, `went off the left: ${st.x}`);
-  run(st, 20, { left: false, right: true, jump: false });
-  assert.ok(st.x <= 224, `went off the right: ${st.x}`);
+  run(st, 40, { left: false, right: true, jump: false });
+  assert.ok(st.x <= st.worldW, `went off the right: ${st.x} of ${st.worldW}`);
+});
+
+check("the room is wider than the screen", () => {
+  const st = freshGatherState(["gin"], fixed(0.5));
+  assert.ok(st.worldW > 224, `world is only ${st.worldW} wide`);
+});
+
+check("the camera follows him and stops at both walls", () => {
+  const st = freshGatherState(["gin"], fixed(0.5));
+  assert.strictEqual(cameraX(st), 0, "camera started scrolled in");
+  run(st, 40, { left: false, right: true, jump: false });
+  assert.strictEqual(cameraX(st), st.worldW - 224, "camera did not reach the far wall");
+  run(st, 40, { left: true, right: false, jump: false });
+  assert.strictEqual(cameraX(st), 0, "camera did not come back");
+});
+
+check("no two items are close enough to be grabbed together", () => {
+  // The guarantee that stops a jump for a high bottle clipping a low one.
+  const st = freshGatherState(["gin", "lime", "sugar", "ice"], fixed(0.5));
+  const reach = PLAYER_W + ITEM_SIZE;
+  for (const a of st.items) {
+    for (const b of st.items) {
+      if (a === b) continue;
+      assert.ok(
+        Math.abs(a.x - b.x) > reach,
+        `${a.key} and ${b.key} are ${Math.abs(a.x - b.x)}px apart, within reach of ${reach}`
+      );
+    }
+  }
+});
+
+check("nothing is stacked directly above anything else", () => {
+  const st = freshGatherState(["gin", "lime", "sugar", "ice"], fixed(0.5));
+  const columns = st.items.map((i) => i.x);
+  assert.strictEqual(new Set(columns).size, columns.length, "two items share a column");
+  assert.ok(ITEM_SPACING > PLAYER_W + ITEM_SIZE, "spacing does not guarantee separation");
 });
 
 check("a jump leaves the ground and lands back on it", () => {

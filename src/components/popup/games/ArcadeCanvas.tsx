@@ -16,11 +16,18 @@ export default function ArcadeCanvas({
   onFrame,
   running,
   className,
+  fit = "width",
 }: {
   /** Called once per animation frame. dt is seconds since the last frame. */
   onFrame: (ctx: CanvasRenderingContext2D, dt: number, t: number) => void;
   running: boolean;
   className?: string;
+  /**
+   * "width" fills the container and takes whatever height the aspect needs.
+   * "height" does the opposite — for a fixed-height row where the screen has to
+   * letterbox rather than push the controls off the bottom.
+   */
+  fit?: "width" | "height";
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const frameRef = useRef(onFrame);
@@ -65,13 +72,24 @@ export default function ArcadeCanvas({
       className={className}
       style={{
         imageRendering: "pixelated",
-        width: "100%",
-        height: "auto",
+        width: fit === "width" ? "100%" : "auto",
+        height: fit === "width" ? "auto" : "100%",
+        maxWidth: "100%",
+        maxHeight: "100%",
         aspectRatio: `${GAME_W} / ${GAME_H}`,
         display: "block",
         background: "#000",
-        touchAction: "manipulation",
+        // A game surface must never behave like a document. Without these, a
+        // press-and-hold on a phone starts a text selection or raises the
+        // copy/paste callout, and the gesture that was meant to be a tap ends
+        // up dragging a selection across the game instead.
+        touchAction: "none",
+        userSelect: "none",
+        WebkitUserSelect: "none",
+        WebkitTouchCallout: "none",
+        WebkitTapHighlightColor: "transparent",
       }}
+      onContextMenu={(e) => e.preventDefault()}
     />
   );
 }

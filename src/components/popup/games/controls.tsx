@@ -65,6 +65,10 @@ export function ArcadeButton({
         touchAction: "none",
         WebkitTapHighlightColor: "transparent",
         userSelect: "none",
+        // The callout is the one that was missing: a press-and-hold on iOS
+        // raises the copy/paste bubble over the game even when selection and
+        // tap highlight are already off.
+        WebkitTouchCallout: "none",
       }}
       className={`select-none border-2 bg-black/60 active:bg-white/20 disabled:opacity-30 flex flex-col items-center justify-center leading-none transition-colors ${className}`}
     >

@@ -36,7 +36,19 @@ export const JUMP_V = 390;
 
 export const SHELF_ROWS = [GROUND_Y - 105, GROUND_Y - 74, GROUND_Y - 45];
 export const ITEM_SIZE = 16;
-export const PER_ROW = 5;
+
+/**
+ * Horizontal gap between neighbouring items.
+ *
+ * This number is a guarantee, not a taste decision. An item is grabbed when its
+ * box overlaps the player's, so two items can only both be in reach if their
+ * centres sit within PLAYER_W + ITEM_SIZE (34px) of each other. At 48 that is
+ * impossible: whatever the player jumps for, exactly one thing is reachable,
+ * and nothing is ever stacked above anything else to be clipped on the way up.
+ */
+export const ITEM_SPACING = 48;
+/** Room at each end so the first and last item aren't against a wall. */
+export const WORLD_MARGIN = 44;
 
 export const PTS_RIGHT = 120;
 export const PTS_WRONG = -60;
@@ -71,6 +83,8 @@ export interface GatherState {
   onGround: boolean;
   facing: 1 | -1;
   items: GatherItem[];
+  /** How wide the room is. The camera and the walls both read this. */
+  worldW: number;
   needed: IngredientKey[];
   collected: IngredientKey[];
   score: number;
@@ -79,6 +93,26 @@ export interface GatherState {
   grabCooldown: number;
   /** True once every needed ingredient is in hand. */
   done: boolean;
+}
+
+/**
+ * The bar is wider than the screen — a classic side-scroller, so the shelves
+ * have room to spread out instead of being crammed into 224px where everything
+ * overlaps. Width follows from the stock, so adding an ingredient widens the
+ * room rather than tightening the spacing.
+ */
+export function worldWidth(itemCount: number): number {
+  return WORLD_MARGIN * 2 + Math.max(0, itemCount - 1) * ITEM_SPACING;
+}
+
+/**
+ * Where the camera sits. Centres on the player, then stops at both ends so the
+ * view never shows past the walls.
+ */
+export function cameraX(st: GatherState): number {
+  const max = Math.max(0, st.worldW - GAME_W);
+  const wanted = st.x - GAME_W / 2;
+  return Math.max(0, Math.min(max, wanted));
 }
 
 export interface GatherInput {
@@ -107,23 +141,23 @@ export function freshGatherState(
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
 
-  const items: GatherItem[] = shuffled.map((key, i) => {
-    const row = Math.floor(i / PER_ROW) % SHELF_ROWS.length;
-    const col = i % PER_ROW;
-    const lane = GAME_W / PER_ROW;
-    return {
-      key,
-      // Centred in its lane, nudged so rows don't line up in columns.
-      x: col * lane + lane / 2 + (row % 2 === 0 ? 0 : lane * 0.25),
-      y: SHELF_ROWS[row],
-      taken: false,
-      bob: rand() * Math.PI * 2,
-    };
-  });
+  // One item per column, left to right, each at one of three heights. Because
+  // every item has its own column, nothing sits above anything else — jumping
+  // for a high bottle cannot clip a low one, which is the whole point.
+  const items: GatherItem[] = shuffled.map((key, i) => ({
+    key,
+    x: WORLD_MARGIN + i * ITEM_SPACING,
+    // Walk the heights rather than repeating a 1-2-3 pattern, so the run reads
+    // as a bar rather than as a staircase.
+    y: SHELF_ROWS[(i * 2 + Math.floor(i / 3)) % SHELF_ROWS.length],
+    taken: false,
+    bob: rand() * Math.PI * 2,
+  }));
 
   return {
     t: 0,
-    x: GAME_W / 2,
+    worldW: worldWidth(items.length),
+    x: WORLD_MARGIN,
     y: GROUND_Y,
     vx: 0,
     vy: 0,
@@ -175,10 +209,10 @@ export function updateGather(st: GatherState, dt: number, input: GatherInput): v
   if (dir !== 0) st.facing = dir > 0 ? 1 : -1;
   st.x += st.vx * dt;
 
-  // The bar has walls. Running off the edge would take him behind the shelves.
+  // The room has walls at both ends of the world, not at the edges of the view.
   const half = PLAYER_W / 2;
   if (st.x < half) st.x = half;
-  if (st.x > GAME_W - half) st.x = GAME_W - half;
+  if (st.x > st.worldW - half) st.x = st.worldW - half;
 
   // ── Jump ──────────────────────────────────────────────────────────────────
   if (input.jump && st.onGround) {
