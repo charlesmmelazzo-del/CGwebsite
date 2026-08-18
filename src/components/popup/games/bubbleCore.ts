@@ -25,9 +25,15 @@ import { ingredientsInUse } from "./cocktails";
 
 // ─── Tuning ──────────────────────────────────────────────────────────────────
 
-/** The tank the bubbles drift in. Below it sits the recipe strip. */
-export const TANK_TOP = 26;
-export const TANK_BOTTOM = 196;
+/**
+ * The tank the bubbles drift in, with the recipe strip below it.
+ *
+ * Runs nearly the full height of the buffer because this phase takes the whole
+ * cabinet — there is no control deck under it to leave room for, so anything
+ * held back here is just empty screen.
+ */
+export const TANK_TOP = 16;
+export const TANK_BOTTOM = 232;
 export const BUBBLE_R = 11;
 
 export const SPEED_MIN = 16;

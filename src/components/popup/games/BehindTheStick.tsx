@@ -358,13 +358,20 @@ function drawStir(ctx: CanvasRenderingContext2D, st: State) {
   meter(ctx, 52, RAIL_Y + 26, 120, 4, clamp((total - st.phaseT) / total, 0, 1), P.cyan);
 }
 
+/**
+ * The drink going across the bar.
+ *
+ * Wordless on purpose. It used to shout ORDER UP!, which is the exact phrase
+ * the next card opens with — the same words twice in three seconds read as the
+ * game repeating itself. A guest smiling at a drink says it without saying it.
+ */
 function drawServe(ctx: CanvasRenderingContext2D, st: State) {
   const p = clamp(st.phaseT / 1.6, 0, 1);
-  const x = 120 + p * 60;
-  rect(ctx, x, 186, 8, 12, P.cyan);
-  rect(ctx, x + 1, 188, 6, 4, P.amber);
-  rect(ctx, 0, RAIL_Y - 6, GAME_W, RAIL_H + 12, "#101020");
-  drawTextMarquee(ctx, "ORDER UP!", 112, RAIL_Y + 6, P.lime, 2, "center", P.black, P.forest);
+  // The glass slides from the bartender's hand to the guest.
+  const x = 120 + p * 52;
+  rect(ctx, x, 184, 9, 14, P.cyan);
+  rect(ctx, x + 1, 186, 7, 5, P.amber);
+  rect(ctx, x + 2, 198, 5, 2, P.slate);
 }
 
 function drawOver(ctx: CanvasRenderingContext2D, t: number) {
@@ -561,14 +568,14 @@ function drawBubbles(ctx: CanvasRenderingContext2D, bs: BubbleState, t: number) 
 
   // ── The recipe, ticking off ──────────────────────────────────────────────
   rect(ctx, 0, TANK_BOTTOM + 2, GAME_W, GAME_H - TANK_BOTTOM - 2, "#100A1C");
-  drawText(ctx, "RECIPE", 6, TANK_BOTTOM + 8, P.white, 1);
+  drawText(ctx, "RECIPE", 6, TANK_BOTTOM + 6, P.white, 1);
 
   bs.needed.forEach((key, i) => {
     const ing = ING_BY_KEY.get(key);
     if (!ing) return;
     const has = bs.collected.includes(key);
     const x = 8 + i * 54;
-    const y = TANK_BOTTOM + 18;
+    const y = TANK_BOTTOM + 16;
     drawSprite(ctx, ing.sprite, x, y, ing.colors, 1);
     if (has) {
       rect(ctx, x - 1, y + 7, 13, 2, P.lime);
@@ -1049,6 +1056,18 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
     [onGameOver]
   );
 
+  // Cards and Bubble Buster take the whole cabinet; only the phases that are
+  // actually played with a control keep the 60/40 split.
+  const fullScreenPhase =
+    uiPhase === "boot" ||
+    uiPhase === "howto" ||
+    uiPhase === "order" ||
+    uiPhase === "build" ||
+    uiPhase === "make" ||
+    uiPhase === "gather" ||
+    uiPhase === "serve" ||
+    uiPhase === "over";
+
   return (
     /*
       A cabinet has a screen and a deck, and they don't move. 60% of the height
@@ -1061,7 +1080,9 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
     */
     <div className="flex flex-col" style={{ height: "min(78vh, 640px)" }}>
       <div
-        className="flex-[3] min-h-0 flex items-center justify-center bg-black px-2 pt-2"
+        className={`min-h-0 flex items-center justify-center bg-black px-2 pt-2 ${
+          fullScreenPhase ? "flex-1" : "flex-[3]"
+        }`}
         onPointerDown={onTankTap}
         onContextMenu={(e) => e.preventDefault()}
       >
@@ -1070,8 +1091,14 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
         </CRTScreen>
       </div>
 
+      {/*
+        The deck only exists when something is played on it. A card explaining
+        the game, or a tank you tap directly, has no controls — leaving an empty
+        40% strip under them wastes the screen and makes the card look cropped.
+      */}
       <div
-        className="flex-[2] min-h-0 p-2 bg-black select-none flex items-center justify-center"
+        hidden={fullScreenPhase}
+        className={`${fullScreenPhase ? "hidden" : "flex"} flex-[2] min-h-0 p-2 bg-black select-none items-center justify-center`}
         style={{
           touchAction: "none",
           WebkitUserSelect: "none",
