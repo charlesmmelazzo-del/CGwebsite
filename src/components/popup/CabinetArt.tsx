@@ -131,13 +131,18 @@ export function BartenderArt({
   // Head 20x14 over torso 20x12, arms 4x9 off each shoulder, tin overhead.
   // Laid out on a 22-wide grid so the arms have somewhere to go.
   //
-  // The tin sits at y0-15 and the raised arms at y14-23, so the hands meet the
-  // base of the tin. Spaced any further apart it reads as a floating tin
-  // rather than a bartender holding one.
+  // Getting "holding" to read took two corrections. ARM puts the hand at its
+  // BOTTOM (rows 4-7 are skin, 1-3 are sleeve), so simply raising the arms
+  // leaves the hands by his ears with the tin stranded overhead. The hands
+  // have to land on the tin's lower edge: tin y0-15, arms y8-16, hands y12-15.
+  // They also have to come inward — at x0/x18 they flank a tin spanning x5-16
+  // and touch nothing, so they sit at x2/x16 to grip its sides.
   const W = 22;
   const H = holdingTin ? 44 : 26;
   const top = holdingTin ? 18 : 0;
-  const armY = holdingTin ? 14 : top + 16;
+  const armY = holdingTin ? 8 : top + 16;
+  const armL = holdingTin ? 2 : 0;
+  const armR = holdingTin ? 16 : 18;
 
   return (
     <svg
@@ -154,8 +159,8 @@ export function BartenderArt({
       <g transform={`translate(1,${top + 14})`}>
         {spriteRects(BARTENDER_TORSO, BARTENDER_COLORS, "torso")}
       </g>
-      <g transform={`translate(0,${armY})`}>{spriteRects(ARM, BARTENDER_COLORS, "armL")}</g>
-      <g transform={`translate(18,${armY})`}>{spriteRects(ARM, BARTENDER_COLORS, "armR")}</g>
+      <g transform={`translate(${armL},${armY})`}>{spriteRects(ARM, BARTENDER_COLORS, "armL")}</g>
+      <g transform={`translate(${armR},${armY})`}>{spriteRects(ARM, BARTENDER_COLORS, "armR")}</g>
       {holdingTin && <g transform="translate(5,0)">{spriteRects(TIN, TIN_COLORS, "tin")}</g>}
     </svg>
   );
