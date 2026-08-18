@@ -150,7 +150,6 @@ check("a jump leaves the ground and lands back on it", () => {
 });
 
 check("a jump clears the top shelf", () => {
-  const st = freshGatherState(["gin"], fixed(0.5));
   const apex = (JUMP_V * JUMP_V) / (2 * 900);
   const headAtApex = GROUND_Y - apex - PLAYER_H;
   const topShelf = Math.min(...SHELF_ROWS);
