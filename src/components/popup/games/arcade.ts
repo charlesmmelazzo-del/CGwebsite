@@ -156,6 +156,37 @@ export function drawText(
   }
 }
 
+/**
+ * Marquee lettering: a full black keyline all the way round, then the fill.
+ *
+ * This is the look on every cabinet header of the era — RAMPAGE, GALAGA,
+ * Q*BERT — and it's what lets bright type sit on top of a busy picture without
+ * a panel behind it. Costs 8 extra passes, which at this resolution is nothing.
+ */
+export function drawTextMarquee(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  color: string,
+  scale = 1,
+  align: TextAlign = "left",
+  keyline: string = P.black,
+  /** Optional hard offset shadow under the whole thing, as on a real marquee. */
+  dropShadow?: string
+) {
+  if (dropShadow) {
+    drawText(ctx, text, x + scale * 2, y + scale * 2, dropShadow, scale, align);
+  }
+  for (let dx = -scale; dx <= scale; dx += scale) {
+    for (let dy = -scale; dy <= scale; dy += scale) {
+      if (dx === 0 && dy === 0) continue;
+      drawText(ctx, text, x + dx, y + dy, keyline, scale, align);
+    }
+  }
+  drawText(ctx, text, x, y, color, scale, align);
+}
+
 /** Text with a hard 1px drop shadow — keeps it readable over busy backdrops. */
 export function drawTextShadow(
   ctx: CanvasRenderingContext2D,

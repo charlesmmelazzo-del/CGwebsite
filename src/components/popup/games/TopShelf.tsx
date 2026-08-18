@@ -2,11 +2,32 @@
 
 import { useCallback, useRef } from "react";
 import ArcadeCanvas from "./ArcadeCanvas";
+import CRTScreen from "./CRTScreen";
 import { ArcadeButton, useArcadeKeys } from "./controls";
-import { blink, clear, drawText, drawTextShadow, GAME_H, GAME_W, P, pad, rect } from "./arcade";
+import {
+  blink,
+  clear,
+  drawSprite,
+  drawText,
+  drawTextMarquee,
+  GAME_H,
+  GAME_W,
+  P,
+  pad,
+  rect,
+} from "./arcade";
+import {
+  CLIMBER,
+  CLIMBER_HERO_COLORS,
+  CLIMBER_STEP,
+  CLIMBER_THIEF_COLORS,
+  ROLLING_BOTTLE,
+  BOTTLE_COLORS,
+  SHELF_BOTTLE,
+  shelfBottleColors,
+} from "./sprites";
 import {
   BOTTLE_H,
-  BOTTLE_W,
   freshState,
   GROUND_Y,
   laddersFor,
@@ -35,8 +56,36 @@ import type { ArcadeGameProps } from "./registry";
 
 const HUD_H = 13;
 
+/** The bar's stock, in the era's saturated primaries. */
+const SHELF_HUES: [string, string][] = [
+  [P.red, "#8E1410"],
+  [P.amber, "#A86500"],
+  [P.cyan, "#1E8F94"],
+  [P.purple, "#5A188A"],
+  [P.orange, "#A84D00"],
+  [P.lime, "#5A8A00"],
+];
+
+/** The bartender watching it all happen, in his vest. */
+const BARKEEP_COLORS: Record<string, string> = {
+  o: "#100810",
+  c: "#3A2010",
+  s: P.skin,
+  S: "#C98A62",
+  m: "#3A2010",
+  r: "#26263A",
+  R: "#16162A",
+  b: "#16162A",
+  B: "#6B4020",
+};
+
 // ─── Drawing ─────────────────────────────────────────────────────────────────
 
+/**
+ * A climber. Hero and thief are the SAME sprite in different colours — palette
+ * swapping one character into a cast is straight out of the era's playbook, and
+ * it keeps both of them animating identically for free.
+ */
 function drawMan(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -44,31 +93,21 @@ function drawMan(
   face: 1 | -1,
   walking: boolean,
   t: number,
-  shirt: string,
-  cap: string
+  colors: Record<string, string>
 ) {
-  // y is the feet line
-  const top = y - PLAYER_H;
-  rect(ctx, x - 5, top, 10, 5, P.skin);          // head
-  rect(ctx, x - 6, top - 2, 12, 3, cap);          // cap
-  rect(ctx, x + (face > 0 ? 2 : -4), top + 2, 2, 1, P.black); // eye
-  rect(ctx, x - 5, top + 5, 10, 6, shirt);        // torso
-  rect(ctx, x - 7, top + 6, 2, 4, P.skin);        // arms
-  rect(ctx, x + 5, top + 6, 2, 4, P.skin);
-
-  const step = walking && Math.floor(t * 9) % 2 === 0;
-  rect(ctx, x - 4, top + 11, 3, 4, P.navy);
-  rect(ctx, x + 1, top + 11, 3, 4, P.navy);
-  if (step) rect(ctx, x + 2 * face, top + 14, 3, 1, P.navy);
+  // Sprite is 14 x 18 and y is the feet line.
+  const sprite = walking && Math.floor(t * 8) % 2 === 0 ? CLIMBER_STEP : CLIMBER;
+  drawSprite(ctx, sprite, Math.round(x - 7), Math.round(y - PLAYER_H - 3), colors, 1, face < 0);
 }
 
 function drawBottleSprite(ctx: CanvasRenderingContext2D, x: number, y: number, spin: number) {
-  // A rolling bottle: the highlight rotates so it reads as tumbling
-  rect(ctx, x, y + 2, BOTTLE_W, BOTTLE_H - 4, P.green);
-  rect(ctx, x + 1, y, BOTTLE_W - 2, 2, P.forest);
-  rect(ctx, x + 1, y + BOTTLE_H - 2, BOTTLE_W - 2, 2, P.forest);
-  const hx = Math.floor(spin) % 3;
-  rect(ctx, x + 1 + hx * 2, y + 3, 2, 2, P.lime);
+  // Outlined so it stays readable rolling across a shelf full of stock.
+  drawSprite(ctx, ROLLING_BOTTLE, Math.round(x), Math.round(y), BOTTLE_COLORS, 1);
+  // A highlight that travels round the bottle, so it reads as tumbling
+  const phase = Math.floor(spin / 4) % 4;
+  const hx = [3, 5, 6, 4][phase];
+  const hy = [2, 3, 6, 7][phase];
+  rect(ctx, x + hx, y + hy, 2, 2, P.lime);
 }
 
 // ─── Scene ───────────────────────────────────────────────────────────────────
@@ -86,9 +125,8 @@ function drawWorld(ctx: CanvasRenderingContext2D, st: State) {
     // Bottles standing on the shelf — the stock the thief is working through
     for (let b = 0; b < 9; b++) {
       const bx = 8 + b * 24 + Math.floor(pseudo(i * 31 + b) * 8);
-      const hue = [P.red, P.amber, P.cyan, P.purple, P.orange, P.lime][(i + b) % 6];
-      rect(ctx, bx, sy - 11, 5, 11, hue);
-      rect(ctx, bx + 1, sy - 14, 3, 3, P.slate);
+      const [body, shade] = SHELF_HUES[(i + b) % SHELF_HUES.length];
+      drawSprite(ctx, SHELF_BOTTLE, bx, sy - 12, shelfBottleColors(body, shade), 1);
     }
 
     rect(ctx, 0, sy, GAME_W, SHELF_TH, P.wood);
@@ -102,6 +140,18 @@ function drawWorld(ctx: CanvasRenderingContext2D, st: State) {
     }
   }
 
+
+  // The floor of the bar, below the lowest shelf — otherwise the bottom of the
+  // screen is an empty void once the camera bottoms out.
+  const groundScreen = shelfY(0) - st.camY;
+  if (groundScreen < GAME_H) {
+    rect(ctx, 0, groundScreen + SHELF_TH, GAME_W, GAME_H - groundScreen, "#1C1030");
+    for (let i = 0; i < 9; i++) {
+      rect(ctx, i * 26 + 4, groundScreen + SHELF_TH, 1, GAME_H, "#140A22");
+    }
+    rect(ctx, 0, groundScreen + SHELF_TH, GAME_W, 1, "#4A2808");
+  }
+
   for (const b of st.bottles) {
     const by = b.y - st.camY;
     if (by < -20 || by > GAME_H + 20) continue;
@@ -110,14 +160,14 @@ function drawWorld(ctx: CanvasRenderingContext2D, st: State) {
 
   const ty = shelfY(st.thiefShelf) - st.camY;
   if (ty > -30 && ty < GAME_H + 30) {
-    drawMan(ctx, st.thiefX, ty, st.thiefDir, true, st.t, P.magenta, P.purple);
+    drawMan(ctx, st.thiefX, ty, st.thiefDir, true, st.t, CLIMBER_THIEF_COLORS);
     if (blink(st.t, 1.5)) drawText(ctx, "HA HA", st.thiefX + 12, ty - 26, P.magenta, 1);
   }
 
   // The player flashes while invulnerable after a hit
   const py = st.py - st.camY;
   if (!(st.invuln > 0 && blink(st.t, 8))) {
-    drawMan(ctx, st.px, py, st.face, st.input.left || st.input.right, st.t, P.red, P.white);
+    drawMan(ctx, st.px, py, st.face, st.input.left || st.input.right, st.t, CLIMBER_HERO_COLORS);
   }
 
   for (const p of st.pops) {
@@ -140,8 +190,8 @@ function drawIntro(ctx: CanvasRenderingContext2D, st: State, T: number) {
     if (sy < -SHELF_GAP || sy > GAME_H + SHELF_GAP) continue;
     for (let b = 0; b < 9; b++) {
       const bx = 8 + b * 24 + Math.floor(pseudo(i * 31 + b) * 8);
-      const hue = [P.red, P.amber, P.cyan, P.purple, P.orange, P.lime][(i + b) % 6];
-      rect(ctx, bx, sy - 11, 5, 11, hue);
+      const [body, shade] = SHELF_HUES[(i + b) % SHELF_HUES.length];
+      drawSprite(ctx, SHELF_BOTTLE, bx, sy - 12, shelfBottleColors(body, shade), 1);
     }
     rect(ctx, 0, sy, GAME_W, SHELF_TH, P.wood);
     for (const lx of laddersFor(i)) {
@@ -153,29 +203,37 @@ function drawIntro(ctx: CanvasRenderingContext2D, st: State, T: number) {
 
   const ground = GROUND_Y - cam;
 
+  if (ground < GAME_H) {
+    rect(ctx, 0, ground + SHELF_TH, GAME_W, GAME_H - ground, "#1C1030");
+    for (let i = 0; i < 9; i++) {
+      rect(ctx, i * 26 + 4, ground + SHELF_TH, 1, GAME_H, "#140A22");
+    }
+    rect(ctx, 0, ground + SHELF_TH, GAME_W, 1, "#4A2808");
+  }
+
   rect(ctx, 150, ground - 26, 60, 4, P.wood);
-  drawMan(ctx, 186, ground, -1, false, st.t, "#202030", "#3A2010");
+  drawMan(ctx, 186, ground, -1, false, st.t, BARKEEP_COLORS);
 
   if (T < 3.4) {
     const x = 10 + Math.min(1, T / 2) * 110;
-    drawMan(ctx, x, ground, 1, T < 2, st.t, P.magenta, P.purple);
+    drawMan(ctx, x, ground, 1, T < 2, st.t, CLIMBER_THIEF_COLORS);
     if (T > 2) {
-      drawTextShadow(ctx, "I ONLY LIKE", 112, 92, P.white, 1, "center");
-      drawTextShadow(ctx, "TOP SHELF BOOZE!", 112, 104, P.yellow, 1, "center");
+      drawTextMarquee(ctx, "I ONLY LIKE", 112, 92, P.white, 1, "center");
+      drawTextMarquee(ctx, "TOP SHELF BOOZE!", 112, 104, P.yellow, 1, "center");
     }
   } else if (T < 5.2) {
     const p = Math.max(0, Math.min(1, (T - 3.4) / 1.8));
-    drawMan(ctx, 120, ground - p * 40, 1, false, st.t, P.magenta, P.purple);
+    drawMan(ctx, 120, ground - p * 40, 1, false, st.t, CLIMBER_THIEF_COLORS);
   } else if (T < 6.6) {
     const ty = shelfY(4) - cam;
-    drawMan(ctx, 112, ty, 1, true, st.t, P.magenta, P.purple);
+    drawMan(ctx, 112, ty, 1, true, st.t, CLIMBER_THIEF_COLORS);
     if (blink(st.t, 3)) drawText(ctx, "HA HA HA", 112, ty - 28, P.magenta, 1, "center");
     drawBottleSprite(ctx, 112 + Math.sin(st.t * 4) * 40, ty - BOTTLE_H, st.t * 12);
   } else {
-    drawTextShadow(ctx, "GO AFTER HIM QUICK", 112, 96, P.white, 1, "center");
-    drawTextShadow(ctx, "BEFORE HE WRECKS", 112, 108, P.white, 1, "center");
-    drawTextShadow(ctx, "THE WHOLE BAR!", 112, 120, P.yellow, 1, "center");
-    drawMan(ctx, 112, ground, 1, false, st.t, P.red, P.white);
+    drawTextMarquee(ctx, "GO AFTER HIM QUICK", 112, 96, P.white, 1, "center");
+    drawTextMarquee(ctx, "BEFORE HE WRECKS", 112, 108, P.white, 1, "center");
+    drawTextMarquee(ctx, "THE WHOLE BAR!", 112, 120, P.yellow, 1, "center");
+    drawMan(ctx, 112, ground, 1, false, st.t, CLIMBER_HERO_COLORS);
   }
 
   if (blink(st.t, 1.5)) {
@@ -246,11 +304,21 @@ export default function TopShelf({ onGameOver }: ArcadeGameProps) {
       drawHud(ctx, st);
 
       if (st.bannerT > 0 && st.banner) {
-        drawTextShadow(ctx, st.banner, 112, 60, P.yellow, st.banner.length > 14 ? 1 : 2, "center");
+        drawTextMarquee(
+          ctx,
+          st.banner,
+          112,
+          60,
+          P.yellow,
+          st.banner.length > 14 ? 1 : 2,
+          "center",
+          P.black,
+          P.crimson
+        );
       }
       if (st.phase === "over") {
         rect(ctx, 20, 120, GAME_W - 40, 46, P.black);
-        drawTextShadow(ctx, "GAME OVER", 112, 132, P.red, 2, "center");
+        drawTextMarquee(ctx, "GAME OVER", 112, 132, P.red, 2, "center", P.black, "#3A0000");
         if (blink(st.t, 2)) drawText(ctx, "THE BAR IS WRECKED", 112, 152, P.yellow, 1, "center");
       }
     },
@@ -259,7 +327,9 @@ export default function TopShelf({ onGameOver }: ArcadeGameProps) {
 
   return (
     <div>
-      <ArcadeCanvas onFrame={onFrame} running />
+      <CRTScreen glow="#3CE0E0">
+          <ArcadeCanvas onFrame={onFrame} running />
+        </CRTScreen>
 
       <div className="p-2 bg-black grid grid-cols-4 gap-1.5">
         <ArcadeButton

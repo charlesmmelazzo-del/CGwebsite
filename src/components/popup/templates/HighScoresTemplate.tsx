@@ -13,13 +13,55 @@ import type { PopupCocktail, PopupTemplateProps } from "@/lib/popup/types";
 /**
  * HIGH SCORES — a golden-age arcade pop-up.
  *
- * The menu is a row of cabinets. Tapping one opens the cocktail: its art, what's
- * in it, how it tastes, the story behind it — and the mini game attached to it,
- * with a $15 gift card for whoever tops the board when the pop-up ends.
+ * The whole page is dressed as a room full of cabinets: marquee lettering with
+ * a heavy keyline and hard offset shadows, a starburst behind the header like
+ * a 1981 flyer, and each cocktail presented as an actual cabinet — lit marquee
+ * on top, artwork behind glass in a black bezel, control panel underneath.
  *
- * Built mobile-first throughout, because nearly everyone will meet this standing
- * at the bar with a phone in one hand and a drink in the other.
+ * Built mobile-first throughout, because nearly everyone meets this standing at
+ * the bar with a phone in one hand and a drink in the other.
  */
+
+// ─── Marquee lettering ───────────────────────────────────────────────────────
+
+/**
+ * Eight-direction text shadow standing in for a stroke.
+ *
+ * `-webkit-text-stroke` centres the stroke on the glyph edge, which eats into
+ * thin letterforms; stacking offset shadows keeps the letter shape intact and
+ * works everywhere.
+ */
+function keyline(color: string, w: number): string {
+  const offsets = [
+    [-w, -w],
+    [0, -w],
+    [w, -w],
+    [-w, 0],
+    [w, 0],
+    [-w, w],
+    [0, w],
+    [w, w],
+  ];
+  return offsets.map(([x, y]) => `${x}px ${y}px 0 ${color}`).join(", ");
+}
+
+function marquee(opts: {
+  fill: string;
+  stroke?: number;
+  shadow1?: string;
+  shadow2?: string;
+}): React.CSSProperties {
+  const w = opts.stroke ?? 2;
+  const parts = [keyline("#100810", w)];
+  // Tight offsets: a marquee shadow sits just behind the letter. Push it much
+  // further and it stops reading as depth and starts reading as a second word.
+  if (opts.shadow1) parts.push(`${w + 1}px ${w + 1}px 0 ${opts.shadow1}`);
+  if (opts.shadow2) parts.push(`${w + 3}px ${w + 3}px 0 ${opts.shadow2}`);
+  return { color: opts.fill, textShadow: parts.join(", ") };
+}
+
+// ─── Template ────────────────────────────────────────────────────────────────
+
 export default function HighScoresTemplate({
   menu,
   cocktails,
@@ -60,62 +102,75 @@ export default function HighScoresTemplate({
   const myTopPick = myVotes.find((v) => v.rank === 1)?.cocktailId;
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <Scanlines />
+    <div className="min-h-screen bg-[#05030F] text-white relative overflow-hidden">
+      <ArcadeBackdrop />
 
-      <div className="relative max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <div className="relative max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
         {/* ── Marquee ──────────────────────────────────────────────────── */}
-        <header className="text-center mb-8 sm:mb-12">
-          <p className="text-[9px] sm:text-[10px] tracking-[0.4em] uppercase text-[#3CE0E0] animate-pulse">
+        <header className="relative text-center mb-10 sm:mb-16">
+          <Starburst />
+
+          <p className="relative text-[9px] sm:text-[10px] tracking-[0.45em] uppercase text-[#3CE0E0]">
             Common Good Presents
           </p>
+
           <h1
-            className="mt-3 text-4xl sm:text-6xl font-black tracking-tight"
             style={{
-              color: "#FFD500",
-              textShadow: "3px 3px 0 #E42B20, 6px 6px 0 #8828C8",
+              ...marquee({ fill: "#FFD500", stroke: 3, shadow1: "#E42B20", shadow2: "#8828C8" }),
               fontFamily: "var(--font-display, system-ui)",
             }}
+            className="relative mt-4 text-[2.6rem] leading-[0.95] sm:text-7xl font-black tracking-tight uppercase"
           >
-            {menu.title || "HIGH SCORES"}
+            {menu.title || "High Scores"}
           </h1>
+
           {menu.subtitle && (
-            <p className="mt-3 text-[10px] sm:text-xs tracking-[0.3em] uppercase text-white/50">
+            <p
+              style={marquee({ fill: "#FFFFFF", stroke: 2 })}
+              className="relative mt-5 text-[10px] sm:text-xs tracking-[0.35em] uppercase"
+            >
               {menu.subtitle}
             </p>
           )}
+
           {menu.description && (
-            <p className="mt-4 max-w-md mx-auto text-xs sm:text-sm text-white/55 leading-relaxed">
+            <p className="relative mt-5 max-w-md mx-auto text-xs sm:text-sm text-white/65 leading-relaxed">
               {menu.description}
             </p>
           )}
 
-          <div className="mt-6 inline-block border-2 border-[#FFD500] px-4 py-2">
-            <p className="text-[9px] sm:text-[10px] tracking-[0.2em] uppercase text-[#FFD500] font-bold">
-              Top score on each game wins a $15 gift card
-            </p>
+          {/* Prize plate, styled like a coin-door instruction strip */}
+          <div className="relative mt-7 inline-block">
+            <div
+              className="border-[3px] border-[#100810] px-5 py-2.5"
+              style={{ background: "#FFD500", boxShadow: "5px 6px 0 #8828C8" }}
+            >
+              <p className="text-[9px] sm:text-[11px] tracking-[0.2em] uppercase text-[#100810] font-black">
+                High score wins a $15 gift card
+              </p>
+            </div>
           </div>
 
           {!isLive && (
-            <p className="mt-4 text-[10px] tracking-[0.2em] uppercase text-white/40">
-              This pop-up has closed — boards are final
+            <p className="relative mt-5 text-[10px] tracking-[0.25em] uppercase text-[#E42B20]">
+              ★ This pop-up has closed — boards are final ★
             </p>
           )}
         </header>
 
         {/* ── Voting status ────────────────────────────────────────────── */}
-        <p className="text-center text-[11px] text-white/45 leading-relaxed mb-6">
+        <p className="relative text-center text-[11px] text-white/55 leading-relaxed mb-7 tracking-wide">
           {votingOpen
             ? myVotes.length === 0
               ? "Play the games. Then vote for the drink you liked best."
               : myVotes.length === 1
-                ? "Vote locked in — tap another cocktail to rank a second favorite."
+                ? "Vote locked in — tap another cabinet to rank a second favorite."
                 : `You've ranked ${myVotes.length} favorites.`
             : voteBlockReason
               ? VOTE_BLOCK_MESSAGE[voteBlockReason]
               : "Voting is closed."}
         </p>
-        {voteError && <p className="mb-4 text-center text-xs text-red-300">{voteError}</p>}
+        {voteError && <p className="mb-4 text-center text-xs text-[#FF9CB0]">{voteError}</p>}
 
         {/* ── Cabinets ─────────────────────────────────────────────────── */}
         {cocktails.length === 0 ? (
@@ -123,7 +178,7 @@ export default function HighScoresTemplate({
             No cocktails on this pop-up yet.
           </p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
             {cocktails.map((c, i) => (
               <Cabinet
                 key={c.id}
@@ -138,11 +193,19 @@ export default function HighScoresTemplate({
 
         {/* ── Standings ────────────────────────────────────────────────── */}
         {cocktails.length > 0 && (
-          <div className="mt-12 sm:mt-16 max-w-xl mx-auto">
-            <Leaderboard results={results} accent="#FFD500" myTopPick={myTopPick} />
+          <div className="mt-14 sm:mt-20 max-w-xl mx-auto">
+            <h2
+              style={marquee({ fill: "#3CE0E0", stroke: 2, shadow1: "#0A4A6A" })}
+              className="text-center text-xl sm:text-2xl font-black tracking-[0.2em] uppercase mb-5"
+            >
+              Cocktail Standings
+            </h2>
+            <div className="border-[3px] border-[#100810] bg-black/70 p-4" style={{ boxShadow: "5px 6px 0 #1B1030" }}>
+              <Leaderboard results={results} accent="#FFD500" myTopPick={myTopPick} />
+            </div>
             {!viewer && (
-              <p className="mt-4 text-center text-xs text-white/35">
-                <Link href="/popup/signup" className="text-[#FFD500] hover:opacity-80">
+              <p className="mt-5 text-center text-xs text-white/40">
+                <Link href="/popup/signup" className="text-[#FFD500] underline hover:opacity-80">
                   Create an account
                 </Link>{" "}
                 to vote and get on the high score boards.
@@ -152,7 +215,6 @@ export default function HighScoresTemplate({
         )}
       </div>
 
-      {/* ── Detail ───────────────────────────────────────────────────────── */}
       {open && (
         <CocktailDetail
           cocktail={open}
@@ -172,9 +234,74 @@ export default function HighScoresTemplate({
   );
 }
 
+// ─── Backdrop ────────────────────────────────────────────────────────────────
+
+/** Deep field, a faint grid, and scanlines over the lot. */
+function ArcadeBackdrop() {
+  return (
+    <>
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 z-0"
+        style={{
+          background:
+            "radial-gradient(120% 90% at 50% 0%, #1B1040 0%, #0A0620 45%, #05030F 100%)",
+        }}
+      />
+      {/* Perspective floor grid, as on every space-shooter cabinet side art */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-x-0 bottom-0 h-1/3 z-0 opacity-25"
+        style={{
+          backgroundImage:
+            "linear-gradient(to right, rgba(60,224,224,0.35) 1px, transparent 1px), linear-gradient(to bottom, rgba(60,224,224,0.35) 1px, transparent 1px)",
+          backgroundSize: "44px 44px",
+          maskImage: "linear-gradient(to bottom, transparent, black)",
+          WebkitMaskImage: "linear-gradient(to bottom, transparent, black)",
+          transform: "perspective(220px) rotateX(58deg)",
+          transformOrigin: "bottom",
+        }}
+      />
+      {/* Scanlines across the whole page */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 z-0 opacity-[0.22]"
+        style={{
+          backgroundImage:
+            "repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,0.85) 3px, rgba(0,0,0,0.85) 4px)",
+        }}
+      />
+    </>
+  );
+}
+
+/** Radiating light behind the title, straight off a 1981 flyer. */
+function Starburst() {
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[130%] aspect-square opacity-[0.30]"
+      style={{
+        background:
+          "repeating-conic-gradient(from 0deg at 50% 50%, rgba(255,213,0,0.55) 0deg 5deg, rgba(0,0,0,0) 5deg 11deg)",
+        maskImage: "radial-gradient(circle at 50% 50%, black 5%, transparent 62%)",
+        WebkitMaskImage: "radial-gradient(circle at 50% 50%, black 5%, transparent 62%)",
+      }}
+    />
+  );
+}
+
 // ─── Cabinet card ────────────────────────────────────────────────────────────
 
-const CABINET_HUES = ["#E42B20", "#3CE0E0", "#FFD500", "#8828C8", "#00B83C", "#FF7B00"];
+/** Each cabinet gets its own marquee colour, like a row in an arcade. */
+const CABINET_HUES: { marquee: string; shadow: string; ink: string }[] = [
+  { marquee: "#E42B20", shadow: "#7A0F0A", ink: "#FFD500" },
+  { marquee: "#3CE0E0", shadow: "#0A5A6A", ink: "#100810" },
+  { marquee: "#FFD500", shadow: "#8A6A00", ink: "#100810" },
+  { marquee: "#8828C8", shadow: "#3A0A5A", ink: "#FFD500" },
+  { marquee: "#00B83C", shadow: "#00551C", ink: "#100810" },
+  { marquee: "#FF7B00", shadow: "#8A3F00", ink: "#100810" },
+];
 
 function Cabinet({
   cocktail,
@@ -193,55 +320,100 @@ function Cabinet({
   return (
     <button
       onClick={onOpen}
-      style={{ borderColor: hue }}
-      className="group text-left border-2 bg-[#0A0616] active:scale-[0.99] transition-transform"
+      className="group block w-full text-left active:translate-y-[2px] transition-transform"
+      style={{ filter: "drop-shadow(5px 7px 0 rgba(0,0,0,0.75))" }}
     >
-      {/* Cabinet marquee */}
-      <div style={{ background: hue }} className="px-2 py-1.5">
-        <p className="text-[9px] tracking-[0.25em] uppercase text-black font-bold truncate">
+      {/* Lit marquee */}
+      <div
+        className="border-[3px] border-b-0 border-[#100810] px-3 py-2 relative overflow-hidden"
+        style={{ background: hue.marquee }}
+      >
+        <div
+          aria-hidden
+          className="absolute inset-0"
+          style={{ background: "linear-gradient(to bottom, rgba(255,255,255,0.26), rgba(0,0,0,0.22))" }}
+        />
+        <p
+          className="relative text-[11px] tracking-[0.18em] uppercase font-black truncate text-center"
+          style={{ color: hue.ink, textShadow: `1px 1px 0 ${hue.shadow}` }}
+        >
           {cocktail.name}
         </p>
       </div>
 
-      {/* Screen */}
-      <div className="relative aspect-[4/3] bg-black overflow-hidden">
-        {cocktail.imageUrl ? (
-          <Image
-            src={cocktail.imageUrl}
-            alt={cocktail.name}
-            fill
-            unoptimized
-            className="object-cover opacity-90 group-hover:opacity-100 transition-opacity"
+      {/* Bezel + screen */}
+      <div className="border-[3px] border-[#100810] bg-[#0A0A12] p-2.5">
+        <div className="relative aspect-[4/3] bg-black overflow-hidden border-2 border-[#000]">
+          {cocktail.imageUrl ? (
+            <Image
+              src={cocktail.imageUrl}
+              alt={cocktail.name}
+              fill
+              unoptimized
+              className="object-cover group-hover:scale-[1.03] transition-transform duration-500"
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <p
+                style={marquee({ fill: hue.marquee, stroke: 1 })}
+                className="text-[11px] tracking-[0.3em] uppercase font-black animate-pulse"
+              >
+                Insert Coin
+              </p>
+            </div>
+          )}
+
+          {/* Curved glass + scanlines over the artwork */}
+          <div
+            aria-hidden
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              backgroundImage:
+                "repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,0.35) 3px, rgba(0,0,0,0.35) 4px)",
+            }}
           />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <p style={{ color: hue }} className="text-[10px] tracking-[0.3em] uppercase">
-              Insert Coin
-            </p>
-          </div>
-        )}
-        {rank !== undefined && (
-          <span
-            style={{ background: hue }}
-            className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center text-black text-[11px] font-bold tabular-nums"
-            title={`Your #${rank} pick`}
-          >
-            {rank}
-          </span>
-        )}
+          <div
+            aria-hidden
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background:
+                "radial-gradient(115% 115% at 50% 45%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.6) 100%)",
+            }}
+          />
+
+          {rank !== undefined && (
+            <span
+              className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center text-[12px] font-black tabular-nums border-2 border-[#100810]"
+              style={{ background: "#FFD500", color: "#100810" }}
+              title={`Your #${rank} pick`}
+            >
+              {rank}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Control panel */}
-      <div className="px-3 py-2.5 border-t-2" style={{ borderColor: hue }}>
+      <div className="border-[3px] border-t-0 border-[#100810] bg-[#15151F] px-3 py-2.5">
+        <div className="flex items-center gap-2.5">
+          {/* Joystick and two buttons */}
+          <span className="flex items-center gap-1.5 shrink-0" aria-hidden>
+            <span className="w-2.5 h-2.5 rounded-full bg-[#E42B20] border border-black/70" />
+            <span className="w-2 h-2 rounded-full bg-[#3CE0E0] border border-black/70" />
+            <span className="w-2 h-2 rounded-full bg-[#FFD500] border border-black/70" />
+          </span>
+          <span
+            className="text-[8px] tracking-[0.18em] uppercase truncate"
+            style={{ color: game ? hue.marquee : "rgba(255,255,255,0.28)" }}
+          >
+            {game ? game.title : "Game coming soon"}
+          </span>
+        </div>
         {cocktail.tagline && (
-          <p className="text-[10px] text-white/50 leading-snug line-clamp-2">{cocktail.tagline}</p>
+          <p className="mt-1.5 text-[10px] text-white/45 leading-snug line-clamp-2">
+            {cocktail.tagline}
+          </p>
         )}
-        <p
-          style={{ color: game ? hue : undefined }}
-          className={`mt-1.5 text-[8px] tracking-[0.2em] uppercase ${game ? "" : "text-white/25"}`}
-        >
-          {game ? `▸ ${game.title}` : "Game coming soon"}
-        </p>
       </div>
     </button>
   );
@@ -278,11 +450,10 @@ function CocktailDetail({
   const picked = rank !== undefined;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/95 overflow-y-auto overscroll-contain">
-      <div className="min-h-full max-w-lg mx-auto px-4 py-4 pb-16">
-        {/* Close */}
-        <div className="sticky top-0 z-10 -mx-4 px-4 py-2 bg-black/90 backdrop-blur flex justify-between items-center">
-          <p className="text-[10px] tracking-[0.25em] uppercase text-[#FFD500] truncate">
+    <div className="fixed inset-0 z-50 bg-[#05030F]/97 overflow-y-auto overscroll-contain">
+      <div className="min-h-full max-w-lg mx-auto px-4 py-4 pb-20">
+        <div className="sticky top-0 z-10 -mx-4 px-4 py-2.5 bg-[#05030F]/95 backdrop-blur flex justify-between items-center border-b-2 border-[#100810]">
+          <p className="text-[10px] tracking-[0.28em] uppercase text-[#FFD500] truncate font-bold">
             {cocktail.name}
           </p>
           <button
@@ -294,76 +465,77 @@ function CocktailDetail({
           </button>
         </div>
 
-        {/* Art */}
+        {/* Artwork behind glass */}
         {cocktail.imageUrl && (
-          <div className="relative w-full aspect-[4/3] mt-2 border-2 border-white/15">
-            <Image
-              src={cocktail.imageUrl}
-              alt={cocktail.name}
-              fill
-              unoptimized
-              className="object-cover"
-            />
+          <div className="mt-3 border-[3px] border-[#100810] bg-[#0A0A12] p-2.5">
+            <div className="relative w-full aspect-[4/3] overflow-hidden">
+              <Image
+                src={cocktail.imageUrl}
+                alt={cocktail.name}
+                fill
+                unoptimized
+                className="object-cover"
+              />
+              <div
+                aria-hidden
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  backgroundImage:
+                    "repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,0.3) 3px, rgba(0,0,0,0.3) 4px)",
+                }}
+              />
+            </div>
           </div>
         )}
 
-        {/* Name + tagline */}
         <h2
-          className="mt-5 text-3xl font-black tracking-tight text-[#FFD500]"
-          style={{ fontFamily: "var(--font-display, system-ui)" }}
+          style={{
+            ...marquee({ fill: "#FFD500", stroke: 2, shadow1: "#E42B20" }),
+            fontFamily: "var(--font-display, system-ui)",
+          }}
+          className="mt-6 text-4xl font-black tracking-tight uppercase leading-none"
         >
           {cocktail.name}
         </h2>
         {cocktail.tagline && (
-          <p className="mt-1.5 text-[10px] tracking-[0.25em] uppercase text-[#3CE0E0]">
+          <p className="mt-2.5 text-[10px] tracking-[0.28em] uppercase text-[#3CE0E0]">
             {cocktail.tagline}
           </p>
         )}
 
-        {/* Ingredients */}
         {cocktail.ingredients && (
-          <section className="mt-5">
-            <h3 className="text-[9px] tracking-[0.3em] uppercase text-white/35 mb-1.5">
-              Ingredients
-            </h3>
-            <p className="text-sm text-white/80 leading-relaxed">{cocktail.ingredients}</p>
-          </section>
+          <DetailSection title="Ingredients">
+            <p className="text-sm text-white/85 leading-relaxed">{cocktail.ingredients}</p>
+          </DetailSection>
         )}
 
-        {/* Flavor */}
         {cocktail.description && (
-          <section className="mt-5">
-            <h3 className="text-[9px] tracking-[0.3em] uppercase text-white/35 mb-1.5">
-              Tasting Notes
-            </h3>
+          <DetailSection title="Tasting Notes">
             <p className="text-sm text-white/70 leading-relaxed">{cocktail.description}</p>
-          </section>
+          </DetailSection>
         )}
 
-        {/* The long story */}
         {cocktail.story && (
-          <section className="mt-5">
-            <h3 className="text-[9px] tracking-[0.3em] uppercase text-white/35 mb-1.5">
-              The Story
-            </h3>
+          <DetailSection title="The Story">
             {cocktail.story.split(/\n\s*\n/).map((para, i) => (
               <p key={i} className="text-sm text-white/60 leading-relaxed mb-3">
                 {para}
               </p>
             ))}
-          </section>
+          </DetailSection>
         )}
 
         {/* Vote */}
         <button
           onClick={onVote}
           disabled={voteBusy || (!votingOpen && !picked)}
-          style={picked ? { background: "#FFD500" } : undefined}
-          className={`mt-6 w-full py-4 text-[11px] tracking-[0.25em] uppercase font-bold transition-colors disabled:opacity-40 ${
-            picked
-              ? "text-black"
-              : "border-2 border-white/25 text-white/70 hover:text-white hover:border-white/50"
+          className={`mt-7 w-full py-4 border-[3px] border-[#100810] text-[11px] tracking-[0.25em] uppercase font-black transition-transform active:translate-y-[2px] disabled:opacity-40 ${
+            picked ? "text-[#100810]" : "text-white/80"
           }`}
+          style={{
+            background: picked ? "#FFD500" : "#1B1030",
+            boxShadow: picked ? "4px 5px 0 #8A6A00" : "4px 5px 0 #100810",
+          }}
         >
           {picked ? (
             <span className="inline-flex items-center gap-2">
@@ -380,8 +552,11 @@ function CocktailDetail({
         </button>
 
         {/* The game */}
-        <div className="mt-8">
-          <h3 className="text-[9px] tracking-[0.3em] uppercase text-white/35 mb-3 text-center">
+        <div className="mt-10">
+          <h3
+            style={marquee({ fill: "#3CE0E0", stroke: 2, shadow1: "#0A4A6A" })}
+            className="text-center text-lg font-black tracking-[0.2em] uppercase mb-4"
+          >
             {game ? "Play for the high score" : "Mini game"}
           </h3>
 
@@ -398,9 +573,14 @@ function CocktailDetail({
               accent="#FFD500"
             />
           ) : (
-            <div className="border-2 border-dashed border-white/15 p-8 text-center">
-              <p className="text-[10px] tracking-[0.3em] uppercase text-white/40">Coming soon</p>
-              <p className="mt-2 text-xs text-white/30 leading-relaxed">
+            <div className="border-[3px] border-dashed border-white/20 p-10 text-center">
+              <p
+                style={marquee({ fill: "#FFFFFF", stroke: 1 })}
+                className="text-[11px] tracking-[0.3em] uppercase font-black"
+              >
+                Coming Soon
+              </p>
+              <p className="mt-3 text-xs text-white/35 leading-relaxed">
                 This cocktail&apos;s game is still in the workshop. Check back before the pop-up
                 ends.
               </p>
@@ -412,19 +592,13 @@ function CocktailDetail({
   );
 }
 
-// ─── CRT scanlines ───────────────────────────────────────────────────────────
-
-/** A faint horizontal line pattern over the whole page — cheap, and it does a
- *  lot of work selling the cabinet feel without touching any of the content. */
-function Scanlines() {
+function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div
-      aria-hidden
-      className="pointer-events-none fixed inset-0 z-0 opacity-[0.16]"
-      style={{
-        backgroundImage:
-          "repeating-linear-gradient(0deg, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,0.9) 3px, rgba(0,0,0,0.9) 3px)",
-      }}
-    />
+    <section className="mt-6">
+      <h3 className="text-[9px] tracking-[0.32em] uppercase text-[#FF7B00] mb-2 font-bold">
+        {title}
+      </h3>
+      {children}
+    </section>
   );
 }

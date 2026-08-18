@@ -9,8 +9,8 @@
 // really do trigger a shake, or that three misses really do end the round, is
 // to step the simulation directly. See the tests that drive `update`.
 
-export const RAIL_Y = 214;
-export const RAIL_H = 34;
+export const RAIL_Y = 240;
+export const RAIL_H = 40;
 export const WINDOW_X = 112;
 export const GOOD_HALF = 13;
 export const PERFECT_HALF = 5;

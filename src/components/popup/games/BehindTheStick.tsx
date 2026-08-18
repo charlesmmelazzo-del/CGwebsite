@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import ArcadeCanvas from "./ArcadeCanvas";
+import CRTScreen from "./CRTScreen";
 import { ArcadeButton, useArcadeKeys } from "./controls";
 import {
   blink,
@@ -9,7 +10,7 @@ import {
   clear,
   drawSprite,
   drawText,
-  drawTextShadow,
+  drawTextMarquee,
   GAME_W,
   meter,
   outline,
@@ -37,6 +38,19 @@ import {
   type Phase,
   type State,
 } from "./behindTheStickCore";
+import {
+  ARM,
+  BARTENDER_COLORS,
+  BARTENDER_HEADS,
+  BARTENDER_TORSO,
+  GUEST,
+  GUEST_ANGRY,
+  guestColors,
+  SHELF_BOTTLE,
+  shelfBottleColors,
+  TIN,
+  TIN_COLORS,
+} from "./sprites";
 import type { ArcadeGameProps } from "./registry";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -189,27 +203,90 @@ const colorFor = (key: string) => ING_BY_KEY.get(key)?.color ?? P.white;
 // ─── Scene ───────────────────────────────────────────────────────────────────
 
 function drawBackbar(ctx: CanvasRenderingContext2D, t: number) {
-  clear(ctx, P.night);
-  rect(ctx, 0, 14, GAME_W, 130, "#1A1030");
+  clear(ctx, "#0C0818");
 
+  // Back wall, with a warm pool of light behind the bartender
+  rect(ctx, 0, 14, GAME_W, 130, "#1B1030");
+  for (let i = 0; i < 5; i++) {
+    rect(ctx, 60 + i * 2, 14, 104 - i * 4, 130, `rgba(90,40,120,${0.10 - i * 0.015})`);
+  }
+
+  // Three shelves of stock, each bottle outlined so it reads at this size
+  const HUES: [string, string][] = [
+    [P.red, "#8E1410"],
+    [P.amber, "#A86500"],
+    [P.green, "#00701F"],
+    [P.cyan, "#1E8F94"],
+    [P.purple, "#5A188A"],
+    [P.orange, "#A84D00"],
+  ];
   for (let s = 0; s < 3; s++) {
-    const y = 30 + s * 30;
-    rect(ctx, 8, y + 18, GAME_W - 16, 3, P.brown);
-    for (let b = 0; b < 12; b++) {
-      const bx = 12 + b * 17 + (s % 2) * 6;
-      if (bx > GAME_W - 20) continue;
-      const hue = [P.red, P.amber, P.green, P.cyan, P.purple, P.orange][(b + s) % 6];
-      rect(ctx, bx, y + 6, 4, 12, hue);
-      rect(ctx, bx + 1, y + 2, 2, 4, P.slate);
+    const y = 36 + s * 30;
+    for (let b = 0; b < 13; b++) {
+      const bx = 6 + b * 17 + (s % 2) * 5;
+      if (bx > GAME_W - 10) continue;
+      const [body, shade] = HUES[(b + s) % HUES.length];
+      drawSprite(ctx, SHELF_BOTTLE, bx, y - 12, shelfBottleColors(body, shade), 1);
+    }
+    // Shelf plank with a lit front edge
+    rect(ctx, 4, y, GAME_W - 8, 3, P.wood);
+    rect(ctx, 4, y, GAME_W - 8, 1, P.tan);
+    rect(ctx, 4, y + 3, GAME_W - 8, 1, "#5A3010");
+  }
+
+  // Back-bar mirror, framed — fills the wall behind the bartender
+  rect(ctx, 62, 108, 100, 36, "#3A1C06");
+  rect(ctx, 64, 110, 96, 32, "#2A1B4A");
+  for (let i = 0; i < 4; i++) {
+    rect(ctx, 68 + i * 3, 112, 2, 28, `rgba(255,255,255,${0.05 - i * 0.01})`);
+  }
+  rect(ctx, 62, 108, 100, 1, P.tan);
+
+  // Pendant lamps over the guest side, each throwing a cone of light
+  for (const lx of [56, 168]) {
+    rect(ctx, lx, 156, 1, 8, "#4A3010");
+    rect(ctx, lx - 5, 164, 11, 3, P.amber);
+    rect(ctx, lx - 4, 165, 9, 1, P.yellow);
+    for (let i = 0; i < 5; i++) {
+      rect(ctx, lx - 6 - i * 3, 167 + i * 8, 13 + i * 6, 8, `rgba(255,160,0,${0.05 - i * 0.008})`);
     }
   }
 
+  // Bar top
   rect(ctx, 0, 144, GAME_W, 8, P.wood);
-  rect(ctx, 0, 152, GAME_W, 4, P.brown);
-  if (blink(t, 0.7)) drawText(ctx, "OPEN", 12, 20, P.magenta, 1);
+  rect(ctx, 0, 144, GAME_W, 1, P.tan);
+  rect(ctx, 0, 152, GAME_W, 4, "#5A3010");
+
+  // Neon sign, buzzing
+  if (blink(t, 0.7)) {
+    drawTextMarquee(ctx, "OPEN", 14, 20, P.magenta, 1, "left", "#3A0030");
+  }
 }
 
-/** Expression and arms both react to how the round is going. */
+/** The public side of the bar: rail, panelled front, brass foot rail. */
+function drawBarFront(ctx: CanvasRenderingContext2D) {
+  // Bar rail the guests lean on
+  rect(ctx, 0, 214, GAME_W, 5, P.wood);
+  rect(ctx, 0, 214, GAME_W, 1, P.tan);
+  rect(ctx, 0, 219, GAME_W, 2, "#4A2808");
+
+  // Panelled front
+  rect(ctx, 0, 221, GAME_W, RAIL_Y - 221, "#5A3010");
+  for (let i = 0; i < 6; i++) {
+    const px = 6 + i * 36;
+    rect(ctx, px, 225, 28, RAIL_Y - 231, "#6B3A14");
+    rect(ctx, px, 225, 28, 1, "#8A5020");
+    rect(ctx, px, RAIL_Y - 7, 28, 1, "#3A1C06");
+  }
+  // Brass foot rail catching the light
+  rect(ctx, 0, RAIL_Y - 4, GAME_W, 2, P.amber);
+  rect(ctx, 0, RAIL_Y - 4, GAME_W, 1, P.yellow);
+}
+
+/**
+ * The bartender, assembled from parts: expression comes from the head sprite,
+ * pose from where the arms are drawn.
+ */
 function drawBartender(
   ctx: CanvasRenderingContext2D,
   cx: number,
@@ -218,84 +295,55 @@ function drawBartender(
   pose: "idle" | "shake" | "stir" | "serve",
   t: number
 ) {
-  const skin = P.skin;
-  const vest = "#202030";
-  const bob = pose === "shake" ? Math.round(Math.sin(t * 26) * 2) : 0;
-  const y = baseY + bob;
+  const C = BARTENDER_COLORS;
+  // Sprite is 20 wide; torso sits 12 tall with the head's 14 above it.
+  const x = cx - 10;
+  const torsoY = baseY - 12;
+  const headY = torsoY - 14;
 
-  rect(ctx, cx - 11, y - 22, 22, 24, vest);
-  rect(ctx, cx - 4, y - 22, 8, 24, P.bone);
-  rect(ctx, cx - 1, y - 20, 2, 6, P.red);
+  const bob = pose === "shake" ? (Math.floor(t * 13) % 2 === 0 ? -1 : 1) : 0;
 
-  rect(ctx, cx - 8, y - 40, 16, 16, skin);
-  rect(ctx, cx - 9, y - 42, 18, 5, "#3A2010");
-  rect(ctx, cx - 9, y - 37, 2, 4, "#3A2010");
-  rect(ctx, cx + 7, y - 37, 2, 4, "#3A2010");
+  drawSprite(ctx, BARTENDER_HEADS[mood] ?? BARTENDER_HEADS.ok, x, headY + bob, C, 1);
+  drawSprite(ctx, BARTENDER_TORSO, x, torsoY, C, 1);
 
-  if (mood === "happy") {
-    rect(ctx, cx - 5, y - 33, 3, 1, P.black);
-    rect(ctx, cx + 2, y - 33, 3, 1, P.black);
-  } else if (mood === "panic") {
-    rect(ctx, cx - 6, y - 34, 4, 4, P.white);
-    rect(ctx, cx + 2, y - 34, 4, 4, P.white);
-    rect(ctx, cx - 5, y - 33, 2, 2, P.black);
-    rect(ctx, cx + 3, y - 33, 2, 2, P.black);
+  // Arms. 4 wide, 9 tall, hung off each shoulder.
+  const armY = torsoY + 2;
+  if (pose === "shake") {
+    // Both arms up, tin overhead, whole thing jerking with the shake
+    const lift = Math.floor(t * 13) % 2 === 0 ? 0 : 3;
+    drawSprite(ctx, ARM, x - 1, armY - 8 + lift, C, 1);
+    drawSprite(ctx, ARM, x + 17, armY - 8 + lift, C, 1);
+    drawSprite(ctx, TIN, cx - 6, headY - 16 + lift, TIN_COLORS, 1);
+  } else if (pose === "stir") {
+    const sway = Math.floor(t * 6) % 2 === 0 ? 0 : 2;
+    drawSprite(ctx, ARM, x - 1, armY, C, 1);
+    drawSprite(ctx, ARM, x + 15 + sway, armY - 4, C, 1);
+    // Mixing glass on the bar, and the spoon in it
+    rect(ctx, cx + 6, baseY - 14, 14, 15, "#100810");
+    rect(ctx, cx + 7, baseY - 13, 12, 13, "#7FA8C0");
+    rect(ctx, cx + 8, baseY - 9, 10, 8, P.amber);
+    rect(ctx, cx + 12 + sway, baseY - 30, 2, 18, "#C8C8D0");
+  } else if (pose === "serve") {
+    drawSprite(ctx, ARM, x - 1, armY, C, 1);
+    drawSprite(ctx, ARM, x + 17, armY + 3, C, 1);
   } else {
-    rect(ctx, cx - 5, y - 34, 2, 3, P.black);
-    rect(ctx, cx + 3, y - 34, 2, 3, P.black);
+    drawSprite(ctx, ARM, x - 1, armY, C, 1);
+    drawSprite(ctx, ARM, x + 17, armY, C, 1);
   }
 
-  rect(ctx, cx - 5, y - 29, 10, 2, "#3A2010"); // moustache
-
-  if (mood === "happy") {
-    rect(ctx, cx - 4, y - 26, 8, 1, P.crimson);
-    rect(ctx, cx - 5, y - 27, 1, 1, P.crimson);
-    rect(ctx, cx + 4, y - 27, 1, 1, P.crimson);
-  } else if (mood === "worried") {
-    rect(ctx, cx - 3, y - 26, 6, 1, P.crimson);
-    rect(ctx, cx - 4, y - 25, 1, 1, P.crimson);
-    rect(ctx, cx + 3, y - 25, 1, 1, P.crimson);
-  } else if (mood === "panic") {
-    rect(ctx, cx - 3, y - 27, 6, 4, P.crimson);
-  } else {
-    rect(ctx, cx - 3, y - 26, 6, 1, P.crimson);
-  }
-
+  // Sweat beads once it's going badly
   if (mood === "worried" || mood === "panic") {
     const drop = Math.floor(t * 6) % 3;
-    rect(ctx, cx + 10, y - 38 + drop * 3, 2, 3, P.cyan);
-    if (mood === "panic") rect(ctx, cx - 12, y - 36 + drop * 3, 2, 3, P.cyan);
-  }
-
-  if (pose === "shake") {
-    const lift = Math.round(Math.sin(t * 26) * 4);
-    rect(ctx, cx - 16, y - 26 + lift, 6, 12, skin);
-    rect(ctx, cx + 10, y - 26 - lift, 6, 12, skin);
-    rect(ctx, cx - 6, y - 54 + lift, 12, 16, P.grey);
-    rect(ctx, cx - 7, y - 56 + lift, 14, 3, P.bone);
-    rect(ctx, cx - 4, y - 50 + lift, 3, 10, P.white);
-  } else if (pose === "stir") {
-    const sway = Math.round(Math.sin(t * 10) * 3);
-    rect(ctx, cx - 16, y - 24, 6, 12, skin);
-    rect(ctx, cx + 8 + sway, y - 30, 6, 16, skin);
-    rect(ctx, cx + 2, y - 14, 14, 16, "#6088A0");
-    rect(ctx, cx + 3, y - 12, 12, 13, P.amber);
-    rect(ctx, cx + 8 + sway, y - 34, 2, 20, P.grey);
-  } else if (pose === "serve") {
-    rect(ctx, cx - 16, y - 24, 6, 12, skin);
-    rect(ctx, cx + 10, y - 20, 8, 6, skin);
-  } else {
-    rect(ctx, cx - 16, y - 24, 6, 12, skin);
-    rect(ctx, cx + 10, y - 24, 6, 12, skin);
+    rect(ctx, x + 17, headY + 4 + drop * 3, 2, 3, P.cyan);
+    if (mood === "panic") rect(ctx, x, headY + 6 + drop * 3, 2, 3, P.cyan);
   }
 }
 
 function drawTin(ctx: CanvasRenderingContext2D, x: number, y: number, fill: number) {
-  rect(ctx, x, y, 18, 26, P.grey);
-  rect(ctx, x - 1, y - 3, 20, 4, P.bone);
-  const h = Math.round(clamp(fill, 0, 1) * 20);
-  if (h > 0) rect(ctx, x + 2, y + 24 - h, 14, h, P.amber);
-  rect(ctx, x + 2, y + 2, 2, 20, P.white);
+  drawSprite(ctx, TIN, x, y, TIN_COLORS, 1);
+  // Contents rise as the round goes on
+  const h = Math.round(clamp(fill, 0, 1) * 9);
+  if (h > 0) rect(ctx, x + 2, y + 13 - h, 8, h, P.amber);
 }
 
 function drawGuest(
@@ -303,30 +351,24 @@ function drawGuest(
   cx: number,
   baseY: number,
   state: "wait" | "happy" | "angry",
-  t: number
+  t: number,
+  shirt: string,
+  shirtShadow: string
 ) {
-  rect(ctx, cx - 8, baseY - 18, 16, 18, state === "angry" ? P.red : P.blue);
-  rect(ctx, cx - 6, baseY - 32, 12, 14, P.skin);
-  rect(ctx, cx - 7, baseY - 34, 14, 4, "#202020");
+  const sprite = state === "angry" ? GUEST_ANGRY : GUEST;
+  drawSprite(ctx, sprite, cx - 7, baseY - 16, guestColors(shirt, shirtShadow), 1);
 
-  if (state === "angry") {
-    rect(ctx, cx - 4, baseY - 28, 3, 2, P.black);
-    rect(ctx, cx + 1, baseY - 28, 3, 2, P.black);
-    rect(ctx, cx - 3, baseY - 24, 6, 3, P.black);
-    if (blink(t, 6)) {
-      rect(ctx, cx + 9, baseY - 34, 5, 1, P.yellow);
-      rect(ctx, cx + 9, baseY - 30, 5, 1, P.yellow);
-    }
-  } else if (state === "happy") {
-    rect(ctx, cx - 4, baseY - 28, 2, 1, P.black);
-    rect(ctx, cx + 2, baseY - 28, 2, 1, P.black);
-    rect(ctx, cx - 3, baseY - 25, 6, 1, P.black);
-    rect(ctx, cx + 8, baseY - 20, 6, 8, P.cyan);
-    rect(ctx, cx + 9, baseY - 19, 4, 3, P.amber);
-  } else {
-    rect(ctx, cx - 4, baseY - 28, 2, 2, P.black);
-    rect(ctx, cx + 2, baseY - 28, 2, 2, P.black);
-    rect(ctx, cx - 2, baseY - 24, 4, 1, P.black);
+  if (state === "angry" && blink(t, 6)) {
+    // Shout lines
+    rect(ctx, cx + 9, baseY - 15, 5, 1, P.yellow);
+    rect(ctx, cx + 9, baseY - 11, 5, 1, P.yellow);
+    rect(ctx, cx - 14, baseY - 15, 5, 1, P.yellow);
+  }
+  if (state === "happy") {
+    // A finished drink in hand
+    rect(ctx, cx + 8, baseY - 12, 7, 9, "#100810");
+    rect(ctx, cx + 9, baseY - 11, 5, 7, P.cyan);
+    rect(ctx, cx + 9, baseY - 9, 5, 4, P.amber);
   }
 }
 
@@ -344,7 +386,7 @@ function drawRail(ctx: CanvasRenderingContext2D, st: State, t: number) {
     if (n.judged) continue;
     const ing = ING_BY_KEY.get(n.ing);
     if (!ing) continue;
-    drawSprite(ctx, ing.sprite, Math.round(n.x - 5), RAIL_Y + 10, ing.colors, 1);
+    drawSprite(ctx, ing.sprite, Math.round(n.x - 5), RAIL_Y + 13, ing.colors, 1);
   }
 }
 
@@ -366,7 +408,7 @@ function drawShake(ctx: CanvasRenderingContext2D, st: State) {
     "center"
   );
   if (!ok && st.phaseT > GRACE_SECONDS) {
-    drawTextShadow(ctx, "FASTER!", 112, 96, P.red, 2, "center");
+    drawTextMarquee(ctx, "FASTER!", 112, 96, P.red, 2, "center", P.black, "#3A0000");
   }
   drawText(
     ctx,
@@ -407,7 +449,7 @@ function drawStir(ctx: CanvasRenderingContext2D, st: State) {
     "center"
   );
   if (!ok && st.phaseT > GRACE_SECONDS) {
-    drawTextShadow(ctx, "STIR FASTER!", 112, 60, P.red, 2, "center");
+    drawTextMarquee(ctx, "STIR FASTER!", 112, 60, P.red, 2, "center", P.black, "#3A0000");
   }
   drawText(
     ctx,
@@ -426,14 +468,14 @@ function drawServe(ctx: CanvasRenderingContext2D, st: State) {
   rect(ctx, x, 186, 8, 12, P.cyan);
   rect(ctx, x + 1, 188, 6, 4, P.amber);
   rect(ctx, 0, RAIL_Y - 6, GAME_W, RAIL_H + 12, "#101020");
-  drawTextShadow(ctx, "ORDER UP!", 112, RAIL_Y + 6, P.lime, 2, "center");
+  drawTextMarquee(ctx, "ORDER UP!", 112, RAIL_Y + 6, P.lime, 2, "center", P.black, P.forest);
 }
 
 function drawOver(ctx: CanvasRenderingContext2D, t: number) {
   rect(ctx, 0, RAIL_Y - 6, GAME_W, RAIL_H + 12, "#101020");
-  drawTextShadow(ctx, "GAME OVER", 112, RAIL_Y + 4, P.red, 2, "center");
+  drawTextMarquee(ctx, "GAME OVER", 112, RAIL_Y + 4, P.red, 2, "center", P.black, "#3A0000");
   if (blink(t, 2)) {
-    drawTextShadow(ctx, "WHERE IS MY DRINK!?", 112, RAIL_Y + 24, P.yellow, 1, "center");
+    drawTextMarquee(ctx, "WHERE IS MY DRINK!?", 112, RAIL_Y + 24, P.yellow, 1, "center");
   }
 }
 
@@ -549,17 +591,22 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
               ? "serve"
               : "idle";
       drawBartender(ctx, 112, 144, st.phase === "over" ? "panic" : st.mood, pose, t);
-      if (pose === "idle") drawTin(ctx, 150, 118, st.tinFill);
+      if (pose === "idle") drawTin(ctx, 152, 130, st.tinFill);
 
-      drawGuest(ctx, 30, 200, st.phase === "over" ? "angry" : "wait", t);
+      // A crowd, so the bar reads as busy rather than two people in a void
+      drawGuest(ctx, 34, 214, st.phase === "over" ? "angry" : "wait", t, P.blue, "#16257A");
+      drawGuest(ctx, 76, 214, st.phase === "over" ? "angry" : "wait", t, P.purple, "#4A1470");
+      drawGuest(ctx, 132, 214, "wait", t, P.orange, "#8A3F00");
       drawGuest(
         ctx,
-        194,
-        200,
+        190,
+        214,
         st.phase === "serve" ? "happy" : st.phase === "over" ? "angry" : "wait",
-        t
+        t,
+        P.teal,
+        "#005058"
       );
-      rect(ctx, 0, 200, GAME_W, 6, P.wood);
+      drawBarFront(ctx);
 
       if (st.phase === "pour" || st.phase === "ready") drawRail(ctx, st, t);
       else if (st.phase === "shake") drawShake(ctx, st);
@@ -577,7 +624,7 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
       drawHud(ctx, st);
 
       if (st.bannerTimer > 0 && st.banner) {
-        drawTextShadow(ctx, st.banner, 112, 96, P.yellow, 2, "center");
+        drawTextMarquee(ctx, st.banner, 112, 96, P.yellow, 2, "center", P.black, P.crimson);
       }
     },
     [onGameOver]
@@ -594,7 +641,9 @@ export default function BehindTheStick({ onGameOver }: ArcadeGameProps) {
         onPointerLeave={endStir}
         style={{ touchAction: uiPhase === "stir" ? "none" : "auto" }}
       >
-        <ArcadeCanvas onFrame={onFrame} running />
+        <CRTScreen glow="#FFA000">
+          <ArcadeCanvas onFrame={onFrame} running />
+        </CRTScreen>
       </div>
 
       <div className="p-2 bg-black">
