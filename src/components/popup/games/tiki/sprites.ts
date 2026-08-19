@@ -26,29 +26,82 @@ import { C } from "./constants";
 
 // ─── Manifest ────────────────────────────────────────────────────────────────
 
-export interface SpriteMeta {
+/**
+ * A character's whole sheet: one transparent PNG, laid out as a uniform grid.
+ *
+ * Rows are animations, columns are frames. Cell size is derived from the image
+ * — width/cols by height/rows — so the sheet can be authored at any resolution
+ * and only the GRID has to be agreed in advance.
+ *
+ * Sheets are the preferred format, and not only because they are easier to
+ * draw. A uniform grid structurally solves the registration problem that loose
+ * frames have: every frame is forced to share a cell size and a centre, so a
+ * walk cycle physically cannot drift or resize between frames the way separate
+ * files silently do.
+ */
+export interface SheetDef {
   /** Filename under /popup/art/tiki/, without extension. */
   file: string;
-  /** Frames in the cycle. Files are suffixed -1, -2, … when frames > 1. */
+  cols: number;
+  rows: number;
+}
+
+export const SHEETS = {
+  player: { file: "player", cols: 4, rows: 2 },
+  helper: { file: "helper", cols: 2, rows: 1 },
+  lime: { file: "lime", cols: 4, rows: 1 },
+  lemon: { file: "lemon", cols: 2, rows: 1 },
+  orange: { file: "orange", cols: 2, rows: 1 },
+  kiwi: { file: "kiwi", cols: 2, rows: 1 },
+  sugarcane: { file: "sugarcane", cols: 4, rows: 1 },
+  "boss-baby-pineapple": { file: "boss-baby-pineapple", cols: 2, rows: 1 },
+} as const satisfies Record<string, SheetDef>;
+
+export type SheetName = keyof typeof SHEETS;
+
+export interface SpriteMeta {
+  /** Frames in the cycle. */
   frames: number;
   /** Height at closest approach, in logical pixels. The detail budget. */
   onScreen: number;
+  /**
+   * Preferred source: one row of a character sheet.
+   *
+   * Checked first. If the sheet has not been drawn yet, the loose files below
+   * are tried, and failing those the code-drawn placeholder is used — so art
+   * can arrive as a sheet, as loose frames, or not at all, in any order and any
+   * mixture, without a code change.
+   */
+  sheet?: {
+    name: SheetName;
+    row: number;
+    /** Fixed column, for a single-frame sprite sharing a row with others. */
+    col?: number;
+  };
+  /** Fallback: loose files, suffixed -1, -2, … when frames > 1. */
+  file?: string;
 }
 
 export const SPRITES = {
-  "player-walk": { file: "player-walk", frames: 4, onScreen: 84 },
-  "player-hit": { file: "player-hit", frames: 1, onScreen: 84 },
-  "player-turn": { file: "player-turn", frames: 1, onScreen: 84 },
-  "player-turn-shades": { file: "player-turn-shades", frames: 1, onScreen: 84 },
-  "helper-walk": { file: "helper-walk", frames: 2, onScreen: 62 },
+  // player.png — 4 cols x 2 rows
+  //   row 0: walk cycle, 4 frames
+  //   row 1: turn-to-camera | turn-with-shades | hit | (spare)
+  "player-walk": { sheet: { name: "player", row: 0 }, file: "player-walk", frames: 4, onScreen: 84 },
+  "player-turn": { sheet: { name: "player", row: 1, col: 0 }, file: "player-turn", frames: 1, onScreen: 84 },
+  "player-turn-shades": { sheet: { name: "player", row: 1, col: 1 }, file: "player-turn-shades", frames: 1, onScreen: 84 },
+  "player-hit": { sheet: { name: "player", row: 1, col: 2 }, file: "player-hit", frames: 1, onScreen: 84 },
 
-  "lime-walk": { file: "lime-walk", frames: 4, onScreen: 60 },
-  "lemon-walk": { file: "lemon-walk", frames: 2, onScreen: 60 },
-  "orange-walk": { file: "orange-walk", frames: 2, onScreen: 60 },
-  "kiwi-walk": { file: "kiwi-walk", frames: 2, onScreen: 60 },
-  "sugarcane-walk": { file: "sugarcane-walk", frames: 4, onScreen: 104 },
-  "boss-baby-pineapple-walk": { file: "boss-baby-pineapple-walk", frames: 2, onScreen: 170 },
+  "helper-walk": { sheet: { name: "helper", row: 0 }, file: "helper-walk", frames: 2, onScreen: 62 },
 
+  "lime-walk": { sheet: { name: "lime", row: 0 }, file: "lime-walk", frames: 4, onScreen: 60 },
+  "lemon-walk": { sheet: { name: "lemon", row: 0 }, file: "lemon-walk", frames: 2, onScreen: 60 },
+  "orange-walk": { sheet: { name: "orange", row: 0 }, file: "orange-walk", frames: 2, onScreen: 60 },
+  "kiwi-walk": { sheet: { name: "kiwi", row: 0 }, file: "kiwi-walk", frames: 2, onScreen: 60 },
+  "sugarcane-walk": { sheet: { name: "sugarcane", row: 0 }, file: "sugarcane-walk", frames: 4, onScreen: 104 },
+  "boss-baby-pineapple-walk": { sheet: { name: "boss-baby-pineapple", row: 0 }, file: "boss-baby-pineapple-walk", frames: 2, onScreen: 170 },
+
+  // Scenery and the shopkeeper stay loose files — one image each with nothing
+  // to animate, so a sheet would only add a layout to get wrong.
   "prop-palm": { file: "prop-palm", frames: 1, onScreen: 150 },
   "shopkeeper-scotch": { file: "shopkeeper-scotch", frames: 1, onScreen: 180 },
 } as const satisfies Record<string, SpriteMeta>;
@@ -57,9 +110,14 @@ export type SpriteKey = keyof typeof SPRITES;
 
 const ART_BASE = "/popup/art/tiki";
 
-/** frames > 1 are numbered from 1; a single-frame sprite has no suffix. */
-export function spriteUrl(key: SpriteKey, frame: number): string {
-  const m = SPRITES[key];
+export function sheetUrl(name: SheetName): string {
+  return `${ART_BASE}/${SHEETS[name].file}.png`;
+}
+
+/** Loose-file URL. frames > 1 are numbered from 1; a single frame has no suffix. */
+export function spriteUrl(key: SpriteKey, frame: number): string | null {
+  const m: SpriteMeta = SPRITES[key];
+  if (!m.file) return null;
   return m.frames > 1 ? `${ART_BASE}/${m.file}-${frame + 1}.png` : `${ART_BASE}/${m.file}.png`;
 }
 
@@ -78,16 +136,27 @@ const buckets = new Map<string, HTMLCanvasElement>();
  */
 export function loadTikiArt(): void {
   if (typeof window === "undefined") return;
+
+  // Character sheets first — the preferred source.
+  for (const name of Object.keys(SHEETS) as SheetName[]) tryLoad(sheetUrl(name));
+
+  // Then loose files, as a fallback for anything not yet drawn as a sheet.
   for (const key of Object.keys(SPRITES) as SpriteKey[]) {
-    for (let f = 0; f < SPRITES[key].frames; f++) {
+    const m: SpriteMeta = SPRITES[key];
+    if (!m.file) continue;
+    for (let f = 0; f < m.frames; f++) {
       const url = spriteUrl(key, f);
-      if (loaded.has(url) || missing.has(url)) continue;
-      const img = new Image();
-      img.onload = () => loaded.set(url, img);
-      img.onerror = () => missing.add(url);
-      img.src = url;
+      if (url) tryLoad(url);
     }
   }
+}
+
+function tryLoad(url: string): void {
+  if (loaded.has(url) || missing.has(url)) return;
+  const img = new Image();
+  img.onload = () => loaded.set(url, img);
+  img.onerror = () => missing.add(url);
+  img.src = url;
 }
 
 /** Bucket heights, in logical px. Enough steps that scaling is invisible. */
@@ -97,17 +166,31 @@ function bucketFor(h: number): number {
   return Math.ceil(h / 8) * 8;
 }
 
-function scaled(url: string, h: number, pixelScale: number): HTMLCanvasElement | null {
+/**
+ * A pre-scaled cell, ready to blit 1:1.
+ *
+ * `src` is the region of the source image to take. For a loose file that is the
+ * whole image; for a sheet it is one cell of the grid.
+ */
+function scaledCell(
+  url: string,
+  src: { x: number; y: number; w: number; h: number } | null,
+  targetH: number,
+  pixelScale: number
+): HTMLCanvasElement | null {
   const img = loaded.get(url);
   if (!img || !img.width) return null;
 
-  const bh = bucketFor(h);
-  const cacheKey = `${url}@${bh}@${pixelScale}`;
+  const region = src ?? { x: 0, y: 0, w: img.width, h: img.height };
+  if (region.w <= 0 || region.h <= 0) return null;
+
+  const bh = bucketFor(targetH);
+  const cacheKey = `${url}@${region.x},${region.y},${region.w},${region.h}@${bh}@${pixelScale}`;
   const hit = buckets.get(cacheKey);
   if (hit) return hit;
 
   const dh = Math.max(1, Math.round(bh * pixelScale));
-  const dw = Math.max(1, Math.round((img.width / img.height) * dh));
+  const dw = Math.max(1, Math.round((region.w / region.h) * dh));
   const cv = document.createElement("canvas");
   cv.width = dw;
   cv.height = dh;
@@ -116,9 +199,48 @@ function scaled(url: string, h: number, pixelScale: number): HTMLCanvasElement |
   // Smoothing ON for the one-time downsample; the blit that follows is 1:1.
   c.imageSmoothingEnabled = true;
   c.imageSmoothingQuality = "high";
-  c.drawImage(img, 0, 0, dw, dh);
+  c.drawImage(img, region.x, region.y, region.w, region.h, 0, 0, dw, dh);
   buckets.set(cacheKey, cv);
   return cv;
+}
+
+/**
+ * Resolve one frame to a pre-scaled cell.
+ *
+ * Sheet first, loose file second, null (so the caller draws its placeholder)
+ * last. That order is what lets art land as a sheet, as loose frames, or in any
+ * mixture of the two, without a code change.
+ */
+function resolve(
+  key: SpriteKey,
+  frame: number,
+  targetH: number,
+  pixelScale: number
+): HTMLCanvasElement | null {
+  const m: SpriteMeta = SPRITES[key];
+
+  if (m.sheet) {
+    const def = SHEETS[m.sheet.name];
+    const url = sheetUrl(m.sheet.name);
+    const img = loaded.get(url);
+    if (img && img.width) {
+      const cw = img.width / def.cols;
+      const ch = img.height / def.rows;
+      const col = m.sheet.col ?? frame;
+      if (col < def.cols && m.sheet.row < def.rows) {
+        return scaledCell(
+          url,
+          { x: col * cw, y: m.sheet.row * ch, w: cw, h: ch },
+          targetH,
+          pixelScale
+        );
+      }
+    }
+  }
+
+  const url = spriteUrl(key, frame);
+  if (!url || missing.has(url)) return null;
+  return scaledCell(url, null, targetH, pixelScale);
 }
 
 // ─── Drawing ─────────────────────────────────────────────────────────────────
@@ -176,8 +298,7 @@ function paint(
   h: number,
   pixelScale: number
 ): void {
-  const url = spriteUrl(key, frame);
-  const art = missing.has(url) ? null : scaled(url, h, pixelScale);
+  const art = resolve(key, frame, h, pixelScale);
   if (art) {
     const w = (art.width / art.height) * h;
     ctx.save();

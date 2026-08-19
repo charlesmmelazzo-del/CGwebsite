@@ -36,6 +36,61 @@ behind the player:
 | Never | draw small and upscale — always generate large, code downsamples |
 | Test | fill it solid black; if unrecognisable, it won't read in game |
 
+---
+
+## Sprite sheets — the preferred format
+
+**Every animated character is one PNG.** Rows are animations, columns are
+frames, all cells the same size. The code slices the cell it needs, so the sheet
+can be any resolution — only the **grid** has to match what's below.
+
+This is easier to draw, and it also fixes something loose files get wrong. With
+separate files, frame 2 quietly comes back a different size or off-centre from
+frame 1, and the character bobs and jitters in game. A grid makes that
+impossible: every frame shares a cell, so they cannot drift apart.
+
+### Laying out a sheet
+
+```
+        col 0        col 1        col 2        col 3
+      +------------+------------+------------+------------+
+row 0 |  walk 1    |  walk 2    |  walk 3    |  walk 4    |
+      +------------+------------+------------+------------+
+row 1 |  turn      |  shades    |  hit       |  (spare)   |
+      +------------+------------+------------+------------+
+```
+
+* **Every cell exactly the same size.** Equal-width columns, equal-height rows.
+* **Character centred horizontally** in its cell.
+* **Feet on the bottom edge** of the cell, consistently. The game plants sprites
+  by their feet, so a character floating higher in one cell will hop.
+* **Transparent everywhere else.** No background, no frame, no guide lines, no
+  padding that varies between cells.
+* Unused cells can be left empty.
+
+### The sheets
+
+| File | Grid | Row 0 | Row 1 |
+|---|---|---|---|
+| `player.png` | 4 x 2 | walk cycle, 4 frames | turn-to-camera · turn-with-shades · hit · *(spare)* |
+| `helper.png` | 2 x 1 | walk cycle, 2 frames | — |
+| `lime.png` | 4 x 1 | walk cycle, 4 frames | — |
+| `lemon.png` | 2 x 1 | walk cycle, 2 frames | — |
+| `orange.png` | 2 x 1 | walk cycle, 2 frames | — |
+| `kiwi.png` | 2 x 1 | walk cycle, 2 frames | — |
+| `sugarcane.png` | 4 x 1 | walk cycle, 4 frames | — |
+| `boss-baby-pineapple.png` | 2 x 1 | walk cycle, 2 frames | — |
+
+Suggested cell size: **512 x 512**, giving e.g. a 2048 x 1024 `player.png`. Any
+size works as long as the grid is right.
+
+**Loose files still work.** Anything without a sheet falls back to the
+individually-named files listed further down, and failing those to a code-drawn
+placeholder. Sheets, loose frames and nothing at all can be mixed freely, in any
+order, without a code change. Scenery and the shopkeeper stay loose files —
+single images with nothing to animate, where a sheet would only add a layout to
+get wrong.
+
 **"On-screen max"** below is how tall the sprite gets at its closest approach, in
 a 270×540 field. That is your detail budget — not the delivery size.
 
