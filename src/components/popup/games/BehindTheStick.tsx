@@ -279,7 +279,7 @@ function drawRail(ctx: CanvasRenderingContext2D, st: State, t: number) {
 
   for (const n of st.notes) {
     if (n.judged) continue;
-    drawIngredient(ctx, n.ing, n.x, RAIL_Y + 20, 18);
+    drawIngredient(ctx, n.ing, n.x, RAIL_Y + 19, 30);
   }
 }
 
@@ -287,12 +287,10 @@ function drawShake(ctx: CanvasRenderingContext2D, st: State) {
   const ok = currentBpm(st) >= st.target;
   const settling = st.phaseT <= GRACE_SECONDS;
 
-  rect(ctx, 0, RAIL_Y - 6, GAME_W, RAIL_H + 12, "#101020");
-
   // One word for what to do. Deliberately no rate meter and no BPM readout:
   // the only thing a player can act on is "keep going" or "speed up", so a
   // number they have to interpret mid-shake is noise.
-  drawTextMarquee(ctx, "SHAKE", 112, RAIL_Y + 2, P.yellow, 2, "center", P.black, "#8A6A00");
+  drawTextMarquee(ctx, "SHAKE", 112, 236, P.yellow, 3, "center", P.black, "#8A6A00");
 
   // One word for how it is going, held back through the grace period so the
   // first thing a player sees is not a scolding.
@@ -312,7 +310,7 @@ function drawShake(ctx: CanvasRenderingContext2D, st: State) {
 
   // How much shaking is left, as a bar rather than a ticking number.
   const total = SHAKE_SECONDS + GRACE_SECONDS;
-  meter(ctx, 52, RAIL_Y + 26, 120, 4, clamp((total - st.phaseT) / total, 0, 1), P.cyan);
+  meter(ctx, 52, 268, 120, 5, clamp((total - st.phaseT) / total, 0, 1), P.cyan);
 }
 
 function drawStir(ctx: CanvasRenderingContext2D, st: State) {
@@ -339,8 +337,7 @@ function drawStir(ctx: CanvasRenderingContext2D, st: State) {
   rect(ctx, cx + Math.round(Math.cos(lead) * 11) - 2, cy - 36, 5, 4, P.white);
 
   // Same treatment as the shake: one instruction, one verdict, no readout.
-  rect(ctx, 0, RAIL_Y - 6, GAME_W, RAIL_H + 12, "#101020");
-  drawTextMarquee(ctx, "STIR", 112, RAIL_Y + 2, P.yellow, 2, "center", P.black, "#8A6A00");
+  drawTextMarquee(ctx, "STIR", 112, 250, P.yellow, 3, "center", P.black, "#8A6A00");
 
   if (st.phaseT > GRACE_SECONDS) {
     drawTextMarquee(
@@ -357,7 +354,7 @@ function drawStir(ctx: CanvasRenderingContext2D, st: State) {
   }
 
   const total = STIR_SECONDS + GRACE_SECONDS;
-  meter(ctx, 52, RAIL_Y + 26, 120, 4, clamp((total - st.phaseT) / total, 0, 1), P.cyan);
+  meter(ctx, 52, 268, 120, 5, clamp((total - st.phaseT) / total, 0, 1), P.cyan);
 }
 
 /**
@@ -660,7 +657,7 @@ function PourDeck({
                 is matching against the rail, so show that and nothing else.
                 Fixed box either way, so the icon appearing after mount doesn't
                 shift the target under a thumb. */}
-            <span style={{ width: 54, height: 74 }} className="flex items-end justify-center">
+            <span style={{ width: 70, height: 94 }} className="flex items-end justify-center">
               {/* The owner's artwork where it exists; the generated icon
                   otherwise, so an ingredient without a file still has a face. */}
               {(artworkUrl(key) ?? iconUrls[key]) && (
@@ -670,8 +667,8 @@ function PourDeck({
                   alt=""
                   style={{
                     imageRendering: artworkUrl(key) ? "auto" : "pixelated",
-                    width: 54,
-                    height: 74,
+                    width: 70,
+                    height: 94,
                     objectFit: "contain",
                     filter: `drop-shadow(0 3px 0 rgba(0,0,0,0.6))`,
                   }}
@@ -679,7 +676,7 @@ function PourDeck({
               )}
             </span>
             <span
-              className="text-[10px] font-black uppercase leading-none tracking-tight"
+              className="text-[11px] font-black uppercase leading-none tracking-tight"
               style={{
                 color: ing.color,
                 fontFamily: "var(--font-pixel, ui-monospace, monospace)",
@@ -1143,7 +1140,10 @@ export default function BehindTheStick({ onGameOver, demo = false }: ArcadeGameP
       const tapping = st.phase === "shake" && st.phaseT - st.lastTapT < 0.5;
       const shakeLift = tapping && st.shakeCount % 2 === 1 ? 1 : 0;
 
-      const drewArt = drawCharacter(ctx, "bartender", 112, 176, 104, {
+      // Feet well below the bar line and a tall figure, so the bar front crops
+      // him at the waist. Half a character drawn twice the size reads far
+      // better than a whole one shrunk to fit above the rail.
+      const drewArt = drawCharacter(ctx, "bartender", 112, 296, 196, {
         mood: artMood,
         pose: pose === "stir" ? "idle" : (pose as "idle" | "shake" | "serve"),
         shakeLift,
@@ -1154,8 +1154,8 @@ export default function BehindTheStick({ onGameOver, demo = false }: ArcadeGameP
       // opens hairline seams through the art.
       if (!drewArt) {
         ctx.save();
-        ctx.translate(112, 168);
-        ctx.scale(2, 2);
+        ctx.translate(112, 232);
+        ctx.scale(3, 3);
         ctx.imageSmoothingEnabled = false;
         drawBartender(
           ctx,
@@ -1174,6 +1174,20 @@ export default function BehindTheStick({ onGameOver, demo = false }: ArcadeGameP
       // The tin stays outside the transform so it keeps its place on the bar
       // rather than floating up with him.
       if (pose === "idle") drawTin(ctx, 172, 140, st.tinFill);
+
+      // ── Shake and stir stand alone ────────────────────────────────────
+      // Nothing behind them. The bar and the bartender were competing with the
+      // one object the player is acting on, and a shake is a close-up.
+      if (st.phase === "shake" || st.phase === "stir") {
+        clear(ctx, P.black);
+        if (st.phase === "shake") drawShake(ctx, st);
+        else drawStir(ctx, st);
+        drawHud(ctx, st);
+        if (st.bannerTimer > 0 && st.banner) {
+          drawTextMarquee(ctx, st.banner, 112, 96, P.yellow, 2, "center", P.black, P.crimson);
+        }
+        return;
+      }
 
       // No crowd while the drink is being built. A wall of guests during the
       // rhythm phase competes with the only thing the player is watching, and
@@ -1199,9 +1213,8 @@ export default function BehindTheStick({ onGameOver, demo = false }: ArcadeGameP
       }
       drawBarFront(ctx);
 
+      // shake and stir returned earlier — they draw on black, with no bar.
       if (st.phase === "pour") drawRail(ctx, st, t);
-      else if (st.phase === "shake") drawShake(ctx, st);
-      else if (st.phase === "stir") drawStir(ctx, st);
       else if (st.phase === "serve") drawServe(ctx, st);
       else if (st.phase === "over") drawOver(ctx, t);
 
@@ -1250,7 +1263,7 @@ export default function BehindTheStick({ onGameOver, demo = false }: ArcadeGameP
     <div className="flex flex-col h-full w-full" style={{ minHeight: 0 }}>
       <div
         className={`min-h-0 flex items-center justify-center bg-black px-2 pt-2 ${
-          fullScreenPhase || demo ? "flex-1" : "flex-[3]"
+          fullScreenPhase || demo ? "flex-1" : "flex-[4]"
         }`}
         onPointerDown={onTankTap}
         onContextMenu={(e) => e.preventDefault()}

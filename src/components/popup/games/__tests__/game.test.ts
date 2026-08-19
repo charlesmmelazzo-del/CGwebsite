@@ -16,6 +16,7 @@ import {
   PTS_WRONG,
   TANK_BOTTOM,
   TANK_TOP,
+  DECOYS,
   freshBubbleState,
   live,
   remaining,
@@ -145,11 +146,27 @@ const fixedSeq = (values: number[]) => {
   return () => values[i++ % values.length];
 };
 
-check("the tank holds every ingredient in use, once each", () => {
-  const st = freshBubbleState(["gin", "lime", "sugar", "ice"]);
+check("the tank holds the whole recipe plus decoys, once each", () => {
+  const recipe: IngredientKey[] = ["gin", "lime", "sugar", "ice"];
+  const st = freshBubbleState(recipe);
   const keys = st.bubbles.map((b) => b.key);
   assert.strictEqual(new Set(keys).size, keys.length, "an ingredient spawned twice");
-  assert.deepStrictEqual([...keys].sort(), [...ingredientsInUse()].sort());
+  for (const k of recipe) {
+    assert.ok(keys.includes(k), `${k} is on the recipe but never spawned`);
+  }
+  assert.strictEqual(keys.length, recipe.length + DECOYS, `tank held ${keys.length}`);
+  const pool = new Set(ingredientsInUse());
+  for (const k of keys) assert.ok(pool.has(k), `${k} is not in the book`);
+});
+
+check("the tank stays small enough to read", () => {
+  // The point of the resize: this phase is about reading the recipe, not about
+  // picking a small target out of a crowd.
+  const st = freshBubbleState(["gin", "lime", "sugar", "ice"]);
+  assert.ok(st.bubbles.length <= 10, `${st.bubbles.length} bubbles is a crowd`);
+  const tankArea = GAME_W * (TANK_BOTTOM - TANK_TOP);
+  const covered = st.bubbles.length * Math.PI * BUBBLE_R * BUBBLE_R;
+  assert.ok(covered / tankArea < 0.55, "the tank is too full to move in");
 });
 
 check("bubbles never leave the tank", () => {

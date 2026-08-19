@@ -34,7 +34,17 @@ import { ingredientsInUse } from "./cocktails";
  */
 export const TANK_TOP = 16;
 export const TANK_BOTTOM = 232;
-export const BUBBLE_R = 11;
+/**
+ * Bubbles are big and there are few of them.
+ *
+ * Fifteen at radius 11 filled the tank with small targets, which made the phase
+ * about picking one out of a crowd rather than about reading the recipe. The
+ * four the drink needs plus a handful of decoys is the same decision with less
+ * hunting, and at this size they are a comfortable thumb target on a phone.
+ */
+export const BUBBLE_R = 19;
+/** Wrong ingredients mixed in alongside the four the recipe calls for. */
+export const DECOYS = 5;
 
 export const SPEED_MIN = 16;
 export const SPEED_MAX = 34;
@@ -83,10 +93,23 @@ export function freshBubbleState(
   needed: IngredientKey[],
   rand: () => number = Math.random
 ): BubbleState {
-  const pool = ingredientsInUse();
+  // The recipe always spawns; the rest of the tank is decoys drawn from the
+  // book. Shuffling before slicing means a given wrong bottle is not always
+  // the one on screen.
+  const others = ingredientsInUse().filter((k) => !needed.includes(k));
+  for (let i = others.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1)) % others.length;
+    [others[i], others[j]] = [others[j], others[i]];
+  }
+  const pool = [...needed, ...others.slice(0, DECOYS)];
+  // Shuffle again so the needed ones are not the first slots filled.
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1)) % pool.length;
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
 
-  const cell = BUBBLE_R * 2 + 6;
-  const jitter = 2.5;
+  const cell = BUBBLE_R * 2 + 8;
+  const jitter = 3;
   const cols = Math.max(1, Math.floor(GAME_W / cell));
   const rows = Math.max(1, Math.floor((TANK_BOTTOM - TANK_TOP) / cell));
   const originX = (GAME_W - cols * cell) / 2;
