@@ -124,6 +124,8 @@ export interface Bullet {
   nx: number;
   vnx: number;
   damage: number;
+  /** Which gun it left. Purely so the renderer can start it at that muzzle. */
+  side: -1 | 1;
 }
 
 export type GateEffect =
@@ -183,6 +185,8 @@ export interface State {
   gun: GunKind;
   /** Ticks down; the flamethrower is drawn while > 0. */
   firing: number;
+  /** Last muzzle used, so a one-barrel gun still alternates hands. */
+  muzzle: -1 | 1;
 
   enemies: Enemy[];
   bullets: Bullet[];
@@ -235,6 +239,7 @@ export function freshState(opts: StartOpts = {}): State {
     helpers: 0,
     gun: "pistol",
     firing: 0,
+    muzzle: 1,
     enemies: [],
     bullets: [],
     gate: null,
@@ -265,15 +270,51 @@ export function freshState(opts: StartOpts = {}): State {
 // posts an unbeatable score without ever seeing an ending.
 
 export function spawnInterval(stage: number): number {
-  return Math.max(0.20, 1.15 / (1 + (stage - 1) * 0.17));
+  return Math.max(0.42, 1.0 / (1 + (stage - 1) * 0.13));
+}
+
+/**
+ * How many enemies arrive at once.
+ *
+ * Enemies spawn in CLUSTERS, not one at a time. A faster trickle of single
+ * enemies reads as a queue and is trivially side-stepped one by one; a wave
+ * arriving abreast is what forces the guest to pick a lane and commit, and is
+ * what actually fills the screen.
+ */
+export function waveSize(stage: number): number {
+  return Math.min(6, 2 + Math.floor((stage - 1) * 0.35));
 }
 
 export function blockerChance(stage: number): number {
   return Math.min(0.55, 0.08 + (stage - 1) * 0.035);
 }
 
+/**
+ * How fast the world comes at you — the player's own walking pace.
+ *
+ * Scenery is STATIC and approaches at exactly this rate: the ground, the palms,
+ * everything that isn't alive. Getting this wrong is immediately visible, and
+ * it was wrong — the ground scrolled at 0.42 while enemies closed at 0.155, so
+ * the sand tore past nearly three times faster than the things walking on it
+ * and nothing felt connected to anything else.
+ */
+export function worldSpeed(stage: number): number {
+  return 0.11 * (1 + (stage - 1) * 0.05);
+}
+
+/** An enemy's own walk, on top of the world coming at it. */
+export function enemyWalk(stage: number): number {
+  return 0.05 * (1 + (stage - 1) * 0.06);
+}
+
+/**
+ * Total closing speed for an enemy: the world plus its own legs.
+ *
+ * Enemies are therefore always faster than the scenery, which is what makes
+ * them read as walking rather than sliding along on the ground.
+ */
 export function enemySpeed(stage: number): number {
-  return 0.155 * (1 + (stage - 1) * 0.055);
+  return worldSpeed(stage) + enemyWalk(stage);
 }
 
 export function blockerHp(stage: number): number {
@@ -412,24 +453,42 @@ export function detonateBomb(st: State): boolean {
 
 // ─── Spawning ────────────────────────────────────────────────────────────────
 
-function spawnEnemy(st: State): void {
+function spawnOne(st: State, nx: number): void {
   const blocker = st.rng() < blockerChance(st.stage);
   const kind: EnemyKind = blocker ? "sugarcane" : pick(GRUNTS, st.rng);
   const hp = blocker ? blockerHp(st.stage) : 1;
-  const base = enemySpeed(st.stage);
+  const world = worldSpeed(st.stage);
+  const walk = enemyWalk(st.stage);
   st.enemies.push({
     id: st.nextId++,
     kind,
-    z: 1,
-    nx: (st.rng() * 2 - 1) * 0.85,
+    // Spawn slightly beyond the horizon and stagger it, so a wave fades in
+    // rather than popping into existence in a rank.
+    z: 1 + st.rng() * 0.12,
+    nx,
     hp,
     maxHp: hp,
-    speed: base * (blocker ? 0.82 : GRUNT_SPEED[kind] ?? 1),
+    // Only the enemy's OWN legs vary by type — the world comes at everything
+    // at the same rate. The kiwi is quick because it runs, not because the
+    // ground moves faster underneath it.
+    speed: world + walk * (blocker ? 0.55 : GRUNT_SPEED[kind] ?? 1),
     burn: 0,
     flash: 0,
     tracks: blocker,
     dying: 0,
   });
+}
+
+/** A wave, spread across the road so it cannot all be dodged with one step. */
+function spawnWave(st: State): void {
+  const n = waveSize(st.stage);
+  // Evenly distributed with jitter: clumping leaves an obvious free lane, and
+  // an exact grid reads as mechanical.
+  for (let i = 0; i < n; i++) {
+    const slot = n === 1 ? 0 : (i / (n - 1)) * 2 - 1;
+    const jitter = (st.rng() * 2 - 1) * (0.9 / Math.max(1, n));
+    spawnOne(st, Math.max(-0.92, Math.min(0.92, slot * 0.85 + jitter)));
+  }
 }
 
 function spawnBoss(st: State): void {
@@ -441,7 +500,7 @@ function spawnBoss(st: State): void {
     nx: 0,
     hp,
     maxHp: hp,
-    speed: enemySpeed(st.stage) * 0.42,
+    speed: worldSpeed(st.stage) + enemyWalk(st.stage) * 0.3,
     burn: 0,
     flash: 0,
     tracks: true,
@@ -456,7 +515,12 @@ function fire(st: State): void {
   if (st.gun === "flame") return;
   for (let i = 0; i < g.count; i++) {
     const off = g.count === 1 ? 0 : (i / (g.count - 1) - 0.5) * 2;
-    st.bullets.push({ z: 0.02, nx: st.playerNx, vnx: off * g.spread, damage: g.damage });
+    // The hero holds two pistols, so single-barrel guns alternate muzzles.
+    st.muzzle = st.muzzle === 1 ? -1 : 1;
+    st.bullets.push({
+      z: 0.02, nx: st.playerNx, vnx: off * g.spread, damage: g.damage,
+      side: g.count === 1 ? st.muzzle : off < 0 ? -1 : 1,
+    });
   }
   // Helpers flank the player and always carry the base pistol, whatever the
   // player is holding. They are extra bodies, not an upgrade multiplier.
@@ -468,6 +532,7 @@ function fire(st: State): void {
       nx: st.playerNx + side * rank * 0.2,
       vnx: 0,
       damage: 1,
+      side: side as -1 | 1,
     });
   }
 }
@@ -509,7 +574,15 @@ function killReward(st: State, e: Enemy): void {
 
 // ─── Step ────────────────────────────────────────────────────────────────────
 
-const BULLET_SPEED = 2.1;
+/**
+ * Bullet travel, in z per second.
+ *
+ * Slower than it looks like it should be. At 2.1 a shot crossed the whole field
+ * in under half a second and spent two or three frames anywhere near the
+ * player, so the gun read as silent — the guest saw specks appearing in the
+ * middle distance with nothing connecting them to the character.
+ */
+const BULLET_SPEED = 1.5;
 
 export function update(st: State, dt: number): void {
   st.t += dt;
@@ -565,7 +638,7 @@ export function update(st: State, dt: number): void {
     st.stageT += dt;
     st.spawnT -= dt;
     if (st.spawnT <= 0) {
-      spawnEnemy(st);
+      spawnWave(st);
       st.spawnT = spawnInterval(st.stage);
     }
     st.gateT -= dt;

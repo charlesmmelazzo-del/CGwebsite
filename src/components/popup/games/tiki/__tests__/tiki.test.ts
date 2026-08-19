@@ -5,7 +5,7 @@ import {
   damage, enemySpeed, freshState, gateGoodChance, GRUNTS, GUNS, isGrunt,
   MAX_ARMOR, MAX_HEALTH, MAX_HELPERS, PTS_BLOCKER, PTS_BOSS, PTS_GRUNT,
   PTS_MISS_BLOCKER, PTS_MISS_GRUNT, spawnInterval, update, detonateBomb,
-  type State,
+  enemyWalk, waveSize, worldSpeed, type State,
 } from "../tikiCore";
 
 let passed = 0;
@@ -39,7 +39,7 @@ check("every grunt dies in exactly one pistol shot", () => {
       id: 1, kind, z: 0.5, nx: 0, hp: 1, maxHp: 1, speed: 0,
       burn: 0, flash: 0, tracks: false, dying: 0,
     }];
-    st.bullets = [{ z: 0.5, nx: 0, vnx: 0, damage: GUNS.pistol.damage }];
+    st.bullets = [{ z: 0.5, nx: 0, vnx: 0, damage: GUNS.pistol.damage, side: 1 }];
     update(st, DT);
     assert.ok(st.enemies[0].dying > 0, `${kind} survived a single pistol bullet`);
   }
@@ -367,6 +367,83 @@ check("every difficulty lever keeps scaling past any build", () => {
   assert.ok(blockerChance(30) > blockerChance(1), "blockers did not get denser");
   assert.ok(blockerHp(60) > blockerHp(30), "blocker health hit a ceiling");
   assert.ok(enemySpeed(60) > enemySpeed(30), "speed hit a ceiling");
+});
+
+// ── Density ─────────────────────────────────────────────────────────────────
+
+check("enemies arrive in waves, not one at a time", () => {
+  assert.ok(waveSize(1) >= 2, "stage 1 spawns a single enemy at a time");
+  assert.ok(waveSize(12) > waveSize(1), "waves do not grow with depth");
+});
+
+check("a wave spreads across the road rather than clumping", () => {
+  const st = fresh();
+  run(st, 1.05);
+  assert.ok(st.enemies.length >= 2, "no wave arrived in the first second");
+  const xs = st.enemies.map((e) => e.nx);
+  assert.ok(Math.max(...xs) - Math.min(...xs) > 0.3,
+    "the whole wave arrived in one lane and can be dodged with one step");
+});
+
+check("the field fills up faster than it used to", () => {
+  const st = fresh();
+  run(st, 6);
+  // The old build trickled one enemy roughly every 1.15s.
+  assert.ok(st.enemies.length + st.kills.grunt + st.kills.blocker > 6,
+    "six seconds produced barely more than the old one-at-a-time trickle");
+});
+
+// ── The world moves at one speed ────────────────────────────────────────────
+
+check("scenery is slower than anything walking at you", () => {
+  for (const stage of [1, 5, 20]) {
+    assert.ok(worldSpeed(stage) < enemySpeed(stage),
+      `stage ${stage}: scenery keeps pace with enemies, so nothing reads as walking`);
+  }
+});
+
+check("enemy speed is exactly the world plus its own legs", () => {
+  for (const stage of [1, 10, 40]) {
+    assert.ok(Math.abs(enemySpeed(stage) - (worldSpeed(stage) + enemyWalk(stage))) < 1e-9,
+      `stage ${stage}: enemy speed drifted from the world it walks in`);
+  }
+});
+
+check("the ground scrolls far slower than the old hard-coded rate", () => {
+  // The bug: ground ran at 0.42 while enemies closed at ~0.155.
+  assert.ok(worldSpeed(1) < 0.2, "ground speed is still outrunning the enemies");
+});
+
+// ── Bullets leave a muzzle ──────────────────────────────────────────────────
+
+check("bullets carry the gun they came from", () => {
+  const st = fresh();
+  st.cooldown = 0;
+  update(st, DT);
+  assert.ok(st.bullets.length > 0);
+  for (const b of st.bullets) assert.ok(b.side === 1 || b.side === -1);
+});
+
+check("a single-barrel gun alternates hands", () => {
+  const st = fresh();
+  const sides = [];
+  for (let i = 0; i < 6; i++) {
+    st.cooldown = 0;
+    st.bullets = [];
+    update(st, DT);
+    sides.push(st.bullets[0].side);
+  }
+  assert.ok(new Set(sides).size === 2, "every shot came from the same pistol");
+});
+
+check("bullets still aim true regardless of which muzzle fired", () => {
+  const st = fresh();
+  st.playerNx = 0.4;
+  st.cooldown = 0;
+  update(st, DT);
+  for (const b of st.bullets) {
+    assert.ok(Math.abs(b.nx - 0.4) < 1e-9, "the muzzle offset leaked into aim");
+  }
 });
 
 // ── Stage flow ──────────────────────────────────────────────────────────────

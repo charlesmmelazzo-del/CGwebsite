@@ -12,7 +12,8 @@ import {
 } from "./constants";
 import {
   armorCost, bombCost, canBuyArmor, canBuyBomb, freshState, GUNS, MAX_ARMOR,
-  MAX_BOMBS, MAX_HEALTH, runDetail, update, detonateBomb, type Enemy, type State,
+  MAX_BOMBS, MAX_HEALTH, runDetail, update, detonateBomb, worldSpeed,
+  type Enemy, type State,
 } from "./tikiCore";
 
 // ─── Progress (the save file) ────────────────────────────────────────────────
@@ -314,8 +315,12 @@ function drawField(
   ctx.fillRect(0, hy, W, h - hy);
 
   // Perspective rungs: the cheapest strong motion cue there is, and the thing
-  // that tells the guest how fast they are travelling.
-  const scroll = (t * 0.42) % 0.08;
+  // that tells the guest how fast they are travelling — which is exactly why it
+  // has to be the SAME speed the world actually moves at. This used to scroll
+  // at a made-up 0.42 while enemies closed at 0.155, so the sand tore past
+  // nearly three times faster than the things walking on it.
+  const world = worldSpeed(s.stage);
+  const scroll = (t * world) % 0.08;
   ctx.fillStyle = C.sandDark;
   for (let z = scroll; z < 1; z += 0.08) {
     const y = projectY(z, h);
@@ -336,7 +341,9 @@ function drawField(
 
   // ── Scenery ────────────────────────────────────────────────────────────
   for (const p of PALMS) {
-    const z = 1 - ((t * 0.16 + p.phase) % 1);
+    // Palms are scenery: they approach at exactly the world's speed, like the
+    // ground they are standing in.
+    const z = 1 - ((t * world + p.phase) % 1);
     if (z <= 0.02 || z >= 0.99) continue;
     const sc = projectScale(z);
     drawSprite(ctx, "prop-palm", 0, projectX(p.nx, z), projectY(z, h), {
@@ -405,16 +412,6 @@ function drawField(
     }
   }
 
-  // ── Bullets ────────────────────────────────────────────────────────────
-  ctx.fillStyle = C.flameHot;
-  for (const b of s.bullets) {
-    const sc = projectScale(b.z);
-    const x = projectX(b.nx, b.z);
-    const y = projectY(b.z, h) - 26 * sc;
-    const r = Math.max(0.8, 2.2 * sc);
-    ctx.fillRect(x - r / 2, y - r, r, r * 2.4);
-  }
-
   // ── Flame cone ─────────────────────────────────────────────────────────
   if (s.gun === "flame" && s.phase !== "over") {
     const range = GUNS.flame.range;
@@ -476,6 +473,58 @@ function drawField(
     py,
     { h: 84, pixelScale: PIXEL_SCALE, flash: hurt ? 0.6 : 0 }
   );
+
+  // ── Bullets ────────────────────────────────────────────────────────────
+  // Drawn AFTER the hero, not before. A bullet spawns at z=0.02, which projects
+  // to a point INSIDE his 84px sprite — drawing them first meant every shot was
+  // hidden behind him until it was well up the field, so the gun looked like it
+  // was firing from somewhere near the horizon.
+  for (const b of s.bullets) {
+    const sc = projectScale(b.z);
+    // Start at the muzzle and converge to true aim over the first stretch. The
+    // offset is visual only — b.nx is what the rules hit-test against, so the
+    // gun still shoots exactly where it points.
+    const muzzleFade = Math.max(0, 1 - b.z / 0.22);
+    const x = projectX(b.nx, b.z) + b.side * 12 * sc * muzzleFade;
+    const y = projectY(b.z, h) - (26 + 24 * muzzleFade) * sc;
+    // Drawn as a TRACER, not a dot. A round travelling this fast covers more
+    // ground between frames than a dot is wide, so a dot strobes; a streak
+    // reads as a continuous line of fire.
+    const w = Math.max(1, 2.6 * sc);
+    const len = Math.max(4, 13 * sc);
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.fillRect(x - w / 2 + 0.6, y - len + 0.6, w, len);
+    ctx.fillStyle = C.flameHot;
+    ctx.fillRect(x - w / 2, y - len, w, len);
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(x - w / 2, y - len, w, len * 0.4);
+  }
+
+  // Muzzle flash. This is what actually anchors the shooting to the character —
+  // without it the hero looks like a bystander while bullets appear in the
+  // middle distance on their own.
+  if (s.firing > 0 && s.gun !== "flame") {
+    const fx = projectX(s.playerNx, 0);
+    const fy = py - 48;
+    const k = Math.min(1, s.firing / 0.06);
+    for (const side of [-1, 1] as const) {
+      const mx = fx + side * 12;
+      ctx.globalAlpha = 0.9 * k;
+      ctx.fillStyle = C.flameHot;
+      ctx.beginPath();
+      ctx.moveTo(mx, fy - 11 * k);
+      ctx.lineTo(mx + 5 * k, fy);
+      ctx.lineTo(mx, fy + 4 * k);
+      ctx.lineTo(mx - 5 * k, fy);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#FFFFFF";
+      ctx.beginPath();
+      ctx.arc(mx, fy, 2.6 * k, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  }
 
   // ── Bark bubble ────────────────────────────────────────────────────────
   if (s.bark) drawBubble(ctx, s.bark.text, px, py - 92, h, s.bark.kind === "boss");

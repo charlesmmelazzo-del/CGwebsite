@@ -132,6 +132,38 @@ No stage number, no money, no luck, no score. Money and luck are shown in the
 shop between stages, where they are actually actionable. The run itself stays
 clean - the guest is watching the field, not reading statistics.
 
+### One speed for the world
+
+The player walks forward at `worldSpeed`. **Everything that isn't alive
+approaches at exactly that rate** — the ground, the palms, all scenery. An enemy
+closes at `worldSpeed + its own walk`, which is what makes it read as walking
+rather than sliding along on the sand.
+
+This was wrong in the first build and it was very visible: the ground scrolled
+at a hard-coded `0.42`, the palms at `0.16`, and enemies closed at `0.155`.
+Three unrelated speeds, with the sand tearing past nearly three times faster
+than the things standing on it. If a new kind of scenery is added, it takes
+`worldSpeed` too.
+
+### Firing
+
+Bullets are drawn **after** the hero, never before. A bullet spawns at `z=0.02`,
+which projects to a point *inside* his 84px sprite — drawn first, every shot was
+hidden behind him until it was well up the field.
+
+Three things make the gun read as firing, and all three are needed:
+
+* **Muzzle flash** at the gun while `firing` is up. This is what anchors the
+  shooting to the character; without it the hero looks like a bystander while
+  bullets appear in the middle distance on their own.
+* **Tracers, not dots.** A round covers more ground between frames than a dot is
+  wide, so a dot strobes and a streak reads as a line of fire.
+* **A slower bullet.** Fast enough to feel instant, slow enough to be seen
+  leaving the barrel.
+
+The muzzle offset is **visual only** — the bullet's `nx` is what the rules
+hit-test, so the gun always shoots exactly where it points.
+
 ### Depth model
 
 Every actor carries a depth `z`, from `1.0` at the horizon to `0.0` at the
@@ -420,6 +452,7 @@ reaching an ending. Every lever below must scale past any possible build.
 
 | Lever | Direction |
 |---|---|
+| Wave size | Rises. Enemies arrive in clusters spread across the road, not one at a time — a faster trickle of singles reads as a queue and is side-stepped one by one. |
 | Enemy count and speed | Rise continuously, no ceiling. |
 | Blocker density | Rises — firepower stops being sufficient, position becomes binding. |
 | Gate quality | Decays. Deep stages offer weaker bonuses and harsher negatives; eventually both sides are negative. |
