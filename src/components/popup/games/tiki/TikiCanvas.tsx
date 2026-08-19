@@ -4,8 +4,16 @@ import { useCallback, useEffect, useRef } from "react";
 import { heightFor, PIXEL_SCALE, W } from "./constants";
 
 export interface DragHandlers {
-  /** -1..1, how hard the thumb is pulling. 0 when nothing is held. */
-  onDrag: (dir: number) => void;
+  /** Thumb went down. The game anchors the character's current position here. */
+  onDragStart: () => void;
+  /**
+   * How far the thumb has moved since it went down, as a fraction of one full
+   * travel. POSITIONAL, not a direction — the character is placed at
+   * anchor + this, rather than accelerating this way.
+   */
+  onDrag: (delta: number) => void;
+  /** Thumb lifted. The character stays exactly where it was left. */
+  onDragEnd: () => void;
   /** A tap that wasn't a drag, in logical coordinates. */
   onTap: (x: number, y: number, h: number) => void;
 }
@@ -20,20 +28,31 @@ export interface DragHandlers {
  * ArcadeCanvas into doing both would put the other two games at risk for no
  * gain.
  *
- * Drag is tracked RELATIVELY — how far the thumb has moved since it went down,
- * not where it is on screen. Absolute tracking would teleport the character to
- * wherever a thumb happened to land, which on a phone happens constantly as the
- * guest re-plants their grip.
+ * Drag is tracked RELATIVELY and POSITIONALLY.
+ *
+ * Relative — measured from where the thumb went down, not where it is on the
+ * screen — because absolute tracking would teleport the character to wherever a
+ * thumb happened to land, which on a phone happens constantly as the guest
+ * re-plants their grip.
+ *
+ * Positional — the delta places the character rather than steering it — because
+ * feeding a drag into a velocity integrator made it feel towed: you moved your
+ * thumb and the character caught up a moment later. In a game where picking a
+ * lane is worth health, that lag is unusable.
  */
 export default function TikiCanvas({
   onFrame,
   running,
+  onDragStart,
   onDrag,
+  onDragEnd,
   onTap,
 }: {
   onFrame: (ctx: CanvasRenderingContext2D, dt: number, t: number, h: number) => void;
   running: boolean;
+  onDragStart: DragHandlers["onDragStart"];
   onDrag: DragHandlers["onDrag"];
+  onDragEnd: DragHandlers["onDragEnd"];
   onTap: DragHandlers["onTap"];
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -42,6 +61,10 @@ export default function TikiCanvas({
   frameRef.current = onFrame;
   const dragRef = useRef(onDrag);
   dragRef.current = onDrag;
+  const dragStartRef = useRef(onDragStart);
+  dragStartRef.current = onDragStart;
+  const dragEndRef = useRef(onDragEnd);
+  dragEndRef.current = onDragEnd;
   const tapRef = useRef(onTap);
   tapRef.current = onTap;
 
@@ -108,12 +131,12 @@ export default function TikiCanvas({
   }, [running]);
 
   // ── Drag ─────────────────────────────────────────────────────────────────
-  // Full drag travel across ~40% of the screen width gives full deflection:
-  // enough that a small thumb movement is precise, short enough that a guest
-  // can cross the road without re-planting.
+  // One full travel is ~38% of the screen width, which then maps to more than
+  // half the road. Short enough to cross lanes with a thumb flick without
+  // re-planting, long enough to still be precise.
   const travel = useCallback(() => {
     const r = wrapRef.current?.getBoundingClientRect();
-    return Math.max(60, (r?.width ?? 320) * 0.4);
+    return Math.max(56, (r?.width ?? 320) * 0.38);
   }, []);
 
   function down(e: React.PointerEvent) {
@@ -121,6 +144,7 @@ export default function TikiCanvas({
     if (pointer.current) return;
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
     pointer.current = { id: e.pointerId, x: e.clientX, startX: e.clientX, startY: e.clientY, moved: false };
+    dragStartRef.current();
   }
 
   function move(e: React.PointerEvent) {
@@ -138,7 +162,7 @@ export default function TikiCanvas({
     if (!p || p.id !== e.pointerId) return;
     e.preventDefault();
     pointer.current = null;
-    dragRef.current(0);
+    dragEndRef.current();
 
     if (!p.moved) {
       const r = wrapRef.current?.getBoundingClientRect();

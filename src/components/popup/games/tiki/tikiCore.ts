@@ -19,7 +19,19 @@ export const MAX_ARMOR = 10;
 export const MAX_BOMBS = 3;
 export const MAX_HELPERS = 6;
 
-export const PLAYER_SPEED = 1.9;          // nx units per second at full drag
+export const PLAYER_SPEED = 2.6;          // keyboard only: nx per second
+
+/**
+ * How hard the character is pinned to the thumb, per second.
+ *
+ * High on purpose. This is effectively direct tracking with one frame of
+ * smoothing — anything gentler reintroduces the towed, drifty feel that made
+ * dodging unreliable.
+ */
+export const FOLLOW_RATE = 34;
+
+/** How much road one full thumb travel covers, in nx. */
+export const DRAG_RANGE = 1.15;
 export const CONTACT_Z = 0.045;           // where an enemy is "on top of" you
 export const CONTACT_NX = 0.30;           // how wide a body is, in nx
 export const CONTACT_DAMAGE = 18;
@@ -85,17 +97,41 @@ export type EnemyKind = "lime" | "lemon" | "orange" | "kiwi" | "sugarcane" | "bo
 
 export const GRUNTS: EnemyKind[] = ["lime", "lemon", "orange", "kiwi"];
 
-/**
- * Every grunt dies in ONE shot, always.
- *
- * The guest has a fraction of a second to decide "shoot through it" or "dodge
- * round it", and that read has to be unconditional. Variety between the four
- * fruits is colour, silhouette and speed — never health. A lemon that secretly
- * took three shots would read as the game cheating.
- */
 export function isGrunt(k: EnemyKind): boolean {
   return GRUNTS.includes(k);
 }
+
+/**
+ * Grunt health.
+ *
+ * These used to die in exactly one shot, on the reasoning that the guest needs
+ * an unconditional read of "shoot through it" or "dodge round it". That held,
+ * but it cost the shooting all of its weight — a one-shot enemy gives no
+ * feedback at all, it simply stops existing, and firing felt like sweeping
+ * rather than fighting.
+ *
+ * A few hits restores the weight. The read is preserved by FEEDBACK instead of
+ * by health: every hit flashes the target white and staggers it visibly, so
+ * "this is dying" is legible without counting shots. The four fruits still all
+ * share one health value — variety between them stays colour, silhouette and
+ * speed, so a lemon never secretly takes longer than a lime.
+ */
+export function gruntHp(stage: number): number {
+  return 2 + Math.floor((stage - 1) / 10);
+}
+
+/**
+ * How long a hit takes an enemy off its stride.
+ *
+ * The whole point of the change above: a bullet has to visibly DO something on
+ * impact, not just decrement a number. The target stalls for a moment and gets
+ * pushed back up the field, which is what makes a hit feel like a hit.
+ */
+export const STAGGER_SECONDS = 0.12;
+/** Fraction of normal walking speed while staggered. */
+export const STAGGER_SPEED = 0.15;
+/** How far back up the field a hit shoves an enemy. */
+export const STAGGER_KNOCKBACK = 0.012;
 
 /** The kiwi is the quick one — speed is visible on approach, health is not. */
 const GRUNT_SPEED: Record<string, number> = {
@@ -114,6 +150,8 @@ export interface Enemy {
   burn: number;
   /** Counts down after a hit, for the white flash. */
   flash: number;
+  /** Counts down after a hit; the enemy is stalled while it runs. */
+  stagger: number;
   /** Blockers steer toward the player; grunts walk straight. */
   tracks: boolean;
   dying: number;
@@ -173,8 +211,21 @@ export interface State {
   stageT: number;
 
   playerNx: number;
-  /** -1, 0 or 1 — set by the drag, integrated into playerNx. */
+  /**
+   * Keyboard steering only: -1, 0 or 1, integrated into playerNx over time.
+   * Touch does NOT use this — see targetNx.
+   */
   drag: number;
+
+  /**
+   * Where the thumb wants the player to be, or null when nothing is held.
+   *
+   * Touch steering is POSITIONAL, not a direction to accelerate in. Feeding a
+   * drag into a velocity integrator made the character feel like it was being
+   * towed — you moved your thumb and the character caught up a moment later,
+   * which is unusable in a game where a lane choice is worth health.
+   */
+  targetNx: number | null;
 
   health: number;
   armor: number;
@@ -231,6 +282,7 @@ export function freshState(opts: StartOpts = {}): State {
     stageT: 0,
     playerNx: 0,
     drag: 0,
+    targetNx: null,
     health: MAX_HEALTH,
     armor: Math.min(MAX_ARMOR, opts.armor ?? 0),
     money: opts.money ?? 0,
@@ -456,7 +508,7 @@ export function detonateBomb(st: State): boolean {
 function spawnOne(st: State, nx: number): void {
   const blocker = st.rng() < blockerChance(st.stage);
   const kind: EnemyKind = blocker ? "sugarcane" : pick(GRUNTS, st.rng);
-  const hp = blocker ? blockerHp(st.stage) : 1;
+  const hp = blocker ? blockerHp(st.stage) : gruntHp(st.stage);
   const world = worldSpeed(st.stage);
   const walk = enemyWalk(st.stage);
   st.enemies.push({
@@ -474,6 +526,7 @@ function spawnOne(st: State, nx: number): void {
     speed: world + walk * (blocker ? 0.55 : GRUNT_SPEED[kind] ?? 1),
     burn: 0,
     flash: 0,
+    stagger: 0,
     tracks: blocker,
     dying: 0,
   });
@@ -503,6 +556,7 @@ function spawnBoss(st: State): void {
     speed: worldSpeed(st.stage) + enemyWalk(st.stage) * 0.3,
     burn: 0,
     flash: 0,
+    stagger: 0,
     tracks: true,
     dying: 0,
   });
@@ -609,7 +663,14 @@ export function update(st: State, dt: number): void {
   }
 
   // ── Player ──
-  st.playerNx += st.drag * PLAYER_SPEED * dt;
+  if (st.targetNx !== null) {
+    // Fast enough to feel like the character is pinned to the thumb, smoothed
+    // just enough that a jittery touch doesn't judder the sprite.
+    const k = Math.min(1, FOLLOW_RATE * dt);
+    st.playerNx += (st.targetNx - st.playerNx) * k;
+  } else {
+    st.playerNx += st.drag * PLAYER_SPEED * dt;
+  }
   if (st.playerNx < -1) st.playerNx = -1;
   if (st.playerNx > 1) st.playerNx = 1;
 
@@ -676,7 +737,9 @@ export function update(st: State, dt: number): void {
     }
     if (e.flash > 0) e.flash -= dt;
 
-    e.z -= e.speed * dt;
+    // A staggered enemy barely advances — the hit visibly stops it.
+    if (e.stagger > 0) e.stagger -= dt;
+    e.z -= e.speed * (e.stagger > 0 ? STAGGER_SPEED : 1) * dt;
     if (e.tracks) {
       const d = st.playerNx - e.nx;
       e.nx += Math.sign(d) * Math.min(Math.abs(d), 0.42 * dt);
@@ -704,6 +767,11 @@ export function update(st: State, dt: number): void {
       if (Math.abs(b.z - e.z) < 0.05 && Math.abs(b.nx - e.nx) < 0.16) {
         e.hp -= b.damage;
         e.flash = 0.12;
+        // Weight: stall it and shove it back up the field. Without this a hit
+        // is an invisible subtraction and the gun feels like it is doing
+        // nothing until the enemy abruptly disappears.
+        e.stagger = STAGGER_SECONDS;
+        e.z = Math.min(1.1, e.z + STAGGER_KNOCKBACK);
         b.damage = 0;
       }
     }

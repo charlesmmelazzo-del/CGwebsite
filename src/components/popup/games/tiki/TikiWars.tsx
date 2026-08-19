@@ -13,7 +13,7 @@ import {
 import {
   armorCost, bombCost, canBuyArmor, canBuyBomb, freshState, GUNS, MAX_ARMOR,
   MAX_BOMBS, MAX_HEALTH, runDetail, update, detonateBomb, worldSpeed,
-  type Enemy, type State,
+  DRAG_RANGE, isGrunt, type Enemy, type State,
 } from "./tikiCore";
 
 // ─── Progress (the save file) ────────────────────────────────────────────────
@@ -148,9 +148,29 @@ export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeG
   }, []);
 
   // ── Input ────────────────────────────────────────────────────────────────
-  const onDrag = useCallback((dir: number) => {
+  // Where the character was when the thumb went down. Everything is measured
+  // from here, so lifting and re-planting a thumb never moves the character.
+  const anchorNx = useRef(0);
+
+  const onDragStart = useCallback(() => {
     if (demo) return;
-    st.current.drag = dir;
+    anchorNx.current = st.current.playerNx;
+    st.current.targetNx = st.current.playerNx;
+  }, [demo]);
+
+  const onDrag = useCallback((delta: number) => {
+    if (demo) return;
+    // Positional: the thumb PLACES the character. See TikiCanvas for why this
+    // is not a velocity.
+    const t = anchorNx.current + delta * DRAG_RANGE;
+    st.current.targetNx = Math.max(-1, Math.min(1, t));
+  }, [demo]);
+
+  const onDragEnd = useCallback(() => {
+    if (demo) return;
+    // Released: the character holds its ground rather than coasting.
+    st.current.targetNx = null;
+    st.current.drag = 0;
   }, [demo]);
 
   const inside = (x: number, y: number, r?: [number, number, number, number]) =>
@@ -197,7 +217,11 @@ export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeG
     if (bombPulse.current > 0) bombPulse.current -= dt;
 
     if (screen === "play") {
-      if (demo) s.drag = botDrag(s);
+      if (demo) {
+        // The bot steers positionally too, so demo mode moves exactly the way
+        // a guest's thumb does.
+        s.targetNx = Math.max(-1, Math.min(1, s.playerNx + botDrag(s) * 0.35));
+      }
 
       const wasPhase = s.phase;
       update(s, dt);
@@ -238,7 +262,14 @@ export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeG
 
   return (
     <div className="absolute inset-0 bg-black">
-      <TikiCanvas onFrame={onFrame} running onDrag={onDrag} onTap={onTap} />
+      <TikiCanvas
+        onFrame={onFrame}
+        running
+        onDragStart={onDragStart}
+        onDrag={onDrag}
+        onDragEnd={onDragEnd}
+        onTap={onTap}
+      />
     </div>
   );
 }
@@ -400,9 +431,11 @@ function drawField(
     });
     ctx.restore();
 
-    // Health pips over anything that takes more than one shot — the guest has
-    // to be able to tell "keep shooting" from "get out of the way".
-    if (e.maxHp > 1 && e.dying <= 0 && e.hp > 0) {
+    // Health bars on BLOCKERS AND BOSSES ONLY. Grunts take a few hits now, so
+    // bar-per-enemy would put one over everything on a crowded screen and read
+    // as noise. A grunt's state is carried by its hit flash and stagger, which
+    // is enough at that size.
+    if (!isGrunt(e.kind) && e.dying <= 0 && e.hp > 0) {
       const bw = Math.max(10, 26 * sc);
       const by = y - base * sc - 4;
       ctx.fillStyle = "rgba(0,0,0,0.55)";

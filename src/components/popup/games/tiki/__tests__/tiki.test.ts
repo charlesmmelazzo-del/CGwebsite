@@ -1,11 +1,12 @@
 // Tiki Wars — driving the real rules frame by frame.
 import assert from "node:assert";
 import {
-  applyEffect, armorCost, blockerChance, blockerHp, bombCost, CONTACT_Z,
+  applyEffect, armorCost, blockerChance, bombCost, CONTACT_Z,
   damage, enemySpeed, freshState, gateGoodChance, GRUNTS, GUNS, isGrunt,
   MAX_ARMOR, MAX_HEALTH, MAX_HELPERS, PTS_BLOCKER, PTS_BOSS, PTS_GRUNT,
   PTS_MISS_BLOCKER, PTS_MISS_GRUNT, spawnInterval, update, detonateBomb,
-  enemyWalk, waveSize, worldSpeed, type State,
+  enemyWalk, waveSize, worldSpeed, gruntHp, blockerHp, FOLLOW_RATE,
+  type State,
 } from "../tikiCore";
 
 let passed = 0;
@@ -32,17 +33,63 @@ const fresh = (o = {}) => freshState({ rng: seeded(7), ...o });
 
 // ── The grunt contract ──────────────────────────────────────────────────────
 
-check("every grunt dies in exactly one pistol shot", () => {
-  for (const kind of GRUNTS) {
-    const st = fresh();
-    st.enemies = [{
-      id: 1, kind, z: 0.5, nx: 0, hp: 1, maxHp: 1, speed: 0,
-      burn: 0, flash: 0, tracks: false, dying: 0,
-    }];
+check("a grunt survives one shot and dies to a few", () => {
+  const st = fresh();
+  assert.ok(gruntHp(1) > 1, "grunts are back to dying in a single shot");
+  st.enemies = [{
+    id: 1, kind: "lime", z: 0.5, nx: 0, hp: gruntHp(1), maxHp: gruntHp(1), speed: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0,
+  }];
+  st.bullets = [{ z: 0.5, nx: 0, vnx: 0, damage: GUNS.pistol.damage, side: 1 }];
+  update(st, DT);
+  assert.equal(st.enemies[0].dying, 0, "one bullet still killed it");
+  for (let i = 0; i < gruntHp(1); i++) {
+    st.enemies[0].z = 0.5;
     st.bullets = [{ z: 0.5, nx: 0, vnx: 0, damage: GUNS.pistol.damage, side: 1 }];
     update(st, DT);
-    assert.ok(st.enemies[0].dying > 0, `${kind} survived a single pistol bullet`);
   }
+  assert.ok(st.enemies[0].dying > 0, "a grunt would not die to its full health in shots");
+});
+
+check("all four fruits share one health value", () => {
+  // Variety between grunts is colour, silhouette and speed — never health.
+  const hps = new Set(GRUNTS.map(() => gruntHp(3)));
+  assert.equal(hps.size, 1);
+});
+
+check("a blocker is still clearly tougher than a grunt", () => {
+  for (const stage of [1, 10, 30]) {
+    assert.ok(blockerHp(stage) > gruntHp(stage),
+      `stage ${stage}: a blocker is no tougher than a grunt`);
+  }
+});
+
+check("a hit staggers the target and shoves it back", () => {
+  const st = fresh();
+  st.enemies = [{
+    id: 1, kind: "sugarcane", z: 0.5, nx: 0, hp: 20, maxHp: 20, speed: 0.2,
+    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0,
+  }];
+  st.bullets = [{ z: 0.5, nx: 0, vnx: 0, damage: 1, side: 1 }];
+  update(st, DT);
+  const e = st.enemies[0];
+  assert.ok(e.stagger > 0, "a hit did not stagger the enemy");
+  assert.ok(e.z > 0.5, "a hit did not push the enemy back");
+});
+
+check("a staggered enemy barely advances", () => {
+  const mk = (stagger: number) => {
+    const st = fresh();
+    st.gun = "flame";                  // no fresh bullets to re-stagger it
+    st.enemies = [{
+      id: 1, kind: "sugarcane", z: 0.9, nx: 0.9, hp: 20, maxHp: 20, speed: 0.4,
+      burn: 0, flash: 0, stagger, tracks: false, dying: 0,
+    }];
+    st.playerNx = -0.9;
+    run(st, 0.1);
+    return st.enemies[0].z;
+  };
+  assert.ok(mk(0.5) > mk(0), "staggering made no difference to how far it walked");
 });
 
 check("grunts are grunts and the blocker is not", () => {
@@ -90,7 +137,7 @@ check("an enemy that reaches the player deals contact damage", () => {
   const st = fresh();
   st.enemies = [{
     id: 1, kind: "lime", z: CONTACT_Z * 0.5, nx: 0, hp: 1, maxHp: 1, speed: 0,
-    burn: 0, flash: 0, tracks: false, dying: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0,
   }];
   st.gun = "flame";           // no bullets, so the hit is unambiguous
   st.playerNx = 0;
@@ -102,7 +149,7 @@ check("a dodged grunt costs no HEALTH (it costs points instead)", () => {
   const st = fresh();
   st.enemies = [{
     id: 1, kind: "lime", z: 0.1, nx: -0.9, hp: 1, maxHp: 1, speed: 0.4,
-    burn: 0, flash: 0, tracks: false, dying: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0,
   }];
   st.gun = "flame";
   st.playerNx = 0.9;
@@ -119,7 +166,7 @@ check("a grunt that walks past unkilled costs points", () => {
   st.playerNx = 1;                     // stand well clear: dodge, not contact
   st.enemies = [{
     id: 1, kind: "lime", z: 0.05, nx: -0.9, hp: 1, maxHp: 1, speed: 0.5,
-    burn: 0, flash: 0, tracks: false, dying: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0,
   }];
   run(st, 0.6);
   assert.equal(st.score, 500 - PTS_MISS_GRUNT, "dodging a grunt was free");
@@ -134,7 +181,7 @@ check("a blocker that gets past costs more than a grunt", () => {
   st.playerNx = 1;
   st.enemies = [{
     id: 1, kind: "sugarcane", z: 0.05, nx: -0.9, hp: 9, maxHp: 9, speed: 0.5,
-    burn: 0, flash: 0, tracks: false, dying: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0,
   }];
   run(st, 0.6);
   assert.equal(st.score, 500 - PTS_MISS_BLOCKER);
@@ -154,7 +201,7 @@ check("an enemy that HITS you is not also charged as a dodge", () => {
   st.playerNx = 0;
   st.enemies = [{
     id: 1, kind: "lime", z: 0.04, nx: 0, hp: 1, maxHp: 1, speed: 0.5,
-    burn: 0, flash: 0, tracks: false, dying: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0,
   }];
   run(st, 0.6);
   assert.ok(st.health < MAX_HEALTH, "should have taken the hit");
@@ -169,7 +216,7 @@ check("score never goes negative from penalties", () => {
   st.playerNx = 1;
   st.enemies = [{
     id: 1, kind: "sugarcane", z: 0.05, nx: -0.9, hp: 9, maxHp: 9, speed: 0.5,
-    burn: 0, flash: 0, tracks: false, dying: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0,
   }];
   run(st, 0.6);
   assert.equal(st.score, 0);
@@ -181,7 +228,7 @@ check("a miss leaves a floating number, because the HUD has no score", () => {
   st.playerNx = 1;
   st.enemies = [{
     id: 1, kind: "lime", z: 0.05, nx: -0.9, hp: 1, maxHp: 1, speed: 0.5,
-    burn: 0, flash: 0, tracks: false, dying: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0,
   }];
   run(st, 0.15);
   assert.ok(st.pops.length > 0, "penalty was applied with no feedback at all");
@@ -196,7 +243,7 @@ check("a boss that touches you is NOT consumed", () => {
   st.playerNx = 0;
   st.enemies = [{
     id: 1, kind: "boss", z: 0.04, nx: 0, hp: 40, maxHp: 40, speed: 0.3,
-    burn: 0, flash: 0, tracks: true, dying: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: true, dying: 0,
   }];
   st.phase = "boss";
   run(st, 1.0);
@@ -211,7 +258,7 @@ check("a boss can never walk off the field and strand the stage", () => {
   st.playerNx = -1;                    // dodge as hard as possible
   st.enemies = [{
     id: 1, kind: "boss", z: 0.02, nx: 1, hp: 40, maxHp: 40, speed: 0.9,
-    burn: 0, flash: 0, tracks: false, dying: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0,
   }];
   st.phase = "boss";
   run(st, 2.0);
@@ -239,7 +286,7 @@ check("the flamethrower burns, and the burn outlives the stream", () => {
   st.playerNx = 0;
   st.enemies = [{
     id: 1, kind: "sugarcane", z: 0.2, nx: 0, hp: 40, maxHp: 40, speed: 0,
-    burn: 0, flash: 0, tracks: false, dying: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0,
   }];
   update(st, DT);
   const e = st.enemies[0];
@@ -257,7 +304,7 @@ check("the flamethrower cannot reach the horizon", () => {
   st.playerNx = 0;
   st.enemies = [{
     id: 1, kind: "sugarcane", z: 0.9, nx: 0, hp: 40, maxHp: 40, speed: 0,
-    burn: 0, flash: 0, tracks: false, dying: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0,
   }];
   update(st, DT);
   assert.equal(st.enemies[0].burn, 0, "flame reached far up the field");
@@ -283,8 +330,8 @@ check("a bomb clears the near field and leaves the far field alone", () => {
   const st = fresh();
   st.bombs = 1;
   st.enemies = [
-    { id: 1, kind: "sugarcane", z: 0.2, nx: 0, hp: 20, maxHp: 20, speed: 0, burn: 0, flash: 0, tracks: false, dying: 0 },
-    { id: 2, kind: "sugarcane", z: 0.9, nx: 0, hp: 20, maxHp: 20, speed: 0, burn: 0, flash: 0, tracks: false, dying: 0 },
+    { id: 1, kind: "sugarcane", z: 0.2, nx: 0, hp: 20, maxHp: 20, speed: 0, burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0 },
+    { id: 2, kind: "sugarcane", z: 0.9, nx: 0, hp: 20, maxHp: 20, speed: 0, burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0 },
   ];
   assert.ok(detonateBomb(st));
   assert.ok(st.enemies[0].hp <= 0, "near enemy survived the bomb");
@@ -367,6 +414,57 @@ check("every difficulty lever keeps scaling past any build", () => {
   assert.ok(blockerChance(30) > blockerChance(1), "blockers did not get denser");
   assert.ok(blockerHp(60) > blockerHp(30), "blocker health hit a ceiling");
   assert.ok(enemySpeed(60) > enemySpeed(30), "speed hit a ceiling");
+});
+
+// ── Steering ────────────────────────────────────────────────────────────────
+
+check("the character is pinned to the thumb, not towed behind it", () => {
+  const st = fresh();
+  st.playerNx = 0;
+  st.targetNx = 0.8;
+  // One tenth of a second is about as long as a guest will tolerate.
+  run(st, 0.1);
+  assert.ok(st.playerNx > 0.75,
+    `after 100ms the character was still at ${st.playerNx.toFixed(2)} of a 0.8 target — too drifty`);
+});
+
+check("a single frame gets most of the way there", () => {
+  const st = fresh();
+  st.playerNx = 0;
+  st.targetNx = 1;
+  update(st, DT);
+  assert.ok(st.playerNx > 0.4, "one frame barely moved the character");
+  assert.ok(FOLLOW_RATE > 20, "follow rate dropped back into towed territory");
+});
+
+check("releasing the thumb stops the character dead", () => {
+  const st = fresh();
+  st.playerNx = 0;
+  st.targetNx = 1;
+  run(st, 0.2);
+  const held = st.playerNx;
+  st.targetNx = null;
+  st.drag = 0;
+  run(st, 0.5);
+  assert.ok(Math.abs(st.playerNx - held) < 1e-6, "the character coasted after release");
+});
+
+check("keyboard steering still works when no thumb is down", () => {
+  const st = fresh();
+  st.targetNx = null;
+  st.drag = 1;
+  run(st, 0.3);
+  assert.ok(st.playerNx > 0.2, "arrow keys no longer move the character");
+});
+
+check("steering never leaves the road", () => {
+  const st = fresh();
+  st.targetNx = 5;
+  run(st, 1);
+  assert.ok(st.playerNx <= 1);
+  st.targetNx = -5;
+  run(st, 1);
+  assert.ok(st.playerNx >= -1);
 });
 
 // ── Density ─────────────────────────────────────────────────────────────────

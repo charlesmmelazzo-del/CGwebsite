@@ -248,14 +248,38 @@ enemy got through, and that is the only feedback there is.
 The grunt is a citrus soldier, and it comes as **lime, lemon, orange and kiwi**.
 They appear mixed together in the same wave, on every stage.
 
-**All grunts die in exactly one shot. Always.** The variety is colour,
-silhouette and speed — never health. The guest has a fraction of a second to
-decide "shoot through it" or "dodge round it," and that read has to be
-unconditional. A lemon that secretly takes three shots reads as the game
-cheating.
+**All four share one health value** — a couple of hits, rising slowly with
+depth. Variety between them is colour, silhouette and speed, never health, so a
+lemon never secretly takes longer than a lime. Speed may vary (the kiwi is the
+quick one) because speed is visible on the approach and health is not.
 
-Speed may vary between them (the kiwi is the quick one), because speed is
-visible in the approach and health is not.
+They used to die in exactly one shot, on the reasoning that the guest needs an
+unconditional read of "shoot through it" or "dodge round it". That read matters,
+but one-shot enemies cost the shooting all of its weight — an enemy that simply
+stops existing gives no feedback, and firing felt like sweeping rather than
+fighting. **The read is now carried by feedback rather than by health:**
+
+* every hit **flashes** the target white
+* every hit **staggers** it, stalling its walk for a moment
+* every hit **shoves it back** up the field
+
+so "this is dying" is legible without counting shots. Health bars are drawn on
+**blockers and bosses only** — a bar over every grunt on a crowded screen reads
+as noise.
+
+### Steering
+
+Touch steering is **positional, not directional**. The thumb's distance from
+where it went down *places* the character; it does not accelerate it. One full
+travel — about 38% of the screen width — covers more than half the road.
+
+Feeding the drag into a velocity integrator, which is what the first build did,
+made the character feel towed: you moved your thumb and it caught up a moment
+later. In a game where picking a lane is worth health, that lag is unusable. The
+character now reaches 99% of the thumb's target within 100ms, and stops dead on
+release rather than coasting.
+
+Keyboard steering stays velocity-based, since a key has no position.
 
 ### Wildcard blockers
 
