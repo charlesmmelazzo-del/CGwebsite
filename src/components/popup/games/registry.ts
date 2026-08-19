@@ -13,6 +13,7 @@
 
 import type { ComponentType } from "react";
 import BehindTheStick from "./BehindTheStick";
+import TikiWars from "./tiki/TikiWars";
 import TopShelf from "./TopShelf";
 
 export interface ArcadeGameProps {
@@ -39,11 +40,22 @@ export interface ArcadeGameProps {
    * moment a game changed. See GameDemo.tsx for the wrapper that mounts these.
    */
   demo?: boolean;
+
+  /**
+   * Pop-up and guest, for a game that keeps progress between runs.
+   *
+   * Both optional: the two string-art games are pure client-side — a run
+   * happens in memory and one number is posted at the end — and they ignore
+   * these entirely. Tiki Wars needs them to find its save file.
+   */
+  menuId?: string;
+  viewerId?: string | null;
 }
 
 const COMPONENTS: Record<string, ComponentType<ArcadeGameProps>> = {
   "behind-the-stick": BehindTheStick,
   "top-shelf": TopShelf,
+  "tiki-wars": TikiWars,
 };
 
 export function getGameComponent(key: string): ComponentType<ArcadeGameProps> | null {

@@ -1,0 +1,667 @@
+// ─── Tiki Wars — sprites ─────────────────────────────────────────────────────
+//
+// Two things live here, and the point of the file is that the game cannot tell
+// them apart:
+//
+//   1. A MANIFEST of every Phase 1 asset from docs/tiki-wars-sprites.md.
+//   2. A code-drawn PLACEHOLDER for each one.
+//
+// Drop a real PNG at public/popup/art/tiki/<file> and it replaces its
+// placeholder the next time the page loads. No code change, no registration.
+// That is what lets the game be built, played and tuned before any art exists,
+// and lets art arrive in any order without a rework.
+//
+// The placeholders are deliberately more than coloured boxes. A blocker has to
+// read as heavier than a grunt at 20 pixels tall or the game cannot be balanced
+// honestly, and a boss has to be legible enough to fight. They follow the same
+// silhouette rules the real art is specced against.
+//
+// Real images are pre-scaled into discrete depth buckets rather than resampled
+// per frame — same reasoning as ingredientImages.ts. Resampling a 1024px source
+// down to 20px sixty times a second, for twenty enemies, is enormous waste for
+// a picture that never changes, and with smoothing off it produces dropped-row
+// mush. Each bucket is resampled ONCE with smoothing on, then blitted 1:1.
+
+import { C } from "./constants";
+
+// ─── Manifest ────────────────────────────────────────────────────────────────
+
+export interface SpriteMeta {
+  /** Filename under /popup/art/tiki/, without extension. */
+  file: string;
+  /** Frames in the cycle. Files are suffixed -1, -2, … when frames > 1. */
+  frames: number;
+  /** Height at closest approach, in logical pixels. The detail budget. */
+  onScreen: number;
+}
+
+export const SPRITES = {
+  "player-walk": { file: "player-walk", frames: 4, onScreen: 84 },
+  "player-hit": { file: "player-hit", frames: 1, onScreen: 84 },
+  "player-turn": { file: "player-turn", frames: 1, onScreen: 84 },
+  "player-turn-shades": { file: "player-turn-shades", frames: 1, onScreen: 84 },
+  "helper-walk": { file: "helper-walk", frames: 2, onScreen: 62 },
+
+  "lime-walk": { file: "lime-walk", frames: 4, onScreen: 60 },
+  "lemon-walk": { file: "lemon-walk", frames: 2, onScreen: 60 },
+  "orange-walk": { file: "orange-walk", frames: 2, onScreen: 60 },
+  "kiwi-walk": { file: "kiwi-walk", frames: 2, onScreen: 60 },
+  "sugarcane-walk": { file: "sugarcane-walk", frames: 4, onScreen: 104 },
+  "boss-baby-pineapple-walk": { file: "boss-baby-pineapple-walk", frames: 2, onScreen: 170 },
+
+  "prop-palm": { file: "prop-palm", frames: 1, onScreen: 150 },
+  "shopkeeper-scotch": { file: "shopkeeper-scotch", frames: 1, onScreen: 180 },
+} as const satisfies Record<string, SpriteMeta>;
+
+export type SpriteKey = keyof typeof SPRITES;
+
+const ART_BASE = "/popup/art/tiki";
+
+/** frames > 1 are numbered from 1; a single-frame sprite has no suffix. */
+export function spriteUrl(key: SpriteKey, frame: number): string {
+  const m = SPRITES[key];
+  return m.frames > 1 ? `${ART_BASE}/${m.file}-${frame + 1}.png` : `${ART_BASE}/${m.file}.png`;
+}
+
+// ─── Real-art loading ────────────────────────────────────────────────────────
+
+const loaded = new Map<string, HTMLImageElement>();
+/** Keys that 404'd. Tried once, then left to the placeholder forever. */
+const missing = new Set<string>();
+const buckets = new Map<string, HTMLCanvasElement>();
+
+/**
+ * Try to load every manifest entry.
+ *
+ * Failures are expected and silent — a missing file is the normal state until
+ * the artwork exists, not an error worth surfacing to someone playing a game.
+ */
+export function loadTikiArt(): void {
+  if (typeof window === "undefined") return;
+  for (const key of Object.keys(SPRITES) as SpriteKey[]) {
+    for (let f = 0; f < SPRITES[key].frames; f++) {
+      const url = spriteUrl(key, f);
+      if (loaded.has(url) || missing.has(url)) continue;
+      const img = new Image();
+      img.onload = () => loaded.set(url, img);
+      img.onerror = () => missing.add(url);
+      img.src = url;
+    }
+  }
+}
+
+/** Bucket heights, in logical px. Enough steps that scaling is invisible. */
+function bucketFor(h: number): number {
+  if (h <= 8) return 8;
+  if (h <= 96) return Math.ceil(h / 4) * 4;
+  return Math.ceil(h / 8) * 8;
+}
+
+function scaled(url: string, h: number, pixelScale: number): HTMLCanvasElement | null {
+  const img = loaded.get(url);
+  if (!img || !img.width) return null;
+
+  const bh = bucketFor(h);
+  const cacheKey = `${url}@${bh}@${pixelScale}`;
+  const hit = buckets.get(cacheKey);
+  if (hit) return hit;
+
+  const dh = Math.max(1, Math.round(bh * pixelScale));
+  const dw = Math.max(1, Math.round((img.width / img.height) * dh));
+  const cv = document.createElement("canvas");
+  cv.width = dw;
+  cv.height = dh;
+  const c = cv.getContext("2d");
+  if (!c) return null;
+  // Smoothing ON for the one-time downsample; the blit that follows is 1:1.
+  c.imageSmoothingEnabled = true;
+  c.imageSmoothingQuality = "high";
+  c.drawImage(img, 0, 0, dw, dh);
+  buckets.set(cacheKey, cv);
+  return cv;
+}
+
+// ─── Drawing ─────────────────────────────────────────────────────────────────
+
+export interface DrawOpts {
+  /** Logical height to draw at. */
+  h: number;
+  /** Buffer density, so a downsample lands 1:1 on device pixels. */
+  pixelScale: number;
+  /** 0..1, drawn as a white flash over the sprite. */
+  flash?: number;
+  /** 0..1, drawn as an orange burn tint. */
+  burn?: number;
+}
+
+/**
+ * Draw a sprite with its feet at (cx, groundY).
+ *
+ * Real art if it has loaded, placeholder otherwise — the caller never knows.
+ */
+/**
+ * Scratch buffer for tinted sprites.
+ *
+ * A flash or a burn CANNOT be painted straight onto the main canvas with
+ * source-atop: that composites against everything already drawn, and the sky
+ * and sand are fully opaque, so the tint comes out as a rectangular slab across
+ * the background instead of a glow on the character. Drawing the sprite alone
+ * into a transparent buffer first gives source-atop the silhouette it needs.
+ *
+ * Only allocated for sprites that are actually flashing or burning, which is a
+ * small fraction of a frame.
+ */
+let scratch: HTMLCanvasElement | null = null;
+
+function scratchCtx(size: number): CanvasRenderingContext2D | null {
+  if (typeof document === "undefined") return null;
+  if (!scratch) scratch = document.createElement("canvas");
+  if (scratch.width !== size || scratch.height !== size) {
+    scratch.width = size;
+    scratch.height = size;
+  }
+  const c = scratch.getContext("2d");
+  if (!c) return null;
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.clearRect(0, 0, size, size);
+  c.imageSmoothingEnabled = false;
+  return c;
+}
+
+/** Draw the artwork (or its placeholder) with feet at the current origin. */
+function paint(
+  ctx: CanvasRenderingContext2D,
+  key: SpriteKey,
+  frame: number,
+  h: number,
+  pixelScale: number
+): void {
+  const url = spriteUrl(key, frame);
+  const art = missing.has(url) ? null : scaled(url, h, pixelScale);
+  if (art) {
+    const w = (art.width / art.height) * h;
+    ctx.save();
+    ctx.scale(1 / pixelScale, 1 / pixelScale);
+    ctx.drawImage(art, (-w / 2) * pixelScale, -art.height);
+    ctx.restore();
+  } else {
+    PLACEHOLDERS[key](ctx, h, frame);
+  }
+}
+
+export interface DrawOpts {
+  /** Logical height to draw at. */
+  h: number;
+  /** Buffer density, so a downsample lands 1:1 on device pixels. */
+  pixelScale: number;
+  /** 0..1, drawn as a white flash over the sprite. */
+  flash?: number;
+  /** 0..1, drawn as an orange burn tint over the sprite. */
+  burn?: number;
+}
+
+/**
+ * Draw a sprite with its feet at (cx, groundY).
+ *
+ * Real art if it has loaded, placeholder otherwise — the caller never knows.
+ */
+export function drawSprite(
+  ctx: CanvasRenderingContext2D,
+  key: SpriteKey,
+  frame: number,
+  cx: number,
+  groundY: number,
+  opts: DrawOpts
+): void {
+  const meta = SPRITES[key];
+  const f = ((frame % meta.frames) + meta.frames) % meta.frames;
+  const flash = opts.flash ?? 0;
+  const burn = opts.burn ?? 0;
+
+  if (flash <= 0 && burn <= 0) {
+    ctx.save();
+    ctx.translate(cx, groundY);
+    paint(ctx, key, f, opts.h, opts.pixelScale);
+    ctx.restore();
+    return;
+  }
+
+  // Tinted path: sprite alone into a transparent buffer, tint it there, blit.
+  const box = Math.ceil(opts.h * 2);
+  const size = Math.ceil(box * opts.pixelScale);
+  const sctx = scratchCtx(size);
+  if (!sctx) {
+    ctx.save();
+    ctx.translate(cx, groundY);
+    paint(ctx, key, f, opts.h, opts.pixelScale);
+    ctx.restore();
+    return;
+  }
+
+  sctx.setTransform(opts.pixelScale, 0, 0, opts.pixelScale, 0, 0);
+  // Feet placed so the sprite sits comfortably inside the square.
+  const originX = box / 2;
+  const originY = box * 0.8;
+  sctx.translate(originX, originY);
+  paint(sctx, key, f, opts.h, opts.pixelScale);
+
+  sctx.globalCompositeOperation = "source-atop";
+  if (burn > 0) {
+    sctx.globalAlpha = Math.min(0.65, burn * 0.65);
+    sctx.fillStyle = C.flame;
+    sctx.fillRect(-originX, -originY, box, box);
+  }
+  if (flash > 0) {
+    sctx.globalAlpha = Math.min(1, flash);
+    sctx.fillStyle = "#FFFFFF";
+    sctx.fillRect(-originX, -originY, box, box);
+  }
+  sctx.globalAlpha = 1;
+  sctx.globalCompositeOperation = "source-over";
+
+  ctx.save();
+  ctx.translate(cx, groundY);
+  ctx.scale(1 / opts.pixelScale, 1 / opts.pixelScale);
+  ctx.drawImage(scratch!, -originX * opts.pixelScale, -originY * opts.pixelScale);
+  ctx.restore();
+}
+
+// ─── Placeholder drawing helpers ─────────────────────────────────────────────
+//
+// Everything below draws in a local space with the feet at (0,0), growing
+// upward into negative y. Sizes are expressed as fractions of `h` so a sprite
+// is identical at every depth.
+
+function ro(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  const rr = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
+}
+
+/** Fill + heavy outline — the one stylistic thing the placeholders share with the real art. */
+function ink(ctx: CanvasRenderingContext2D, fill: string, h: number, weight = 0.035) {
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.lineWidth = Math.max(0.7, h * weight);
+  ctx.strokeStyle = C.outline;
+  ctx.stroke();
+}
+
+function circle(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.closePath();
+}
+
+/** Legs that swing with the walk cycle. phase 0..1. */
+function legs(ctx: CanvasRenderingContext2D, h: number, w: number, phase: number, color: string) {
+  const swing = Math.sin(phase * Math.PI * 2) * w * 0.35;
+  const legH = h * 0.22;
+  for (const s of [-1, 1]) {
+    const dx = s * w * 0.22 + (s > 0 ? swing : -swing);
+    ro(ctx, dx - w * 0.11, -legH, w * 0.22, legH, w * 0.08);
+    ink(ctx, color, h);
+  }
+}
+
+function shadowBlob(ctx: CanvasRenderingContext2D, w: number) {
+  ctx.beginPath();
+  ctx.ellipse(0, 0, w * 0.5, w * 0.16, 0, 0, Math.PI * 2);
+  ctx.fillStyle = C.shadow;
+  ctx.fill();
+}
+
+// ─── Placeholders ────────────────────────────────────────────────────────────
+
+type Placeholder = (ctx: CanvasRenderingContext2D, h: number, frame: number) => void;
+
+/** The hero, from behind: bottle body, arms out, guns forward. */
+function drawPlayerBack(ctx: CanvasRenderingContext2D, h: number, frame: number) {
+  const w = h * 0.42;
+  shadowBlob(ctx, w);
+  legs(ctx, h, w, frame / 4, C.rumGlass);
+
+  const bodyH = h * 0.52;
+  const bodyY = -h * 0.22 - bodyH;
+  ro(ctx, -w * 0.32, bodyY, w * 0.64, bodyH, w * 0.16);
+  ink(ctx, C.rumGlass, h);
+
+  // Label — the one flash of colour that identifies him at distance.
+  ro(ctx, -w * 0.26, bodyY + bodyH * 0.34, w * 0.52, bodyH * 0.38, w * 0.05);
+  ink(ctx, C.rumLabel, h, 0.02);
+
+  // Neck and cap.
+  const neckY = bodyY - h * 0.12;
+  ro(ctx, -w * 0.14, neckY, w * 0.28, h * 0.13, w * 0.05);
+  ink(ctx, C.rumGlass, h);
+  ro(ctx, -w * 0.18, neckY - h * 0.07, w * 0.36, h * 0.08, w * 0.04);
+  ink(ctx, C.rumLabel, h);
+
+  // Arms forward, guns at the ends. Slight alternate with the stride.
+  const bob = Math.sin((frame / 4) * Math.PI * 2) * h * 0.012;
+  for (const s of [-1, 1]) {
+    ro(ctx, s * w * 0.3 - w * 0.1, bodyY + bodyH * 0.16 + (s > 0 ? bob : -bob), w * 0.2, bodyH * 0.5, w * 0.08);
+    ink(ctx, C.rumGlass, h);
+    ro(ctx, s * w * 0.34 - w * 0.07, bodyY + bodyH * 0.08 + (s > 0 ? bob : -bob), w * 0.14, bodyH * 0.2, w * 0.03);
+    ink(ctx, "#3A3A44", h, 0.02);
+  }
+}
+
+/** The hero turned to camera — quips and the boss-kill beat. */
+function drawPlayerTurn(shades: boolean): Placeholder {
+  return (ctx, h) => {
+    const w = h * 0.42;
+    shadowBlob(ctx, w);
+    legs(ctx, h, w, 0, C.rumGlass);
+
+    const bodyH = h * 0.52;
+    const bodyY = -h * 0.22 - bodyH;
+    ro(ctx, -w * 0.34, bodyY, w * 0.68, bodyH, w * 0.16);
+    ink(ctx, C.rumGlass, h);
+    ro(ctx, -w * 0.28, bodyY + bodyH * 0.34, w * 0.56, bodyH * 0.38, w * 0.05);
+    ink(ctx, C.rumLabel, h, 0.02);
+
+    const neckY = bodyY - h * 0.12;
+    ro(ctx, -w * 0.15, neckY, w * 0.3, h * 0.13, w * 0.05);
+    ink(ctx, C.rumGlass, h);
+    ro(ctx, -w * 0.19, neckY - h * 0.07, w * 0.38, h * 0.08, w * 0.04);
+    ink(ctx, C.rumLabel, h);
+
+    // Face on the shoulder of the bottle, so he reads as looking at you.
+    const fy = bodyY + bodyH * 0.16;
+    if (shades) {
+      ro(ctx, -w * 0.24, fy - h * 0.02, w * 0.48, h * 0.055, w * 0.02);
+      ink(ctx, "#101014", h, 0.02);
+    } else {
+      for (const s of [-1, 1]) {
+        circle(ctx, s * w * 0.13, fy, h * 0.026);
+        ink(ctx, "#FFFFFF", h, 0.018);
+        circle(ctx, s * w * 0.13, fy, h * 0.012);
+        ctx.fillStyle = C.outline;
+        ctx.fill();
+      }
+    }
+    // Grin.
+    ctx.beginPath();
+    ctx.arc(0, fy + h * 0.045, h * 0.038, 0.15 * Math.PI, 0.85 * Math.PI);
+    ctx.lineWidth = Math.max(0.7, h * 0.022);
+    ctx.strokeStyle = C.outline;
+    ctx.stroke();
+  };
+}
+
+function drawHelper(ctx: CanvasRenderingContext2D, h: number, frame: number) {
+  const w = h * 0.38;
+  shadowBlob(ctx, w);
+  legs(ctx, h, w, frame / 2, C.rumGlass);
+  const bodyH = h * 0.55;
+  const bodyY = -h * 0.22 - bodyH;
+  ro(ctx, -w * 0.28, bodyY, w * 0.56, bodyH, w * 0.14);
+  ink(ctx, C.rumGlass, h);
+  ro(ctx, -w * 0.22, bodyY + bodyH * 0.38, w * 0.44, bodyH * 0.3, w * 0.04);
+  ink(ctx, C.rumGreen, h, 0.02);
+  ro(ctx, -w * 0.13, bodyY - h * 0.1, w * 0.26, h * 0.11, w * 0.04);
+  ink(ctx, C.rumGlass, h);
+  // One gun, forward.
+  ro(ctx, w * 0.22, bodyY + bodyH * 0.2, w * 0.16, bodyH * 0.34, w * 0.05);
+  ink(ctx, "#3A3A44", h, 0.02);
+}
+
+/**
+ * The citrus grunts.
+ *
+ * All four share a silhouette on purpose: round body, helmet, stubby limbs.
+ * The guest has a fraction of a second to read "one shot, can be dodged", and
+ * that read has to be the same whichever fruit it is.
+ */
+function drawGrunt(body: string, detail: string, lean = 0): Placeholder {
+  return (ctx, h, frame) => {
+    const w = h * 0.62;
+    shadowBlob(ctx, w * 0.8);
+    ctx.save();
+    if (lean) ctx.rotate(lean);
+    legs(ctx, h, w * 0.7, frame / 2, detail);
+
+    const r = w * 0.38;
+    const cy = -h * 0.2 - r;
+    circle(ctx, 0, cy, r);
+    ink(ctx, body, h);
+
+    // Arms.
+    const swing = Math.sin((frame / 2) * Math.PI * 2) * h * 0.02;
+    for (const s of [-1, 1]) {
+      ro(ctx, s * r * 0.95 - w * 0.07, cy - h * 0.02 + (s > 0 ? swing : -swing), w * 0.14, h * 0.16, w * 0.06);
+      ink(ctx, detail, h);
+    }
+
+    // Helmet — the thing that says "soldier" at 12 pixels.
+    ctx.beginPath();
+    ctx.arc(0, cy - r * 0.12, r * 0.92, Math.PI, 0);
+    ctx.closePath();
+    ink(ctx, "#5E6B3A", h);
+
+    // Scowl.
+    for (const s of [-1, 1]) {
+      circle(ctx, s * r * 0.32, cy + r * 0.12, h * 0.022);
+      ctx.fillStyle = C.outline;
+      ctx.fill();
+    }
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.3, cy + r * 0.52);
+    ctx.lineTo(r * 0.3, cy + r * 0.52);
+    ctx.lineWidth = Math.max(0.7, h * 0.025);
+    ctx.strokeStyle = C.outline;
+    ctx.stroke();
+    ctx.restore();
+  };
+}
+
+/** The blocker. Must read as a WALL — wider, taller, weapon up. */
+function drawSugarcane(ctx: CanvasRenderingContext2D, h: number, frame: number) {
+  const w = h * 0.5;
+  shadowBlob(ctx, w);
+  legs(ctx, h, w * 1.1, frame / 4, C.caneDark);
+
+  const bodyH = h * 0.6;
+  const bodyY = -h * 0.2 - bodyH;
+  ro(ctx, -w * 0.4, bodyY, w * 0.8, bodyH, w * 0.1);
+  ink(ctx, C.cane, h, 0.03);
+
+  // Cane segments.
+  ctx.lineWidth = Math.max(0.6, h * 0.016);
+  ctx.strokeStyle = C.caneDark;
+  for (let i = 1; i < 5; i++) {
+    const y = bodyY + (bodyH / 5) * i;
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.4, y);
+    ctx.lineTo(w * 0.4, y);
+    ctx.stroke();
+  }
+
+  // Raised arms — reads as "coming for you" even tiny.
+  const swing = Math.sin((frame / 4) * Math.PI * 2) * h * 0.03;
+  for (const s of [-1, 1]) {
+    ctx.save();
+    ctx.translate(s * w * 0.42, bodyY + bodyH * 0.22 + (s > 0 ? swing : -swing));
+    ctx.rotate(s * -0.5);
+    ro(ctx, -w * 0.1, -bodyH * 0.4, w * 0.2, bodyH * 0.44, w * 0.07);
+    ink(ctx, C.caneDark, h, 0.03);
+    ctx.restore();
+  }
+
+  // Fronds.
+  for (const a of [-0.85, -0.3, 0.3, 0.85]) {
+    ctx.save();
+    ctx.translate(0, bodyY);
+    ctx.rotate(a);
+    ro(ctx, -w * 0.05, -h * 0.2, w * 0.1, h * 0.2, w * 0.04);
+    ink(ctx, C.pineappleLeaf, h, 0.03);
+    ctx.restore();
+  }
+
+  // Blunt-toothed snarl.
+  const fy = bodyY + bodyH * 0.3;
+  ro(ctx, -w * 0.2, fy, w * 0.4, h * 0.05, w * 0.02);
+  ink(ctx, "#2A2018", h, 0.02);
+  for (const s of [-1, 0, 1]) {
+    ro(ctx, s * w * 0.11 - w * 0.035, fy, w * 0.07, h * 0.025, 0);
+    ctx.fillStyle = C.bone;
+    ctx.fill();
+  }
+}
+
+/** Baby Pineapple. Crown, club, and enough bulk to feel like a wall. */
+function drawBabyPineapple(ctx: CanvasRenderingContext2D, h: number, frame: number) {
+  const w = h * 0.66;
+  shadowBlob(ctx, w);
+  const waddle = Math.sin((frame / 2) * Math.PI * 2) * 0.06;
+  ctx.save();
+  ctx.rotate(waddle);
+  legs(ctx, h, w * 0.8, frame / 2, C.pineapple);
+
+  const bodyH = h * 0.5;
+  const bodyY = -h * 0.2 - bodyH;
+  ro(ctx, -w * 0.36, bodyY, w * 0.72, bodyH, w * 0.22);
+  ink(ctx, C.pineapple, h, 0.028);
+
+  // Cross-hatch skin.
+  ctx.lineWidth = Math.max(0.5, h * 0.008);
+  ctx.strokeStyle = "#C4860F";
+  for (let i = -2; i <= 2; i++) {
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.36, bodyY + bodyH * 0.5 + i * bodyH * 0.16);
+    ctx.lineTo(w * 0.36, bodyY + bodyH * 0.5 + i * bodyH * 0.16 - bodyH * 0.2);
+    ctx.stroke();
+  }
+
+  // Diaper.
+  ro(ctx, -w * 0.34, bodyY + bodyH * 0.74, w * 0.68, bodyH * 0.3, w * 0.08);
+  ink(ctx, "#F2F2EA", h, 0.022);
+
+  // Leaves + crown.
+  for (const a of [-0.6, -0.2, 0.2, 0.6]) {
+    ctx.save();
+    ctx.translate(0, bodyY + h * 0.01);
+    ctx.rotate(a);
+    ro(ctx, -w * 0.05, -h * 0.16, w * 0.1, h * 0.17, w * 0.04);
+    ink(ctx, C.pineappleLeaf, h, 0.028);
+    ctx.restore();
+  }
+  ctx.beginPath();
+  ctx.moveTo(-w * 0.2, bodyY - h * 0.04);
+  ctx.lineTo(-w * 0.14, bodyY - h * 0.14);
+  ctx.lineTo(-w * 0.05, bodyY - h * 0.06);
+  ctx.lineTo(w * 0.05, bodyY - h * 0.15);
+  ctx.lineTo(w * 0.14, bodyY - h * 0.05);
+  ctx.lineTo(w * 0.2, bodyY - h * 0.13);
+  ctx.lineTo(w * 0.2, bodyY - h * 0.01);
+  ctx.closePath();
+  ink(ctx, "#FFD54A", h, 0.022);
+
+  // Furious face.
+  const fy = bodyY + bodyH * 0.34;
+  for (const s of [-1, 1]) {
+    circle(ctx, s * w * 0.15, fy, h * 0.03);
+    ink(ctx, "#FFFFFF", h, 0.018);
+    circle(ctx, s * w * 0.15, fy + h * 0.006, h * 0.014);
+    ctx.fillStyle = C.outline;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(s * w * 0.05, fy - h * 0.05);
+    ctx.lineTo(s * w * 0.26, fy - h * 0.02);
+    ctx.lineWidth = Math.max(0.8, h * 0.018);
+    ctx.strokeStyle = C.outline;
+    ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.arc(0, fy + h * 0.09, h * 0.045, 1.15 * Math.PI, 1.85 * Math.PI);
+  ctx.lineWidth = Math.max(0.8, h * 0.02);
+  ctx.strokeStyle = C.outline;
+  ctx.stroke();
+
+  // Club, dragged at his side.
+  ctx.save();
+  ctx.translate(w * 0.46, bodyY + bodyH * 0.5);
+  ctx.rotate(0.5 + waddle);
+  ro(ctx, -w * 0.06, -h * 0.02, w * 0.12, h * 0.3, w * 0.04);
+  ink(ctx, "#8A5A2A", h, 0.026);
+  circle(ctx, 0, h * 0.3, w * 0.14);
+  ink(ctx, "#7A4A20", h, 0.026);
+  ctx.restore();
+  ctx.restore();
+}
+
+function drawPalm(ctx: CanvasRenderingContext2D, h: number) {
+  const w = h * 0.5;
+  ctx.beginPath();
+  ctx.moveTo(-w * 0.07, 0);
+  ctx.quadraticCurveTo(w * 0.05, -h * 0.5, w * 0.16, -h * 0.78);
+  ctx.lineTo(w * 0.3, -h * 0.76);
+  ctx.quadraticCurveTo(w * 0.16, -h * 0.48, w * 0.09, 0);
+  ctx.closePath();
+  ink(ctx, "#8A6438", h, 0.02);
+  for (const a of [-1.15, -0.55, 0, 0.55, 1.15]) {
+    ctx.save();
+    ctx.translate(w * 0.22, -h * 0.78);
+    ctx.rotate(a);
+    ctx.beginPath();
+    ctx.ellipse(0, -h * 0.13, w * 0.11, h * 0.15, 0, 0, Math.PI * 2);
+    ink(ctx, a === 0 ? "#2FA84A" : "#25913E", h, 0.018);
+    ctx.restore();
+  }
+  circle(ctx, w * 0.22, -h * 0.74, w * 0.07);
+  ink(ctx, "#6B4A28", h, 0.018);
+}
+
+function drawShopkeeper(ctx: CanvasRenderingContext2D, h: number) {
+  const w = h * 0.62;
+  // Squat amber bottle, upper body only — he's framed by the booth window.
+  ro(ctx, -w * 0.34, -h * 0.62, w * 0.68, h * 0.62, w * 0.14);
+  ink(ctx, "#C67A22", h, 0.024);
+  ro(ctx, -w * 0.26, -h * 0.42, w * 0.52, h * 0.24, w * 0.04);
+  ink(ctx, C.bone, h, 0.018);
+  // Neck + flat cap.
+  ro(ctx, -w * 0.14, -h * 0.76, w * 0.28, h * 0.15, w * 0.05);
+  ink(ctx, "#C67A22", h, 0.024);
+  ro(ctx, -w * 0.2, -h * 0.86, w * 0.4, h * 0.1, w * 0.04);
+  ink(ctx, "#3E5A3A", h, 0.024);
+  // Tartan band.
+  ro(ctx, -w * 0.15, -h * 0.68, w * 0.3, h * 0.06, 0);
+  ink(ctx, "#8A2B2B", h, 0.016);
+  // Knowing look.
+  for (const s of [-1, 1]) {
+    circle(ctx, s * w * 0.1, -h * 0.7, h * 0.02);
+    ctx.fillStyle = C.outline;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(s * w * 0.03, -h * 0.745);
+    ctx.lineTo(s * w * 0.17, -h * 0.735);
+    ctx.lineWidth = Math.max(0.7, h * 0.014);
+    ctx.strokeStyle = C.outline;
+    ctx.stroke();
+  }
+}
+
+const PLACEHOLDERS: Record<SpriteKey, Placeholder> = {
+  "player-walk": drawPlayerBack,
+  "player-hit": (ctx, h) => drawPlayerBack(ctx, h, 0),
+  "player-turn": drawPlayerTurn(false),
+  "player-turn-shades": drawPlayerTurn(true),
+  "helper-walk": drawHelper,
+
+  "lime-walk": drawGrunt(C.lime, "#6FA81E"),
+  "lemon-walk": drawGrunt(C.lemon, "#C9B31E"),
+  "orange-walk": drawGrunt(C.orange, "#C96A12"),
+  // The kiwi leans forward — the one grunt whose speed you can read on approach.
+  "kiwi-walk": drawGrunt(C.kiwi, C.kiwiSkin, -0.12),
+  "sugarcane-walk": drawSugarcane,
+  "boss-baby-pineapple-walk": drawBabyPineapple,
+
+  "prop-palm": drawPalm,
+  "shopkeeper-scotch": drawShopkeeper,
+};

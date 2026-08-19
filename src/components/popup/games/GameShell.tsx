@@ -159,6 +159,29 @@ export default function GameShell({
     );
   }
 
+  // ── Full-bleed games ──────────────────────────────────────────────────────
+  // Tiki Wars flexes its height to the device and draws its own controls into
+  // the canvas, so a bezel and marquee around it would waste exactly the screen
+  // its art is drawn for. Only while PLAYING: the attract and score screens are
+  // the cabinet's own furniture and stay in the frame.
+  const bleed = Boolean(meta.fullBleed) && phase === "playing";
+
+  if (bleed) {
+    return (
+      <div className="fixed inset-0 z-[70] bg-black">
+        <Game onGameOver={handleGameOver} menuId={menuId} viewerId={viewerId} />
+        <button
+          onClick={leave}
+          aria-label="Quit"
+          className="absolute top-2 right-2 z-10 px-3 py-1.5 text-[10px] tracking-[0.25em] uppercase text-white/40 hover:text-white/90 transition-colors"
+          style={{ WebkitTapHighlightColor: "transparent" }}
+        >
+          Quit
+        </button>
+      </div>
+    );
+  }
+
   const cabinet = (
     <div className={`w-full mx-auto ${fullscreen ? "max-w-[560px] flex-1 min-h-0 flex flex-col" : "max-w-[420px]"}`}>
       {/* ── Marquee ──────────────────────────────────────────────────────── */}
@@ -177,7 +200,7 @@ export default function GameShell({
         className={`border-2 bg-black ${fullscreen ? "flex-1 min-h-0" : ""}`}
       >
         {phase === "playing" ? (
-          <Game onGameOver={handleGameOver} />
+          <Game onGameOver={handleGameOver} menuId={menuId} viewerId={viewerId} />
         ) : phase === "attract" ? (
           <AttractScreen
             meta={meta}
