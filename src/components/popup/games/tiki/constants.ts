@@ -193,6 +193,9 @@ export const C = {
   armorBack: "#12384A",
   money: "#4CD964",
   danger: "#FF3B30",
+  // Cold and saturated on purpose: the one hue nothing else on the beach uses,
+  // so a round never disappears into the sand it is flying over.
+  bulletCore: "#22E4FF",
   flame: "#FF6A00",
   flameHot: "#FFD028",
   shadow: "rgba(0,0,0,0.32)",

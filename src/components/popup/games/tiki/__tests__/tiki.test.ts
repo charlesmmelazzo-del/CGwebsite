@@ -6,7 +6,8 @@ import {
   MAX_ARMOR, MAX_HEALTH, MAX_HELPERS, PTS_BLOCKER, PTS_BOSS, PTS_GRUNT,
   PTS_MISS_BLOCKER, PTS_MISS_GRUNT, spawnInterval, update, detonateBomb,
   enemyWalk, waveSize, worldSpeed, gruntHp, blockerHp, FOLLOW_RATE,
-  type State,
+  MAX_TRAVERSE, GATE_REACH, GATE_CURE_HITS, cureGateOption, LADDERS,
+  rungOf, type State,
 } from "../tikiCore";
 
 let passed = 0;
@@ -347,14 +348,13 @@ check("a bomb you don't have does nothing", () => {
 
 // ── Gates ───────────────────────────────────────────────────────────────────
 
+/** A helpers-ladder option at a named rung. tier 3 is neutral. */
+const helperOpt = (tier: number) => ({ family: "helpers" as const, tier, cure: 0 });
+const moneyOpt = (tier: number) => ({ family: "money" as const, tier, cure: 0 });
+
 check("the gate you steer into is the one that applies", () => {
   const st = fresh();
-  st.gate = {
-    z: 0.05,
-    left: { effect: { kind: "helpers", n: 3 }, label: "+3", good: true },
-    right: { effect: { kind: "helpers", n: -3 }, label: "-3", good: false },
-    taken: false,
-  };
+  st.gate = { z: 0.05, left: helperOpt(6), right: helperOpt(0), taken: false, flipped: 0 };
   st.playerNx = -0.6;
   run(st, 0.15);                       // let the gate reach the player
   assert.equal(st.helpers, 3, "steering left did not take the left gate");
@@ -363,12 +363,7 @@ check("the gate you steer into is the one that applies", () => {
 
 check("the gate you steer away from is the one you avoid", () => {
   const st = fresh();
-  st.gate = {
-    z: 0.05,
-    left: { effect: { kind: "helpers", n: 3 }, label: "+3", good: true },
-    right: { effect: { kind: "helpers", n: -3 }, label: "-3", good: false },
-    taken: false,
-  };
+  st.gate = { z: 0.05, left: helperOpt(6), right: helperOpt(0), taken: false, flipped: 0 };
   st.playerNx = 0.6;
   run(st, 0.15);
   assert.equal(st.helpers, 0, "steering right somehow took the left gate");
@@ -376,14 +371,126 @@ check("the gate you steer away from is the one you avoid", () => {
 
 check("a gate only ever fires once", () => {
   const st = fresh();
-  st.gate = {
-    z: 0.05,
-    left: { effect: { kind: "money", n: 5 }, label: "+$5", good: true },
-    right: { effect: { kind: "money", n: 5 }, label: "+$5", good: true },
-    taken: false,
-  };
+  st.gate = { z: 0.05, left: moneyOpt(2), right: moneyOpt(2), taken: false, flipped: 0 };
   run(st, 0.9);
   assert.equal(st.money, 5, "a single gate paid out more than once");
+});
+
+// ── Gates you can refuse, and gates you can fix ─────────────────────────────
+
+check("hugging the open edge refuses the gate entirely", () => {
+  const st = fresh();
+  st.gate = { z: 0.05, left: helperOpt(0), right: helperOpt(0), taken: false, flipped: 0 };
+  st.playerNx = -1;                    // outside GATE_REACH
+  run(st, 0.2);
+  assert.equal(st.helpers, 0, "a gate applied from outside its panel");
+  assert.equal(st.gatesTaken, 0, "refusing the gate still counted as taking one");
+  assert.ok(GATE_REACH < 1, "panels span the whole road again — a gate is compulsory");
+});
+
+check("standing inside a panel still takes it", () => {
+  const st = fresh();
+  st.gate = { z: 0.05, left: helperOpt(6), right: helperOpt(0), taken: false, flipped: 0 };
+  st.playerNx = -GATE_REACH + 0.05;
+  run(st, 0.2);
+  assert.equal(st.helpers, 3, "just inside the panel did not take the gate");
+});
+
+check("curing steps ONE rung at a time, not straight to a reward", () => {
+  const o = helperOpt(0);              // -3 RUM
+  assert.equal(rungOf(o).label, "-3 RUM");
+  for (let i = 0; i < GATE_CURE_HITS - 1; i++) {
+    assert.equal(cureGateOption(o), false, "stepped up before enough rounds landed");
+  }
+  assert.equal(cureGateOption(o), true);
+  assert.equal(rungOf(o).label, "-2 RUM", "a single cure jumped more than one rung");
+});
+
+check("a -3 has to be walked all the way through neutral to pay out", () => {
+  const o = helperOpt(0);
+  const step = () => { for (let i = 0; i < GATE_CURE_HITS; i++) cureGateOption(o); };
+  step(); assert.equal(rungOf(o).label, "-2 RUM");
+  step(); assert.equal(rungOf(o).label, "-1 RUM");
+  step(); assert.equal(rungOf(o).tone, "neutral", "never passes through harmless");
+  assert.equal(rungOf(o).effect, null, "the neutral rung still does something");
+  step(); assert.equal(rungOf(o).tone, "good", "could not be walked into a reward");
+});
+
+check("the neutral rung applies nothing at all", () => {
+  const st = fresh({ money: 40 });
+  st.helpers = 2;
+  st.gate = { z: 0.05, left: helperOpt(3), right: helperOpt(0), taken: false, flipped: 0 };
+  st.playerNx = -0.5;
+  st.cooldown = 99;                    // don't let our own fire cure the panel
+  run(st, 0.2);
+  assert.equal(st.helpers, 2, "the neutral rung changed something");
+  assert.equal(st.money, 40);
+});
+
+check("a maxed panel absorbs no more rounds", () => {
+  const o = helperOpt(6);              // top of the helpers ladder
+  assert.equal(cureGateOption(o), false);
+  assert.equal(o.cure, 0, "rounds were banked into a panel that cannot improve");
+});
+
+check("shooting a panel cures the side the bullet is actually on", () => {
+  const st = fresh();
+  st.gate = { z: 0.5, left: helperOpt(0), right: helperOpt(0), taken: false, flipped: 0 };
+  st.cooldown = 99;
+  for (let i = 0; i < GATE_CURE_HITS; i++) {
+    st.bullets = [{ z: 0.5, nx: -0.3, vnx: 0, damage: 1, side: 1 }];
+    update(st, DT);
+    st.gate!.z = 0.5;                  // hold it still for the test
+  }
+  assert.equal(rungOf(st.gate!.left).label, "-2 RUM", "the left panel did not take the rounds");
+  assert.equal(rungOf(st.gate!.right).label, "-3 RUM", "the right panel took rounds it never saw");
+});
+
+check("a round through the open edge cures nothing", () => {
+  const st = fresh();
+  st.gate = { z: 0.5, left: helperOpt(0), right: helperOpt(0), taken: false, flipped: 0 };
+  st.cooldown = 99;
+  for (let i = 0; i < GATE_CURE_HITS * 2; i++) {
+    st.bullets = [{ z: 0.5, nx: -0.95, vnx: 0, damage: 1, side: 1 }];
+    update(st, DT);
+    st.gate!.z = 0.5;
+  }
+  assert.equal(rungOf(st.gate!.left).label, "-3 RUM", "a round past the panel still cured it");
+});
+
+check("a bullet is not eaten by the gate", () => {
+  const st = fresh();
+  st.gate = { z: 0.5, left: helperOpt(0), right: helperOpt(0), taken: false, flipped: 0 };
+  st.cooldown = 99;                    // no fresh shots muddying the count
+  st.bullets = [{ z: 0.5, nx: -0.3, vnx: 0, damage: 1, side: 1 }];
+  update(st, DT);
+  assert.equal(st.bullets.length, 1, "the gate swallowed the round");
+  assert.ok(st.bullets[0].damage > 0, "the round can no longer hurt anything behind the gate");
+});
+
+check("one round counts against a panel exactly once", () => {
+  const st = fresh();
+  st.cooldown = 99;
+  st.gate = { z: 0.5, left: helperOpt(0), right: helperOpt(0), taken: false, flipped: 0 };
+  st.bullets = [{ z: 0.5, nx: -0.3, vnx: 0, damage: 1, side: 1 }];
+  // Hold the round beside the panel for many frames.
+  for (let i = 0; i < 12; i++) {
+    st.bullets[0].z = 0.5;
+    st.gate.z = 0.5;
+    update(st, DT);
+  }
+  assert.equal(st.gate!.left.cure, 1,
+    `one round was counted ${st.gate!.left.cure} times`);
+});
+
+check("every ladder passes through exactly one neutral rung", () => {
+  for (const [family, ladder] of Object.entries(LADDERS)) {
+    const neutrals = ladder.filter((r) => r.tone === "neutral");
+    assert.equal(neutrals.length, 1, `${family} does not have exactly one neutral rung`);
+    const firstGood = ladder.findIndex((r) => r.tone === "good");
+    const lastBad = ladder.map((r) => r.tone).lastIndexOf("bad");
+    assert.ok(lastBad < firstGood, `${family} is not ordered bad -> neutral -> good`);
+  }
 });
 
 check("helpers and armor stay inside their caps", () => {
@@ -424,17 +531,29 @@ check("the character is pinned to the thumb, not towed behind it", () => {
   st.targetNx = 0.8;
   // One tenth of a second is about as long as a guest will tolerate.
   run(st, 0.1);
-  assert.ok(st.playerNx > 0.75,
+  assert.ok(st.playerNx > 0.7,
     `after 100ms the character was still at ${st.playerNx.toFixed(2)} of a 0.8 target — too drifty`);
+  assert.ok(FOLLOW_RATE > 20, "follow rate dropped back into towed territory");
 });
 
-check("a single frame gets most of the way there", () => {
+check("a full road crossing is quick", () => {
   const st = fresh();
-  st.playerNx = 0;
+  st.playerNx = -1;
+  st.targetNx = 1;
+  run(st, 0.35);
+  assert.ok(st.playerNx > 0.9,
+    `crossing the road took longer than 350ms (reached ${st.playerNx.toFixed(2)})`);
+});
+
+check("but a violent flick cannot teleport across the road", () => {
+  const st = fresh();
+  st.playerNx = -1;
   st.targetNx = 1;
   update(st, DT);
-  assert.ok(st.playerNx > 0.4, "one frame barely moved the character");
-  assert.ok(FOLLOW_RATE > 20, "follow rate dropped back into towed territory");
+  assert.ok(st.playerNx < 0.2,
+    "one frame crossed most of the road — a flick teleports the character");
+  // ...and the cap must stay generous, or it becomes the towed feel again.
+  assert.ok(MAX_TRAVERSE > 5, "the traverse cap is tight enough to feel like lag");
 });
 
 check("releasing the thumb stops the character dead", () => {

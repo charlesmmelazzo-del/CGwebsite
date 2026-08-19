@@ -30,8 +30,30 @@ export const PLAYER_SPEED = 2.6;          // keyboard only: nx per second
  */
 export const FOLLOW_RATE = 34;
 
-/** How much road one full thumb travel covers, in nx. */
-export const DRAG_RANGE = 1.15;
+/**
+ * How much road one full thumb travel covers, in nx.
+ *
+ * This is the GAIN, and it is what makes the character feel fast or slow across
+ * the road — not the follow rate. Lowering it means the same thumb movement
+ * covers less ground, which reads as more controlled without introducing any
+ * lag at all. Lowering FOLLOW_RATE instead would just bring back the drift.
+ */
+export const DRAG_RANGE = 0.88;
+
+/**
+ * Ceiling on how fast the character can cross the road, in nx per second.
+ *
+ * Generous enough that ordinary steering never touches it — it only bites on a
+ * violent flick, which would otherwise teleport the character from edge to edge
+ * in a single frame. Capping the speed rather than softening the follow keeps
+ * normal movement exactly as responsive as it was.
+ *
+ * Set this too low and the cap becomes the dominant constraint instead of an
+ * edge case, which is just the old towed feel wearing a different hat. At 2.9
+ * it took a third of a second to cross the road and the character visibly
+ * lagged the thumb again.
+ */
+export const MAX_TRAVERSE = 7.5;
 export const CONTACT_Z = 0.045;           // where an enemy is "on top of" you
 export const CONTACT_NX = 0.30;           // how wide a body is, in nx
 export const CONTACT_DAMAGE = 18;
@@ -164,6 +186,14 @@ export interface Bullet {
   damage: number;
   /** Which gun it left. Purely so the renderer can start it at that muzzle. */
   side: -1 | 1;
+  /**
+   * Set once this round has been counted against a gate panel.
+   *
+   * The cure check runs every frame, and a bullet stays within tolerance of a
+   * panel for several frames — without this, one round cured a gate four or
+   * five times over and a panel walked its whole ladder off a single shot.
+   */
+  spentOnGate?: boolean;
 }
 
 export type GateEffect =
@@ -173,10 +203,78 @@ export type GateEffect =
   | { kind: "money"; n: number }
   | { kind: "health"; n: number };
 
-export interface GateOption {
-  effect: GateEffect;
+/**
+ * A gate outcome is a RUNG on a ladder, not a fixed card.
+ *
+ * Shooting a panel walks it up its own ladder ONE rung at a time — a -3 RUM
+ * becomes -2, then -1, then nothing, and only then starts paying out. That is
+ * what makes curing feel like work rather than a coin flip: the number visibly
+ * climbs, and the guest chooses how many rounds it is worth.
+ */
+export type GateFamily = "helpers" | "money" | "gun" | "health";
+
+export interface Rung {
+  /** null is the neutral rung — the gate simply does nothing. */
+  effect: GateEffect | null;
   label: string;
-  good: boolean;
+  tone: "bad" | "neutral" | "good";
+}
+
+/**
+ * Every ladder passes through neutral in the middle, so a negative can always
+ * be walked to harmless first, and only then into a real reward.
+ */
+export const LADDERS: Record<GateFamily, Rung[]> = {
+  helpers: [
+    { effect: { kind: "helpers", n: -3 }, label: "-3 RUM", tone: "bad" },
+    { effect: { kind: "helpers", n: -2 }, label: "-2 RUM", tone: "bad" },
+    { effect: { kind: "helpers", n: -1 }, label: "-1 RUM", tone: "bad" },
+    { effect: null, label: "NOTHING", tone: "neutral" },
+    { effect: { kind: "helpers", n: 1 }, label: "+1 RUM", tone: "good" },
+    { effect: { kind: "helpers", n: 2 }, label: "+2 RUM", tone: "good" },
+    { effect: { kind: "helpers", n: 3 }, label: "+3 RUM", tone: "good" },
+  ],
+  money: [
+    { effect: { kind: "money", n: -5 }, label: "-$5", tone: "bad" },
+    { effect: null, label: "NOTHING", tone: "neutral" },
+    { effect: { kind: "money", n: 5 }, label: "+$5", tone: "good" },
+    { effect: { kind: "money", n: 10 }, label: "+$10", tone: "good" },
+  ],
+  gun: [
+    { effect: { kind: "gun", gun: "pistol" }, label: "PISTOL", tone: "bad" },
+    { effect: null, label: "NOTHING", tone: "neutral" },
+    { effect: { kind: "gun", gun: "shotgun" }, label: "SHOTGUN", tone: "good" },
+    { effect: { kind: "gun", gun: "uzi" }, label: "UZI", tone: "good" },
+    { effect: { kind: "gun", gun: "flame" }, label: "FLAME", tone: "good" },
+  ],
+  health: [
+    { effect: { kind: "health", n: -20 }, label: "POISON", tone: "bad" },
+    { effect: null, label: "NOTHING", tone: "neutral" },
+    { effect: { kind: "health", n: 25 }, label: "+HEALTH", tone: "good" },
+    { effect: { kind: "bomb" }, label: "BOMB", tone: "good" },
+  ],
+};
+
+export interface GateOption {
+  family: GateFamily;
+  /** Index into the family's ladder. */
+  tier: number;
+  /** Rounds landed since the last rung. Resets on every step up. */
+  cure: number;
+}
+
+export function rungOf(o: GateOption): Rung {
+  const l = LADDERS[o.family];
+  return l[Math.max(0, Math.min(l.length - 1, o.tier))];
+}
+
+export function isGoodOption(o: GateOption): boolean {
+  return rungOf(o).tone === "good";
+}
+
+/** True once a panel is as good as its ladder goes. */
+export function isMaxedOption(o: GateOption): boolean {
+  return o.tier >= LADDERS[o.family].length - 1;
 }
 
 export interface Gate {
@@ -184,7 +282,30 @@ export interface Gate {
   left: GateOption;
   right: GateOption;
   taken: boolean;
+  /** Set for a moment when a panel steps up, so the renderer can flash it. */
+  flipped: number;
 }
+
+/**
+ * How far across the road a gate panel actually reaches, as a fraction.
+ *
+ * Deliberately NOT the full width. Panels used to span the whole road, so a
+ * gate was compulsory — and when depth decay puts a negative on BOTH sides,
+ * being forced to eat one is a punishment with no play in it. The outer edges
+ * are now open: you can refuse a gate entirely, but only by committing to the
+ * very edge of the road, which usually means giving up position on whatever
+ * else is coming.
+ */
+export const GATE_REACH = 0.72;
+
+/**
+ * Rounds needed to move a panel up ONE rung.
+ *
+ * The cost is per STEP, not per gate, so dragging a -3 all the way to a payout
+ * is a real investment — fifteen rounds not spent on the things walking at you.
+ * Curing a -1 to harmless is cheap; turning it into a reward is a decision.
+ */
+export const GATE_CURE_HITS = 5;
 
 /** Floating score text — the only feedback the guest gets on a miss. */
 export interface Pop {
@@ -391,40 +512,47 @@ export function gateGoodChance(stage: number, luck: number): number {
 
 // ─── Gates ───────────────────────────────────────────────────────────────────
 
-const GOOD_POOL: GateOption[] = [
-  { effect: { kind: "helpers", n: 1 }, label: "+1 RUM", good: true },
-  { effect: { kind: "helpers", n: 2 }, label: "+2 RUM", good: true },
-  { effect: { kind: "helpers", n: 3 }, label: "+3 RUM", good: true },
-  { effect: { kind: "gun", gun: "shotgun" }, label: "SHOTGUN", good: true },
-  { effect: { kind: "gun", gun: "uzi" }, label: "UZI", good: true },
-  { effect: { kind: "gun", gun: "flame" }, label: "FLAME", good: true },
-  { effect: { kind: "bomb" }, label: "BOMB", good: true },
-  { effect: { kind: "money", n: 5 }, label: "+$5", good: true },
-  { effect: { kind: "health", n: 25 }, label: "+HEALTH", good: true },
-];
-
-const BAD_POOL: GateOption[] = [
-  { effect: { kind: "helpers", n: -1 }, label: "-1 RUM", good: false },
-  { effect: { kind: "helpers", n: -2 }, label: "-2 RUM", good: false },
-  { effect: { kind: "helpers", n: -3 }, label: "-3 RUM", good: false },
-  { effect: { kind: "gun", gun: "pistol" }, label: "PISTOL", good: false },
-  { effect: { kind: "money", n: -5 }, label: "-$5", good: false },
-  { effect: { kind: "health", n: -20 }, label: "POISON", good: false },
-];
-
 function pick<T>(arr: T[], rng: () => number): T {
   return arr[Math.floor(rng() * arr.length) % arr.length];
 }
 
+const FAMILIES: GateFamily[] = ["helpers", "money", "gun", "health"];
+
 export function makeGate(st: State): Gate {
+  const roll = (bad: boolean): GateOption => {
+    const family = pick(FAMILIES, st.rng);
+    const ladder = LADDERS[family];
+    const neutral = ladder.findIndex((r) => r.tone === "neutral");
+    const tier = bad
+      ? Math.floor(st.rng() * neutral)
+      : neutral + 1 + Math.floor(st.rng() * (ladder.length - neutral - 1));
+    return { family, tier, cure: 0 };
+  };
+
   const good = st.rng() < gateGoodChance(st.stage, st.luck);
-  const a = good ? pick(GOOD_POOL, st.rng) : pick(BAD_POOL, st.rng);
-  const b = pick(BAD_POOL, st.rng);
+  const a = roll(!good);
+  const b = roll(true);
   const flip = st.rng() < 0.5;
-  return { z: 1, left: flip ? a : b, right: flip ? b : a, taken: false };
+  return { z: 1, left: flip ? a : b, right: flip ? b : a, taken: false, flipped: 0 };
 }
 
-export function applyEffect(st: State, e: GateEffect): void {
+/**
+ * Land a round on a panel. Returns true if this shot stepped it up a rung.
+ *
+ * A panel already at the top of its ladder absorbs nothing — there is no reward
+ * for pouring ammunition into a gate that is already as good as it gets.
+ */
+export function cureGateOption(o: GateOption): boolean {
+  if (isMaxedOption(o)) return false;
+  o.cure += 1;
+  if (o.cure < GATE_CURE_HITS) return false;
+  o.tier += 1;
+  o.cure = 0;
+  return true;
+}
+
+export function applyEffect(st: State, e: GateEffect | null): void {
+  if (!e) return;                     // the neutral rung does nothing
   switch (e.kind) {
     case "helpers":
       st.helpers = Math.max(0, Math.min(MAX_HELPERS, st.helpers + e.n));
@@ -667,7 +795,9 @@ export function update(st: State, dt: number): void {
     // Fast enough to feel like the character is pinned to the thumb, smoothed
     // just enough that a jittery touch doesn't judder the sprite.
     const k = Math.min(1, FOLLOW_RATE * dt);
-    st.playerNx += (st.targetNx - st.playerNx) * k;
+    const want = (st.targetNx - st.playerNx) * k;
+    const cap = MAX_TRAVERSE * dt;
+    st.playerNx += Math.abs(want) > cap ? Math.sign(want) * cap : want;
   } else {
     st.playerNx += st.drag * PLAYER_SPEED * dt;
   }
@@ -718,14 +848,33 @@ export function update(st: State, dt: number): void {
 
   // ── Gate ──
   if (st.gate) {
-    st.gate.z -= GATE_SPEED * dt;
-    if (!st.gate.taken && st.gate.z <= 0.04) {
-      st.gate.taken = true;
-      const opt = st.playerNx < 0 ? st.gate.left : st.gate.right;
-      applyEffect(st, opt.effect);
-      st.gatesTaken++;
+    const gate = st.gate;
+    gate.z -= GATE_SPEED * dt;
+    if (gate.flipped > 0) gate.flipped -= dt;
+
+    // Rounds landing on a panel cure it. The bullet is NOT consumed — a gate is
+    // a sign, not a wall, and eating shots would stop the guest defending
+    // themselves from whatever is walking up behind it.
+    for (const b of st.bullets) {
+      if (b.spentOnGate) continue;                    // one round, one count
+      if (Math.abs(b.z - gate.z) > 0.06) continue;
+      if (Math.abs(b.nx) > GATE_REACH) continue;      // through the open edge
+      b.spentOnGate = true;
+      const side = b.nx < 0 ? gate.left : gate.right;
+      if (cureGateOption(side)) gate.flipped = 0.7;
     }
-    if (st.gate.z <= -0.12) st.gate = null;
+
+    if (!gate.taken && gate.z <= 0.04) {
+      gate.taken = true;
+      // Off the end of a panel is a clean miss — the gate simply does not
+      // apply. That is the whole point of leaving the edges open.
+      if (Math.abs(st.playerNx) <= GATE_REACH) {
+        const chosen = st.playerNx < 0 ? gate.left : gate.right;
+        applyEffect(st, rungOf(chosen).effect);
+        st.gatesTaken++;
+      }
+    }
+    if (gate.z <= -0.12) st.gate = null;
   }
 
   // ── Enemies ──

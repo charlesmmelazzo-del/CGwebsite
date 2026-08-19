@@ -13,7 +13,8 @@ import {
 import {
   armorCost, bombCost, canBuyArmor, canBuyBomb, freshState, GUNS, MAX_ARMOR,
   MAX_BOMBS, MAX_HEALTH, runDetail, update, detonateBomb, worldSpeed,
-  DRAG_RANGE, isGrunt, type Enemy, type State,
+  DRAG_RANGE, isGrunt, GATE_REACH, GATE_CURE_HITS, rungOf, isGoodOption,
+  isMaxedOption, type Enemy, type State,
 } from "./tikiCore";
 
 // ─── Progress (the save file) ────────────────────────────────────────────────
@@ -123,10 +124,14 @@ export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeG
   const botDrag = useCallback((s: State): number => {
     // A gate is the only thing worth crossing the road for.
     if (s.gate && s.gate.z < 0.75 && !s.gate.taken) {
-      const wantRight = s.gate.right.good && !s.gate.left.good;
-      const wantLeft = s.gate.left.good && !s.gate.right.good;
+      const rightGood = isGoodOption(s.gate.right);
+      const leftGood = isGoodOption(s.gate.left);
+      const wantRight = rightGood && !leftGood;
+      const wantLeft = leftGood && !rightGood;
       if (wantRight) return s.playerNx < 0.45 ? 1 : 0;
       if (wantLeft) return s.playerNx > -0.45 ? -1 : 0;
+      // Both bad: run for the open edge rather than eat one.
+      if (!leftGood && !rightGood) return s.playerNx > 0 ? 1 : -1;
     }
     // Otherwise: get off the line of anything close, then line up on the
     // nearest thing worth shooting.
@@ -388,17 +393,57 @@ function drawField(
     const y = projectY(g.z, h);
     const hw = roadHalf(g.z);
     const gh = 66 * projectScale(g.z);
-    for (const [side, opt] of [[-1, g.left] as const, [1, g.right] as const]) {
-      const x0 = side < 0 ? W / 2 - hw : W / 2;
-      ctx.fillStyle = opt.good ? "rgba(60,220,120,0.34)" : "rgba(230,50,50,0.34)";
-      ctx.fillRect(x0, y - gh, hw, gh);
-      ctx.strokeStyle = opt.good ? "#5CE08A" : "#FF6A5E";
-      ctx.lineWidth = 1.4;
-      ctx.strokeRect(x0, y - gh, hw, gh);
-      const sc = g.z < 0.55 ? 2 : 1;
-      if (hw > 22) {
-        drawText(ctx, opt.label, x0 + hw / 2, y - gh / 2 - 3 * sc, "#FFFFFF", sc, "center");
+    // Panels stop short of the road edge. The gap is the escape route when
+    // both sides are negative — see GATE_REACH.
+    const reach = hw * GATE_REACH;
+
+    for (const [side, o] of [[-1, g.left] as const, [1, g.right] as const]) {
+      const rung = rungOf(o);
+      const x0 = side < 0 ? W / 2 - reach : W / 2;
+      const tone =
+        rung.tone === "good" ? { fill: "rgba(60,220,120,0.34)", line: "#5CE08A" }
+          : rung.tone === "neutral" ? { fill: "rgba(230,200,90,0.30)", line: "#F0D264" }
+            : { fill: "rgba(230,50,50,0.34)", line: "#FF6A5E" };
+
+      ctx.fillStyle = tone.fill;
+      ctx.fillRect(x0, y - gh, reach, gh);
+
+      // Progress toward the next rung, filling from the bottom. This is the
+      // whole feedback loop for shooting a gate — without it the guest has no
+      // idea whether their rounds are doing anything.
+      if (o.cure > 0 && !isMaxedOption(o)) {
+        const frac = o.cure / GATE_CURE_HITS;
+        ctx.fillStyle = "rgba(255,255,255,0.30)";
+        ctx.fillRect(x0, y - gh * frac, reach, gh * frac);
       }
+
+      ctx.strokeStyle = tone.line;
+      ctx.lineWidth = g.flipped > 0 ? 2.6 : 1.4;
+      ctx.strokeRect(x0, y - gh, reach, gh);
+
+      // Largest size that fits, and CLIPPED to its own panel either way.
+      //
+      // Fixed sizing drew "NOTHING" and "POISON" straight through each other
+      // into one unreadable smear at distance. Refusing to draw anything that
+      // didn't fit was worse — a gate with no label is a gate you cannot make
+      // a decision about, and "POISON" misses fitting by a single pixel at the
+      // range where you most need to read it. Clipping means the label is
+      // always there and can never bleed into its neighbour.
+      const sc = textWidth(rung.label, 2) <= reach - 6 ? 2 : 1;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x0, y - gh, reach, gh);
+      ctx.clip();
+      drawText(ctx, rung.label, x0 + reach / 2, y - gh / 2 - 3 * sc, "#FFFFFF", sc, "center");
+      ctx.restore();
+    }
+
+    // A step up flashes the whole gate, so it reads even mid-firefight.
+    if (g.flipped > 0) {
+      ctx.globalAlpha = Math.min(0.5, g.flipped);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(W / 2 - reach, y - gh, reach * 2, gh);
+      ctx.globalAlpha = 1;
     }
   }
 
@@ -523,14 +568,17 @@ function drawField(
     // Drawn as a TRACER, not a dot. A round travelling this fast covers more
     // ground between frames than a dot is wide, so a dot strobes; a streak
     // reads as a continuous line of fire.
-    const w = Math.max(1, 2.6 * sc);
-    const len = Math.max(4, 13 * sc);
-    ctx.fillStyle = "rgba(0,0,0,0.35)";
-    ctx.fillRect(x - w / 2 + 0.6, y - len + 0.6, w, len);
-    ctx.fillStyle = C.flameHot;
+    const w = Math.max(1.4, 3 * sc);
+    const len = Math.max(5, 14 * sc);
+    // Cyan with a hard black keyline. The old warm yellow was almost exactly
+    // the value and hue of the sand it flew over and simply disappeared; a cold
+    // colour is the one thing this palette has that sand, sky and fruit do not.
+    ctx.fillStyle = C.outline;
+    ctx.fillRect(x - w / 2 - 0.9, y - len - 0.9, w + 1.8, len + 1.8);
+    ctx.fillStyle = C.bulletCore;
     ctx.fillRect(x - w / 2, y - len, w, len);
     ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(x - w / 2, y - len, w, len * 0.4);
+    ctx.fillRect(x - w / 2, y - len, w, len * 0.45);
   }
 
   // Muzzle flash. This is what actually anchors the shooting to the character —

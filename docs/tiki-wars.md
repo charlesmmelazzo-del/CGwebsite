@@ -158,6 +158,9 @@ Three things make the gun read as firing, and all three are needed:
   bullets appear in the middle distance on their own.
 * **Tracers, not dots.** A round covers more ground between frames than a dot is
   wide, so a dot strobes and a streak reads as a line of fire.
+* **A cold colour.** Rounds were warm yellow, which is almost exactly the hue
+  and value of the sand they fly over, and they simply disappeared. Cyan is the
+  one hue nothing else on the beach uses.
 * **A slower bullet.** Fast enough to feel instant, slow enough to be seen
   leaving the barrel.
 
@@ -275,9 +278,19 @@ travel — about 38% of the screen width — covers more than half the road.
 
 Feeding the drag into a velocity integrator, which is what the first build did,
 made the character feel towed: you moved your thumb and it caught up a moment
-later. In a game where picking a lane is worth health, that lag is unusable. The
-character now reaches 99% of the thumb's target within 100ms, and stops dead on
-release rather than coasting.
+later. In a game where picking a lane is worth health, that lag is unusable.
+
+Two separate knobs control how this feels, and they are easy to confuse:
+
+* **`DRAG_RANGE` is the gain** — how much road one thumb travel covers. This is
+  what makes the character feel fast or slow, and lowering it costs nothing.
+* **`FOLLOW_RATE` is the responsiveness.** Lowering this to slow the character
+  down just brings back the drift.
+
+There is also a **traverse cap** so a violent flick cannot teleport the
+character edge to edge in one frame. It must stay generous — set too low it
+becomes the dominant constraint rather than an edge case, which is the towed
+feel wearing a different hat.
 
 Keyboard steering stays velocity-based, since a key has no position.
 
@@ -335,15 +348,53 @@ the end of every stage.**
 
 ## Gates
 
-Periodically a pair (later, more) of panels sweeps down the field. The player
-steers through one. One side is a bonus, one a negative — until deep stages,
-where both may be negative and the choice becomes damage control.
+Periodically a pair of panels sweeps down the field. The player steers through
+one — or past both.
 
-**Bonuses:** `+1/+2/+3 Helper` · `Shotgun` · `Uzi` · `Flamethrower` ·
-`Bomb` (clears the field) · `Money +$5`
+### Panels do not span the road
 
-**Negatives:** `-1/-2/-3 Helper` · `Pistol` (downgrade) · `Money -$5` ·
-`Poison` (health) · `Black Cat` (-10% luck)
+Each panel reaches about **72% of the way** from the centre to the road edge,
+leaving the outer edges open. A gate is therefore never compulsory: you can
+refuse it entirely, but only by committing to the very edge of the road, which
+usually means giving up position on whatever else is coming.
+
+This matters most at depth, where gate quality decays until **both sides are
+negative**. Being forced to eat one of two punishments is not a decision; being
+able to spend your position to dodge both is.
+
+### Shooting a gate cures it
+
+Rounds landed on a panel walk it **up its own ladder, one rung at a time**. A
+`-3 RUM` becomes `-2`, then `-1`, then `NOTHING`, and only then starts paying
+out. Each rung costs five rounds, so dragging a `-3` all the way to a reward is
+fifteen rounds not spent on the things walking at you.
+
+That is the point: a bad gate stops being something that happens *to* you and
+becomes a problem you can shoot your way out of, priced in the only currency the
+game has — where your bullets go.
+
+* Every ladder passes through a **neutral** rung, so a negative can always be
+  walked to harmless before it becomes a reward.
+* A panel already at the top of its ladder absorbs nothing.
+* **One round counts once.** The cure check runs every frame and a bullet stays
+  in range of a panel for several of them; without a spent flag a single shot
+  cured a gate four or five times over.
+* Bullets are **not** consumed. A gate is a sign, not a wall — eating rounds
+  would stop the guest defending themselves from whatever is behind it.
+* A round through the open edge cures nothing.
+
+The panel fills white from the bottom as it charges toward the next rung. That
+fill is the entire feedback loop: without it the guest has no idea whether their
+rounds are doing anything.
+
+### The ladders
+
+| Family | Rungs, worst to best |
+|---|---|
+| **Helpers** | -3 RUM · -2 RUM · -1 RUM · **NOTHING** · +1 RUM · +2 RUM · +3 RUM |
+| **Money** | -$5 · **NOTHING** · +$5 · +$10 |
+| **Gun** | PISTOL (downgrade) · **NOTHING** · SHOTGUN · UZI · FLAME |
+| **Health** | POISON · **NOTHING** · +HEALTH · BOMB |
 
 Money is the only gate outcome that outlives the run. That tension — take the
 power you need now, or bank toward a permanent upgrade — is the core decision of
@@ -352,7 +403,12 @@ the game and should stay sharp at every difficulty.
 Gates and tier-2 blockers should not share screen time. A gate gets its own
 moment.
 
----
+### Labels
+
+Drawn at the largest size that fits and **clipped to their own panel**. Fixed
+sizing smeared "NOTHING" and "POISON" through each other at distance; refusing
+to draw a label that didn't fit was worse, since a gate you cannot read is a
+gate you cannot make a decision about.
 
 ## Economy
 
