@@ -364,13 +364,60 @@ function drawStir(ctx: CanvasRenderingContext2D, st: State) {
  * the next card opens with — the same words twice in three seconds read as the
  * game repeating itself. A guest smiling at a drink says it without saying it.
  */
-function drawServe(ctx: CanvasRenderingContext2D, st: State) {
-  const p = clamp(st.phaseT / 1.6, 0, 1);
-  // The glass slides from the bartender's hand to the guest.
-  const x = 120 + p * 52;
-  rect(ctx, x, 184, 9, 14, P.cyan);
-  rect(ctx, x + 1, 186, 7, 5, P.amber);
-  rect(ctx, x + 2, 198, 5, 2, P.slate);
+/** A finished cocktail, drawn from rects like everything else on the tube. */
+function drawCocktail(ctx: CanvasRenderingContext2D, cx: number, cy: number, s = 1) {
+  const u = (n: number) => Math.round(n * s);
+  // Bowl, tapering to the stem.
+  for (let i = 0; i < u(9); i++) {
+    const w = u(20) - i * 2;
+    rect(ctx, cx - w / 2, cy - u(10) + i, w, 1, i < u(3) ? P.magenta : P.pink);
+  }
+  rect(ctx, cx - u(10), cy - u(11), u(20), u(1) + 1, P.white);
+  rect(ctx, cx - 1, cy - u(1), u(2), u(9), P.slate);
+  rect(ctx, cx - u(6), cy + u(8), u(12), u(2), P.slate);
+  // Garnish, so it reads as a drink rather than a funnel.
+  rect(ctx, cx + u(5), cy - u(14), u(2), u(5), P.lime);
+  rect(ctx, cx + u(4), cy - u(15), u(4), u(2), P.green);
+}
+
+/**
+ * The serve.
+ *
+ * Both characters on black, side on, and the drink travels between them. The
+ * old version showed one guest appearing at the bar with a glass sliding past
+ * — which read as a glass moving of its own accord past somebody who happened
+ * to be there. Two figures and a handover is the same beat, legibly.
+ */
+function drawServe(ctx: CanvasRenderingContext2D, st: State, t: number) {
+  clear(ctx, P.black);
+
+  const bartenderX = 62;
+  const guestX = 166;
+  const baseY = 250;
+
+  const drewPair =
+    drawCharacter(ctx, "bartender", bartenderX, baseY, 150, { mood: "happy", pose: "serve" }) &&
+    drawCharacter(ctx, "guest", guestX, baseY, 140, { mood: "happy", facing: -1 });
+
+  if (!drewPair) {
+    drawBartender(ctx, bartenderX, baseY, "happy", "serve", t);
+    drawGuest(ctx, guestX, baseY, "happy", t, P.teal, "#005058");
+  }
+
+  // ── The handover ────────────────────────────────────────────────────────
+  // Eased so it leaves slowly, crosses quickly and settles — a linear slide
+  // looks like a prop on a rail.
+  const p = clamp(st.phaseT / 1.5, 0, 1);
+  const ease = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+  const x = bartenderX + 22 + ease * (guestX - bartenderX - 44);
+  // A shallow arc, so it is carried rather than dragged.
+  const y = 176 - Math.sin(ease * Math.PI) * 12;
+
+  drawCocktail(ctx, x, y, 1.3);
+
+  if (p >= 1 && blink(t, 3)) {
+    drawTextMarquee(ctx, "NICE ONE!", 112, 60, P.lime, 2, "center", P.black, "#00551C");
+  }
 }
 
 function drawOver(ctx: CanvasRenderingContext2D, t: number) {
@@ -1178,10 +1225,11 @@ export default function BehindTheStick({ onGameOver, demo = false }: ArcadeGameP
       // ── Shake and stir stand alone ────────────────────────────────────
       // Nothing behind them. The bar and the bartender were competing with the
       // one object the player is acting on, and a shake is a close-up.
-      if (st.phase === "shake" || st.phase === "stir") {
+      if (st.phase === "shake" || st.phase === "stir" || st.phase === "serve") {
         clear(ctx, P.black);
         if (st.phase === "shake") drawShake(ctx, st);
-        else drawStir(ctx, st);
+        else if (st.phase === "stir") drawStir(ctx, st);
+        else drawServe(ctx, st, t);
         drawHud(ctx, st);
         if (st.bannerTimer > 0 && st.banner) {
           drawTextMarquee(ctx, st.banner, 112, 96, P.yellow, 2, "center", P.black, P.crimson);
@@ -1189,33 +1237,15 @@ export default function BehindTheStick({ onGameOver, demo = false }: ArcadeGameP
         return;
       }
 
-      // No crowd while the drink is being built. A wall of guests during the
-      // rhythm phase competes with the only thing the player is watching, and
-      // it stops the bartender being drawn big enough to read. One guest steps
-      // in only to take the drink, or to ask where it is.
-      if (st.phase === "serve" || st.phase === "over") {
-        const happy = st.phase === "serve";
-        const drewGuest = drawCharacter(ctx, "guest", 182, 214, 74, {
-          mood: happy ? "happy" : "sad",
-          facing: -1,
-        });
-        if (!drewGuest) {
-          drawGuest(
-            ctx,
-            176,
-            214,
-            happy ? "happy" : "angry",
-            t,
-            happy ? P.teal : P.red,
-            happy ? "#005058" : "#7A0F0A"
-          );
-        }
-      }
+      // No guests behind the bar at all now. A wall of them during the rhythm
+      // phase competed with the only thing worth watching, and it kept the
+      // bartender too small to read. The guest gets his own scene at the serve,
+      // full size on black, where the handover actually happens.
       drawBarFront(ctx);
 
       // shake and stir returned earlier — they draw on black, with no bar.
+      // shake, stir and serve returned earlier — they draw on black.
       if (st.phase === "pour") drawRail(ctx, st, t);
-      else if (st.phase === "serve") drawServe(ctx, st);
       else if (st.phase === "over") drawOver(ctx, t);
 
       for (const sp of st.splashes) {
