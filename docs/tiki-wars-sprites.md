@@ -101,6 +101,88 @@ row 1 |  turn      |  shades    |  hit       |  (spare)   |
   padding that varies between cells.
 * Unused cells can be left empty.
 
+### Enemy sheet layouts
+
+Every enemy is **one row**. Animations run left to right along it, so there is
+never a second row to line up.
+
+| Type | Grid | Layout |
+|---|---|---|
+| **Soldier** | **4 x 1** | walk 1 · walk 2 · walk 3 · walk 4 |
+| **Blocker** | **5 x 1** | walk 1 · walk 2 · walk 3 · walk 4 · **hit** |
+| **Boss** | **5 x 1** | walk 1 · walk 2 · **attack 1** · **attack 2** · **hit** |
+
+The **hit** cell is used both for the flash when a round lands and for the
+moment of defeat, so draw it as "just took a heavy one" — recoiling, eyes
+screwed shut, weapon flying — rather than a corpse.
+
+---
+
+## The full enemy roster
+
+23 characters. Two are delivered. Everything front-facing, walking toward the
+camera; see the per-character descriptions further down for the ones already
+written up.
+
+### Soldiers — 4 x 1, one shot each, appear on every stage
+
+| # | File | Character | Status |
+|---|---|---|---|
+| 1 | `lime.png` | Lime soldier | **done** |
+| 2 | `kiwi.png` | Kiwi soldier | **done** |
+| 3 | `lemon.png` | Lemon soldier — yellow, oval, pointed at both ends, sour squint | |
+| 4 | `orange.png` | Orange soldier — rounder and bulkier, dimpled peel, gruff scowl | |
+
+### Blockers, stage-native — 5 x 1
+
+| # | File | Character | Stage |
+|---|---|---|---|
+| 5 | `sugarcane.png` | Giant sugar cane monster | Beach |
+| 6 | `worm.png` | Tequila worm in an embroidered sombrero | Desert |
+| 7 | `mezcal.png` | Mezcal bottle, huge curled moustache, sabre | Desert |
+| 8 | `cinnamon.png` | Cinnamon stick with a wooden mallet | Winter |
+| 9 | `coconut.png` | Hairy coconut with a glowing energy sword | Winter |
+| 10 | `grapefruit.png` | Grapefruit thug with a baseball bat | Winter |
+| 11 | `candycane.png` | Zombie candy cane, cracked and lurching | Winter |
+| 12 | `pineapple-knight.png` | Rank-and-file pineapple in chainmail | Castle |
+
+### Blockers, wildcard — 5 x 1, can appear on ANY stage
+
+| # | File | Character |
+|---|---|---|
+| 13 | `wild-milk.png` | Angry milk carton with a wrench |
+| 14 | `wild-beer.png` | Angry beer can with a lead pipe |
+| 15 | `wild-coconutcream.png` | Angry coconut cream can with a can opener |
+| 16 | `wild-gingerbeer.png` | Angry ginger beer bottle with a katana |
+| 17 | `wild-pomegranate.png` | Angry pomegranate with a plank of lumber |
+| 18 | `wild-almond.png` | Angry almond with an oversized wooden spoon |
+| 19 | `wild-blender.png` | Angry blender with boxing gloves — **the elite, biggest of the pool** |
+
+### Bosses — 5 x 1
+
+| # | File | Character | Stage |
+|---|---|---|---|
+| 20 | `boss-baby-pineapple.png` | Baby Pineapple, crown and club | Beach |
+| 21 | `boss-knight-pineapple.png` | Knight Pineapple, plate armour and longsword | Desert |
+| 22 | `boss-santa-pineapple.png` | Santa Pineapple, red coat and whip | Winter |
+| 23 | `boss-king-pineapple.png` | **King Pineapple**, cloak, sceptre, hostage under one arm | Castle finale |
+
+**No extra art for the Castle's mid-stage blockers** — it reuses bosses 20, 21
+and 22 as ordinary blockers, drawn smaller.
+
+### If you want an order to draw them in
+
+Only four of these can actually appear in the game today, because the rest of
+the world is still to be built. In priority order:
+
+1. **`lemon.png`, `orange.png`** — completes the soldier set that fills the screen
+2. **`sugarcane.png`** — the only blocker the game currently spawns
+3. **`boss-baby-pineapple.png`** — the only boss
+
+Everything from #6 down belongs to stages that do not exist yet. Send them
+whenever — each sheet gets checked on arrival — but they will sit unused until
+the Desert, Winter and Castle are built.
+
 ### The sheets
 
 | File | Grid | Row 0 | Row 1 |

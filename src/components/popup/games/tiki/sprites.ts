@@ -75,7 +75,14 @@ export interface SpriteMeta {
   sheet?: {
     name: SheetName;
     row: number;
-    /** Fixed column, for a single-frame sprite sharing a row with others. */
+    /**
+     * Column this animation STARTS at. Defaults to 0.
+     *
+     * Frames run rightward from here, which lets one row carry several
+     * animations back to back — walk, then attack, then hit — so a whole
+     * character can be a single strip. That is much easier to draw than a
+     * multi-row grid, and there is no second row to line up.
+     */
     col?: number;
   };
   /** Fallback: loose files, suffixed -1, -2, … when frames > 1. */
@@ -231,7 +238,7 @@ function resolve(
     if (img && img.width) {
       const cw = img.width / def.cols;
       const ch = img.height / def.rows;
-      const col = m.sheet.col ?? frame;
+      const col = (m.sheet.col ?? 0) + frame;
       if (col < def.cols && m.sheet.row < def.rows) {
         return scaledCell(
           url,
