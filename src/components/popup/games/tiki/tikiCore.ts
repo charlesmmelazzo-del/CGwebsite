@@ -33,6 +33,25 @@ export const PTS_BLOCKER = 50;
 export const PTS_BOSS = 500;
 export const PTS_STAGE = 100;
 
+/**
+ * What an enemy costs you for walking past unkilled.
+ *
+ * Without this, dodging is strictly free: side-step everything, never fire, and
+ * survive indefinitely at no cost. The penalty makes position a trade rather
+ * than an escape — you can still dodge what you cannot kill, but it is never
+ * the cheap option.
+ *
+ * Deliberately HALF the kill value rather than equal to it. At depth the wave
+ * outgrows any gun, so a symmetric penalty would make simply surviving a deep
+ * stage net-negative and punish the guest for getting good. Half keeps dodging
+ * clearly worse than killing without turning late stages into a bleed.
+ */
+export const PTS_MISS_GRUNT = 5;
+export const PTS_MISS_BLOCKER = 25;
+
+/** Depth at which an enemy counts as having got past you. */
+export const MISS_Z = -0.02;
+
 /** Mirrors the DB cap in scores.ts. Clamped, never rejected. */
 export const MAX_SCORE = 10_000_000;
 
@@ -127,6 +146,15 @@ export interface Gate {
   taken: boolean;
 }
 
+/** Floating score text — the only feedback the guest gets on a miss. */
+export interface Pop {
+  nx: number;
+  z: number;
+  text: string;
+  good: boolean;
+  life: number;
+}
+
 export interface Bark {
   text: string;
   life: number;
@@ -165,6 +193,9 @@ export interface State {
 
   score: number;
   kills: { grunt: number; blocker: number; boss: number };
+  /** Enemies that walked past unkilled. Counted for the owner's run detail. */
+  misses: { grunt: number; blocker: number };
+  pops: Pop[];
   moneyEarned: number;
   gatesTaken: number;
 
@@ -211,6 +242,8 @@ export function freshState(opts: StartOpts = {}): State {
     barkCooldown: 0,
     score: opts.score ?? 0,
     kills: { grunt: 0, blocker: 0, boss: 0 },
+    misses: { grunt: 0, blocker: 0 },
+    pops: [],
     moneyEarned: 0,
     gatesTaken: 0,
     cooldown: 0,
@@ -439,6 +472,26 @@ function fire(st: State): void {
   }
 }
 
+function addPop(st: State, e: Enemy, text: string, good: boolean): void {
+  st.pops.push({ nx: e.nx, z: Math.max(0, e.z), text, good, life: 0.9 });
+}
+
+/**
+ * An enemy got past you.
+ *
+ * The HUD shows health and armor and nothing else, so a silent deduction would
+ * be invisible — the guest would lose points all run without ever being told.
+ * The floating number IS the feedback.
+ */
+function missPenalty(st: State, e: Enemy): void {
+  if (e.kind === "boss") return;          // a boss cannot be dodged past
+  const cost = isGrunt(e.kind) ? PTS_MISS_GRUNT : PTS_MISS_BLOCKER;
+  if (isGrunt(e.kind)) st.misses.grunt++;
+  else st.misses.blocker++;
+  st.score = Math.max(0, st.score - cost);
+  addPop(st, e, `-${cost}`, false);
+}
+
 function killReward(st: State, e: Enemy): void {
   if (e.kind === "boss") {
     st.kills.boss++;
@@ -451,6 +504,7 @@ function killReward(st: State, e: Enemy): void {
     st.score += PTS_BLOCKER;
   }
   st.score = Math.min(MAX_SCORE, st.score);
+  if (e.kind !== "boss") addPop(st, e, `+${isGrunt(e.kind) ? PTS_GRUNT : PTS_BLOCKER}`, true);
 }
 
 // ─── Step ────────────────────────────────────────────────────────────────────
@@ -597,11 +651,37 @@ export function update(st: State, dt: number): void {
     // Contact.
     if (e.z <= CONTACT_Z && Math.abs(e.nx - st.playerNx) < CONTACT_NX) {
       damage(st, CONTACT_DAMAGE);
-      e.dying = 0.25;
       // Helpers are bodies between you and them — one is lost per hit taken.
       if (st.helpers > 0) st.helpers -= 1;
+      if (e.kind === "boss") {
+        // A boss is NOT consumed by hitting you. Removing it here left the
+        // phase stuck on "boss" with nothing on the field and no way to clear
+        // the stage — an unrecoverable softlock. It falls back and comes again;
+        // killing it is the only way past.
+        e.z = 0.3;
+        e.flash = 0.15;
+      } else {
+        e.dying = 0.25;
+      }
+      continue;
+    }
+
+    // Got past. Everything except a boss is charged for and leaves the field.
+    if (e.z <= MISS_Z) {
+      if (e.kind === "boss") {
+        // The boss never leaves. It is the stage's exit condition, so removing
+        // it here — for any reason — strands the run with nothing to kill.
+        e.z = 0.3;
+      } else {
+        missPenalty(st, e);
+        e.dying = 0.01;
+      }
     }
   }
+
+  // Floating score text.
+  for (const p of st.pops) p.life -= dt;
+  st.pops = st.pops.filter((p) => p.life > 0);
 
   st.bullets = st.bullets.filter((b) => b.damage > 0);
   st.enemies = st.enemies.filter((e) => (e.dying > 0 ? true : e.z > -0.15) && !(e.dying < 0));
@@ -613,6 +693,7 @@ export function runDetail(st: State, runs: number): Record<string, unknown> {
     stage: st.stage,
     runs,
     kills: st.kills,
+    misses: st.misses,
     moneyEarned: st.moneyEarned,
     gatesTaken: st.gatesTaken,
     armor: st.armor,

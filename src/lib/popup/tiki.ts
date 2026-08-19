@@ -89,15 +89,26 @@ export async function saveTikiProgress(
 
   const clean = sanitise(incoming);
 
-  // Never let a save move the ratchet backwards. Two tabs, a stale client or a
-  // request that arrives out of order should not be able to erase a guest's
-  // best stage or their leaderboard total.
+  // Two tabs, a stale client or a request arriving out of order must not erase
+  // a guest's progress. bestStage and runs only ever climb, so they ratchet.
+  //
+  // totalScore CANNOT ratchet: dodging an enemy deducts points, so an honest
+  // run can legitimately end lower than it started. Clamping it upward would
+  // silently refund every penalty and make dodging free again — the exact thing
+  // the penalty exists to prevent. Instead it is guarded by the run counter: a
+  // write is only accepted from a client that has played at least as many runs
+  // as we have already recorded, which rejects a stale save without rejecting a
+  // legitimately lower score.
   const existing = await loadTikiProgress(userId, menuId);
+  const stale = clean.runs < existing.runs;
   const merged: TikiProgress = {
     ...clean,
     bestStage: Math.max(existing.bestStage, clean.bestStage),
-    totalScore: Math.max(existing.totalScore, clean.totalScore),
     runs: Math.max(existing.runs, clean.runs),
+    totalScore: stale ? existing.totalScore : clean.totalScore,
+    money: stale ? existing.money : clean.money,
+    armor: stale ? existing.armor : clean.armor,
+    luck: stale ? existing.luck : clean.luck,
   };
 
   const { error } = await sb.from("popup_tiki_progress").upsert(

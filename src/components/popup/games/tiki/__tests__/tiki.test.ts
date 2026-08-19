@@ -3,8 +3,9 @@ import assert from "node:assert";
 import {
   applyEffect, armorCost, blockerChance, blockerHp, bombCost, CONTACT_Z,
   damage, enemySpeed, freshState, gateGoodChance, GRUNTS, GUNS, isGrunt,
-  MAX_ARMOR, MAX_HEALTH, MAX_HELPERS, PTS_BOSS, PTS_GRUNT, spawnInterval,
-  update, detonateBomb, type State,
+  MAX_ARMOR, MAX_HEALTH, MAX_HELPERS, PTS_BLOCKER, PTS_BOSS, PTS_GRUNT,
+  PTS_MISS_BLOCKER, PTS_MISS_GRUNT, spawnInterval, update, detonateBomb,
+  type State,
 } from "../tikiCore";
 
 let passed = 0;
@@ -97,7 +98,7 @@ check("an enemy that reaches the player deals contact damage", () => {
   assert.ok(st.health < MAX_HEALTH, "walked into the player with no damage");
 });
 
-check("a dodged grunt walks past harmlessly", () => {
+check("a dodged grunt costs no HEALTH (it costs points instead)", () => {
   const st = fresh();
   st.enemies = [{
     id: 1, kind: "lime", z: 0.1, nx: -0.9, hp: 1, maxHp: 1, speed: 0.4,
@@ -107,6 +108,115 @@ check("a dodged grunt walks past harmlessly", () => {
   st.playerNx = 0.9;
   run(st, 1.2);
   assert.equal(st.health, MAX_HEALTH, "a grunt dodged by a full road still hit");
+});
+
+// ── Dodging has a price ─────────────────────────────────────────────────────
+
+check("a grunt that walks past unkilled costs points", () => {
+  const st = fresh();
+  st.score = 500;
+  st.gun = "flame";                    // no bullets, so nothing dies by accident
+  st.playerNx = 1;                     // stand well clear: dodge, not contact
+  st.enemies = [{
+    id: 1, kind: "lime", z: 0.05, nx: -0.9, hp: 1, maxHp: 1, speed: 0.5,
+    burn: 0, flash: 0, tracks: false, dying: 0,
+  }];
+  run(st, 0.6);
+  assert.equal(st.score, 500 - PTS_MISS_GRUNT, "dodging a grunt was free");
+  assert.equal(st.misses.grunt, 1);
+  assert.equal(st.health, MAX_HEALTH, "the dodge should not also have hurt");
+});
+
+check("a blocker that gets past costs more than a grunt", () => {
+  const st = fresh();
+  st.score = 500;
+  st.gun = "flame";
+  st.playerNx = 1;
+  st.enemies = [{
+    id: 1, kind: "sugarcane", z: 0.05, nx: -0.9, hp: 9, maxHp: 9, speed: 0.5,
+    burn: 0, flash: 0, tracks: false, dying: 0,
+  }];
+  run(st, 0.6);
+  assert.equal(st.score, 500 - PTS_MISS_BLOCKER);
+  assert.ok(PTS_MISS_BLOCKER > PTS_MISS_GRUNT);
+  assert.equal(st.misses.blocker, 1);
+});
+
+check("killing always beats dodging", () => {
+  assert.ok(PTS_GRUNT > 0 && PTS_MISS_GRUNT > 0);
+  assert.ok(PTS_BLOCKER > 0 && PTS_MISS_BLOCKER > 0);
+});
+
+check("an enemy that HITS you is not also charged as a dodge", () => {
+  const st = fresh();
+  st.score = 500;
+  st.gun = "flame";
+  st.playerNx = 0;
+  st.enemies = [{
+    id: 1, kind: "lime", z: 0.04, nx: 0, hp: 1, maxHp: 1, speed: 0.5,
+    burn: 0, flash: 0, tracks: false, dying: 0,
+  }];
+  run(st, 0.6);
+  assert.ok(st.health < MAX_HEALTH, "should have taken the hit");
+  assert.equal(st.misses.grunt, 0, "took damage AND a dodge penalty");
+  assert.equal(st.score, 500, "a hit should not deduct points as well");
+});
+
+check("score never goes negative from penalties", () => {
+  const st = fresh();
+  st.score = 3;
+  st.gun = "flame";
+  st.playerNx = 1;
+  st.enemies = [{
+    id: 1, kind: "sugarcane", z: 0.05, nx: -0.9, hp: 9, maxHp: 9, speed: 0.5,
+    burn: 0, flash: 0, tracks: false, dying: 0,
+  }];
+  run(st, 0.6);
+  assert.equal(st.score, 0);
+});
+
+check("a miss leaves a floating number, because the HUD has no score", () => {
+  const st = fresh();
+  st.gun = "flame";
+  st.playerNx = 1;
+  st.enemies = [{
+    id: 1, kind: "lime", z: 0.05, nx: -0.9, hp: 1, maxHp: 1, speed: 0.5,
+    burn: 0, flash: 0, tracks: false, dying: 0,
+  }];
+  run(st, 0.15);
+  assert.ok(st.pops.length > 0, "penalty was applied with no feedback at all");
+  assert.equal(st.pops[0].good, false);
+});
+
+// ── The boss cannot be lost ─────────────────────────────────────────────────
+
+check("a boss that touches you is NOT consumed", () => {
+  const st = fresh();
+  st.gun = "flame";
+  st.playerNx = 0;
+  st.enemies = [{
+    id: 1, kind: "boss", z: 0.04, nx: 0, hp: 40, maxHp: 40, speed: 0.3,
+    burn: 0, flash: 0, tracks: true, dying: 0,
+  }];
+  st.phase = "boss";
+  run(st, 1.0);
+  const boss = st.enemies.find((e) => e.kind === "boss");
+  assert.ok(boss, "the boss vanished after hitting the player — stage softlocks");
+  assert.ok(boss!.hp > 0, "the boss died from touching the player");
+});
+
+check("a boss can never walk off the field and strand the stage", () => {
+  const st = fresh();
+  st.gun = "flame";
+  st.playerNx = -1;                    // dodge as hard as possible
+  st.enemies = [{
+    id: 1, kind: "boss", z: 0.02, nx: 1, hp: 40, maxHp: 40, speed: 0.9,
+    burn: 0, flash: 0, tracks: false, dying: 0,
+  }];
+  st.phase = "boss";
+  run(st, 2.0);
+  assert.ok(st.enemies.some((e) => e.kind === "boss"), "boss walked past and left the stage unclearable");
+  assert.equal(st.misses.blocker + st.misses.grunt, 0, "a boss was charged as a dodge");
 });
 
 // ── Guns ────────────────────────────────────────────────────────────────────

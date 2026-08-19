@@ -435,6 +435,24 @@ function drawField(
     ctx.globalAlpha = 1;
   }
 
+  // ── Floating score text ────────────────────────────────────────────────
+  // The HUD carries health and armor and nothing else, so this is the ONLY
+  // place the guest is told that dodging cost them. It has to be legible in
+  // the half-second it exists.
+  for (const p of s.pops) {
+    const sc = projectScale(p.z);
+    const rise = (1 - p.life / 0.9) * 26;
+    const x = projectX(p.nx, p.z);
+    const y = projectY(p.z, h) - 30 * sc - rise;
+    ctx.globalAlpha = Math.min(1, p.life / 0.35);
+    const size = p.good ? 1 : 2;
+    // Black keyline first: these land on bright sand and would otherwise be
+    // unreadable exactly when they matter.
+    drawText(ctx, p.text, x + 1, y + 1, "rgba(0,0,0,0.75)", size, "center");
+    drawText(ctx, p.text, x, y, p.good ? C.money : C.danger, size, "center");
+    ctx.globalAlpha = 1;
+  }
+
   // ── Helpers and the hero ───────────────────────────────────────────────
   const walk = Math.floor(t * 8);
   for (let i = 0; i < s.helpers; i++) {

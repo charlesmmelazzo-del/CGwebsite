@@ -184,6 +184,33 @@ Contact with any enemy costs health (armor first, if any). Tier 1 exists to be
 mowed down and to punish bad positioning; tier 2 exists to make raw firepower
 insufficient and force lane commitment.
 
+**A boss is never consumed by contact.** It hits you, falls back, and comes
+again. Killing it is the only way past — it is the stage's exit condition, so
+removing it from the field for any other reason strands the run with nothing
+left to kill.
+
+### Dodging has a price
+
+An enemy that walks past unkilled **deducts points**: half its kill value —
+**5** for a grunt, **25** for a blocker. A boss is exempt, since it cannot be
+dodged past at all.
+
+Without this, dodging is strictly free: side-step everything, never fire, and
+survive indefinitely at no cost, which is exactly how the game first played.
+The penalty turns position into a trade rather than an escape. You can still
+duck what you cannot kill — it is simply never the cheap option.
+
+Half the kill value rather than the full amount, deliberately. At depth the wave
+outgrows any gun, so a symmetric penalty would make surviving a deep stage
+net-negative and punish the guest for getting good.
+
+Score is floored at zero; penalties can never push a run negative.
+
+**The deduction has to be visible.** The HUD carries health and armor and
+nothing else, so a silent subtraction would be invisible — a guest could bleed
+points all run and never be told. A floating number rises from wherever the
+enemy got through, and that is the only feedback there is.
+
 ### Grunt variants
 
 The grunt is a citrus soldier, and it comes as **lime, lemon, orange and kiwi**.
@@ -366,6 +393,13 @@ Stage clear: `100 × stage`.
 
 Score **accumulates across runs** — see Go Again above. A game over banks the
 total; it never resets while the guest is at this pop-up.
+
+Because dodging deducts points, a run can legitimately end **lower** than it
+started. The save file therefore cannot clamp the total upward: doing so would
+silently refund every penalty. It is guarded by the run counter instead — a
+write is only accepted from a client that has played at least as many runs as
+the server has recorded, which rejects a stale save without rejecting an
+honestly lower score.
 
 **Money is deliberately not scored.** It already converts into power; counting
 it as well would double-dip and make "always take the money" strictly correct,
