@@ -49,6 +49,39 @@ separate files, frame 2 quietly comes back a different size or off-centre from
 frame 1, and the character bobs and jitters in game. A grid makes that
 impossible: every frame shares a cell, so they cannot drift apart.
 
+### Background: use flat magenta
+
+Export with **real transparency** if the tool allows it. If it doesn't, fill the
+background with **flat pure magenta `#FF00FF`** — no gradient, no checkerboard —
+and the import will key it out. Magenta is used nowhere in this artwork, so it
+can never be confused with the art itself.
+
+**Do not rely on a checkerboard pattern.** A checkerboard drawn by an export
+tool is just grey pixels; it carries no transparency at all. The first batch
+arrived that way and had to have the background cut out by flood-filling in from
+the edges. That worked — the heavy black outline stopped the fill — but it only
+works because of that outline, and it is not something to depend on.
+
+### Importing
+
+`node scripts/tiki-art.mjs` copies from `~/Desktop/Game Assets/Tiki Wars/` into
+the game and does four things the export cannot:
+
+1. **Cuts the background** — keys out flat magenta, or flood-fills a baked-in
+   checkerboard from the edges.
+2. **Straightens the frames** — each frame is re-centred horizontally on its own
+   pixel centroid. The first batch drifted about 100px across four cells, which
+   reads as a side-to-side wobble. Vertical position is left alone, because the
+   up-and-down in a walk cycle is the bob.
+3. **Trims dead margin** — the game sizes a sprite by its cell height, so empty
+   space inside the cell shrinks the character. Cropping is done once for the
+   whole sheet so the frames stay registered and the bob survives.
+4. **Downscales** — source art at 1536px tall is nine times more than the screen
+   can ever show. The first batch was 19MB; after import it is about 2MB.
+
+Nothing needs to be named or sized a particular way on your side — the mapping
+from your filenames lives in that script.
+
 ### Laying out a sheet
 
 ```
@@ -137,8 +170,20 @@ back. These replace the back-view sprite for about a second.
 ### Weapon overlays — **back view**
 
 Drawn **over** the walk cycle so the body animates once for all four guns.
-Same canvas size and registration as the player sprites: the arms sit exactly
-where `player-walk` has them, so an overlay drops straight on top.
+
+**The walk cycle must have NO ARMS drawn into it.** This is the one hard
+requirement, and the first batch showed why: the body was drawn holding two
+pistols, so overlaying the shotgun put a shotgun *and* two pistols on screen at
+once — four arms of hardware rather than a weapon swap.
+
+So the body sheet is a bottle with legs and no arms, and **every** gun is an
+overlay — including the base pistols, which need their own `gun-pistols` file
+rather than being painted into the body.
+
+Ideally the overlays are drawn **on the same canvas size as the walk frames**,
+from the same pose. Then they land exactly where they were drawn and need no
+alignment at all. Otherwise they have to be nudged into place by hand, which has
+to be redone every time either side is re-exported.
 
 | File | Deliver | Frames | Description |
 |---|---|---|---|

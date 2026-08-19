@@ -47,12 +47,12 @@ export interface SheetDef {
 }
 
 export const SHEETS = {
-  player: { file: "player", cols: 4, rows: 2 },
+  player: { file: "player", cols: 4, rows: 1 },
   helper: { file: "helper", cols: 2, rows: 1 },
   lime: { file: "lime", cols: 4, rows: 1 },
   lemon: { file: "lemon", cols: 2, rows: 1 },
   orange: { file: "orange", cols: 2, rows: 1 },
-  kiwi: { file: "kiwi", cols: 2, rows: 1 },
+  kiwi: { file: "kiwi", cols: 4, rows: 1 },
   sugarcane: { file: "sugarcane", cols: 4, rows: 1 },
   "boss-baby-pineapple": { file: "boss-baby-pineapple", cols: 2, rows: 1 },
 } as const satisfies Record<string, SheetDef>;
@@ -83,20 +83,25 @@ export interface SpriteMeta {
 }
 
 export const SPRITES = {
-  // player.png — 4 cols x 2 rows
-  //   row 0: walk cycle, 4 frames
-  //   row 1: turn-to-camera | turn-with-shades | hit | (spare)
+  // player.png is the WALK CYCLE ONLY — 4 cols x 1 row. The turn-to-camera
+  // poses are single images and stay loose files; there is nothing to gain from
+  // forcing one-frame art into a grid.
   "player-walk": { sheet: { name: "player", row: 0 }, file: "player-walk", frames: 4, onScreen: 84 },
-  "player-turn": { sheet: { name: "player", row: 1, col: 0 }, file: "player-turn", frames: 1, onScreen: 84 },
-  "player-turn-shades": { sheet: { name: "player", row: 1, col: 1 }, file: "player-turn-shades", frames: 1, onScreen: 84 },
-  "player-hit": { sheet: { name: "player", row: 1, col: 2 }, file: "player-hit", frames: 1, onScreen: 84 },
+  "player-turn": { file: "player-turn", frames: 1, onScreen: 84 },
+  "player-turn-shades": { file: "player-turn-shades", frames: 1, onScreen: 84 },
+  "player-hit": { file: "player-hit", frames: 1, onScreen: 84 },
+
+  // Weapon overlays — drawn OVER the walk cycle so the body animates once for
+  // every gun, instead of a separate walk sheet per weapon.
+  "gun-shotgun": { file: "gun-shotgun", frames: 1, onScreen: 84 },
+  "gun-uzi": { file: "gun-uzi", frames: 1, onScreen: 84 },
 
   "helper-walk": { sheet: { name: "helper", row: 0 }, file: "helper-walk", frames: 2, onScreen: 62 },
 
   "lime-walk": { sheet: { name: "lime", row: 0 }, file: "lime-walk", frames: 4, onScreen: 60 },
   "lemon-walk": { sheet: { name: "lemon", row: 0 }, file: "lemon-walk", frames: 2, onScreen: 60 },
   "orange-walk": { sheet: { name: "orange", row: 0 }, file: "orange-walk", frames: 2, onScreen: 60 },
-  "kiwi-walk": { sheet: { name: "kiwi", row: 0 }, file: "kiwi-walk", frames: 2, onScreen: 60 },
+  "kiwi-walk": { sheet: { name: "kiwi", row: 0 }, file: "kiwi-walk", frames: 4, onScreen: 60 },
   "sugarcane-walk": { sheet: { name: "sugarcane", row: 0 }, file: "sugarcane-walk", frames: 4, onScreen: 104 },
   "boss-baby-pineapple-walk": { sheet: { name: "boss-baby-pineapple", row: 0 }, file: "boss-baby-pineapple-walk", frames: 2, onScreen: 170 },
 
@@ -768,7 +773,18 @@ function drawShopkeeper(ctx: CanvasRenderingContext2D, h: number) {
   }
 }
 
+/**
+ * Weapon overlays have NO placeholder, deliberately.
+ *
+ * The walk cycle already draws the hero holding his base pistols, so with no
+ * overlay art the sensible fallback is simply to show that — not to invent a
+ * shape. A missing shotgun therefore looks like pistols rather than like a bug.
+ */
+const noOverlay: Placeholder = () => {};
+
 const PLACEHOLDERS: Record<SpriteKey, Placeholder> = {
+  "gun-shotgun": noOverlay,
+  "gun-uzi": noOverlay,
   "player-walk": drawPlayerBack,
   "player-hit": (ctx, h) => drawPlayerBack(ctx, h, 0),
   "player-turn": drawPlayerTurn(false),

@@ -293,6 +293,26 @@ type Hits = Record<string, [number, number, number, number]>;
 const TOP_INSET = 12;
 const BOTTOM_INSET = 26;
 
+/**
+ * Whether the walk cycle art has NO arms drawn into it.
+ *
+ * The weapon overlays are wired up and working, but they cannot be switched on
+ * against the current body: it already holds two pistols, so overlaying a
+ * shotgun leaves the hero visibly carrying both. Verified on screen — it is
+ * four arms of hardware, not a weapon swap.
+ *
+ * Flip this to true when an armless walk sheet lands, and the shotgun and uzi
+ * appear with no other change. Until then the hero keeps his painted-on
+ * pistols and a gun upgrade still changes how the weapon FIRES, just not how
+ * it looks.
+ */
+const ARMLESS_BODY = false;
+
+// Hand-tuned placement for the weapon overlays. See the note where they're drawn.
+const GUN_SCALE = 1.0;
+const GUN_DX = 0;
+const GUN_DY = 0;
+
 /** Scenery is fixed to the field, so it streams past at the same rate as enemies. */
 const PALMS = [
   { nx: -1.55, phase: 0.0 }, { nx: 1.62, phase: 0.28 },
@@ -551,6 +571,26 @@ function drawField(
     py,
     { h: 84, pixelScale: PIXEL_SCALE, flash: hurt ? 0.6 : 0 }
   );
+
+  // ── Equipped weapon ────────────────────────────────────────────────────
+  // Drawn OVER the walk cycle, so the body animates once for every gun rather
+  // than needing a whole walk sheet per weapon.
+  //
+  // The offsets below are hand-tuned rather than derived. The body and the arms
+  // were authored on different canvases (768 vs 1024 wide), so there is no
+  // shared framing to compute an exact alignment from. If the body is ever
+  // redrawn WITHOUT arms on the same canvas as the weapons, these constants go
+  // away and the overlay simply lands where it was drawn.
+  const overlay: SpriteKey | null =
+    !ARMLESS_BODY || turning ? null
+      : s.gun === "shotgun" ? "gun-shotgun"
+        : s.gun === "uzi" ? "gun-uzi"
+          : null;
+  if (overlay) {
+    drawSprite(ctx, overlay, 0, px + GUN_DX, py + GUN_DY, {
+      h: 84 * GUN_SCALE, pixelScale: PIXEL_SCALE, flash: hurt ? 0.6 : 0,
+    });
+  }
 
   // ── Bullets ────────────────────────────────────────────────────────────
   // Drawn AFTER the hero, not before. A bullet spawns at z=0.02, which projects
