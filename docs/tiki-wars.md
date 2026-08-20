@@ -539,8 +539,20 @@ Money is the only gate outcome that outlives the run. That tension — take the
 power you need now, or bank toward a permanent upgrade — is the core decision of
 the game and should stay sharp at every difficulty.
 
-Gates and tier-2 blockers should not share screen time. A gate gets its own
-moment.
+### Gates get clear road
+
+Spawning **stops for a beat before a gate arrives**, and again while it is at
+the top of the field, so a gate does not come down inside a crowd. Stages are
+longer to pay for it, which is the right trade: a gate the guest cannot read is
+a decision they cannot make.
+
+A gate also **outruns the wave**, and its speed scales with the stage to keep
+doing so. Slowing it to the world's pace reads better physically — it is
+scenery — but it then spends ten seconds of every cycle on screen and gets
+overtaken by every enemy on the field, so the gap it was given at spawn closes
+before it arrives. Outrunning them means the only thing that needs clearing is
+the road *ahead* of it: one short quiet window rather than a permanent hole in
+the wave.
 
 ### Labels
 

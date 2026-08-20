@@ -161,9 +161,42 @@ export function contactNx(tier: EnemyTier): number {
 }
 export const CONTACT_DAMAGE = 18;
 
-export const STAGE_SECONDS = 46;          // spawning time before the boss shows
-export const GATE_EVERY = 11.5;
-export const GATE_SPEED = 0.30;           // z per second
+export const STAGE_SECONDS = 64;          // spawning time before the boss shows
+export const GATE_EVERY = 14;
+
+/**
+ * How fast a gate closes on the player, in z per second.
+ *
+ * Faster than anything walking, deliberately. Slowing it to the world's pace
+ * reads better physically — it is scenery, after all — but it then spends ten
+ * seconds of every cycle on screen and gets overtaken by every enemy on the
+ * field. Outrunning them means the only thing that has to be cleared is the
+ * road AHEAD of it, which is one short quiet window rather than a permanent
+ * hole in the wave.
+ */
+export const GATE_SPEED = 0.30;
+
+/**
+ * Gate speed at a given stage.
+ *
+ * SCALES, because a fixed figure stops working: enemies speed up with depth and
+ * by about stage 20 they were outrunning a 0.30 gate, at which point the whole
+ * wave overtakes it and the clear road it was given closes up behind it. Held a
+ * comfortable margin above the fastest thing walking.
+ */
+export function gateSpeed(stage: number): number {
+  return Math.max(GATE_SPEED, enemySpeed(stage) * 1.35);
+}
+
+/**
+ * Quiet road before a gate arrives.
+ *
+ * Spawning stops for this long before a gate appears, so it does not come down
+ * the field inside a crowd. Enemies walk FASTER than the gate — see below — so
+ * a gap opened in front of it keeps opening rather than closing, and the gate
+ * gets its own moment without the field having to be empty.
+ */
+export const GATE_QUIET_LEAD = 2.2;
 
 export const PTS_GRUNT = 10;
 export const PTS_BLOCKER = 50;
@@ -716,7 +749,7 @@ export const WAVE_SPREAD = 0.78;
 export const BLOCKER_AIM_SPREAD = 0.3;
 
 export function spawnInterval(stage: number): number {
-  return Math.max(0.6, 1.45 / (1 + (stage - 1) * 0.12));
+  return Math.max(0.72, 1.82 / (1 + (stage - 1) * 0.12));
 }
 
 /**
@@ -730,7 +763,7 @@ export function spawnInterval(stage: number): number {
  * This is separate from the adaptive pressure loop, which reacts to how the
  * guest is doing. This one always happens.
  */
-export const STAGE_RAMP = 0.4;
+export const STAGE_RAMP = 0.55;
 
 export function stageRamp(stageT: number): number {
   return 1 + STAGE_RAMP * Math.min(1, Math.max(0, stageT) / STAGE_SECONDS);
@@ -1265,7 +1298,13 @@ export function update(st: State, dt: number): void {
       Math.min(PRESSURE_MAX, st.pressure + err * PRESSURE_RATE * dt));
 
     st.spawnT -= dt;
-    if (st.spawnT <= 0) {
+    // Hold the road clear either side of a gate. Longer stages are the price,
+    // and worth it: a gate the guest cannot read is a decision they cannot make.
+    const gateComing = st.gateT <= GATE_QUIET_LEAD;
+    // A short hold after it appears too, so nothing spawns into the space it
+    // has just been given.
+    const gateHere = st.gate !== null && st.gate.z > 0.5;
+    if (st.spawnT <= 0 && !gateComing && !gateHere) {
       spawnWave(st);
       st.spawnT = spawnInterval(st.stage) / (st.pressure * stageRamp(st.stageT));
     }
@@ -1286,7 +1325,7 @@ export function update(st: State, dt: number): void {
   // ── Gate ──
   if (st.gate) {
     const gate = st.gate;
-    gate.z -= GATE_SPEED * dt;
+    gate.z -= gateSpeed(st.stage) * dt;
     if (gate.flipped > 0) gate.flipped -= dt;
 
     // Rounds landing on a panel cure it. The bullet is NOT consumed — a gate is
@@ -1397,8 +1436,14 @@ export function update(st: State, dt: number): void {
     // Contact.
     if (e.z <= CONTACT_Z && Math.abs(e.nx - st.playerNx) < contactNx(e.tier)) {
       damage(st, CONTACT_DAMAGE);
-      // Helpers are bodies between you and them — one is lost per hit taken.
-      if (st.helpers > 0) st.helpers -= 1;
+      // The WHOLE squad is lost, not one of them.
+      //
+      // Helpers are bodies standing alongside the hero, so anything that gets
+      // close enough to hit him has walked through all of them. Losing one per
+      // hit let a big rank soak several contacts in a row and quietly turned
+      // helpers into a second health bar; losing the lot makes getting touched
+      // hurt in a way health alone does not.
+      st.helpers = 0;
       if (e.tier === "boss") {
         // A boss is NOT consumed by hitting you. Removing it here left the
         // phase stuck on "boss" with nothing on the field and no way to clear

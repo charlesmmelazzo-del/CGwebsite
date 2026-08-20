@@ -77,12 +77,27 @@ const ENDING: Beat[] = [
 ];
 
 export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeGameProps) {
-  // The intro plays on a guest's FIRST run at this pop-up and never again. It
-  // is the hook for someone who has just walked up to the bar; for the fourth
-  // Go Again in a row it is an obstacle between them and the game.
-  const [screen, setScreen] = useState<Screen>("play");
-  const story = useRef<{ beats: Beat[]; i: number; then: Screen } | null>(null);
+  // Opens ON the story, not on gameplay.
+  //
+  // Starting in "play" and switching once the save file came back meant a frame
+  // or two of the beach rendered first, so the game appeared to start and then
+  // glitch to the logo. Whether the intro is WANTED is not known until the save
+  // file loads, so it opens showing it and a returning guest is moved straight
+  // to play — the wrong way round is visible, this way round is not.
+  const [screen, setScreen] = useState<Screen>("story");
+  const story = useRef<{ beats: Beat[]; i: number; then: Screen } | null>({
+    beats: INTRO, i: 0, then: "play",
+  });
   const [, forceRender] = useState(0);
+  /**
+   * Blocks a second advance landing on the same tap.
+   *
+   * A cutscene beat was being skipped — panel two appeared to show twice
+   * because panel three was consumed by a duplicate advance. A short guard is
+   * right regardless of where the second event came from: nobody taps a
+   * comic panel twice in a tenth of a second on purpose.
+   */
+  const lastAdvance = useRef(0);
 
   const progress = useRef<Progress>({ ...BLANK });
   const st = useRef<State>(freshState());
@@ -92,6 +107,8 @@ export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeG
   /** Set when the King dies, so the blimp escape plays at the stage break. */
   const finaleDue = useRef(false);
   const bombPulse = useRef(0);
+  /** Seconds the current story beat has been up, for demo mode's auto-advance. */
+  const storyHold = useRef(0);
 
   // Hit rectangles, written by the renderer each frame and read by the tap
   // handler. Buttons live in the canvas — the game is full-bleed and a DOM
@@ -110,9 +127,9 @@ export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeG
     async function load() {
       if (demo || !menuId || !viewerId) {
         st.current = freshState();
-        // No save file to consult, so show the story to anyone who is not the
-        // attract loop. Demo mode never gets it — it has to be the game.
-        if (!demo) startStory(INTRO, "play");
+        // No save file to consult, so the intro it already opened on stands.
+        // Demo mode keeps it too and advances itself — the attract loop is an
+        // advertisement, and the story is the best part of the pitch.
         return;
       }
       try {
@@ -128,10 +145,13 @@ export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeG
           luck: p.luck,
           score: p.totalScore,
         });
-        // First run at this pop-up only. It is the hook for someone who has
-        // just walked up to the bar; by the fourth Go Again it is an obstacle
-        // between them and the game.
-        if (p.runs === 0) startStory(INTRO, "play");
+        // A returning guest goes straight in. The intro is the hook for
+        // someone who has just walked up to the bar; by the fourth Go Again it
+        // is an obstacle between them and the game.
+        if (p.runs > 0) {
+          story.current = null;
+          setScreen("play");
+        }
       } catch {
         /* a save file that won't load must never stop someone playing */
       }
@@ -210,8 +230,12 @@ export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeG
   const nextBeat = useCallback(() => {
     const s2 = story.current;
     if (!s2) return;
+    const now = performance.now();
+    if (now - lastAdvance.current < 220) return;
+    lastAdvance.current = now;
     if (s2.i + 1 < s2.beats.length) {
       s2.i += 1;
+      storyHold.current = 0;
       forceRender((n) => n + 1);
       return;
     }
@@ -363,10 +387,21 @@ export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeG
       }
     }
 
-    if (screen === "story") drawStory(ctx, story.current, h, hits.current, t);
+    if (screen === "story") {
+      // Demo mode has no thumb, so the attract loop pages itself.
+      if (demo) {
+        storyHold.current += dt;
+        if (storyHold.current > 2.4) {
+          storyHold.current = 0;
+          lastAdvance.current = 0;      // the guard is for taps, not the clock
+          nextBeat();
+        }
+      }
+      drawStory(ctx, story.current, h, hits.current, t, demo ?? false);
+    }
     else if (screen === "shop") drawShop(ctx, s, h, hits.current, shopQuip.current, t);
     else drawField(ctx, s, h, t, hits.current, demo ?? false, bombPulse.current);
-  }, [screen, demo, botDrag, onGameOver, save, startStory]);
+  }, [screen, demo, botDrag, onGameOver, save, startStory, nextBeat]);
 
   return (
     <div className="absolute inset-0 bg-black">
@@ -1051,7 +1086,8 @@ function drawStory(
   story: { beats: Beat[]; i: number } | null,
   h: number,
   hits: Hits,
-  t: number
+  t: number,
+  demo: boolean
 ): void {
   ctx.fillStyle = "#0A0710";
   ctx.fillRect(0, 0, W, h);
@@ -1097,13 +1133,17 @@ function drawStory(
   }
 
   // Skip, top right. Always available — nobody should be trapped in a cutscene
-  // they have already seen, least of all someone standing at a bar.
-  const sw = 46, sh = 20;
-  hits.skip = [W - sw - 8, TOP_INSET - 4, sw, sh];
-  drawText(ctx, "SKIP >>", W - 10, TOP_INSET + 2, "rgba(255,255,255,0.5)", 1, "right");
-
-  drawText(ctx, "TAP", W / 2, h - BOTTOM_INSET - 26,
-    blink(t, 1.2) ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.16)", 1, "center");
+  // they have already seen, least of all someone standing at a bar. Hidden in
+  // demo mode, where there is nobody to press it.
+  if (!demo) {
+    const sw = 46, sh = 20;
+    hits.skip = [W - sw - 8, TOP_INSET - 4, sw, sh];
+    drawText(ctx, "SKIP >>", W - 10, TOP_INSET + 2, "rgba(255,255,255,0.5)", 1, "right");
+    drawText(ctx, "TAP", W / 2, h - BOTTOM_INSET - 26,
+      blink(t, 1.2) ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.16)", 1, "center");
+  } else {
+    hits.skip = [0, 0, 0, 0];
+  }
 }
 
 interface ShopRow {

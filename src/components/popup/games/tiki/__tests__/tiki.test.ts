@@ -14,7 +14,7 @@ import {
   MAX_TRAVERSE, GATE_REACH, GATE_CURE_HITS, cureGateOption, LADDERS,
   PRESSURE_TARGET_Z, PRESSURE_MIN, PRESSURE_MAX, BLOCKER_AIM_SPREAD,
   STAGGER_SPEED, BOSS_STAGGER_SPEED, stageRamp, STAGE_SECONDS,
-  TRACK_LIMIT, contactNx,
+  TRACK_LIMIT, contactNx, GATE_QUIET_LEAD, GATE_EVERY, gateSpeed, makeGate,
   PLAYER_NX_LIMIT, HELPER_NX_LIMIT, HELPER_DAMAGE, helperSlots,
   rungOf, type State,
 } from "../tikiCore";
@@ -838,6 +838,82 @@ check("a boss winds up when it gets close, so its attack art is seen", () => {
   assert.ok(boss && boss.attacking > 0, "the boss never entered its attack");
 });
 
+// ── Getting hit costs the squad ─────────────────────────────────────────────
+
+check("one contact wipes every helper, not just one", () => {
+  // Losing one per hit let a big rank soak several contacts in a row and
+  // quietly turned helpers into a second health bar.
+  const st = fresh();
+  st.gun = "flame";
+  st.helpers = MAX_HELPERS;
+  st.playerNx = 0;
+  st.enemies = [{
+    id: 1, kind: "lime", tier: "grunt", z: 0.04, nx: 0, hp: 9, maxHp: 9, speed: 0.4,
+    burn: 0, flash: 0, stagger: 0, tracks: false, aim: 0, dying: 0, attacking: 0,
+  }];
+  run(st, 0.4);
+  assert.ok(st.health < MAX_HEALTH, "the hit never landed");
+  assert.equal(st.helpers, 0, `${st.helpers} helpers survived a contact`);
+});
+
+check("armor absorbing the hit still costs the squad", () => {
+  // Armor spares the health bar, not the bottles standing next to you.
+  const st = fresh({ armor: 3 });
+  st.gun = "flame";
+  st.helpers = 3;
+  st.playerNx = 0;
+  st.enemies = [{
+    id: 1, kind: "lime", tier: "grunt", z: 0.04, nx: 0, hp: 9, maxHp: 9, speed: 0.4,
+    burn: 0, flash: 0, stagger: 0, tracks: false, aim: 0, dying: 0, attacking: 0,
+  }];
+  run(st, 0.4);
+  assert.equal(st.armor, 2, "armor did not take the hit");
+  assert.equal(st.health, MAX_HEALTH);
+  assert.equal(st.helpers, 0);
+});
+
+// ── Gates get clear road ────────────────────────────────────────────────────
+
+check("nothing spawns into the run-up to a gate", () => {
+  const st = fresh();
+  st.gateT = GATE_QUIET_LEAD - 0.1;     // a gate is imminent
+  st.spawnT = 0;
+  const before = st.enemies.length;
+  run(st, 1.5);
+  assert.equal(st.enemies.length, before,
+    "a wave spawned on top of an arriving gate");
+});
+
+check("nor into the space it has just been given", () => {
+  const st = fresh();
+  st.gate = makeGate(st);
+  st.gate.z = 0.9;
+  st.gateT = GATE_EVERY;
+  st.spawnT = 0;
+  const before = st.enemies.length;
+  run(st, 1);
+  assert.equal(st.enemies.length, before, "a wave spawned behind a fresh gate");
+});
+
+check("spawning resumes once the gate is through", () => {
+  const st = fresh();
+  st.gate = makeGate(st);
+  st.gate.z = 0.2;                     // well past the hold
+  st.gateT = GATE_EVERY;
+  st.spawnT = 0;
+  run(st, 1.2);
+  assert.ok(st.enemies.length > 0, "the road stayed empty after the gate passed");
+});
+
+check("a gate outruns the wave, so only the road ahead needs clearing", () => {
+  // Slower than the enemies and it gets overtaken by the whole field, and the
+  // gap it was given at spawn closes before it arrives.
+  for (const stage of [1, 10, 30, 60]) {
+    assert.ok(gateSpeed(stage) > enemySpeed(stage) * 1.2,
+      `stage ${stage}: gate at ${gateSpeed(stage).toFixed(2)} against enemies at ${enemySpeed(stage).toFixed(2)}`);
+  }
+});
+
 // ── Spread ──────────────────────────────────────────────────────────────────
 
 check("a wave of two straddles the middle, not both kerbs", () => {
@@ -1183,7 +1259,20 @@ check("a stage runs, sends a boss, and the boss kill is its own beat", () => {
   // This is about stage FLOW, not survival — the test player never steers, so
   // with enemies as tough as they now are it would otherwise be walked over
   // long before the boss window opens.
-  for (let i = 0; i < 47; i++) { st.health = MAX_HEALTH; run(st, 1); }
+  // Tied to the constant, not a copy of it — the stage length has changed
+  // twice and this silently stopped reaching the boss both times.
+  //
+  // Health is restored every FRAME, not every second: topping up once a second
+  // still let the run end inside one, and a dead player never reaches the boss
+  // no matter how long the test waits.
+  // Stops just AFTER the boss appears, not two seconds later: the hero fires
+  // the whole time, and with a backlog of rounds in flight the boss was being
+  // killed inside the slack — leaving the phase on "bosskill" and the assert
+  // below looking like the boss had never come.
+  for (let i = 0; i < Math.round((STAGE_SECONDS + 0.3) / DT); i++) {
+    st.health = MAX_HEALTH;
+    update(st, DT);
+  }
   assert.equal(st.phase, "boss", "no boss after the spawn window closed");
   const boss = st.enemies.find((e) => e.tier === "boss");
   assert.ok(boss, "boss phase with no boss on the field");
