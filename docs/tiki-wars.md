@@ -277,6 +277,33 @@ nothing else, so a silent subtraction would be invisible — a guest could bleed
 points all run and never be told. A floating number rises from wherever the
 enemy got through, and that is the only feedback there is.
 
+### Fewer, tougher
+
+Enemies are deliberately meaty and deliberately not numerous. A swarm of
+one-shot enemies gives the gun nothing to do — you can neither see a burst
+landing nor feel anything drop. Pouring rounds into something until it gives way
+is what the gun is there for, so a stage-one soldier is over half a second of
+sustained pistol fire and a blocker several times that.
+
+The base numbers are tuned for someone who is **struggling**. Anyone who is not
+gets more enemies from the pressure loop above, which is the right way round:
+the floor is generous and the ceiling is earned.
+
+### Where a wave lands
+
+Wave slots are the **centres of n equal lanes**, not the endpoints of the road.
+
+Endpoints were a real bug: `i / (n - 1)` gives exactly -1 and +1, so every wave
+of two spawned hard against both kerbs with the entire middle of the road empty.
+Cell centres put a pair a third of the way out and a single enemy straight down
+the middle. Waves also span only about 78% of the road, because the outer lane
+is where the guest sits to refuse a gate.
+
+Blockers each carry a small personal **aim offset**. They steer at the player,
+and every one of them steering at the exact same point converged them onto a
+single x — they arrived in single file and threw away the spread they were
+spawned with. Offsets keep them closing as a group that still occupies width.
+
 ### Soldier variants
 
 Six of them — **lime, kiwi, lemon, orange, cherry and sugar cube** — mixed

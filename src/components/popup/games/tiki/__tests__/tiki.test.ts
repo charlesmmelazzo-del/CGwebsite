@@ -10,7 +10,7 @@ import {
   enemyWalk, waveSize, worldSpeed, gruntHp, blockerHp, FOLLOW_RATE,
   BLOCKERS, BOSSES, bossFor, ELITE_BLOCKER, BOSS_ATTACK_Z,
   MAX_TRAVERSE, GATE_REACH, GATE_CURE_HITS, cureGateOption, LADDERS,
-  PRESSURE_TARGET_Z, PRESSURE_MIN, PRESSURE_MAX,
+  PRESSURE_TARGET_Z, PRESSURE_MIN, PRESSURE_MAX, BLOCKER_AIM_SPREAD,
   rungOf, type State,
 } from "../tikiCore";
 
@@ -43,7 +43,7 @@ check("a grunt survives one shot and dies to a few", () => {
   assert.ok(gruntHp(1) > 1, "grunts are back to dying in a single shot");
   st.enemies = [{
     id: 1, kind: "lime", tier: "grunt", z: 0.5, nx: 0, hp: gruntHp(1), maxHp: gruntHp(1), speed: 0,
-    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, aim: 0, dying: 0, attacking: 0,
   }];
   st.bullets = [{ z: 0.5, nx: 0, vnx: 0, damage: GUNS.pistol.damage, side: 1 }];
   update(st, DT);
@@ -73,7 +73,7 @@ check("a hit staggers the target and shoves it back", () => {
   const st = fresh();
   st.enemies = [{
     id: 1, kind: "sugarcane", tier: "blocker", z: 0.5, nx: 0, hp: 20, maxHp: 20, speed: 0.2,
-    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, aim: 0, dying: 0, attacking: 0,
   }];
   st.bullets = [{ z: 0.5, nx: 0, vnx: 0, damage: 1, side: 1 }];
   update(st, DT);
@@ -88,7 +88,7 @@ check("a staggered enemy barely advances", () => {
     st.gun = "flame";                  // no fresh bullets to re-stagger it
     st.enemies = [{
       id: 1, kind: "sugarcane", tier: "blocker", z: 0.9, nx: 0.9, hp: 20, maxHp: 20, speed: 0.4,
-      burn: 0, flash: 0, stagger, tracks: false, dying: 0, attacking: 0,
+      burn: 0, flash: 0, stagger, tracks: false, aim: 0, dying: 0, attacking: 0,
     }];
     st.playerNx = -0.9;
     run(st, 0.1);
@@ -142,7 +142,7 @@ check("an enemy that reaches the player deals contact damage", () => {
   const st = fresh();
   st.enemies = [{
     id: 1, kind: "lime", tier: "grunt", z: CONTACT_Z * 0.5, nx: 0, hp: 1, maxHp: 1, speed: 0,
-    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, aim: 0, dying: 0, attacking: 0,
   }];
   st.gun = "flame";           // no bullets, so the hit is unambiguous
   st.playerNx = 0;
@@ -154,7 +154,7 @@ check("a dodged grunt costs no HEALTH (it costs points instead)", () => {
   const st = fresh();
   st.enemies = [{
     id: 1, kind: "lime", tier: "grunt", z: 0.1, nx: -0.9, hp: 1, maxHp: 1, speed: 0.4,
-    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, aim: 0, dying: 0, attacking: 0,
   }];
   st.gun = "flame";
   st.playerNx = 0.9;
@@ -171,7 +171,7 @@ check("a grunt that walks past unkilled costs points", () => {
   st.playerNx = 1;                     // stand well clear: dodge, not contact
   st.enemies = [{
     id: 1, kind: "lime", tier: "grunt", z: 0.05, nx: -0.9, hp: 1, maxHp: 1, speed: 0.5,
-    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, aim: 0, dying: 0, attacking: 0,
   }];
   run(st, 0.6);
   assert.equal(st.score, 500 - PTS_MISS_GRUNT, "dodging a grunt was free");
@@ -186,7 +186,7 @@ check("a blocker that gets past costs more than a grunt", () => {
   st.playerNx = 1;
   st.enemies = [{
     id: 1, kind: "sugarcane", tier: "blocker", z: 0.05, nx: -0.9, hp: 9, maxHp: 9, speed: 0.5,
-    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, aim: 0, dying: 0, attacking: 0,
   }];
   run(st, 0.6);
   assert.equal(st.score, 500 - PTS_MISS_BLOCKER);
@@ -206,7 +206,7 @@ check("an enemy that HITS you is not also charged as a dodge", () => {
   st.playerNx = 0;
   st.enemies = [{
     id: 1, kind: "lime", tier: "grunt", z: 0.04, nx: 0, hp: 1, maxHp: 1, speed: 0.5,
-    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, aim: 0, dying: 0, attacking: 0,
   }];
   run(st, 0.6);
   assert.ok(st.health < MAX_HEALTH, "should have taken the hit");
@@ -221,7 +221,7 @@ check("score never goes negative from penalties", () => {
   st.playerNx = 1;
   st.enemies = [{
     id: 1, kind: "sugarcane", tier: "blocker", z: 0.05, nx: -0.9, hp: 9, maxHp: 9, speed: 0.5,
-    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, aim: 0, dying: 0, attacking: 0,
   }];
   run(st, 0.6);
   assert.equal(st.score, 0);
@@ -233,7 +233,7 @@ check("a miss leaves a floating number, because the HUD has no score", () => {
   st.playerNx = 1;
   st.enemies = [{
     id: 1, kind: "lime", tier: "grunt", z: 0.05, nx: -0.9, hp: 1, maxHp: 1, speed: 0.5,
-    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, aim: 0, dying: 0, attacking: 0,
   }];
   run(st, 0.15);
   assert.ok(st.pops.length > 0, "penalty was applied with no feedback at all");
@@ -248,7 +248,7 @@ check("a boss that touches you is NOT consumed", () => {
   st.playerNx = 0;
   st.enemies = [{
     id: 1, kind: "boss", tier: "boss", z: 0.04, nx: 0, hp: 40, maxHp: 40, speed: 0.3,
-    burn: 0, flash: 0, stagger: 0, tracks: true, dying: 0, attacking: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: true, aim: 0, dying: 0, attacking: 0,
   }];
   st.phase = "boss";
   run(st, 1.0);
@@ -263,7 +263,7 @@ check("a boss can never walk off the field and strand the stage", () => {
   st.playerNx = -1;                    // dodge as hard as possible
   st.enemies = [{
     id: 1, kind: "boss", tier: "boss", z: 0.02, nx: 1, hp: 40, maxHp: 40, speed: 0.9,
-    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, aim: 0, dying: 0, attacking: 0,
   }];
   st.phase = "boss";
   run(st, 2.0);
@@ -291,7 +291,7 @@ check("the flamethrower burns, and the burn outlives the stream", () => {
   st.playerNx = 0;
   st.enemies = [{
     id: 1, kind: "sugarcane", tier: "blocker", z: 0.2, nx: 0, hp: 40, maxHp: 40, speed: 0,
-    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, aim: 0, dying: 0, attacking: 0,
   }];
   update(st, DT);
   const e = st.enemies[0];
@@ -309,7 +309,7 @@ check("the flamethrower cannot reach the horizon", () => {
   st.playerNx = 0;
   st.enemies = [{
     id: 1, kind: "sugarcane", tier: "blocker", z: 0.9, nx: 0, hp: 40, maxHp: 40, speed: 0,
-    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, aim: 0, dying: 0, attacking: 0,
   }];
   update(st, DT);
   assert.equal(st.enemies[0].burn, 0, "flame reached far up the field");
@@ -335,8 +335,8 @@ check("a bomb clears the near field and leaves the far field alone", () => {
   const st = fresh();
   st.bombs = 1;
   st.enemies = [
-    { id: 1, kind: "sugarcane", tier: "blocker", z: 0.2, nx: 0, hp: 20, maxHp: 20, speed: 0, burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0 },
-    { id: 2, kind: "sugarcane", tier: "blocker", z: 0.9, nx: 0, hp: 20, maxHp: 20, speed: 0, burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0 },
+    { id: 1, kind: "sugarcane", tier: "blocker", z: 0.2, nx: 0, hp: 20, maxHp: 20, speed: 0, burn: 0, flash: 0, stagger: 0, tracks: false, aim: 0, dying: 0, attacking: 0 },
+    { id: 2, kind: "sugarcane", tier: "blocker", z: 0.9, nx: 0, hp: 20, maxHp: 20, speed: 0, burn: 0, flash: 0, stagger: 0, tracks: false, aim: 0, dying: 0, attacking: 0 },
   ];
   assert.ok(detonateBomb(st));
   assert.ok(st.enemies[0].hp <= 0, "near enemy survived the bomb");
@@ -717,7 +717,7 @@ check("the blender is the elite — tougher and worth more", () => {
   st.score = 0;
   const mk = (kind: string) => ({
     id: 1, kind, tier: "blocker" as const, z: 0.5, nx: 0, hp: 0, maxHp: 9,
-    speed: 0, burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
+    speed: 0, burn: 0, flash: 0, stagger: 0, tracks: false, aim: 0, dying: 0, attacking: 0,
   });
   st.enemies = [mk("sugarcane")];
   update(st, DT);
@@ -735,12 +735,78 @@ check("a boss winds up when it gets close, so its attack art is seen", () => {
   st.enemies = [{
     id: 1, kind: "baby", tier: "boss", z: BOSS_ATTACK_Z + 0.05, nx: 0.9,
     hp: 99, maxHp: 99, speed: 0.3, burn: 0, flash: 0, stagger: 0,
-    tracks: false, dying: 0, attacking: 0,
+    tracks: false, aim: 0, dying: 0, attacking: 0,
   }];
   st.playerNx = -0.9;
   run(st, 1.2);
   const boss = st.enemies.find((e) => e.tier === "boss");
   assert.ok(boss && boss.attacking > 0, "the boss never entered its attack");
+});
+
+// ── Spread ──────────────────────────────────────────────────────────────────
+
+check("a wave of two straddles the middle, not both kerbs", () => {
+  // The bug this guards: slots taken from the ENDPOINTS of the road meant
+  // i/(n-1) gave exactly -1 and +1, so every pair spawned hard against both
+  // sides with the whole middle empty.
+  const st = fresh();
+  st.stage = 1;
+  assert.equal(waveSize(1), 2);
+  const xs: number[] = [];
+  for (let i = 0; i < 200; i++) {
+    st.enemies = [];
+    st.spawnT = 0;
+    update(st, DT);
+    for (const e of st.enemies) xs.push(Math.abs(e.nx));
+  }
+  const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
+  assert.ok(mean < 0.6, `a wave of two averages ${mean.toFixed(2)} from centre — still hugging the kerbs`);
+  assert.ok(Math.max(...xs) < 0.92, "something spawned on the very edge");
+});
+
+check("waves fill the middle of the road", () => {
+  const st = fresh();
+  st.stage = 6;
+  let middle = 0, total = 0;
+  for (let i = 0; i < 4000; i++) {
+    const before = st.enemies.length;
+    update(st, DT);
+    for (let k = before; k < st.enemies.length; k++) {
+      if (Math.abs(st.enemies[k].nx) < 0.33) middle++;
+      total++;
+    }
+    st.killDepth = 0.45;
+    if (total > 600) break;
+  }
+  assert.ok(middle / total > 0.2,
+    `only ${((middle / total) * 100).toFixed(0)}% of spawns land in the middle third`);
+});
+
+check("blockers close in abreast, not nose to tail", () => {
+  const st = fresh();
+  st.stage = 10;
+  st.playerNx = 0;
+  const aims = new Set<number>();
+  for (let i = 0; i < 3000; i++) {
+    const before = st.enemies.length;
+    update(st, DT);
+    for (let k = before; k < st.enemies.length; k++) {
+      if (st.enemies[k].tier === "blocker") aims.add(st.enemies[k].aim);
+    }
+    st.killDepth = 0.45;
+    if (aims.size > 8) break;
+  }
+  assert.ok(aims.size > 3, "every blocker steers at the exact same point");
+  Array.from(aims).forEach((a) => assert.ok(Math.abs(a) <= BLOCKER_AIM_SPREAD + 1e-9));
+});
+
+check("fewer but tougher: a soldier takes real fire to drop", () => {
+  assert.ok(gruntHp(1) >= 3, "soldiers are back to dying too quickly");
+  assert.ok(blockerHp(1) >= 6, "blockers do not soak enough");
+  assert.ok(waveSize(1) <= 2, "stage one sends too many at once");
+  // A stage-1 soldier should be over half a second of sustained pistol fire.
+  const seconds = gruntHp(1) / (GUNS.pistol.rate * GUNS.pistol.damage);
+  assert.ok(seconds > 0.4, `a soldier dies in ${seconds.toFixed(2)}s — no weight to it`);
 });
 
 // ── Adaptive pressure ───────────────────────────────────────────────────────
@@ -810,7 +876,7 @@ check("a miss counts for more than a kill", () => {
   up.killDepth = PRESSURE_TARGET_Z;
   up.enemies = [{
     id: 1, kind: "lime", tier: "grunt", z: 0.9, nx: 0, hp: 0, maxHp: 2, speed: 0,
-    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, aim: 0, dying: 0, attacking: 0,
   }];
   update(up, DT);
   const kickUp = up.killDepth - PRESSURE_TARGET_Z;
@@ -821,7 +887,7 @@ check("a miss counts for more than a kill", () => {
   down.playerNx = 1;
   down.enemies = [{
     id: 1, kind: "lime", tier: "grunt", z: 0.02, nx: -0.9, hp: 1, maxHp: 2, speed: 0.6,
-    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, aim: 0, dying: 0, attacking: 0,
   }];
   run(down, 0.4);
   const kickDown = PRESSURE_TARGET_Z - down.killDepth;
@@ -910,7 +976,10 @@ check("bullets still aim true regardless of which muzzle fired", () => {
 
 check("a stage runs, sends a boss, and the boss kill is its own beat", () => {
   const st = fresh();
-  run(st, 47);
+  // This is about stage FLOW, not survival — the test player never steers, so
+  // with enemies as tough as they now are it would otherwise be walked over
+  // long before the boss window opens.
+  for (let i = 0; i < 47; i++) { st.health = MAX_HEALTH; run(st, 1); }
   assert.equal(st.phase, "boss", "no boss after the spawn window closed");
   const boss = st.enemies.find((e) => e.tier === "boss");
   assert.ok(boss, "boss phase with no boss on the field");

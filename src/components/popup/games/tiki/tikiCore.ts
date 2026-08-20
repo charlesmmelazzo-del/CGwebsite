@@ -195,12 +195,19 @@ export function bossFor(stage: number): BossName {
  *
  * A few hits restores the weight. The read is preserved by FEEDBACK instead of
  * by health: every hit flashes the target white and staggers it visibly, so
- * "this is dying" is legible without counting shots. The four fruits still all
+ * "this is dying" is legible without counting shots. All six soldiers still
  * share one health value — variety between them stays colour, silhouette and
- * speed, so a lemon never secretly takes longer than a lime.
+ * speed, so a cherry never secretly takes longer than a lime.
+ *
+ * Deliberately meaty. FEWER, TOUGHER enemies read better than a swarm of
+ * one-shot ones: you can see a burst landing, and pouring rounds into something
+ * until it drops is the feeling the gun is there for. The adaptive pressure
+ * loop is what stops that leaving the field empty — the base numbers are tuned
+ * for someone who is struggling, and the loop adds enemies for anyone who is
+ * not.
  */
 export function gruntHp(stage: number): number {
-  return 2 + Math.floor((stage - 1) / 10);
+  return 3 + Math.floor((stage - 1) / 8);
 }
 
 /**
@@ -246,6 +253,15 @@ export interface Enemy {
   stagger: number;
   /** Blockers steer toward the player; grunts walk straight. */
   tracks: boolean;
+  /**
+   * How far off the player's exact position this one aims, in nx.
+   *
+   * Every blocker steering at the same point converges them onto one x and they
+   * arrive as a single-file queue, which throws away the spread the wave was
+   * spawned with. A small personal offset keeps them closing on the guest as a
+   * GROUP that still occupies width.
+   */
+  aim: number;
   dying: number;
   /** Bosses only: counts down while the attack frames are showing. */
   attacking: number;
@@ -547,8 +563,19 @@ export function freshState(opts: StartOpts = {}): State {
 // hard, it is a maxed-out guest who CANNOT die, gets bored at stage 40, and
 // posts an unbeatable score without ever seeing an ending.
 
+/**
+ * How much of the road a wave spans.
+ *
+ * Below 1 on purpose: pushing waves right to the kerb wastes them, because the
+ * outer lane is where the guest sits to refuse a gate anyway.
+ */
+export const WAVE_SPREAD = 0.78;
+
+/** How far off the player a blocker aims, so they don't stack into a column. */
+export const BLOCKER_AIM_SPREAD = 0.3;
+
 export function spawnInterval(stage: number): number {
-  return Math.max(0.42, 1.0 / (1 + (stage - 1) * 0.13));
+  return Math.max(0.55, 1.25 / (1 + (stage - 1) * 0.12));
 }
 
 /**
@@ -560,7 +587,7 @@ export function spawnInterval(stage: number): number {
  * what actually fills the screen.
  */
 export function waveSize(stage: number): number {
-  return Math.min(6, 2 + Math.floor((stage - 1) * 0.35));
+  return Math.min(5, 2 + Math.floor((stage - 1) * 0.25));
 }
 
 // ─── Pressure ────────────────────────────────────────────────────────────────
@@ -626,11 +653,11 @@ export function enemySpeed(stage: number): number {
 }
 
 export function blockerHp(stage: number): number {
-  return 3 + Math.floor((stage - 1) * 0.8);
+  return 7 + Math.floor((stage - 1) * 1.1);
 }
 
 export function bossHp(stage: number): number {
-  return 28 + (stage - 1) * 9;
+  return 40 + (stage - 1) * 12;
 }
 
 /**
@@ -791,6 +818,9 @@ function spawnOne(st: State, nx: number): void {
       flash: 0,
       stagger: 0,
       tracks: true,
+      // Spread the convergence point so a wave of blockers arrives abreast
+      // rather than nose to tail.
+      aim: (st.rng() * 2 - 1) * BLOCKER_AIM_SPREAD,
       dying: 0,
       attacking: 0,
     });
@@ -817,6 +847,7 @@ function spawnOne(st: State, nx: number): void {
     flash: 0,
     stagger: 0,
     tracks: false,
+    aim: 0,
     dying: 0,
     attacking: 0,
   });
@@ -825,12 +856,19 @@ function spawnOne(st: State, nx: number): void {
 /** A wave, spread across the road so it cannot all be dodged with one step. */
 function spawnWave(st: State): void {
   const n = waveSize(st.stage);
-  // Evenly distributed with jitter: clumping leaves an obvious free lane, and
-  // an exact grid reads as mechanical.
+  // Slots are the CENTRES of n equal lanes, not the endpoints of the road.
+  //
+  // Endpoints were the bug: with a wave of two, i/(n-1) gives exactly -1 and
+  // +1, so every pair spawned hard against both kerbs with the whole middle of
+  // the road empty. Cell centres put a wave of two at roughly a third out from
+  // the middle and a wave of one straight down it.
   for (let i = 0; i < n; i++) {
-    const slot = n === 1 ? 0 : (i / (n - 1)) * 2 - 1;
-    const jitter = (st.rng() * 2 - 1) * (0.9 / Math.max(1, n));
-    spawnOne(st, Math.max(-0.92, Math.min(0.92, slot * 0.85 + jitter)));
+    const slot = ((i + 0.5) / n) * 2 - 1;
+    // Jitter stays inside its own lane, so spread never collapses back into a
+    // clump — an exact grid reads as mechanical, but a wandering one leaves an
+    // obvious free lane.
+    const jitter = (st.rng() * 2 - 1) * (WAVE_SPREAD / n) * 0.8;
+    spawnOne(st, Math.max(-0.9, Math.min(0.9, slot * WAVE_SPREAD + jitter)));
   }
 }
 
@@ -849,6 +887,7 @@ function spawnBoss(st: State): void {
     flash: 0,
     stagger: 0,
     tracks: true,
+    aim: 0,
     dying: 0,
     attacking: 0,
   });
@@ -1087,7 +1126,8 @@ export function update(st: State, dt: number): void {
     }
     e.z -= e.speed * (e.stagger > 0 ? STAGGER_SPEED : 1) * dt;
     if (e.tracks) {
-      const d = st.playerNx - e.nx;
+      const want = st.playerNx + e.aim;
+      const d = want - e.nx;
       e.nx += Math.sign(d) * Math.min(Math.abs(d), 0.42 * dt);
     }
 
