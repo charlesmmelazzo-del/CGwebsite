@@ -11,7 +11,7 @@ import {
   BLOCKERS, BOSSES, bossFor, ELITE_BLOCKER, BOSS_ATTACK_Z,
   MAX_TRAVERSE, GATE_REACH, GATE_CURE_HITS, cureGateOption, LADDERS,
   PRESSURE_TARGET_Z, PRESSURE_MIN, PRESSURE_MAX, BLOCKER_AIM_SPREAD,
-  PLAYER_NX_LIMIT, HELPER_NX_LIMIT, HELPER_SPACING,
+  PLAYER_NX_LIMIT, HELPER_NX_LIMIT, HELPER_SPACING, HELPER_DAMAGE,
   rungOf, type State,
 } from "../tikiCore";
 
@@ -316,7 +316,7 @@ check("the flamethrower cannot reach the horizon", () => {
   assert.equal(st.enemies[0].burn, 0, "flame reached far up the field");
 });
 
-check("helpers add bullets but never upgrade past the base pistol", () => {
+check("helpers widen the hero's fire without multiplying it", () => {
   const a = fresh();
   a.cooldown = 0;
   update(a, DT);
@@ -325,9 +325,61 @@ check("helpers add bullets but never upgrade past the base pistol", () => {
   const b = fresh();
   b.helpers = 4;
   b.cooldown = 0;
+  b.helperCooldown = 0;
   update(b, DT);
-  assert.equal(b.bullets.length, solo + 4);
-  for (const bullet of b.bullets) assert.equal(bullet.damage, GUNS.pistol.damage);
+  assert.equal(b.bullets.length, solo + 4, "helpers did not each put a round out");
+
+  const helperRounds = b.bullets.filter((x) => x.damage === HELPER_DAMAGE);
+  assert.equal(helperRounds.length, 4);
+  assert.ok(HELPER_DAMAGE < GUNS.pistol.damage,
+    "a helper round hits as hard as the hero's — three of them clear the road");
+});
+
+check("a full rank of helpers roughly doubles output, not quadruples it", () => {
+  const dps = (helpers: number) => {
+    const st = fresh();
+    st.helpers = helpers;
+    let total = 0;
+    for (let i = 0; i < 600; i++) {
+      const before = st.bullets.reduce((n, x) => n + x.damage, 0);
+      update(st, DT);
+      const after = st.bullets.reduce((n, x) => n + x.damage, 0);
+      if (after > before) total += after - before;
+    }
+    return total;
+  };
+  const alone = dps(0);
+  const full = dps(MAX_HELPERS);
+  assert.ok(full < alone * 2.6,
+    `six helpers gave ${(full / alone).toFixed(1)}x the firepower — too strong`);
+  assert.ok(full > alone * 1.4,
+    `six helpers only gave ${(full / alone).toFixed(1)}x — not worth taking`);
+});
+
+check("the hero's gun does not speed up his helpers", () => {
+  // An uzi fires far faster than a pistol; the helpers must not follow it.
+  // Counted by object identity, not by index: update() FILTERS spent rounds
+  // before adding new ones, so "everything past the old length" miscounts
+  // exactly when there are lots of bullets in flight — which is the uzi case.
+  const count = (gun: "pistol" | "uzi") => {
+    const st = fresh();
+    st.gun = gun;
+    st.helpers = 2;
+    const seen = new Set<object>();
+    let helperRounds = 0;
+    for (let i = 0; i < 600; i++) {
+      update(st, DT);
+      for (const b of st.bullets) {
+        if (seen.has(b)) continue;
+        seen.add(b);
+        if (b.damage === HELPER_DAMAGE) helperRounds++;
+      }
+    }
+    return helperRounds;
+  };
+  const withPistol = count("pistol"), withUzi = count("uzi");
+  assert.ok(Math.abs(withUzi - withPistol) <= withPistol * 0.1,
+    `helpers fired ${withUzi} rounds behind an uzi against ${withPistol} behind a pistol`);
 });
 
 // ── Bombs ───────────────────────────────────────────────────────────────────

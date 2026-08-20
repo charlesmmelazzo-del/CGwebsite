@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { drawText, textWidth } from "../arcade";
+import { drawText, pad, textWidth } from "../arcade";
 import type { ArcadeGameProps } from "../registry";
 import TikiCanvas from "./TikiCanvas";
 import { QuipBag } from "./quips";
@@ -15,7 +15,7 @@ import {
 } from "./constants";
 import {
   armorCost, bombCost, canBuyArmor, canBuyBomb, freshState, GUNS, MAX_ARMOR,
-  MAX_BOMBS, MAX_HEALTH, runDetail, update, detonateBomb, worldSpeed,
+  MAX_BOMBS, MAX_HEALTH, MAX_SCORE, runDetail, update, detonateBomb, worldSpeed,
   DRAG_RANGE, GATE_REACH, GATE_CURE_HITS, HELPER_SPACING, HELPER_NX_LIMIT,
   rungOf, isGoodOption,
   isMaxedOption, type Enemy, type GunKind, type State,
@@ -770,6 +770,18 @@ function drawHud(ctx: CanvasRenderingContext2D, s: State) {
     ctx.fillStyle = i < s.armor ? C.armor : C.armorBack;
     ctx.fillRect(bx, y + 11, pip, 4);
   }
+
+  // Score, top right.
+  //
+  // Keylined rather than plain: it sits over bright sky at the start of a stage
+  // and over dark sea by the horizon, and a single flat colour is unreadable
+  // against one or the other. It is the run's TOTAL, which carries across Go
+  // Again, so it can be a large number — hence right-aligned, growing leftward
+  // into empty sky instead of pushing anything else around.
+  // Zero-padded, matching the score screen and every cabinet ever built.
+  const score = pad(Math.min(MAX_SCORE, Math.floor(s.score)));
+  drawText(ctx, score, W - 7, y + 1, "rgba(0,0,0,0.75)", 2, "right");
+  drawText(ctx, score, W - 8, y, "#FFFFFF", 2, "right");
 }
 
 function drawBombButton(ctx: CanvasRenderingContext2D, s: State, h: number, hits: Hits) {

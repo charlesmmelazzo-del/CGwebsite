@@ -38,6 +38,16 @@ export const HELPER_SPACING = 0.38;
 export const HELPER_NX_LIMIT = 0.86;
 
 /**
+ * Damage of one helper's round, against a pistol round's 1.
+ *
+ * A fifth. Helpers carry the base pistol whatever the hero is holding, and they
+ * are meant to widen his fire rather than multiply it — a rank of six roughly
+ * doubles his output, which is worth taking without ending the difficulty
+ * curve.
+ */
+export const HELPER_DAMAGE = 0.2;
+
+/**
  * How far the hero may travel, as a fraction of the road's half-width.
  *
  * Short of the kerb, so a 66px-wide sprite stays fully on screen at full lock.
@@ -479,6 +489,11 @@ export interface State {
   gun: GunKind;
   /** Ticks down; the flamethrower is drawn while > 0. */
   firing: number;
+  /**
+   * Helpers keep their own trigger, so the hero's gun cannot speed them up.
+   * Picking up an uzi used to make them fire at its rate as well.
+   */
+  helperCooldown: number;
   /** Last muzzle used, so a one-barrel gun still alternates hands. */
   muzzle: -1 | 1;
 
@@ -553,6 +568,7 @@ export function freshState(opts: StartOpts = {}): State {
     helpers: 0,
     gun: "pistol",
     firing: 0,
+    helperCooldown: 0,
     muzzle: 1,
     enemies: [],
     bullets: [],
@@ -946,8 +962,22 @@ function fire(st: State): void {
       pierce: PIERCING[st.gun] ?? false,
     });
   }
-  // Helpers flank the player and always carry the base pistol, whatever the
-  // player is holding. They are extra bodies, not an upgrade multiplier.
+}
+
+/**
+ * Helper fire, on its OWN cadence and at a fraction of a pistol round.
+ *
+ * Both of those matter, and both were wrong. Helpers used to fire whenever the
+ * hero did, for full pistol damage each — so three of them quadrupled his
+ * firepower and cleared the road on sight, and picking up an uzi secretly made
+ * the helpers fire at thirteen rounds a second too. They are extra bodies, not
+ * a multiplier on whatever the hero is carrying.
+ *
+ * At HELPER_DAMAGE each they are worth roughly a fifth of the hero apiece, so a
+ * full rank of six is a real upgrade without being the end of the difficulty
+ * curve.
+ */
+function fireHelpers(st: State): void {
   for (let i = 0; i < st.helpers; i++) {
     const side = i % 2 === 0 ? -1 : 1;
     const rank = Math.floor(i / 2) + 1;
@@ -955,7 +985,7 @@ function fire(st: State): void {
       z: 0.02,
       nx: st.playerNx + side * rank * HELPER_SPACING,
       vnx: 0,
-      damage: 1,
+      damage: HELPER_DAMAGE,
       side: side as -1 | 1,
     });
   }
@@ -1070,6 +1100,15 @@ export function update(st: State, dt: number): void {
       fire(st);
       st.firing = 0.06;
       st.cooldown = 1 / g.rate;
+    }
+  }
+
+  // Helpers fire to the PISTOL's rate regardless of what the hero is carrying.
+  if (st.helpers > 0) {
+    st.helperCooldown -= dt;
+    if (st.helperCooldown <= 0) {
+      fireHelpers(st);
+      st.helperCooldown = 1 / GUNS.pistol.rate;
     }
   }
 

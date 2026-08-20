@@ -126,11 +126,17 @@ and every re-plant would burn a bomb.
 
 ### HUD
 
-**Health and armor. Nothing else.**
+**Health, armor and score.**
 
-No stage number, no money, no luck, no score. Money and luck are shown in the
-shop between stages, where they are actually actionable. The run itself stays
-clean - the guest is watching the field, not reading statistics.
+Health and armor sit top left, score top right, zero-padded like any cabinet.
+Nothing else: no stage number, no money, no luck. Money and luck are shown in
+the shop between stages, where they are the only things a guest can act on.
+
+The score is the run's cumulative total, which carries across Go Again, so it
+can grow long — hence right-aligned, growing leftward into empty sky rather
+than pushing anything else around. It is keylined in black because it sits over
+bright sky at the start of a stage and dark sea near the horizon, and one flat
+colour is unreadable against one or the other.
 
 ### Where the camera sits
 
@@ -439,6 +445,19 @@ holding.
 Rum-bottle companions that flank the player, move with them, and fire the base
 pistol. Killed by contact with any enemy that reaches them. **Reset to zero at
 the end of every stage.**
+
+They are extra bodies, **not a multiplier on the hero's gun**, and two separate
+things enforce that:
+
+* **Their rounds are worth a fifth of a pistol round.** At full strength they
+  used to hit as hard as the hero, so three of them quadrupled his output and
+  cleared the road on sight.
+* **They keep their own trigger, at the pistol's rate.** Firing whenever the
+  hero fired meant picking up an uzi secretly made the helpers fire at thirteen
+  rounds a second as well.
+
+A full rank of six roughly doubles his output — worth taking, and nowhere near
+the end of the difficulty curve.
 
 ---
 
