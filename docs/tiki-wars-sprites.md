@@ -69,10 +69,24 @@ the game and does four things the export cannot:
 
 1. **Cuts the background** — keys out flat magenta, or flood-fills a baked-in
    checkerboard from the edges.
-2. **Straightens the frames** — each frame is re-centred horizontally on its own
-   pixel centroid. The first batch drifted about 100px across four cells, which
-   reads as a side-to-side wobble. Vertical position is left alone, because the
-   up-and-down in a walk cycle is the bob.
+2. **Cuts the frames apart by content, and re-lays them on a real grid** — the
+   sheet is separated into blobs of touching pixels, the biggest of those are
+   taken to be the character in each pose, every smaller blob (a spark, a
+   detached star) is given to the body nearest it, and each frame is copied out
+   pixel by pixel and centred on its own FEET.
+
+   Doing it by content rather than by arithmetic is what allows the poses to
+   **overlap**, which the art genuinely does: the Baby boss winds his mace up
+   over the frame to his left and swings it through the frame to his right. Cut
+   on equal columns, that frame lost half its mace, and the severed half stayed
+   behind in the neighbouring cell — so a walking boss dragged a disembodied
+   chunk of somebody else's weapon along beside him. Registering on the feet
+   rather than on the centroid matters for the same poses: a centroid is dragged
+   sideways by whatever the character is holding, so he lurched the moment he
+   wound up.
+
+   Vertical position is left exactly as drawn, because the up-and-down in a walk
+   cycle is the bob.
 3. **Trims dead margin** — the game sizes a sprite by its cell height, so empty
    space inside the cell shrinks the character. Cropping is done once for the
    whole sheet so the frames stay registered and the bob survives.
@@ -93,12 +107,19 @@ row 1 |  turn      |  shades    |  hit       |  (spare)   |
       +------------+------------+------------+------------+
 ```
 
-* **Every cell exactly the same size.** Equal-width columns, equal-height rows.
-* **Character centred horizontally** in its cell.
-* **Feet on the bottom edge** of the cell, consistently. The game plants sprites
-  by their feet, so a character floating higher in one cell will hop.
-* **Transparent everywhere else.** No background, no frame, no guide lines, no
-  padding that varies between cells.
+* **Frames evenly spaced, left to right.** They do NOT have to be the same width
+  or line up on a grid — the import cuts them apart by what is drawn, not by
+  measurement — but keep them in order and keep them apart enough to read as
+  separate poses.
+* **A weapon may overhang into the next pose.** A raised mace or a lance is
+  fine. What is not fine is two poses whose bodies genuinely touch, because
+  then they are one shape and there is no way to tell them apart.
+* **Feet on the same line** in every cell. The game plants sprites by their
+  feet, and the import registers each frame on the feet it can see, so a pose
+  drawn floating higher will sit higher in game.
+* **Transparent everywhere else.** No background, no frame, no guide lines.
+* **No separator bars or borders drawn between frames.** They read as artwork,
+  get cut out with the pose, and there is nothing to tell them from a weapon.
 * Unused cells can be left empty.
 
 ### Enemy sheet layouts

@@ -27,35 +27,140 @@ export const MAX_BOMBS = 3;
  */
 export const MAX_HELPERS = 3;
 
-/**
- * How far a helper stands from the hero, in nx.
- *
- * Widened when the camera dropped and everything grew: at the old spacing the
- * flanking bottles overlapped his arms and the group read as one cluttered
- * shape rather than a squad.
- */
-export const HELPER_SPACING = 0.38;
+// ─── The helper cluster ──────────────────────────────────────────────────────
+//
+// A helper used to be a POSITION rather than a THING. Three slots were computed
+// from the hero's nx every frame — hero minus spacing, hero plus spacing, and
+// so on — and whatever was standing in slot two was drawn there and fired from
+// there. Two things followed from that, and both were visible:
+//
+//   * The squad was welded to the hero. It could not lean, lag, spread or
+//     settle, because there was nothing there to have momentum.
+//   * A slot that would have fallen off the side of the screen was MIRRORED to
+//     the other side. Walk to the right kerb and the helper on your right
+//     stopped existing and an identical one appeared on your left, mid-burst,
+//     shooting up the far lane. Nothing moved between the two places. It was a
+//     teleport, and it happened exactly when the guest was concentrating.
+//
+// So a helper is a body now: a position, a velocity, and a place on a ring
+// around the hero that it would LIKE to be. A spring pulls it toward that
+// place, drag settles it, the hero's own movement shoves it, its neighbours
+// keep it at arm's length, and the kerb stops it. Nothing is ever assigned a
+// position, so nothing can jump: when the hero pins himself to the kerb the
+// ring TURNS, and the squad swings around him and re-forms on the open side.
 
 /**
  * How far out a helper may sit.
  *
- * Wider than the hero's own limit, because a helper is a smaller sprite and
- * flanks him — but still short of the screen edge. Without it, the hero at full
- * lock pushed his outside helper clean off the side of the display.
+ * Short of the screen edge, and it can be wider than the hero's own limit
+ * because a helper is a much smaller sprite — measured from the imported sheet,
+ * a helper reaches about 23 logical px either side of its feet against the
+ * hero's 36.
  */
 export const HELPER_NX_LIMIT = 0.86;
 
 /**
- * Where each helper stands, given where the hero is.
+ * The ring the squad floats on: how far across the road, and how far up it.
  *
- * They flank him, alternating sides — but a slot that would fall off the screen
- * is MIRRORED to the other side rather than clamped. Clamping stacked them: at
- * full lock the outside helper was pinned to the screen edge, which is a few
- * pixels from the hero himself, so the squad collapsed into one overlapping
- * shape exactly when the guest was dodging hardest.
- *
- * Shared by the rules and the renderer so a helper is drawn where it shoots.
+ * The depth radius is small next to the lateral one because depth is expensive
+ * on screen — the perspective divide turns a tenth of z into most of the height
+ * of the hero, so a ring that is round in field units is enormously tall in
+ * pixels. These two numbers are what make the cluster read as a group standing
+ * AROUND him rather than a queue in front of him.
  */
+export const HELPER_RING_NX = 0.44;
+export const HELPER_RING_Z = 0.042;
+
+/**
+ * Depth of the ring's centre.
+ *
+ * Far enough up-field that the whole ring stays in front of the hero. It cannot
+ * go behind him: z is 0 at his feet and the projection has no meaning below
+ * that — a negative depth puts a helper under the bottom edge of the screen at
+ * twice the size of everything else.
+ */
+export const HELPER_RING_Z0 = 0.062;
+
+/**
+ * Where each helper sits on the ring, by squad size.
+ *
+ * Angles, with 0 to the hero's right, a quarter turn up-field, half a turn to
+ * his left. Two flank him; the third takes the point. Nobody is placed at
+ * three-quarters — that is the spot between the hero and the camera, and a
+ * helper there is drawn on top of him.
+ */
+const RING: number[][] = [[], [0], [0, Math.PI], [0, Math.PI, Math.PI / 2]];
+
+function ringAngles(n: number): number[] {
+  if (n <= 0) return [];
+  if (n < RING.length) return RING[n];
+  // More than the ladder can hand out. Spread them evenly rather than fail:
+  // the tests push the count past the cap to measure firepower.
+  return Array.from({ length: n }, (_, i) => (i / n) * Math.PI * 2);
+}
+
+/**
+ * How far the ring turns when the hero is pinned to a kerb, in radians.
+ *
+ * This is the whole answer to the teleport. Rather than reflecting a helper
+ * that has run out of road, the FORMATION rotates away from the wall, so the
+ * place the outside helper is heading for slides up-field and around to the
+ * open side. He walks the arc, because he is following a spring rather than
+ * being assigned a slot.
+ *
+ * A little over a quarter turn. Less and the outside place is still off the
+ * road at full lock; much more and the squad spins in a way nothing physical
+ * would.
+ */
+export const HELPER_SWING = 1.9;
+
+/**
+ * How far the ring's centre is shoved off the kerb, in nx.
+ *
+ * Turning the ring is not enough on its own. A ring is symmetric: rotate it as
+ * far as you like and there is still somebody on the wall side, and with the
+ * hero parked against the kerb that somebody has nowhere to stand but on top of
+ * him. So the whole cluster also slides INBOARD as he leans, which is what a
+ * crowd of people pressed against a wall would actually do.
+ */
+export const HELPER_LEAN_SHIFT = 0.32;
+
+/** Spring pulling a helper to its place, and the drag that settles it. */
+const HELPER_PULL = 55;
+const HELPER_DRAG = 12;
+
+/**
+ * How much of the hero's own movement is left for the springs to catch up on.
+ *
+ * The squad's places are measured FROM the hero, so without this they would
+ * track him perfectly rigidly — he can cross the road in a third of a second
+ * and a rigidly-attached cluster looks welded on. Holding a little over half of
+ * each step back makes them swing out behind a dash and gather in again, which
+ * is the whole "floating around him" of it. Simulating them in absolute
+ * position instead would be the same thing with no upper bound on the lag, and
+ * they would simply be left behind.
+ */
+const HELPER_LAG = 0.58;
+
+/**
+ * Personal space, in nx, and how hard it is defended.
+ *
+ * Applied between helpers and between a helper and the hero. Springs alone let
+ * two of them settle in the same place while the ring is turning, which is the
+ * overlapping-blob look the slots had at the kerb.
+ */
+const HELPER_SPACE = 0.3;
+const HELPER_SHOVE = 26;
+
+/**
+ * Depth counted in units of the lateral radius.
+ *
+ * Distances between helpers have to be measured in some shared unit or the
+ * separation rule is nonsense: a tenth of z and a tenth of nx are nowhere near
+ * the same distance on screen.
+ */
+const Z_TO_NX = HELPER_RING_NX / HELPER_RING_Z;
+
 /**
  * Damage of one helper's round, against a pistol round's 1.
  *
@@ -66,47 +171,144 @@ export const HELPER_NX_LIMIT = 0.86;
  */
 export const HELPER_DAMAGE = 0.2;
 
-export function helperSlots(playerNx: number, count: number): number[] {
-  const out: number[] = [];
-  // Each side keeps its OWN rank count. Mirroring a blocked slot to the same
-  // rank on the other side put two helpers in exactly the same place — the
-  // mirrored one has to take the next free slot over there, not the twin of the
-  // one it could not use.
-  let left = 0;
-  let right = 0;
-
-  const at = (isLeft: boolean): number | null => {
-    const rank = (isLeft ? left : right) + 1;
-    const nx = playerNx + (isLeft ? -1 : 1) * rank * HELPER_SPACING;
-    return Math.abs(nx) <= HELPER_NX_LIMIT ? nx : null;
-  };
-
-  for (let i = 0; i < count; i++) {
-    const preferLeft = i % 2 === 0;
-    let nx = at(preferLeft);
-    let onLeft = preferLeft;
-
-    if (nx === null) {
-      nx = at(!preferLeft);
-      onLeft = !preferLeft;
-    }
-    if (nx === null) {
-      // Both sides out of room — a full rank with the hero at the kerb. Take
-      // the next rank inward and let it clamp; better bunched than off screen.
-      const rank = Math.max(left, right) + 1;
-      onLeft = preferLeft;
-      nx = Math.max(-HELPER_NX_LIMIT, Math.min(HELPER_NX_LIMIT,
-        playerNx + (onLeft ? -1 : 1) * rank * HELPER_SPACING));
-    }
-
-    if (onLeft) left++;
-    else right++;
-    out.push(nx);
-  }
-  return out;
+/** One of the bottles flanking the hero. */
+export interface Helper {
+  /** Position across the road, RELATIVE to the hero. */
+  dnx: number;
+  /** Depth. Absolute, because the hero is always at 0. */
+  z: number;
+  vnx: number;
+  vz: number;
+  /** Its own phase, so the cluster breathes out of step with itself. */
+  phase: number;
 }
 
-export const PLAYER_NX_LIMIT = 0.81;
+/**
+ * Where the squad would like to be, relative to the hero.
+ *
+ * Shared by the rules and the renderer, and by nothing else: these are targets,
+ * not positions. Where a helper actually IS lives in state.helperUnits, which
+ * is what both fires and is drawn.
+ */
+export function helperTargets(
+  playerNx: number,
+  units: Helper[],
+  t: number
+): { dnx: number; z: number }[] {
+  const angles = ringAngles(units.length);
+  // Turn the ring away from whichever kerb the hero is leaning on. Squared, so
+  // the formation is undisturbed through the middle of the road and only swings
+  // when he is genuinely running out of room.
+  const lean = playerNx / PLAYER_NX_LIMIT;
+  const pinned = Math.sign(lean) * Math.min(1, lean * lean);
+  const swing = HELPER_SWING * pinned;
+  const shift = -HELPER_LEAN_SHIFT * pinned;
+
+  return angles.map((base, i) => {
+    const u = units[i];
+    // A slow wander so the cluster never looks welded into a diagram. Each
+    // helper carries its own phase, so they drift out of step with each other.
+    const a = base + swing + Math.sin(t * 0.8 + u.phase) * 0.2;
+    const r = 1 + Math.sin(t * 0.62 + u.phase * 1.7) * 0.07;
+    return {
+      dnx: shift + HELPER_RING_NX * r * Math.cos(a),
+      z: HELPER_RING_Z0 + HELPER_RING_Z * r * Math.sin(a),
+    };
+  });
+}
+
+/** Keep the bodies in step with the count the ladder has handed out. */
+function syncHelpers(st: State): void {
+  while (st.helperUnits.length > st.helpers) st.helperUnits.pop();
+  while (st.helperUnits.length < st.helpers) {
+    // A new one arrives AT the hero and is pushed out to its place by the
+    // spring, which reads as it running up and falling in beside him. Dropping
+    // it straight into formation made a helper wink into existence.
+    st.helperUnits.push({
+      dnx: 0, z: 0.01, vnx: 0, vz: 0, phase: st.rng() * Math.PI * 2,
+    });
+  }
+}
+
+/**
+ * Move the squad.
+ *
+ * `heroStep` is how far the hero moved this frame: the places are measured from
+ * him, so his movement is what shoves them.
+ */
+function stepHelpers(st: State, dt: number, heroStep: number): void {
+  syncHelpers(st);
+  const units = st.helperUnits;
+  if (units.length === 0) return;
+
+  const targets = helperTargets(st.playerNx, units, st.t);
+
+  for (let i = 0; i < units.length; i++) {
+    const u = units[i];
+    const want = targets[i];
+
+    // The hero's step, minus what the helper keeps up with by itself.
+    u.dnx -= heroStep * HELPER_LAG;
+
+    let ax = (want.dnx - u.dnx) * HELPER_PULL - u.vnx * HELPER_DRAG;
+    let az = (want.z - u.z) * HELPER_PULL - u.vz * HELPER_DRAG;
+
+    // Elbow room. Measured in one shared unit so a helper directly up-field is
+    // as far away as one the same distance to the side.
+    const shove = (dx: number, dz: number) => {
+      const zz = dz * Z_TO_NX;
+      const d = Math.hypot(dx, zz);
+      if (d >= HELPER_SPACE) return;
+      // Two bodies in exactly the same place have no direction to separate in;
+      // push sideways rather than dividing by zero.
+      const k = (HELPER_SPACE - d) * HELPER_SHOVE;
+      if (d < 1e-4) { ax += k; return; }
+      ax += (dx / d) * k;
+      az += (zz / d) * k / Z_TO_NX;
+    };
+    // The hero sits at the origin of this space: relative nx 0, depth 0.
+    shove(u.dnx, u.z);
+    for (let j = 0; j < units.length; j++) {
+      if (j === i) continue;
+      shove(u.dnx - units[j].dnx, u.z - units[j].z);
+    }
+
+    u.vnx += ax * dt;
+    u.vz += az * dt;
+    u.dnx += u.vnx * dt;
+    u.z += u.vz * dt;
+
+    // The kerb. A wall, not a slot: it stops the body where it is instead of
+    // moving it somewhere else, and the ring has already turned to take the
+    // squad away from it.
+    const nx = st.playerNx + u.dnx;
+    if (nx > HELPER_NX_LIMIT) { u.dnx = HELPER_NX_LIMIT - st.playerNx; if (u.vnx > 0) u.vnx = 0; }
+    if (nx < -HELPER_NX_LIMIT) { u.dnx = -HELPER_NX_LIMIT - st.playerNx; if (u.vnx < 0) u.vnx = 0; }
+    // Depth is fenced for the same reason: the projection has no meaning behind
+    // the hero, and a helper too far up the field is a stranger, not a squad.
+    if (u.z < 0.008) { u.z = 0.008; if (u.vz < 0) u.vz = 0; }
+    if (u.z > 0.16) { u.z = 0.16; if (u.vz > 0) u.vz = 0; }
+  }
+}
+
+/** Where a helper actually is, in field coordinates. */
+export function helperAt(st: State, u: Helper): { nx: number; z: number } {
+  return { nx: st.playerNx + u.dnx, z: u.z };
+}
+
+/**
+ * How far the hero may lean into the road.
+ *
+ * Measured from the art rather than chosen: on the imported sheets his walk
+ * poses reach 36 logical px right of his feet (the shotgun barrel) and 31 px
+ * left, and the celebration and hit poses throw an arm out to 43. The road is
+ * 126 px either side of centre on a 270 px screen, so 0.75 is the furthest out
+ * he can stand with the WHOLE of him still on the display. At 0.81 the gun in
+ * his outside hand was sliced off by the edge of the screen every time the
+ * guest hugged the kerb — which is most of the time, because that is where you
+ * go to refuse a gate.
+ */
+export const PLAYER_NX_LIMIT = 0.75;
 
 export const PLAYER_SPEED = 2.6;          // keyboard only: nx per second
 
@@ -155,11 +357,18 @@ export const CONTACT_NX = 0.30;           // how wide a body is, in nx
  * of the boss off the side of the display. Grunts do not track, so they are
  * not here.
  *
- * The boss figure is set by the WIDEST of them, measured from the imported
- * sheets rather than assumed: Baby and Knight are about 189px where King is
- * 176, and a limit fitted to the narrowest clipped the other two.
+ * Both figures come from measuring the WIDEST of them on the imported sheets,
+ * from the feet each frame is registered on, rather than from a guess: the
+ * broadest boss walk pose reaches 92 logical px to one side of its feet, and
+ * the broadest blocker 58. The road is 126px either side of centre and the
+ * screen is 135, so what fits is (135 - reach) / 126.
+ *
+ * The blocker figure used to be 0.74, which is what a blocker would need to
+ * follow the guest almost to the kerb — and at 0.74 the widest of them, the
+ * blender and the milk carton, were being sliced down one side by the edge of
+ * the screen while they walked.
  */
-export const TRACK_LIMIT: Record<string, number> = { blocker: 0.74, boss: 0.30 };
+export const TRACK_LIMIT: Record<string, number> = { blocker: 0.61, boss: 0.30 };
 
 /**
  * Contact half-width, by tier.
@@ -459,6 +668,13 @@ export interface Bullet {
   damage: number;
   /** Which gun it left. Purely so the renderer can start it at that muzzle. */
   side: -1 | 1;
+  /**
+   * Fired by a helper rather than by the hero.
+   *
+   * The renderer starts a round at the muzzle of the gun that fired it, and a
+   * helper's gun is neither in the hero's hand nor at his scale.
+   */
+  fromHelper?: boolean;
   /** Carries on through what it hits, instead of stopping at the first. */
   pierce?: boolean;
   /**
@@ -650,6 +866,15 @@ export interface State {
   luck: number;
   bombs: number;
   helpers: number;
+  /**
+   * The bodies themselves.
+   *
+   * Kept alongside the count rather than derived from it: a helper has
+   * momentum and a place it is heading for, and neither survives being
+   * recomputed from a number every frame. The count is what the gate ladder
+   * changes; these are what fire and what get drawn.
+   */
+  helperUnits: Helper[];
   gun: GunKind;
   /** Set when a clover is bought, cleared on entering the next shop. */
   cloverBought: boolean;
@@ -749,6 +974,7 @@ export function freshState(opts: StartOpts = {}): State {
     luck: Math.min(100, opts.luck ?? 0),
     bombs: 0,
     helpers: 0,
+    helperUnits: [],
     gun: "pistol",
     cloverBought: false,
     firing: 0,
@@ -1299,14 +1525,17 @@ function fire(st: State): void {
  * curve.
  */
 function fireHelpers(st: State): void {
-  const slots = helperSlots(st.playerNx, st.helpers);
-  for (const nx of slots) {
+  for (const u of st.helperUnits) {
+    // From where the helper IS, at the depth it is standing at — not from a
+    // slot beside the hero. A round that starts anywhere else gives the game
+    // away the moment the squad is mid-swing around him.
     st.bullets.push({
-      z: 0.02,
-      nx,
+      z: Math.max(0.02, u.z),
+      nx: st.playerNx + u.dnx,
       vnx: 0,
       damage: HELPER_DAMAGE,
-      side: nx < st.playerNx ? -1 : 1,
+      side: u.dnx < 0 ? -1 : 1,
+      fromHelper: true,
     });
   }
 }
@@ -1397,6 +1626,7 @@ export function update(st: State, dt: number): void {
   }
 
   // ── Player ──
+  const heroWas = st.playerNx;
   if (st.targetNx !== null) {
     // Fast enough to feel like the character is pinned to the thumb, smoothed
     // just enough that a jittery touch doesn't judder the sprite.
@@ -1409,6 +1639,10 @@ export function update(st: State, dt: number): void {
   }
   if (st.playerNx < -PLAYER_NX_LIMIT) st.playerNx = -PLAYER_NX_LIMIT;
   if (st.playerNx > PLAYER_NX_LIMIT) st.playerNx = PLAYER_NX_LIMIT;
+
+  // ── The squad ──
+  // After the hero has moved, so his step this frame is what shoves them.
+  stepHelpers(st, dt, st.playerNx - heroWas);
 
   // ── Firing ──
   const g = GUNS[st.gun];

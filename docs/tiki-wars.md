@@ -325,12 +325,18 @@ cramped purely because the hero grew. Separating them widened the road by about
 
 Everything that sits near the edge has its own limit, sized to its own sprite:
 
+Every figure below is **measured off the imported sheets**, from the feet each
+frame is registered on, rather than estimated. The road is 126px either side of
+centre on a 270px screen, so a sprite that reaches `r` px past its feet can
+stand at `(135 - r) / 126`.
+
 | | Limit | Why |
 |---|---|---|
-| Hero | 0.81 | ~64px wide, and must clear the screen edge at full lock |
-| Soldier spawns | 0.86 | Narrow sprites, so they can use more of the road |
-| Blocker spawns | 0.74 | ~84px across — a shared limit would hang a shoulder off |
-| Helpers | 0.86 | Flank the hero, so they sit further out than he does |
+| Hero | 0.75 | Reaches 36px right of his feet with the shotgun, 43px in the celebration pose |
+| Soldier spawns | 0.86 | Narrow sprites — 37px at the widest — so they can use more of the road |
+| Blocker tracking | 0.61 | The blender and the milk carton reach 58px |
+| Boss tracking | 0.30 | The knight reaches 92px, and a boss is nearly three-quarters of the screen |
+| Helpers | 0.86 | Much the smallest of the cast at 23px, so they can sit outside the hero |
 
 One number for all of them either lets the widest sprite overhang or needlessly
 keeps the narrowest away from the kerb.
@@ -462,13 +468,30 @@ Rum-bottle companions that flank the player, move with them, and fire the base
 pistol. Killed by contact with any enemy that reaches them. **Reset to zero at
 the end of every stage.**
 
-Helper positions come from one shared function, so a helper is drawn exactly
-where it shoots. A slot that would fall off the screen is **mirrored to the
-other side rather than clamped** — clamping pinned the outside helper to the
-screen edge, a few pixels from the hero, so the squad collapsed into one
-overlapping shape precisely when the guest was dodging hardest. Each side keeps
-its own rank count, or the mirrored helper lands on top of the one it was
-avoiding.
+**A helper is a body, not a slot.** It has a position, a velocity, and a place
+on a ring around the hero that it would like to be; a spring pulls it there,
+drag settles it, the hero's own movement shoves it, its neighbours keep it at
+arm's length and the kerb stops it. Nothing is ever assigned a position, so
+nothing can jump — the squad drifts, swings and gathers like objects floating
+around him, and it fires from wherever it actually is.
+
+They used to be three positions computed from the hero's nx every frame, and a
+slot that ran off the side of the road was MIRRORED to the other side. Walking
+to the right kerb made the helper on your right vanish and an identical one
+appear on your left, mid-burst, shooting up the far lane, with no motion in
+between. That teleport is what the physics replaces.
+
+Being pinned to a kerb is handled by the FORMATION rather than by the helper.
+The ring both **turns** (a little over a quarter turn at full lock) and
+**slides inboard**, so the places the squad is heading for move up-field and
+around to the open side, and each bottle walks the arc to its new one. Turning
+alone is not enough: a ring is symmetric, so however far it rotates somebody is
+still on the wall side with nowhere to stand but on top of the hero.
+
+The ring is much wider across the road than it is deep — a tenth of z is most of
+the hero's height on screen — and its centre sits far enough up-field that the
+whole of it stays in FRONT of him. It cannot go behind: depth is 0 at his feet
+and the projection has no meaning below that.
 
 **Capped at three, and the rarest thing a gate offers.** Six was reachable in a
 single run and it showed: a full rank plus a decent gun cleared the road faster

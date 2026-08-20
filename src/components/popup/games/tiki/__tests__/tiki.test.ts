@@ -16,7 +16,7 @@ import {
   PRESSURE_TARGET_Z, PRESSURE_MIN, PRESSURE_MAX, BLOCKER_AIM_SPREAD,
   STAGGER_SPEED, BOSS_STAGGER_SPEED, stageRamp, STAGE_SECONDS,
   TRACK_LIMIT, contactNx, gateSpeed, buildWaveCycle, makeGate,
-  PLAYER_NX_LIMIT, HELPER_NX_LIMIT, HELPER_DAMAGE, helperSlots,
+  PLAYER_NX_LIMIT, HELPER_NX_LIMIT, HELPER_DAMAGE,
   rungOf, type State,
 } from "../tikiCore";
 
@@ -734,32 +734,101 @@ check("steering stops short of the kerb, so the hero stays on screen", () => {
   assert.ok(st.playerNx >= -PLAYER_NX_LIMIT - 1e-9);
 });
 
+/** Where the squad actually is, in road coordinates. */
+const squadNx = (st: State) => st.helperUnits.map((u) => st.playerNx + u.dnx);
+
+/** Settle a squad of `n` with the hero parked at `nx`. */
+function squadAt(nx: number, n: number): State {
+  const st = fresh();
+  st.helpers = n;
+  st.targetNx = nx;
+  run(st, 3);
+  return st;
+}
+
 check("a helper never gets pushed off the screen", () => {
   for (const nx of [-PLAYER_NX_LIMIT, -0.4, 0, 0.4, PLAYER_NX_LIMIT]) {
-    for (const slot of helperSlots(nx, MAX_HELPERS)) {
-      assert.ok(Math.abs(slot) <= HELPER_NX_LIMIT + 1e-9,
-        `helper at ${slot.toFixed(2)} with the hero at ${nx}`);
+    const st = squadAt(nx, MAX_HELPERS);
+    for (const at of squadNx(st)) {
+      assert.ok(Math.abs(at) <= HELPER_NX_LIMIT + 1e-9,
+        `helper at ${at.toFixed(2)} with the hero at ${nx}`);
     }
   }
 });
 
-check("helpers flank the hero instead of stacking on him at the kerb", () => {
-  // Clamping put the outside helper on the screen edge, a few pixels from the
-  // hero himself, so the squad collapsed into one overlapping shape exactly
-  // when the guest was dodging hardest. Mirrored slots keep them apart.
-  const slots = helperSlots(PLAYER_NX_LIMIT, 4);
-  for (const slot of slots) {
-    assert.ok(Math.abs(slot - PLAYER_NX_LIMIT) > 0.2,
-      `a helper sits ${Math.abs(slot - PLAYER_NX_LIMIT).toFixed(2)} from the hero — on top of him`);
+check("a helper never teleports across the hero", () => {
+  // The bug this replaces: a place that ran off the side of the road was
+  // MIRRORED to the other side, so hugging the kerb made the helper on your
+  // right vanish and an identical one appear on your left, mid-burst. Nothing
+  // moved in between. Whatever the squad does now, it has to do it by moving.
+  const st = fresh();
+  st.helpers = MAX_HELPERS;
+  run(st, 2);                             // let them form up first
+  let last = squadNx(st);
+  // Slam from one kerb to the other and back, which is the worst case there is.
+  for (const target of [PLAYER_NX_LIMIT, -PLAYER_NX_LIMIT, PLAYER_NX_LIMIT]) {
+    st.targetNx = target;
+    for (let i = 0; i < Math.round(1.2 / DT); i++) {
+      update(st, DT);
+      const now = squadNx(st);
+      for (let k = 0; k < now.length; k++) {
+        assert.ok(Math.abs(now[k] - last[k]) < 0.2,
+          `a helper jumped ${(now[k] - last[k]).toFixed(2)} across the road in one frame`);
+      }
+      last = now;
+    }
   }
-  assert.equal(new Set(slots.map((x) => x.toFixed(3))).size, slots.length,
-    "two helpers landed in the same place");
 });
 
-check("helpers still flank both sides in open road", () => {
-  const slots = helperSlots(0, 2);
-  assert.ok(Math.min(...slots) < 0 && Math.max(...slots) > 0,
+check("the squad keeps its shape at the kerb instead of stacking on the hero", () => {
+  // Clamping used to pin the outside helper to the screen edge, a few pixels
+  // from the hero himself, so the squad collapsed into one overlapping blob
+  // exactly when the guest was dodging hardest. The ring turns instead.
+  const st = squadAt(PLAYER_NX_LIMIT, MAX_HELPERS);
+  const at = squadNx(st);
+  // Distance measured across the road AND up it, in one unit: a helper further
+  // up the field is genuinely further away on screen, and the shove that keeps
+  // them apart is written in the same terms.
+  const apart = (dnx: number, dz: number) => Math.hypot(dnx, dz * 10.5);
+  for (let i = 0; i < at.length; i++) {
+    assert.ok(apart(at[i] - st.playerNx, st.helperUnits[i].z) > 0.28,
+      `a helper is standing on the hero at the kerb`);
+    for (let j = i + 1; j < at.length; j++) {
+      assert.ok(apart(at[i] - at[j], st.helperUnits[i].z - st.helperUnits[j].z) > 0.2,
+        `two helpers ended up in the same place — one shape, not a squad`);
+    }
+  }
+});
+
+check("helpers flank both sides in open road", () => {
+  const st = squadAt(0, 2);
+  const at = squadNx(st);
+  assert.ok(Math.min(...at) < 0 && Math.max(...at) > 0,
     "both helpers ended up on the same side with the whole road available");
+});
+
+check("the squad floats in FRONT of the hero, never behind him", () => {
+  // z is 0 at the hero's feet and the projection has no meaning below that: a
+  // negative depth throws a helper off the bottom of the screen at twice
+  // everyone else's size.
+  for (const nx of [-PLAYER_NX_LIMIT, 0, PLAYER_NX_LIMIT]) {
+    const st = squadAt(nx, MAX_HELPERS);
+    for (const u of st.helperUnits) {
+      assert.ok(u.z > 0, `a helper stood at depth ${u.z.toFixed(3)}`);
+    }
+  }
+});
+
+check("a helper fires from where it is standing", () => {
+  const st = squadAt(0.5, MAX_HELPERS);
+  st.bullets = [];
+  st.helperCooldown = 0;
+  update(st, DT);
+  const at = squadNx(st);
+  for (const b of st.bullets.filter((x) => x.fromHelper)) {
+    assert.ok(at.some((a) => Math.abs(a - b.nx) < 0.02),
+      `a helper's round left from ${b.nx.toFixed(2)}, where no helper is standing`);
+  }
 });
 
 check("the road is wider than the hero can travel", () => {

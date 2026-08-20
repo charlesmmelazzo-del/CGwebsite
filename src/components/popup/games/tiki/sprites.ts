@@ -156,7 +156,63 @@ export const PLAYER_H = 114;
 export const SOLDIER_H = 80;
 export const BLOCKER_H = 140;
 export const BOSS_H = 226;
-export const HELPER_H = 84;
+/**
+ * The helper, at the depth its ring sits at rather than at the player's feet.
+ *
+ * Bigger than it looks: a helper is drawn at the size ITS OWN depth calls for
+ * now that the squad floats up-field of the hero, and the ring's centre scales
+ * a sprite to about four fifths. 104 there is the 84 it used to be drawn at
+ * flat, so the squad kept the size it was tuned to look right at.
+ */
+export const HELPER_H = 104;
+
+// ─── Muzzles ─────────────────────────────────────────────────────────────────
+//
+// Where each weapon actually ENDS, so the flash comes out of the barrel.
+//
+// It used to be a flat twelve pixels either side of the hero's middle, and at
+// twelve pixels the flash goes off inside the bottle: he holds his pistols
+// akimbo at arm's length, which is nearer thirty. The shotgun and the laser he
+// holds in ONE hand, up and out to his right, so a flash on both sides was
+// half of it firing out of his empty hand.
+//
+// Both numbers are fractions of the sprite's drawn HEIGHT, not of its width.
+// The cell around a character is only as wide as its widest pose needs — a
+// shotgun sheet is wider than a pistol sheet — so a fraction of the width would
+// mean something different on every sheet. Height is the one dimension the game
+// actually sets.
+//
+//   x  from the feet, positive to the hero's right
+//   y  up from the ground line
+//
+// Measured off the imported sheets: the outermost opaque pixel in the band
+// where the arms are, and the top of the artwork above it. Re-measure them if
+// the character is redrawn — scripts/tiki-art.mjs registers every frame on the
+// feet, so these hold across a re-import of the same art.
+export interface Muzzle { x: number; y: number }
+
+export const MUZZLES: Record<GunArt, Muzzle[]> = {
+  pistols: [{ x: -0.274, y: 0.608 }, { x: 0.243, y: 0.646 }],
+  uzi: [{ x: -0.255, y: 0.632 }, { x: 0.248, y: 0.635 }],
+  // One barrel, right hand, held high.
+  shotgun: [{ x: 0.311, y: 0.736 }],
+  laser: [{ x: 0.314, y: 0.674 }],
+  // The flamethrower's nozzle is in his LEFT hand, low.
+  flame: [{ x: -0.252, y: 0.535 }],
+};
+
+/**
+ * The muzzle a round on this side comes out of.
+ *
+ * A one-barrelled gun has one answer whichever side the rules picked, which is
+ * the point: the shotgun alternates `side` so its pellets do not stack, and all
+ * three still leave the same barrel.
+ */
+export function muzzleFor(gun: GunArt, side: -1 | 1): Muzzle {
+  const list = MUZZLES[gun];
+  if (list.length === 1) return list[0];
+  return side < 0 ? list[0] : list[1];
+}
 
 export const SPRITES: Record<SpriteKey, SpriteMeta> = {
   // The turn-to-camera poses are single images and stay loose files.
@@ -471,10 +527,19 @@ function paint(
 ): void {
   const art = resolve(key, frame, h, pixelScale);
   if (art) {
-    const w = (art.width / art.height) * h;
     ctx.save();
     ctx.scale(1 / pixelScale, 1 / pixelScale);
-    ctx.drawImage(art, (-w / 2) * pixelScale, -art.height);
+    // Centred on the cell it was cut from, which is the point the frame is
+    // registered on — scripts/tiki-art.mjs puts the character's FEET there.
+    //
+    // The offset is measured off the art's OWN width. It used to be computed
+    // from the height being asked for, which is not the height that gets drawn:
+    // the cell is resampled into one of a set of depth buckets and then blitted
+    // at that bucket's size, a few pixels off the request. The mismatch showed
+    // as the sprite sitting a pixel or two beside its own feet, and it changed
+    // as an enemy walked between buckets, so a character wobbled while
+    // approaching.
+    ctx.drawImage(art, -Math.round(art.width / 2), -art.height);
     ctx.restore();
   } else {
     (PLACEHOLDERS[key] ?? ((c, hh, f) => genericFoe(hh, f, c)))(ctx, h, frame);

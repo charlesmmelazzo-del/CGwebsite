@@ -338,41 +338,213 @@ function cutBackground(img) {
   return { kind: test.kind, cut, total: w * h };
 }
 
-// ─── Frame straightening ─────────────────────────────────────────────────────
+// ─── Frame extraction ────────────────────────────────────────────────────────
+//
+// The single most damaging thing this tool used to do.
+//
+// It assumed a sheet was a uniform grid: cut it into `frames` equal cells,
+// measure each cell's centroid, and slide the cell's pixels so that centroid
+// sat in the middle. Every part of that is wrong for the art actually being
+// delivered, because THE FRAMES OVERLAP. The Baby boss winds a mace up over the
+// frame to his left and swings it through the frame to his right; the hero's
+// shotgun barrel pokes past the edge of every cell it is in.
+//
+// On a uniform cut that produced exactly the artefacts that were on screen:
+//
+//   * A frame lost whatever hung outside its cell — the boss's raised mace was
+//     sliced down the middle, and the hero's barrel tip was cut off.
+//   * The severed piece did not disappear. It stayed in the NEIGHBOURING cell,
+//     so a walking boss dragged a disembodied chunk of somebody else's mace
+//     across the screen beside him.
+//   * The centroid used to centre a cell was measured over that mess, so the
+//     alignment it computed was wrong as well.
+//
+// So frames are not cut by arithmetic here. The sheet is separated into blobs
+// of touching pixels, the `frames` biggest and best separated of those are
+// taken to be the character in each pose, every smaller blob (a spark, a
+// detached star, a puff of dust) is given to whichever body it sits nearest,
+// and each frame is then copied out PIXEL BY PIXEL — only the pixels belonging
+// to that frame's own blobs. Content that overlaps a neighbour comes along;
+// the neighbour's content stays behind. Nothing is ever cut.
 
-/** Horizontal centroid of the opaque pixels in a cell. */
-function centroidX(img, x0, cw) {
+/**
+ * Label every blob of touching opaque pixels.
+ *
+ * Eight-way connectivity, because a diagonal line of pixels is one line to the
+ * eye and this has to agree with the eye. The stack is an explicit array: a
+ * character blob runs to tens of thousands of pixels and recursion blows the
+ * JS stack well before that.
+ */
+function blobs(img, minAlpha = 24) {
   const { w, h, data } = img;
-  let sum = 0, n = 0;
-  for (let y = 0; y < h; y++) {
-    for (let x = x0; x < x0 + cw; x++) {
-      const a = data[(y * w + x) * 4 + 3];
-      if (a > 40) { sum += x - x0; n++; }
+  const lab = new Int32Array(w * h).fill(-1);
+  const out = [];
+  const stack = [];
+  for (let seed = 0; seed < w * h; seed++) {
+    if (lab[seed] >= 0 || data[seed * 4 + 3] <= minAlpha) continue;
+    const id = out.length;
+    let minx = w, maxx = -1, miny = h, maxy = -1, count = 0;
+    lab[seed] = id;
+    stack.push(seed);
+    while (stack.length) {
+      const p = stack.pop();
+      const x = p % w, y = (p - x) / w;
+      count++;
+      if (x < minx) minx = x;
+      if (x > maxx) maxx = x;
+      if (y < miny) miny = y;
+      if (y > maxy) maxy = y;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx, ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const q = ny * w + nx;
+          if (lab[q] < 0 && data[q * 4 + 3] > minAlpha) { lab[q] = id; stack.push(q); }
+        }
+      }
     }
+    out.push({ id, minx, maxx, miny, maxy, count });
   }
-  return n ? sum / n : cw / 2;
+  return { lab, list: out };
 }
 
-/** Slide each cell horizontally so its centroid sits at the cell centre. */
-function straighten(img, frames) {
+/**
+ * Which blobs make up each frame, left to right.
+ *
+ * The bodies are picked by size, but with a spacing rule: a blob can only claim
+ * a frame of its own if it stands clear of every body already claimed, by a
+ * good fraction of the spacing the frames are laid out on. Without that rule a
+ * character whose arm is drawn detached from its body would take two frames and
+ * push a real pose off the end of the sheet.
+ *
+ * Everything left over goes to the nearest body, measured as the horizontal GAP
+ * between the two blobs rather than between their centres — a long mace handle
+ * has its centre nowhere near the fist holding it.
+ */
+function frameGroups(img, frames) {
+  const { w } = img;
+  const { lab, list } = blobs(img);
+  if (list.length < frames) return null;
+
+  const pitch = w / frames;
+  const bySize = [...list].sort((a, b) => b.count - a.count);
+  const bodies = [];
+  for (const c of bySize) {
+    if (bodies.length === frames) break;
+    const mid = (c.minx + c.maxx) / 2;
+    if (bodies.every((b) => Math.abs(mid - (b.minx + b.maxx) / 2) > pitch * 0.45)) bodies.push(c);
+  }
+  if (bodies.length < frames) return null;
+  bodies.sort((a, b) => a.minx - b.minx);
+
+  const groups = bodies.map((b) => ({ ids: new Set([b.id]), body: b }));
+  const gapTo = (c, b) => (c.maxx < b.minx ? b.minx - c.maxx : c.minx > b.maxx ? c.minx - b.maxx : 0);
+  for (const c of list) {
+    if (bodies.includes(c)) continue;
+    let best = 0, bestGap = Infinity;
+    for (let i = 0; i < groups.length; i++) {
+      const gap = gapTo(c, groups[i].body);
+      if (gap < bestGap) { bestGap = gap; best = i; }
+    }
+    groups[best].ids.add(c.id);
+  }
+
+  for (const g of groups) {
+    let minx = w, maxx = -1;
+    for (const c of list) {
+      if (!g.ids.has(c.id)) continue;
+      if (c.minx < minx) minx = c.minx;
+      if (c.maxx > maxx) maxx = c.maxx;
+    }
+    g.minx = minx;
+    g.maxx = maxx;
+    g.anchor = anchorX(img, lab, g.body);
+  }
+  return { lab, groups };
+}
+
+/**
+ * The x the frame is registered on: the centre of the character's FEET.
+ *
+ * Not the centroid of the whole blob, which is what this tool used before. A
+ * centroid is dragged around by whatever the pose is holding — the boss with
+ * his mace up and out to one side has a centroid a long way from where he is
+ * standing, so registering on it made him lurch sideways the moment he wound
+ * up. What actually has to hold still between frames is the point he stands on,
+ * and that is the bottom of the blob: two boots, or two bare feet, either side
+ * of the body's axis.
+ */
+function anchorX(img, lab, body) {
+  const { w, data } = img;
+  const band = Math.max(2, Math.round((body.maxy - body.miny + 1) * 0.25));
+  let sum = 0, n = 0;
+  for (let y = body.maxy - band + 1; y <= body.maxy; y++) {
+    for (let x = body.minx; x <= body.maxx; x++) {
+      const p = y * w + x;
+      if (lab[p] === body.id && data[p * 4 + 3] > 24) { sum += x; n++; }
+    }
+  }
+  if (n >= 30) return sum / n;
+  // Nothing to stand on — a pose drawn mid-air. Fall back to the whole blob.
+  sum = 0; n = 0;
+  for (let y = body.miny; y <= body.maxy; y++) {
+    for (let x = body.minx; x <= body.maxx; x++) {
+      const p = y * w + x;
+      if (lab[p] === body.id) { sum += x; n++; }
+    }
+  }
+  return n ? sum / n : (body.minx + body.maxx) / 2;
+}
+
+/**
+ * Re-lay a sheet as a real uniform grid, one frame per cell, nothing clipped.
+ *
+ * The cell has to be wide enough for the WIDEST reach any frame makes from its
+ * own anchor, so a cell is often mostly empty — the boss's swing is three times
+ * the width of the boss. That costs nothing on screen: the game scales a sprite
+ * by the HEIGHT of its cell, so the padding is transparent margin, not a
+ * smaller character. It compresses to almost nothing in the PNG as well.
+ *
+ * Vertical position is left exactly as drawn. The rise and fall through a walk
+ * cycle is the bob, and flattening it would turn the walk into a slide.
+ */
+function relayout(img, frames, pad = 6) {
   const { w, h, data } = img;
-  const cw = Math.floor(w / frames);
-  const out = Buffer.alloc(w * h * 4);
+  const found = frameGroups(img, frames);
+  if (!found) return null;
+  const { lab, groups } = found;
+
+  let half = 0;
+  for (const g of groups) {
+    half = Math.max(half, g.anchor - g.minx, g.maxx - g.anchor);
+  }
+  const cw = Math.ceil(half + pad) * 2;
+  const outW = cw * frames;
+  const out = Buffer.alloc(outW * h * 4);
+
   const shifts = [];
   for (let f = 0; f < frames; f++) {
-    const x0 = f * cw;
-    const shift = Math.round(cw / 2 - centroidX(img, x0, cw));
-    shifts.push(shift);
+    const g = groups[f];
+    // Whole pixels only: a fractional shift would need resampling, and every
+    // frame resampled independently is how a walk cycle starts shimmering.
+    const shift = Math.round(f * cw + cw / 2 - g.anchor);
+    shifts.push(shift - f * cw);
     for (let y = 0; y < h; y++) {
-      for (let x = 0; x < cw; x++) {
-        const src = x - shift;
-        if (src < 0 || src >= cw) continue;
-        const si = (y * w + x0 + src) * 4, di = (y * w + x0 + x) * 4;
-        out[di] = data[si]; out[di+1] = data[si+1]; out[di+2] = data[si+2]; out[di+3] = data[si+3];
+      for (let x = g.minx; x <= g.maxx; x++) {
+        const p = y * w + x;
+        // The pixel-by-pixel test that makes overlapping frames separable: a
+        // pixel travels with the frame that OWNS it, not with the column it
+        // happens to sit in.
+        if (lab[p] < 0 || !g.ids.has(lab[p])) continue;
+        const dx = x + shift;
+        if (dx < f * cw || dx >= (f + 1) * cw) continue;
+        const si = p * 4, di = (y * outW + dx) * 4;
+        out[di] = data[si]; out[di+1] = data[si+1];
+        out[di+2] = data[si+2]; out[di+3] = data[si+3];
       }
     }
   }
-  return { data: out, shifts };
+  return { w: outW, h, data: out, hadAlpha: true, shifts };
 }
 
 // ─── Rotation ────────────────────────────────────────────────────────────────
@@ -620,14 +792,21 @@ function targetHeight(name) {
  * pale halo. Weighting by alpha means fully transparent pixels contribute
  * nothing at all to the colour.
  */
-function downscale(img, targetH, maxW = Infinity) {
+function downscale(img, targetH, maxW = Infinity, frames = 1) {
   const { w, h, data } = img;
   // Backdrops are very wide and short, so height alone never caps them: the
   // beach horizon came out 1774px across for a 540px screen. Whichever limit
   // bites first wins.
   const scale = Math.min(targetH / h, maxW / w, 1);
   if (scale >= 1) return img;
-  const nw = Math.max(1, Math.round(w * scale)), nh = Math.max(1, Math.round(h * scale));
+  // The width lands on a WHOLE number of cells. The game finds a frame by
+  // dividing the image width by the column count, so a sheet whose width does
+  // not divide leaves every cell boundary a fraction of a pixel out — and each
+  // frame is then resampled off a fractional source rectangle, which smears a
+  // sliver of the next frame into the edge of this one.
+  const nh = Math.max(1, Math.round(h * scale));
+  const cell = Math.max(1, Math.round((w / frames) * scale));
+  const nw = cell * frames;
   const out = Buffer.alloc(nw * nh * 4);
 
   for (let y = 0; y < nh; y++) {
@@ -704,9 +883,22 @@ for (const [from, to] of Object.entries(MAP)) {
     rotated = true;
   }
   let shifts = null;
-  // Straighten BEFORE downscaling, so the shift is measured at full resolution.
+  // Re-lay the frames BEFORE downscaling, so blobs are separated and registered
+  // at full resolution rather than off a picture that has already lost detail.
   const nFrames = framesFor(to);
-  if (nFrames > 1 && !full) ({ data: img.data, shifts } = straighten(img, nFrames));
+  if (nFrames > 1 && !full) {
+    const laid = relayout(img, nFrames);
+    if (laid) {
+      img.w = laid.w; img.h = laid.h; img.data = laid.data;
+      shifts = laid.shifts;
+    } else {
+      // Not separable into the expected number of poses. Left exactly as
+      // delivered rather than guessed at: a sheet that arrives in some other
+      // shape should show up as an obvious problem here, not as a character
+      // that is subtly wrong in the game.
+      console.log(`  WARNING  ${to}: could not separate ${nFrames} frames — imported uncut`);
+    }
+  }
 
   const srcW = img.w, srcH = img.h;
   // Weapon overlays are NOT trimmed: they have to keep the same framing as the
@@ -714,7 +906,7 @@ for (const [from, to] of Object.entries(MAP)) {
   // the arms off the character.
   const trimmed = full ? img : trim(img, nFrames);
   // 1080 = twice the 540px device width the game ever draws into.
-  const small = downscale(trimmed, targetHeight(to), to.startsWith("bg-") ? 1080 : Infinity);
+  const small = downscale(trimmed, targetHeight(to), to.startsWith("bg-") ? 1080 : Infinity, full ? 1 : nFrames);
 
   if (!dry) writePNG(path.join(DEST, to), small.w, small.h, small.data);
   done++;
@@ -727,7 +919,7 @@ for (const [from, to] of Object.entries(MAP)) {
     (strays ? `  strays -${strays}` : "") +
     (despilled ? `  despill ${despilled}` : "") +
     `  bg:${cutInfo.kind}` +
-    (shifts ? `  recentred [${shifts.join(", ")}]px` : "") +
+    (shifts ? `  re-laid [${shifts.join(", ")}]px` : "") +
     (bytes ? `  ${(bytes / 1024).toFixed(0)}KB` : "")
   );
 }

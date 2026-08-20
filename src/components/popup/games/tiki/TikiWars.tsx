@@ -7,7 +7,7 @@ import TikiCanvas from "./TikiCanvas";
 import { QuipBag } from "./quips";
 import {
   drawSprite, getImage, loadTikiArt, prefetchSheet, BLOCKER_H, BOSS_H, HELPER_H,
-  PLAYER_H, SOLDIER_H, type GunArt, type SpriteKey,
+  PLAYER_H, SOLDIER_H, MUZZLES, muzzleFor, type GunArt, type SpriteKey,
 } from "./sprites";
 import {
   C, horizonY, PIXEL_SCALE, playerY, projectScale, projectX, projectY,
@@ -17,7 +17,7 @@ import {
   armorCost, bombCost, canBuyArmor, canBuyBomb, canBuyClover, cloverCost,
   freshState, GUNS, LUCK_STEP, MAX_ARMOR, MAX_LUCK,
   MAX_BOMBS, MAX_HEALTH, MAX_SCORE, runDetail, update, detonateBomb, worldSpeed,
-  DRAG_RANGE, GATE_REACH, GATE_GAP, GATE_CURE_HITS, helperSlots, rungOf,
+  DRAG_RANGE, GATE_REACH, GATE_GAP, GATE_CURE_HITS, rungOf,
   isGoodOption,
   isMaxedOption, isFinaleBoss, bossFor, pickStageBlockers,
   type Enemy, type GunKind, type State,
@@ -474,6 +474,22 @@ const GUN_SHEET: Record<GunKind, GunArt> = {
   laser: "laser",
 };
 
+/**
+ * How tall the muzzle burst is drawn, in logical px.
+ *
+ * Sized against the hero rather than the gun: it is a flash of light, and one
+ * scaled per weapon made the pistols look broken next to the shotgun.
+ */
+const MUZZLE_FLASH_H = 26;
+
+/**
+ * The helper's own muzzle, as a fraction of ITS height.
+ *
+ * Same measurement as the hero's, off the helper sheet: it carries two pistols
+ * at arm's length, a little lower than he holds his.
+ */
+const HELPER_MUZZLE = { x: 0.271, y: 0.535 };
+
 /** Roadside dressing, fixed to the field so it streams past with the ground. */
 const SCENERY: { key: SpriteKey; nx: number; phase: number; h: number }[] = [
   { key: "prop-palm", nx: -1.55, phase: 0.0, h: 150 },
@@ -761,11 +777,17 @@ function drawField(
     const px = projectX(s.playerNx, 0);
     const tipX = projectX(s.playerNx, range);
     const spread = GUNS.flame.spread * roadHalf(range);
+    // Out of the NOZZLE, which he holds low in his left hand. The stream used
+    // to start four pixels left of his middle and halfway up him, so the fire
+    // came out of the bottle rather than out of the thing he is carrying.
+    const noz = MUZZLES.flame[0];
+    const nozX = px + noz.x * PLAYER_H;
+    const nozY = py - noz.y * PLAYER_H;
     ctx.globalAlpha = 0.75;
     for (const [col, k] of [[C.flame, 1], [C.flameHot, 0.55]] as const) {
       ctx.fillStyle = col;
       ctx.beginPath();
-      ctx.moveTo(px - 4, py - 30);
+      ctx.moveTo(nozX, nozY);
       ctx.lineTo(tipX - spread * k + Math.sin(t * 22) * 2, tipY);
       ctx.lineTo(tipX + spread * k + Math.cos(t * 19) * 2, tipY);
       ctx.closePath();
@@ -794,12 +816,18 @@ function drawField(
 
   // ── Helpers and the hero ───────────────────────────────────────────────
   const walk = Math.floor(t * 8);
-  // The same slots the rules fire from, so a helper is drawn where it shoots.
-  helperSlots(s.playerNx, s.helpers).forEach((nx, i) => {
-    drawSprite(ctx, "helper-walk", walk + i, projectX(nx, 0.03), projectY(0.03, h), {
-      h: HELPER_H, pixelScale: PIXEL_SCALE,
-    });
-  });
+  // Drawn where the bodies actually are, at the size their depth calls for, far
+  // to near — so one that has drifted forward is smaller and one that has swung
+  // in toward the camera is bigger and passes in FRONT of the rest. That depth
+  // is what makes the cluster read as bottles floating around him rather than a
+  // row of stickers stuck to his sides.
+  for (const u of [...s.helperUnits].sort((a, b) => b.z - a.z)) {
+    const sc = projectScale(u.z);
+    drawSprite(ctx, "helper-walk", walk + Math.floor(u.phase * 4),
+      projectX(s.playerNx + u.dnx, u.z), projectY(u.z, h), {
+        h: HELPER_H * sc, pixelScale: PIXEL_SCALE,
+      });
+  }
 
   const px = projectX(s.playerNx, 0);
 
@@ -834,9 +862,15 @@ function drawField(
     // Start at the muzzle and converge to true aim over the first stretch. The
     // offset is visual only — b.nx is what the rules hit-test against, so the
     // gun still shoots exactly where it points.
+    //
+    // The muzzle is the real one out of the sheet, and a helper's round leaves
+    // a helper's gun: a shared guess put every round in the game out of the
+    // middle of the hero's chest.
     const muzzleFade = Math.max(0, 1 - b.z / 0.22);
-    const x = projectX(b.nx, b.z) + b.side * 12 * sc * muzzleFade;
-    const y = projectY(b.z, h) - (26 + 24 * muzzleFade) * sc;
+    const m = b.fromHelper ? HELPER_MUZZLE : muzzleFor(GUN_SHEET[s.gun], b.side);
+    const body = b.fromHelper ? HELPER_H : PLAYER_H;
+    const x = projectX(b.nx, b.z) + b.side * Math.abs(m.x) * body * sc * muzzleFade;
+    const y = projectY(b.z, h) - (26 + (m.y * body - 26) * muzzleFade) * sc;
     // A laser has to read as different at a glance, because it behaves
     // differently: its round goes THROUGH what it hits.
     const key: SpriteKey = b.pierce ? "fx-laser" : "fx-bullet";
@@ -854,16 +888,18 @@ function drawField(
   // without it the hero looks like a bystander while bullets appear in the
   // middle distance on their own.
   if (s.firing > 0 && s.gun !== "flame") {
-    const fx = projectX(s.playerNx, 0);
-    const fy = py - PLAYER_H * 0.55;
     // The four frames run off the firing countdown, so the flash plays ONCE per
     // shot rather than looping on wall-clock time.
     const k = Math.min(1, Math.max(0, s.firing / 0.06));
     const frame = Math.min(3, Math.floor((1 - k) * 4));
-    for (const side of [-1, 1] as const) {
-      drawSprite(ctx, "fx-muzzle", frame, fx + side * 12, fy + 13, {
-        h: 26, pixelScale: PIXEL_SCALE,
-      });
+    // ONE flash per barrel the hero is actually holding, at the end of it. The
+    // burst is drawn standing on its own base, so the base goes a few pixels
+    // inside the barrel and the flame throws up and out from there.
+    for (const m of MUZZLES[GUN_SHEET[s.gun]]) {
+      drawSprite(ctx, "fx-muzzle", frame,
+        px + m.x * PLAYER_H, py - m.y * PLAYER_H + 5, {
+          h: MUZZLE_FLASH_H, pixelScale: PIXEL_SCALE,
+        });
     }
   }
 
