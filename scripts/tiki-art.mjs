@@ -268,7 +268,15 @@ function bgTest(img) {
   // its border and a 60% threshold sent it down the checkerboard path — which
   // matched nothing, and the magenta shipped as a bright band across the sky.
   if (mag > grey && mag / n > 0.15) {
-    return { kind: "chroma", is: (r, g, b) => r > 140 && g < 120 && b > 140 };
+    // Looser than "bright magenta": the edge between the key and the artwork is
+    // a gradient, and a strict test walks the fill up to the first blended
+    // pixel and stops, leaving a magenta rim all the way round. What identifies
+    // the key is that GREEN is well below both red and blue — true of the pure
+    // colour and of everything part-way blended into it.
+    return {
+      kind: "chroma",
+      is: (r, g, b) => r > 95 && b > 95 && g < r - 45 && g < b - 45,
+    };
   }
   return { kind: "checkerboard", is: (r, g, b) =>
     Math.max(r,g,b) - Math.min(r,g,b) < 26 && Math.max(r,g,b) > 196 };
@@ -343,6 +351,79 @@ function straighten(img, frames) {
     }
   }
   return { data: out, shifts };
+}
+
+// ─── Chroma clean-up ─────────────────────────────────────────────────────────
+
+/**
+ * Kill magenta the flood fill could not reach.
+ *
+ * The fill only removes background CONNECTED to the border, which is the right
+ * default — it is what stops a white highlight inside a bottle being eaten. But
+ * it leaves any pocket the artwork encloses: between an arm and a body, inside
+ * the crook of a weapon, through the gap in a letter. Those pockets are still
+ * unmistakably the key colour, so they can be matched outright.
+ *
+ * Stricter than the fill's test, deliberately. This one ignores connectivity,
+ * so it has to be certain — near-magenta artwork like the King's cloak must
+ * survive it.
+ */
+function killStrayChroma(img) {
+  const { w, h, data } = img;
+  let cut = 0;
+  for (let i = 0; i < w * h; i++) {
+    const j = i * 4;
+    if (data[j + 3] === 0) continue;
+    const r = data[j], g = data[j + 1], b = data[j + 2];
+    if (r > 155 && b > 155 && g < 105 && Math.abs(r - b) < 70) {
+      data[j + 3] = 0;
+      cut++;
+    }
+  }
+  return cut;
+}
+
+/**
+ * Pull the magenta cast out of the pixels that survived at the edge.
+ *
+ * Even a perfect cut leaves a rim one or two pixels wide where the artwork was
+ * blended into the key before anyone thought about transparency. Left alone it
+ * becomes a pink halo — and downscaling smears it inward, which is why it was
+ * showing up on screen rather than staying a hairline.
+ *
+ * Only applied to pixels TOUCHING the cut, so genuinely purple artwork further
+ * in is never altered. Where green sits below both red and blue, both are
+ * brought down to meet it, which is the standard chroma despill.
+ */
+function despill(img, reach = 2) {
+  const { w, h, data } = img;
+  const near = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (data[(y * w + x) * 4 + 3] !== 0) continue;
+      for (let dy = -reach; dy <= reach; dy++) {
+        for (let dx = -reach; dx <= reach; dx++) {
+          const nx = x + dx, ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          near[ny * w + nx] = 1;
+        }
+      }
+    }
+  }
+  let fixed = 0;
+  for (let i = 0; i < w * h; i++) {
+    if (!near[i]) continue;
+    const j = i * 4;
+    if (data[j + 3] === 0) continue;
+    const r = data[j], g = data[j + 1], b = data[j + 2];
+    const cast = Math.min(r, b) - g;
+    if (cast > 10) {
+      data[j] = Math.max(g, r - cast);
+      data[j + 2] = Math.max(g, b - cast);
+      fixed++;
+    }
+  }
+  return fixed;
 }
 
 // ─── Caption band ────────────────────────────────────────────────────────────
@@ -550,6 +631,14 @@ for (const [from, to] of Object.entries(MAP)) {
   const cutInfo = full
     ? { kind: "full-bleed", cut: 0 }
     : img.hadAlpha ? { kind: "already had alpha", cut: 0 } : cutBackground(img);
+  // Clean up before anything resamples: downscaling averages neighbours, so a
+  // rim left here is smeared inward rather than staying a hairline.
+  let strays = 0;
+  let despilled = 0;
+  if (!full) {
+    strays = killStrayChroma(img);
+    despilled = despill(img);
+  }
   let captions = 0;
   if (LABELLED(to)) ({ cut: captions } = dropCaptions(img));
   let shifts = null;
@@ -572,6 +661,8 @@ for (const [from, to] of Object.entries(MAP)) {
     `  ${to.padEnd(24)} ${srcW}x${srcH} -> ${small.w}x${small.h}` +
     (full ? "  [full-bleed]" : "") +
     (captions ? `  captions -${captions}px` : "") +
+    (strays ? `  strays -${strays}` : "") +
+    (despilled ? `  despill ${despilled}` : "") +
     `  bg:${cutInfo.kind}` +
     (shifts ? `  recentred [${shifts.join(", ")}]px` : "") +
     (bytes ? `  ${(bytes / 1024).toFixed(0)}KB` : "")

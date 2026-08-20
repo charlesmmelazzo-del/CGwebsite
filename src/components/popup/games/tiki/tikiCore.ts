@@ -17,7 +17,15 @@
 export const MAX_HEALTH = 100;
 export const MAX_ARMOR = 10;
 export const MAX_BOMBS = 3;
-export const MAX_HELPERS = 6;
+/**
+ * Most helpers a hero may have at once.
+ *
+ * Three. Six was reachable in a single run and it showed: a full rank plus a
+ * decent gun cleared the road faster than the wave could arrive, and the game
+ * stopped asking anything. Three is a visible squad without being an answer to
+ * the whole stage.
+ */
+export const MAX_HELPERS = 3;
 
 /**
  * How far a helper stands from the hero, in nx.
@@ -479,20 +487,20 @@ export interface Rung {
  * be walked to harmless first, and only then into a real reward.
  */
 export const LADDERS: Record<GateFamily, Rung[]> = {
+  // Tops out at +2, so no single gate hands over a full squad — a rank of
+  // three has to be built across two of them.
   helpers: [
-    { effect: { kind: "helpers", n: -3 }, label: "-3 RUM", tone: "bad" },
     { effect: { kind: "helpers", n: -2 }, label: "-2 RUM", tone: "bad" },
     { effect: { kind: "helpers", n: -1 }, label: "-1 RUM", tone: "bad" },
     { effect: null, label: "NOTHING", tone: "neutral" },
     { effect: { kind: "helpers", n: 1 }, label: "+1 RUM", tone: "good" },
     { effect: { kind: "helpers", n: 2 }, label: "+2 RUM", tone: "good" },
-    { effect: { kind: "helpers", n: 3 }, label: "+3 RUM", tone: "good" },
   ],
   money: [
     { effect: { kind: "money", n: -5 }, label: "-$5", tone: "bad" },
     { effect: null, label: "NOTHING", tone: "neutral" },
     { effect: { kind: "money", n: 5 }, label: "+$5", tone: "good" },
-    { effect: { kind: "money", n: 10 }, label: "+$10", tone: "good" },
+    { effect: { kind: "money", n: 8 }, label: "+$8", tone: "good" },
   ],
   gun: [
     { effect: { kind: "gun", gun: "pistol" }, label: "PISTOL", tone: "bad" },
@@ -505,7 +513,7 @@ export const LADDERS: Record<GateFamily, Rung[]> = {
   health: [
     { effect: { kind: "health", n: -20 }, label: "POISON", tone: "bad" },
     { effect: null, label: "NOTHING", tone: "neutral" },
-    { effect: { kind: "health", n: 25 }, label: "+HEALTH", tone: "good" },
+    { effect: { kind: "health", n: 18 }, label: "+HEALTH", tone: "good" },
     { effect: { kind: "bomb" }, label: "BOMB", tone: "good" },
   ],
 };
@@ -749,7 +757,7 @@ export const WAVE_SPREAD = 0.78;
 export const BLOCKER_AIM_SPREAD = 0.3;
 
 export function spawnInterval(stage: number): number {
-  return Math.max(0.72, 1.82 / (1 + (stage - 1) * 0.12));
+  return Math.max(0.78, 2.05 / (1 + (stage - 1) * 0.12));
 }
 
 /**
@@ -869,11 +877,34 @@ function pick<T>(arr: readonly T[], rng: () => number): T {
   return arr[Math.floor(rng() * arr.length) % arr.length];
 }
 
-const FAMILIES: GateFamily[] = ["helpers", "money", "gun", "health"];
+/**
+ * How often each family comes up on a gate.
+ *
+ * Helpers are the rarest. They are the one reward that COMPOUNDS — every
+ * bottle keeps firing for the rest of the stage — so seeing them as often as
+ * anything else meant a lucky run of gates snowballed into a squad that did the
+ * work for you.
+ */
+const FAMILY_WEIGHTS: [GateFamily, number][] = [
+  ["helpers", 1],
+  ["gun", 2],
+  ["health", 2],
+  ["money", 3],
+];
+
+function pickFamily(rng: () => number): GateFamily {
+  const total = FAMILY_WEIGHTS.reduce((n, [, w]) => n + w, 0);
+  let r = rng() * total;
+  for (const [family, w] of FAMILY_WEIGHTS) {
+    r -= w;
+    if (r <= 0) return family;
+  }
+  return FAMILY_WEIGHTS[FAMILY_WEIGHTS.length - 1][0];
+}
 
 export function makeGate(st: State): Gate {
   const roll = (bad: boolean): GateOption => {
-    const family = pick(FAMILIES, st.rng);
+    const family = pickFamily(st.rng);
     const ladder = LADDERS[family];
     const neutral = ladder.findIndex((r) => r.tone === "neutral");
     const tier = bad

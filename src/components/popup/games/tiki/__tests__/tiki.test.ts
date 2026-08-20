@@ -409,22 +409,35 @@ check("a bomb you don't have does nothing", () => {
 
 // ── Gates ───────────────────────────────────────────────────────────────────
 
-/** A helpers-ladder option at a named rung. tier 3 is neutral. */
+// Ladder positions are looked up by MEANING, never written as numbers.
+// Hard-coded tiers broke every one of these tests the first time the helper
+// ladder was reshaped, and said nothing useful when they did.
+const neutralTier = (f: keyof typeof LADDERS) =>
+  LADDERS[f].findIndex((r) => r.tone === "neutral");
+const bestTier = (f: keyof typeof LADDERS) => LADDERS[f].length - 1;
+const WORST = 0;
+
 const helperOpt = (tier: number) => ({ family: "helpers" as const, tier, cure: 0 });
 const moneyOpt = (tier: number) => ({ family: "money" as const, tier, cure: 0 });
 
+/** How many helpers the best rung of the ladder actually hands over. */
+const bestHelperGain = () => {
+  const e = LADDERS.helpers[bestTier("helpers")].effect;
+  return e && e.kind === "helpers" ? e.n : 0;
+};
+
 check("the gate you steer into is the one that applies", () => {
   const st = fresh();
-  st.gate = { z: 0.05, left: helperOpt(6), right: helperOpt(0), taken: false, flipped: 0 };
+  st.gate = { z: 0.05, left: helperOpt(bestTier("helpers")), right: helperOpt(WORST), taken: false, flipped: 0 };
   st.playerNx = -0.6;
   run(st, 0.15);                       // let the gate reach the player
-  assert.equal(st.helpers, 3, "steering left did not take the left gate");
+  assert.equal(st.helpers, bestHelperGain(), "steering left did not take the left gate");
   assert.equal(st.gatesTaken, 1);
 });
 
 check("the gate you steer away from is the one you avoid", () => {
   const st = fresh();
-  st.gate = { z: 0.05, left: helperOpt(6), right: helperOpt(0), taken: false, flipped: 0 };
+  st.gate = { z: 0.05, left: helperOpt(bestTier("helpers")), right: helperOpt(WORST), taken: false, flipped: 0 };
   st.playerNx = 0.6;
   run(st, 0.15);
   assert.equal(st.helpers, 0, "steering right somehow took the left gate");
@@ -451,36 +464,38 @@ check("hugging the open edge refuses the gate entirely", () => {
 
 check("standing inside a panel still takes it", () => {
   const st = fresh();
-  st.gate = { z: 0.05, left: helperOpt(6), right: helperOpt(0), taken: false, flipped: 0 };
+  st.gate = { z: 0.05, left: helperOpt(bestTier("helpers")), right: helperOpt(WORST), taken: false, flipped: 0 };
   st.playerNx = -GATE_REACH + 0.05;
   run(st, 0.2);
-  assert.equal(st.helpers, 3, "just inside the panel did not take the gate");
+  assert.equal(st.helpers, bestHelperGain(), "just inside the panel did not take the gate");
 });
 
 check("curing steps ONE rung at a time, not straight to a reward", () => {
-  const o = helperOpt(0);              // -3 RUM
-  assert.equal(rungOf(o).label, "-3 RUM");
+  const o = helperOpt(WORST);
+  assert.equal(o.tier, 0);
   for (let i = 0; i < GATE_CURE_HITS - 1; i++) {
     assert.equal(cureGateOption(o), false, "stepped up before enough rounds landed");
   }
   assert.equal(cureGateOption(o), true);
-  assert.equal(rungOf(o).label, "-2 RUM", "a single cure jumped more than one rung");
+  assert.equal(o.tier, 1, "a single cure jumped more than one rung");
+  assert.equal(rungOf(o).label, LADDERS.helpers[1].label);
 });
 
-check("a -3 has to be walked all the way through neutral to pay out", () => {
-  const o = helperOpt(0);
+check("the worst rung is walked through neutral before it pays out", () => {
+  const o = helperOpt(WORST);
   const step = () => { for (let i = 0; i < GATE_CURE_HITS; i++) cureGateOption(o); };
-  step(); assert.equal(rungOf(o).label, "-2 RUM");
-  step(); assert.equal(rungOf(o).label, "-1 RUM");
-  step(); assert.equal(rungOf(o).tone, "neutral", "never passes through harmless");
-  assert.equal(rungOf(o).effect, null, "the neutral rung still does something");
-  step(); assert.equal(rungOf(o).tone, "good", "could not be walked into a reward");
+  const seen: string[] = [rungOf(o).tone];
+  for (let i = 0; i < LADDERS.helpers.length - 1; i++) { step(); seen.push(rungOf(o).tone); }
+  assert.equal(seen[0], "bad", "the bottom of the ladder is not a penalty");
+  assert.ok(seen.includes("neutral"), "never passes through harmless");
+  assert.equal(seen[seen.length - 1], "good", "could not be walked into a reward");
+  assert.ok(seen.indexOf("neutral") < seen.indexOf("good"), "reached a reward before harmless");
 });
 
 check("the neutral rung applies nothing at all", () => {
   const st = fresh({ money: 40 });
   st.helpers = 2;
-  st.gate = { z: 0.05, left: helperOpt(3), right: helperOpt(0), taken: false, flipped: 0 };
+  st.gate = { z: 0.05, left: helperOpt(neutralTier("helpers")), right: helperOpt(WORST), taken: false, flipped: 0 };
   st.playerNx = -0.5;
   st.cooldown = 99;                    // don't let our own fire cure the panel
   run(st, 0.2);
@@ -503,8 +518,8 @@ check("shooting a panel cures the side the bullet is actually on", () => {
     update(st, DT);
     st.gate!.z = 0.5;                  // hold it still for the test
   }
-  assert.equal(rungOf(st.gate!.left).label, "-2 RUM", "the left panel did not take the rounds");
-  assert.equal(rungOf(st.gate!.right).label, "-3 RUM", "the right panel took rounds it never saw");
+  assert.equal(st.gate!.left.tier, 1, "the left panel did not take the rounds");
+  assert.equal(st.gate!.right.tier, WORST, "the right panel took rounds it never saw");
 });
 
 check("a round through the open edge cures nothing", () => {
@@ -516,7 +531,7 @@ check("a round through the open edge cures nothing", () => {
     update(st, DT);
     st.gate!.z = 0.5;
   }
-  assert.equal(rungOf(st.gate!.left).label, "-3 RUM", "a round past the panel still cured it");
+  assert.equal(st.gate!.left.tier, WORST, "a round past the panel still cured it");
 });
 
 check("a bullet is not eaten by the gate", () => {
@@ -633,13 +648,13 @@ check("the shuffle bag uses every line before repeating one", () => {
 check("a bad gate draws from downgrade, a good one from pickup", () => {
   const st = fresh();
   // tier 0 on the helpers ladder is -3 RUM; tier 6 is +3 RUM.
-  st.gate = { z: 0.05, left: helperOpt(0), right: helperOpt(6), taken: false, flipped: 0 };
+  st.gate = { z: 0.05, left: helperOpt(WORST), right: helperOpt(bestTier("helpers")), taken: false, flipped: 0 };
   st.playerNx = -0.5;
   run(st, 0.2);
-  assert.equal(st.lastGate, "bad", "a -3 RUM did not report itself as bad");
+  assert.equal(st.lastGate, "bad", "the worst rung did not report itself as bad");
 
   const st2 = fresh();
-  st2.gate = { z: 0.05, left: helperOpt(6), right: helperOpt(0), taken: false, flipped: 0 };
+  st2.gate = { z: 0.05, left: helperOpt(bestTier("helpers")), right: helperOpt(WORST), taken: false, flipped: 0 };
   st2.playerNx = -0.5;
   run(st2, 0.2);
   assert.equal(st2.lastGate, "good");
@@ -647,7 +662,7 @@ check("a bad gate draws from downgrade, a good one from pickup", () => {
 
 check("a neutral gate reports neutral, so nothing is said", () => {
   const st = fresh();
-  st.gate = { z: 0.05, left: helperOpt(3), right: helperOpt(0), taken: false, flipped: 0 };
+  st.gate = { z: 0.05, left: helperOpt(neutralTier("helpers")), right: helperOpt(WORST), taken: false, flipped: 0 };
   st.playerNx = -0.5;
   st.cooldown = 99;
   run(st, 0.2);
@@ -1194,8 +1209,9 @@ check("a wave spreads across the road rather than clumping", () => {
 check("the field fills up faster than it used to", () => {
   const st = fresh();
   run(st, 6);
-  // The old build trickled one enemy roughly every 1.15s.
-  assert.ok(st.enemies.length + st.kills.grunt + st.kills.blocker > 6,
+  // The point is that a wave is more than one enemy — not a fixed rate, which
+  // has been deliberately lowered several times since.
+  assert.ok(st.enemies.length + st.kills.grunt + st.kills.blocker >= waveSize(1) * 2,
     "six seconds produced barely more than the old one-at-a-time trickle");
 });
 
@@ -1294,6 +1310,37 @@ check("a boss is worth far more than a grunt", () => {
 check("shop prices rise as you stock up", () => {
   assert.ok(armorCost(9) > armorCost(0));
   assert.ok(bombCost(2) > bombCost(0));
+});
+
+// ── Helpers are rationed ────────────────────────────────────────────────────
+
+check("a squad tops out at three", () => {
+  assert.equal(MAX_HELPERS, 3, "six was reachable in one run and cleared the road");
+  const st = fresh();
+  for (let i = 0; i < 20; i++) applyEffect(st, { kind: "helpers", n: 2 });
+  assert.equal(st.helpers, MAX_HELPERS);
+});
+
+check("no single gate hands over a whole squad", () => {
+  const best = LADDERS.helpers[LADDERS.helpers.length - 1].effect;
+  const gain = best && best.kind === "helpers" ? best.n : 0;
+  assert.ok(gain < MAX_HELPERS,
+    `one gate gives ${gain} of a maximum ${MAX_HELPERS} — a full rank in a single pickup`);
+});
+
+check("helpers are the rarest thing a gate offers", () => {
+  // They are the one reward that COMPOUNDS, so a lucky run of gates would
+  // otherwise snowball into a squad that does the work for you.
+  const st = fresh();
+  const seen: Record<string, number> = {};
+  for (let i = 0; i < 4000; i++) {
+    const g = makeGate(st);
+    for (const o of [g.left, g.right]) seen[o.family] = (seen[o.family] ?? 0) + 1;
+  }
+  for (const f of ["money", "gun", "health"]) {
+    assert.ok(seen.helpers < seen[f],
+      `helpers came up ${seen.helpers} times against ${f}'s ${seen[f]}`);
+  }
 });
 
 // ── The shop ────────────────────────────────────────────────────────────────

@@ -470,6 +470,13 @@ overlapping shape precisely when the guest was dodging hardest. Each side keeps
 its own rank count, or the mirrored helper lands on top of the one it was
 avoiding.
 
+**Capped at three, and the rarest thing a gate offers.** Six was reachable in a
+single run and it showed: a full rank plus a decent gun cleared the road faster
+than the wave could arrive and the game stopped asking anything. They are also
+the one reward that COMPOUNDS — every bottle keeps firing for the rest of the
+stage — so a lucky run of gates snowballed. No single gate hands over a whole
+squad either; three has to be built across two of them.
+
 They are extra bodies, **not a multiplier on the hero's gun**, and two separate
 things enforce that:
 
@@ -530,10 +537,13 @@ rounds are doing anything.
 
 | Family | Rungs, worst to best |
 |---|---|
-| **Helpers** | -3 RUM · -2 RUM · -1 RUM · **NOTHING** · +1 RUM · +2 RUM · +3 RUM |
-| **Money** | -$5 · **NOTHING** · +$5 · +$10 |
-| **Gun** | PISTOL (downgrade) · **NOTHING** · SHOTGUN · UZI · FLAME |
+| **Helpers** | -2 RUM · -1 RUM · **NOTHING** · +1 RUM · +2 RUM |
+| **Money** | -$5 · **NOTHING** · +$5 · +$8 |
+| **Gun** | PISTOL (downgrade) · **NOTHING** · SHOTGUN · UZI · FLAME · LASER |
 | **Health** | POISON · **NOTHING** · +HEALTH · BOMB |
+
+Families are **weighted**, not drawn evenly — money is the most common offer and
+helpers the least, for the compounding reason above.
 
 Money is the only gate outcome that outlives the run. That tension — take the
 power you need now, or bank toward a permanent upgrade — is the core decision of
