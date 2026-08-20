@@ -51,10 +51,14 @@ function startStage(p: Progress): number {
 type Screen = "story" | "play" | "shop";
 
 /**
- * One beat of a story sequence: a picture and a line under it.
+ * One beat of a story sequence: a picture, and optionally a line under it.
  *
- * Captions are drawn in code rather than baked into the art, so they can be
- * reworded or translated without redrawing a panel.
+ * The panels carry their OWN dialogue, drawn into the art — "HELP ME PLEASE!",
+ * "I'LL GET YOU NEXT TIME!" — so none of them takes a caption. Adding one would
+ * simply say the same thing twice in two different typefaces.
+ *
+ * The mechanism stays because a future panel might arrive without text, and a
+ * code-drawn caption can be reworded without redrawing a picture.
  */
 interface Beat {
   art: SpriteKey;
@@ -63,14 +67,14 @@ interface Beat {
 
 const INTRO: Beat[] = [
   { art: "logo-tiki-wars", caption: null },
-  { art: "intro-1", caption: "A good night. The best night." },
-  { art: "intro-2", caption: "Somebody was watching." },
-  { art: "intro-3", caption: "SAVE ME!" },
-  { art: "intro-4", caption: "Nobody takes my girl." },
+  { art: "intro-1", caption: null },
+  { art: "intro-2", caption: null },
+  { art: "intro-3", caption: null },
+  { art: "intro-4", caption: null },
 ];
 
 const ENDING: Beat[] = [
-  { art: "ending-blimp", caption: "You think you can catch me that easily?" },
+  { art: "ending-blimp", caption: null },
 ];
 
 export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeGameProps) {

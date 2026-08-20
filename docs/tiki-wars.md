@@ -936,15 +936,13 @@ view.
 
 ### Trademark
 
-The hero render carries a real spirits brand's wordmark, label layout and
-barcode. This game ships on a public site as part of a commercial promotion,
-which makes that a live trademark exposure rather than a theoretical one.
+**Resolved.** The hero's label originally carried a real spirits brand's
+wordmark; it now reads **TROPICAL FIRE**, an original mark, across the in-game
+sprites and every story panel. The green-and-yellow overproof look is a style
+and is fine to evoke — it was the wordmark that carried the risk.
 
-**Recommendation: keep the silhouette, palette and attitude; replace the label
-with an original one.** The overproof green-and-yellow look is a style and is
-fine to evoke. The wordmark, the specific label composition and the barcode are
-what carry risk. Same for any other real brand that shows up in the cast —
-tequila, mezcal and cinnamon characters should all be generic.
+The same rule applies to anything drawn later: tequila, mezcal, beer and
+cinnamon characters all use invented labels.
 
 ---
 
