@@ -219,6 +219,12 @@ Contact with any enemy costs health (armor first, if any). Tier 1 exists to be
 mowed down and to punish bad positioning; tier 2 exists to make raw firepower
 insufficient and force lane commitment.
 
+**Four bosses, and a run meets all of them.** Baby, Knight, Santa and King
+guard successive stages and then cycle, rather than the beach boss repeating
+forever. Each has its own attack frames, which play when it closes inside
+`BOSS_ATTACK_Z`. Once the real stages exist the boss becomes a property of the
+stage instead.
+
 **A boss is never consumed by contact.** It hits you, falls back, and comes
 again. Killing it is the only way past — it is the stage's exit condition, so
 removing it from the field for any other reason strands the run with nothing
@@ -246,14 +252,14 @@ nothing else, so a silent subtraction would be invisible — a guest could bleed
 points all run and never be told. A floating number rises from wherever the
 enemy got through, and that is the only feedback there is.
 
-### Grunt variants
+### Soldier variants
 
-The grunt is a citrus soldier, and it comes as **lime, lemon, orange and kiwi**.
-They appear mixed together in the same wave, on every stage.
+Six of them — **lime, kiwi, lemon, orange, cherry and sugar cube** — mixed
+together in the same wave, on every stage.
 
-**All four share one health value** — a couple of hits, rising slowly with
+**All six share one health value** — a couple of hits, rising slowly with
 depth. Variety between them is colour, silhouette and speed, never health, so a
-lemon never secretly takes longer than a lime. Speed may vary (the kiwi is the
+cherry never secretly takes longer than a lime. Speed may vary (the kiwi is the
 quick one) because speed is visible on the approach and health is not.
 
 They used to die in exactly one shot, on the reasoning that the guest needs an
@@ -294,10 +300,16 @@ feel wearing a different hat.
 
 Keyboard steering stays velocity-based, since a key has no position.
 
-### Wildcard blockers
+### The blocker pool
 
-A pool of tier-2 blockers that are **not tied to any stage** — any of them can
-turn up anywhere, at any point in a run.
+**Fourteen blockers, and for now every one of them can appear on any stage.**
+
+The design has stage-native blockers (sugar cane on the beach, cinnamon in the
+winter) with a wildcard pool on top. Only the beach exists yet, so confining
+each blocker to its unbuilt stage would leave thirteen of the fourteen drawn and
+never seen. Treating the whole roster as wildcards uses every one of them today
+and gives the waves real variety; the stage weighting returns when the stages
+themselves do.
 
 This is what keeps the endless tail alive. The stage-native blockers are
 predictable by design; once a guest has seen the beach three times they know
@@ -308,18 +320,25 @@ from the wildcard pool rather than the stage's own roster.
 They obey every normal blocker rule — must be killed, scaling health, contact
 damage. The pool:
 
-| Wildcard | Flavour |
-|---|---|
-| Angry milk carton | Wrench |
-| Angry beer can | Length of pipe |
-| Angry coconut cream can | Can opener |
-| Angry ginger beer bottle | Samurai sword |
-| Angry pomegranate | Piece of lumber |
-| Angry almond | Giant spoon |
-| Angry blender | Boxing gloves |
+| Blocker | Weapon | Home stage |
+|---|---|---|
+| Sugar cane | Machete | Beach |
+| Tequila worm | Sombrero, bandolier | Desert |
+| Mezcal bottle | Sabre | Desert |
+| Cinnamon stick | Mallet | Winter |
+| Coconut | Energy sword | Winter |
+| Grapefruit | Baseball bat | Winter |
+| Candy cane | Undead lurch | Winter |
+| Milk carton | Wrench | wildcard |
+| Beer can | Length of pipe | wildcard |
+| Coconut cream can | Can opener | wildcard |
+| Ginger beer bottle | Katana | wildcard |
+| Cherry | — | wildcard |
+| Almond | Giant spoon | wildcard |
+| **Blender** | **Boxing gloves** | **wildcard — the elite** |
 
-The blender is the heaviest of them and works well as an occasional elite —
-tougher than the rest of the pool and worth more points.
+The blender is the heaviest of them and is the pool's **elite**: 1.6x the health
+of an ordinary blocker, slower with it, and worth double points.
 
 The pool is a plain list, so new wildcards can be added later with nothing more
 than a sprite and a line of metadata.

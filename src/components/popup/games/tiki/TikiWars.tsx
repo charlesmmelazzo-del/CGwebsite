@@ -13,7 +13,7 @@ import {
 import {
   armorCost, bombCost, canBuyArmor, canBuyBomb, freshState, GUNS, MAX_ARMOR,
   MAX_BOMBS, MAX_HEALTH, runDetail, update, detonateBomb, worldSpeed,
-  DRAG_RANGE, isGrunt, GATE_REACH, GATE_CURE_HITS, rungOf, isGoodOption,
+  DRAG_RANGE, GATE_REACH, GATE_CURE_HITS, rungOf, isGoodOption,
   isMaxedOption, type Enemy, type State,
 } from "./tikiCore";
 
@@ -482,14 +482,30 @@ function drawField(
   for (const e of sorted) {
     if (e.z > 1.02) continue;
     const sc = projectScale(e.z);
+    // Which sheet, and which animation on it.
+    //
+    // Blockers and bosses carry a HIT frame, so a staggered or dying one snaps
+    // to it — that is what makes a landed round read as a landed round rather
+    // than a number going down. Grunts have no hit frame and keep their walk;
+    // the white flash carries it for them.
+    const hurt = e.dying > 0 || e.stagger > 0;
     const key: SpriteKey =
-      e.kind === "boss" ? "boss-baby-pineapple-walk"
-        : e.kind === "sugarcane" ? "sugarcane-walk"
+      e.tier === "boss"
+        ? (hurt ? `boss-${e.kind}-hit`
+          : e.attacking > 0 ? `boss-${e.kind}-attack`
+            : `boss-${e.kind}-walk`) as SpriteKey
+        : e.tier === "blocker"
+          ? (hurt ? `blk-${e.kind}-hit` : `blk-${e.kind}-walk`) as SpriteKey
           : (`${e.kind}-walk` as SpriteKey);
-    const base = e.kind === "boss" ? 170 : e.kind === "sugarcane" ? 104 : 60;
+    const base = e.tier === "boss" ? 170 : e.tier === "blocker" ? 104 : 60;
     const x = projectX(e.nx, e.z);
     const y = projectY(e.z, h);
-    const frame = Math.floor(t * 7 + e.id);
+    // The attack frames are a one-shot swing, not a loop, so they run off their
+    // own countdown rather than wall-clock time.
+    const frame =
+      e.tier === "boss" && e.attacking > 0 && !hurt
+        ? (e.attacking > 0.45 ? 0 : 1)
+        : Math.floor(t * 7 + e.id);
 
     ctx.save();
     if (e.dying > 0) {
@@ -510,12 +526,12 @@ function drawField(
     // bar-per-enemy would put one over everything on a crowded screen and read
     // as noise. A grunt's state is carried by its hit flash and stagger, which
     // is enough at that size.
-    if (!isGrunt(e.kind) && e.dying <= 0 && e.hp > 0) {
+    if (e.tier !== "grunt" && e.dying <= 0 && e.hp > 0) {
       const bw = Math.max(10, 26 * sc);
       const by = y - base * sc - 4;
       ctx.fillStyle = "rgba(0,0,0,0.55)";
       ctx.fillRect(x - bw / 2, by, bw, 2.6);
-      ctx.fillStyle = e.kind === "boss" ? C.danger : C.flameHot;
+      ctx.fillStyle = e.tier === "boss" ? C.danger : C.flameHot;
       ctx.fillRect(x - bw / 2, by, bw * Math.max(0, e.hp / e.maxHp), 2.6);
     }
   }

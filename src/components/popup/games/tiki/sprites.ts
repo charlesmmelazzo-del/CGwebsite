@@ -46,32 +46,53 @@ export interface SheetDef {
   rows: number;
 }
 
-export const SHEETS = {
+// ─── The cast ────────────────────────────────────────────────────────────────
+//
+// Enemy art is systematic, so the manifest is DERIVED from these three lists
+// rather than written out by hand. Adding a new enemy is one string here plus
+// the PNG — not six near-identical manifest entries to keep in step.
+
+/** Soldiers: 4 frames, walk only. One shot each. */
+export const SOLDIERS = ["lime", "kiwi", "lemon", "orange", "cherry", "sugarcube"] as const;
+
+/** Blockers: 5 frames — walk x4, then hit. */
+export const BLOCKERS = [
+  "sugarcane", "worm", "mezcal", "cinnamon", "coconut", "grapefruit", "candycane",
+  "milk", "beercan", "coconutcream", "gingerbeer", "cherry", "almond", "blender",
+] as const;
+
+/** Bosses: 5 frames — walk x2, attack x2, then hit. */
+export const BOSSES = ["baby", "knight", "santa", "king"] as const;
+
+export type SoldierName = (typeof SOLDIERS)[number];
+export type BlockerName = (typeof BLOCKERS)[number];
+export type BossName = (typeof BOSSES)[number];
+
+export interface SheetDef {
+  /** Filename under /popup/art/tiki/, without extension. */
+  file: string;
+  cols: number;
+  rows: number;
+}
+
+/** Every character sheet, built from the rosters above. */
+export const SHEETS: Record<string, SheetDef> = {
   player: { file: "player", cols: 4, rows: 1 },
   helper: { file: "helper", cols: 2, rows: 1 },
-  lime: { file: "lime", cols: 4, rows: 1 },
-  lemon: { file: "lemon", cols: 2, rows: 1 },
-  orange: { file: "orange", cols: 2, rows: 1 },
-  kiwi: { file: "kiwi", cols: 4, rows: 1 },
-  sugarcane: { file: "sugarcane", cols: 4, rows: 1 },
-  "boss-baby-pineapple": { file: "boss-baby-pineapple", cols: 2, rows: 1 },
-} as const satisfies Record<string, SheetDef>;
+  ...Object.fromEntries(SOLDIERS.map((n) => [n, { file: n, cols: 4, rows: 1 }])),
+  // blk-/boss- prefixes keep the two cherries apart: there is a cherry SOLDIER
+  // and a cherry BLOCKER, and they are different characters.
+  ...Object.fromEntries(BLOCKERS.map((n) => [`blk-${n}`, { file: `blk-${n}`, cols: 5, rows: 1 }])),
+  ...Object.fromEntries(BOSSES.map((n) => [`boss-${n}`, { file: `boss-${n}`, cols: 5, rows: 1 }])),
+};
 
-export type SheetName = keyof typeof SHEETS;
+export type SheetName = string;
 
 export interface SpriteMeta {
   /** Frames in the cycle. */
   frames: number;
   /** Height at closest approach, in logical pixels. The detail budget. */
   onScreen: number;
-  /**
-   * Preferred source: one row of a character sheet.
-   *
-   * Checked first. If the sheet has not been drawn yet, the loose files below
-   * are tried, and failing those the code-drawn placeholder is used — so art
-   * can arrive as a sheet, as loose frames, or not at all, in any order and any
-   * mixture, without a code change.
-   */
   sheet?: {
     name: SheetName;
     row: number;
@@ -80,8 +101,7 @@ export interface SpriteMeta {
      *
      * Frames run rightward from here, which lets one row carry several
      * animations back to back — walk, then attack, then hit — so a whole
-     * character can be a single strip. That is much easier to draw than a
-     * multi-row grid, and there is no second row to line up.
+     * character is a single strip with no second row to line up.
      */
     col?: number;
   };
@@ -89,10 +109,21 @@ export interface SpriteMeta {
   file?: string;
 }
 
-export const SPRITES = {
+export type SpriteKey =
+  | "player-walk" | "player-turn" | "player-turn-shades" | "player-hit"
+  | "helper-walk" | "gun-shotgun" | "gun-uzi"
+  | "prop-palm" | "shopkeeper-scotch"
+  | `${SoldierName}-walk`
+  | `blk-${BlockerName}-walk` | `blk-${BlockerName}-hit`
+  | `boss-${BossName}-walk` | `boss-${BossName}-attack` | `boss-${BossName}-hit`;
+
+const SOLDIER_H = 60;
+const BLOCKER_H = 104;
+const BOSS_H = 170;
+
+export const SPRITES: Record<SpriteKey, SpriteMeta> = {
   // player.png is the WALK CYCLE ONLY — 4 cols x 1 row. The turn-to-camera
-  // poses are single images and stay loose files; there is nothing to gain from
-  // forcing one-frame art into a grid.
+  // poses are single images and stay loose files.
   "player-walk": { sheet: { name: "player", row: 0 }, file: "player-walk", frames: 4, onScreen: 84 },
   "player-turn": { file: "player-turn", frames: 1, onScreen: 84 },
   "player-turn-shades": { file: "player-turn-shades", frames: 1, onScreen: 84 },
@@ -102,23 +133,26 @@ export const SPRITES = {
   // every gun, instead of a separate walk sheet per weapon.
   "gun-shotgun": { file: "gun-shotgun", frames: 1, onScreen: 84 },
   "gun-uzi": { file: "gun-uzi", frames: 1, onScreen: 84 },
-
   "helper-walk": { sheet: { name: "helper", row: 0 }, file: "helper-walk", frames: 2, onScreen: 62 },
-
-  "lime-walk": { sheet: { name: "lime", row: 0 }, file: "lime-walk", frames: 4, onScreen: 60 },
-  "lemon-walk": { sheet: { name: "lemon", row: 0 }, file: "lemon-walk", frames: 2, onScreen: 60 },
-  "orange-walk": { sheet: { name: "orange", row: 0 }, file: "orange-walk", frames: 2, onScreen: 60 },
-  "kiwi-walk": { sheet: { name: "kiwi", row: 0 }, file: "kiwi-walk", frames: 4, onScreen: 60 },
-  "sugarcane-walk": { sheet: { name: "sugarcane", row: 0 }, file: "sugarcane-walk", frames: 4, onScreen: 104 },
-  "boss-baby-pineapple-walk": { sheet: { name: "boss-baby-pineapple", row: 0 }, file: "boss-baby-pineapple-walk", frames: 2, onScreen: 170 },
 
   // Scenery and the shopkeeper stay loose files — one image each with nothing
   // to animate, so a sheet would only add a layout to get wrong.
   "prop-palm": { file: "prop-palm", frames: 1, onScreen: 150 },
   "shopkeeper-scotch": { file: "shopkeeper-scotch", frames: 1, onScreen: 180 },
-} as const satisfies Record<string, SpriteMeta>;
 
-export type SpriteKey = keyof typeof SPRITES;
+  ...Object.fromEntries(SOLDIERS.map((n) => [
+    `${n}-walk`, { sheet: { name: n, row: 0 }, frames: 4, onScreen: SOLDIER_H },
+  ])),
+  ...Object.fromEntries(BLOCKERS.flatMap((n) => [
+    [`blk-${n}-walk`, { sheet: { name: `blk-${n}`, row: 0 }, frames: 4, onScreen: BLOCKER_H }],
+    [`blk-${n}-hit`, { sheet: { name: `blk-${n}`, row: 0, col: 4 }, frames: 1, onScreen: BLOCKER_H }],
+  ])),
+  ...Object.fromEntries(BOSSES.flatMap((n) => [
+    [`boss-${n}-walk`, { sheet: { name: `boss-${n}`, row: 0 }, frames: 2, onScreen: BOSS_H }],
+    [`boss-${n}-attack`, { sheet: { name: `boss-${n}`, row: 0, col: 2 }, frames: 2, onScreen: BOSS_H }],
+    [`boss-${n}-hit`, { sheet: { name: `boss-${n}`, row: 0, col: 4 }, frames: 1, onScreen: BOSS_H }],
+  ])),
+} as Record<SpriteKey, SpriteMeta>;
 
 const ART_BASE = "/popup/art/tiki";
 
@@ -146,21 +180,26 @@ const buckets = new Map<string, HTMLCanvasElement>();
  * Failures are expected and silent — a missing file is the normal state until
  * the artwork exists, not an error worth surfacing to someone playing a game.
  */
+/**
+ * Warm up only what the guest is certain to see immediately.
+ *
+ * Everything else is fetched ON FIRST USE, from resolve(). The full cast is
+ * about 10MB — 14 blockers and 4 bosses, most of which a given run never meets
+ * — and pulling all of it up front on a phone at a bar would stall the start of
+ * the game to download art for a stage nobody has reached. A sprite that has
+ * not arrived yet falls back to its placeholder for a frame or two, which is
+ * the same path used when art does not exist at all.
+ */
 export function loadTikiArt(): void {
   if (typeof window === "undefined") return;
-
-  // Character sheets first — the preferred source.
-  for (const name of Object.keys(SHEETS) as SheetName[]) tryLoad(sheetUrl(name));
-
-  // Then loose files, as a fallback for anything not yet drawn as a sheet.
-  for (const key of Object.keys(SPRITES) as SpriteKey[]) {
-    const m: SpriteMeta = SPRITES[key];
-    if (!m.file) continue;
-    for (let f = 0; f < m.frames; f++) {
-      const url = spriteUrl(key, f);
-      if (url) tryLoad(url);
-    }
+  tryLoad(sheetUrl("player"));
+  for (const key of ["player-turn", "player-turn-shades"] as SpriteKey[]) {
+    const url = spriteUrl(key, 0);
+    if (url) tryLoad(url);
   }
+  // The soldiers fill the screen from the first wave, so they are worth having
+  // ready; they are also the smallest sheets in the game.
+  for (const n of SOLDIERS) tryLoad(sheetUrl(n));
 }
 
 function tryLoad(url: string): void {
@@ -234,6 +273,9 @@ function resolve(
   if (m.sheet) {
     const def = SHEETS[m.sheet.name];
     const url = sheetUrl(m.sheet.name);
+    // Ask for it the first time it is actually needed. tryLoad is idempotent,
+    // so this is a no-op on every frame after the first.
+    tryLoad(url);
     const img = loaded.get(url);
     if (img && img.width) {
       const cw = img.width / def.cols;
@@ -252,6 +294,7 @@ function resolve(
 
   const url = spriteUrl(key, frame);
   if (!url || missing.has(url)) return null;
+  tryLoad(url);
   return scaledCell(url, null, targetH, pixelScale);
 }
 
@@ -318,7 +361,7 @@ function paint(
     ctx.drawImage(art, (-w / 2) * pixelScale, -art.height);
     ctx.restore();
   } else {
-    PLACEHOLDERS[key](ctx, h, frame);
+    (PLACEHOLDERS[key] ?? ((c, hh, f) => genericFoe(hh, f, c)))(ctx, h, frame);
   }
 }
 
@@ -789,22 +832,53 @@ function drawShopkeeper(ctx: CanvasRenderingContext2D, h: number) {
  */
 const noOverlay: Placeholder = () => {};
 
-const PLACEHOLDERS: Record<SpriteKey, Placeholder> = {
+/**
+ * Stand-in for anything without hand-drawn placeholder art.
+ *
+ * There are now 46 sprite keys and writing a bespoke placeholder for each would
+ * be a lot of code for pictures nobody will ever see once the art lands. What a
+ * placeholder actually has to do is hold the right SPACE and read as the right
+ * TIER, so this draws a bulk-appropriate blob: the guest can still tell a
+ * blocker from a grunt while the real sheet is downloading.
+ */
+function genericFoe(h: number, frame: number, ctx: CanvasRenderingContext2D) {
+  const w = h * 0.6;
+  shadowBlob(ctx, w * 0.85);
+  legs(ctx, h, w * 0.75, frame / 2, "#5A5A66");
+  const r = w * 0.42;
+  const cy = -h * 0.24 - r;
+  circle(ctx, 0, cy, r);
+  ink(ctx, "#7A7A88", h);
+  for (const s2 of [-1, 1]) {
+    circle(ctx, s2 * r * 0.34, cy - h * 0.02, h * 0.028);
+    ink(ctx, "#FFFFFF", h, 0.02);
+  }
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.34, cy + r * 0.5);
+  ctx.lineTo(r * 0.34, cy + r * 0.5);
+  ctx.lineWidth = Math.max(0.7, h * 0.025);
+  ctx.strokeStyle = C.outline;
+  ctx.stroke();
+}
+
+const PLACEHOLDERS: Partial<Record<SpriteKey, Placeholder>> = {
   "gun-shotgun": noOverlay,
   "gun-uzi": noOverlay,
+  "lime-walk": drawGrunt(C.lime, "#6FA81E"),
+  "lemon-walk": drawGrunt(C.lemon, "#C9B31E"),
+  "orange-walk": drawGrunt(C.orange, "#C96A12"),
+  "cherry-walk": drawGrunt("#E0243C", "#8A1020"),
+  "sugarcube-walk": drawGrunt("#F2F2EA", "#B9B9AE"),
+  // The kiwi leans forward — the one grunt whose speed you can read on approach.
+  "kiwi-walk": drawGrunt(C.kiwi, C.kiwiSkin, -0.12),
+  "blk-sugarcane-walk": drawSugarcane,
+  "boss-baby-walk": drawBabyPineapple,
   "player-walk": drawPlayerBack,
   "player-hit": (ctx, h) => drawPlayerBack(ctx, h, 0),
   "player-turn": drawPlayerTurn(false),
   "player-turn-shades": drawPlayerTurn(true),
   "helper-walk": drawHelper,
 
-  "lime-walk": drawGrunt(C.lime, "#6FA81E"),
-  "lemon-walk": drawGrunt(C.lemon, "#C9B31E"),
-  "orange-walk": drawGrunt(C.orange, "#C96A12"),
-  // The kiwi leans forward — the one grunt whose speed you can read on approach.
-  "kiwi-walk": drawGrunt(C.kiwi, C.kiwiSkin, -0.12),
-  "sugarcane-walk": drawSugarcane,
-  "boss-baby-pineapple-walk": drawBabyPineapple,
 
   "prop-palm": drawPalm,
   "shopkeeper-scotch": drawShopkeeper,

@@ -26,29 +26,81 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
-const SRC = path.join(os.homedir(), "Desktop", "Game Assets", "Tiki Wars", "Character Assets");
+const ROOT = path.join(os.homedir(), "Desktop", "Game Assets", "Tiki Wars", "Character Assets");
+
+/** ROOT and every folder beneath it — he reorganises, and art must not vanish. */
+function srcDirs() {
+  const out = [];
+  const walk = (d) => {
+    if (!fs.existsSync(d)) return;
+    out.push(d);
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      if (e.isDirectory()) walk(path.join(d, e.name));
+    }
+  };
+  walk(ROOT);
+  return out;
+}
 const DEST = path.join(process.cwd(), "public", "popup", "art", "tiki");
 
-/** His filename -> the name the game's sprite manifest looks for. */
+/**
+ * His filename -> the name the game's sprite manifest looks for.
+ *
+ * Blockers are prefixed blk- and bosses boss-, which keeps them unambiguous:
+ * there is both a cherry SOLDIER and a cherry BLOCKER, and they are different
+ * characters with different frame counts.
+ */
 const MAP = {
+  // ── Player ──
   "Player Walking Sheet.png": "player.png",     // the 4x1 walk SHEET
   "Player Turn .png": "player-turn.png",
   "Player Turn Shades.png": "player-turn-shades.png",
-  "Lime Soldier Sheet.png": "lime.png",
-  "Kiwi Soldier Sheet.png": "kiwi.png",
   "Shotgun Arms.png": "gun-shotgun.png",
   "Uzi Arms.png": "gun-uzi.png",
+
+  // ── Soldiers: 4 frames, walk only ──
+  "Lime Soldier Sheet.png": "lime.png",
+  "Kiwi Soldier Sheet.png": "kiwi.png",
+  "Lemon Solider.png": "lemon.png",             // sic: his spelling
+  "Orange Soldier.png": "orange.png",
+  "Cherry Soldier.png": "cherry.png",
+  "Sugar Cube Soldier.png": "sugarcube.png",
+
+  // ── Blockers: 5 frames, walk x4 + hit ──
+  "Sugar Cane Blocker.png": "blk-sugarcane.png",
+  "Worm Blocker.png": "blk-worm.png",
+  "Mezcal Blocker.png": "blk-mezcal.png",
+  "Cinnamon Blocker.png": "blk-cinnamon.png",
+  "Coconut Blocker.png": "blk-coconut.png",
+  "Grapefruit Blocker.png": "blk-grapefruit.png",
+  "Candy Cane Blocker.png": "blk-candycane.png",
+  "Milk Blocker.png": "blk-milk.png",
+  "Beer Can Blocker.png": "blk-beercan.png",
+  "Coconut Cream Blocker.png": "blk-coconutcream.png",
+  "Ginger Beer Blocker.png": "blk-gingerbeer.png",
+  "Cherry Blocker.png": "blk-cherry.png",
+  "Almond Blocker.png": "blk-almond.png",
+  "Blender Blocker.png": "blk-blender.png",
+
+  // ── Bosses: 5 frames, walk x2 + attack x2 + hit ──
+  "Baby Boss.png": "boss-baby.png",
+  "Knight Boss.png": "boss-knight.png",
+  "Santa Boss.png": "boss-santa.png",
+  "King Boss.png": "boss-king.png",
 };
+
+/** Frame count by target-name prefix. */
+function framesFor(name) {
+  if (name.startsWith("blk-") || name.startsWith("boss-")) return 5;
+  if (name === "player.png") return 4;
+  if (["lime.png","kiwi.png","lemon.png","orange.png","cherry.png","sugarcube.png"].includes(name)) return 4;
+  return 1;
+}
 
 /** Overlays keep the body's framing — trimming them would slide the arms off. */
 const OVERLAY = { "gun-shotgun.png": true, "gun-uzi.png": true };
 
-/** Sheets that must have their frames straightened, and how many frames. */
-const FRAMES = {
-  "player.png": 4,
-  "lime.png": 4,
-  "kiwi.png": 4,
-};
+
 
 // ─── PNG ─────────────────────────────────────────────────────────────────────
 
@@ -302,6 +354,21 @@ function trim(img, frames, pad = 4) {
 const TARGET_H = 384;
 
 /**
+ * Target height per sprite, from the largest size it is ever drawn at.
+ *
+ * A single figure for everything wastes most of the download: a soldier is
+ * drawn at 60 logical px (120 device) and a boss at 170 (340), so giving the
+ * soldier the boss's resolution ships several times more detail than the screen
+ * can show. Each is boxed to roughly 1.5x its own maximum instead.
+ */
+function targetHeight(name) {
+  if (name.startsWith("boss-")) return 384;          // 170 logical -> 340 device
+  if (name.startsWith("blk-")) return 288;           // 104 logical -> 208 device
+  if (name.startsWith("player") || name.startsWith("gun-")) return 256;  // 84 -> 168
+  return 192;                                         // soldiers: 60 -> 120
+}
+
+/**
  * Box-filter downscale, averaging RGB WEIGHTED BY ALPHA.
  *
  * This weighting is the whole trick. Cutting the background leaves those pixels
@@ -340,26 +407,47 @@ function downscale(img, targetH) {
 // ─── Run ─────────────────────────────────────────────────────────────────────
 
 const dry = process.argv.includes("--dry");
-if (!fs.existsSync(SRC)) { console.error("Source folder not found:\n  " + SRC); process.exit(1); }
 fs.mkdirSync(DEST, { recursive: true });
+
+/** Look for a source file in every folder he uses. */
+function find(name) {
+  for (const d of srcDirs()) {
+    const p = path.join(d, name);
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
+// Anything sitting in his folders that this script does not know about is
+// almost certainly art that will silently never appear in the game.
+const known = new Set(Object.keys(MAP));
+for (const d of srcDirs()) {
+  if (!fs.existsSync(d)) continue;
+  for (const f of fs.readdirSync(d)) {
+    if (f.toLowerCase().endsWith(".png") && !known.has(f)) {
+      console.log(`  UNMAPPED  ${f}  <- in ${path.basename(d)}/, not imported`);
+    }
+  }
+}
 
 let done = 0;
 for (const [from, to] of Object.entries(MAP)) {
-  const src = path.join(SRC, from);
-  if (!fs.existsSync(src)) { console.log(`  skip  ${from}  (not found)`); continue; }
+  const src = find(from);
+  if (!src) { console.log(`  skip  ${from}  (not found)`); continue; }
 
   const img = readPNG(src);
   const cutInfo = img.hadAlpha ? { kind: "already had alpha", cut: 0 } : cutBackground(img);
   let shifts = null;
   // Straighten BEFORE downscaling, so the shift is measured at full resolution.
-  if (FRAMES[to]) ({ data: img.data, shifts } = straighten(img, FRAMES[to]));
+  const nFrames = framesFor(to);
+  if (nFrames > 1) ({ data: img.data, shifts } = straighten(img, nFrames));
 
   const srcW = img.w, srcH = img.h;
   // Weapon overlays are NOT trimmed: they have to keep the same framing as the
   // body they sit on top of, and cropping them to their own content would slide
   // the arms off the character.
-  const trimmed = OVERLAY[to] ? img : trim(img, FRAMES[to] ?? 1);
-  const small = downscale(trimmed, TARGET_H);
+  const trimmed = OVERLAY[to] ? img : trim(img, nFrames);
+  const small = downscale(trimmed, targetHeight(to));
 
   if (!dry) writePNG(path.join(DEST, to), small.w, small.h, small.data);
   done++;

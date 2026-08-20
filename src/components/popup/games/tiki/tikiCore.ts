@@ -115,12 +115,58 @@ export const GUNS: Record<GunKind, {
 export const BURN_DPS = 3.5;
 export const BURN_SECONDS = 2.6;
 
-export type EnemyKind = "lime" | "lemon" | "orange" | "kiwi" | "sugarcane" | "boss";
+/**
+ * Every enemy the game can put on the field.
+ *
+ * `kind` is the sprite roster name; `tier` is what the rules care about. The
+ * renderer turns a kind into a sheet name, so adding an enemy is one entry in
+ * one of these lists plus the PNG.
+ */
+export const GRUNTS = ["lime", "kiwi", "lemon", "orange", "cherry", "sugarcube"] as const;
 
-export const GRUNTS: EnemyKind[] = ["lime", "lemon", "orange", "kiwi"];
+/**
+ * Blockers. ALL of them can appear on ANY stage, for now.
+ *
+ * The design has stage-native blockers (sugar cane on the beach, cinnamon in
+ * the winter) with a wildcard pool on top. Only the beach exists yet, so
+ * confining each blocker to its unbuilt stage would leave thirteen of the
+ * fourteen drawn and never seen. Treating the whole roster as wildcards uses
+ * every one of them today and gives the waves real variety; the stage
+ * weighting comes back when the stages themselves do.
+ */
+export const BLOCKERS = [
+  "sugarcane", "worm", "mezcal", "cinnamon", "coconut", "grapefruit", "candycane",
+  "milk", "beercan", "coconutcream", "gingerbeer", "cherry", "almond", "blender",
+] as const;
 
-export function isGrunt(k: EnemyKind): boolean {
-  return GRUNTS.includes(k);
+/** Bosses, in the order a run meets them. */
+export const BOSSES = ["baby", "knight", "santa", "king"] as const;
+
+export type GruntName = (typeof GRUNTS)[number];
+export type BlockerName = (typeof BLOCKERS)[number];
+export type BossName = (typeof BOSSES)[number];
+export type EnemyTier = "grunt" | "blocker" | "boss";
+
+export function isGrunt(k: string): boolean {
+  return (GRUNTS as readonly string[]).includes(k);
+}
+
+export function isBlocker(k: string): boolean {
+  return (BLOCKERS as readonly string[]).includes(k);
+}
+
+/** The blender is the elite of the pool: tougher and worth more. */
+export const ELITE_BLOCKER: BlockerName = "blender";
+
+/**
+ * Which boss guards which stage.
+ *
+ * Cycles through all four rather than repeating the beach boss forever, so a
+ * guest who keeps going meets every one of them. Once the real stages exist
+ * this becomes a property of the stage instead.
+ */
+export function bossFor(stage: number): BossName {
+  return BOSSES[(stage - 1) % BOSSES.length];
 }
 
 /**
@@ -155,14 +201,23 @@ export const STAGGER_SPEED = 0.15;
 /** How far back up the field a hit shoves an enemy. */
 export const STAGGER_KNOCKBACK = 0.012;
 
-/** The kiwi is the quick one — speed is visible on approach, health is not. */
-const GRUNT_SPEED: Record<string, number> = {
-  lime: 1, lemon: 0.94, orange: 0.88, kiwi: 1.32,
+/**
+ * Per-soldier walking speed.
+ *
+ * The ONLY thing that varies between soldiers, along with how they look. Health
+ * is deliberately identical across all six — speed is visible on the approach
+ * and health is not, so a cherry that secretly took longer than a lime would
+ * read as the game cheating.
+ */
+const GRUNT_SPEED: Record<GruntName, number> = {
+  lime: 1, kiwi: 1.32, lemon: 0.94, orange: 0.88, cherry: 1.18, sugarcube: 0.8,
 };
 
 export interface Enemy {
   id: number;
-  kind: EnemyKind;
+  /** Roster name — the renderer maps this to a sprite sheet. */
+  kind: string;
+  tier: EnemyTier;
   z: number;
   nx: number;
   hp: number;
@@ -177,6 +232,8 @@ export interface Enemy {
   /** Blockers steer toward the player; grunts walk straight. */
   tracks: boolean;
   dying: number;
+  /** Bosses only: counts down while the attack frames are showing. */
+  attacking: number;
 }
 
 export interface Bullet {
@@ -522,7 +579,7 @@ export function gateGoodChance(stage: number, luck: number): number {
 
 // ─── Gates ───────────────────────────────────────────────────────────────────
 
-function pick<T>(arr: T[], rng: () => number): T {
+function pick<T>(arr: readonly T[], rng: () => number): T {
   return arr[Math.floor(rng() * arr.length) % arr.length];
 }
 
@@ -645,28 +702,55 @@ export function detonateBomb(st: State): boolean {
 
 function spawnOne(st: State, nx: number): void {
   const blocker = st.rng() < blockerChance(st.stage);
-  const kind: EnemyKind = blocker ? "sugarcane" : pick(GRUNTS, st.rng);
-  const hp = blocker ? blockerHp(st.stage) : gruntHp(st.stage);
   const world = worldSpeed(st.stage);
   const walk = enemyWalk(st.stage);
+
+  if (blocker) {
+    const kind = pick(BLOCKERS, st.rng);
+    const elite = kind === ELITE_BLOCKER;
+    const hp = Math.round(blockerHp(st.stage) * (elite ? 1.6 : 1));
+    st.enemies.push({
+      id: st.nextId++,
+      kind,
+      tier: "blocker",
+      z: 1 + st.rng() * 0.12,
+      nx,
+      hp,
+      maxHp: hp,
+      // The elite is heavier in every sense: tougher, and slower with it.
+      speed: world + walk * (elite ? 0.42 : 0.55),
+      burn: 0,
+      flash: 0,
+      stagger: 0,
+      tracks: true,
+      dying: 0,
+      attacking: 0,
+    });
+    return;
+  }
+
+  const kind = pick(GRUNTS, st.rng);
+  const hp = gruntHp(st.stage);
   st.enemies.push({
     id: st.nextId++,
     kind,
+    tier: "grunt",
     // Spawn slightly beyond the horizon and stagger it, so a wave fades in
     // rather than popping into existence in a rank.
     z: 1 + st.rng() * 0.12,
     nx,
     hp,
     maxHp: hp,
-    // Only the enemy's OWN legs vary by type — the world comes at everything
-    // at the same rate. The kiwi is quick because it runs, not because the
-    // ground moves faster underneath it.
-    speed: world + walk * (blocker ? 0.55 : GRUNT_SPEED[kind] ?? 1),
+    // Only the enemy's OWN legs vary by type — the world comes at everything at
+    // the same rate. The kiwi is quick because it runs, not because the ground
+    // moves faster underneath it.
+    speed: world + walk * GRUNT_SPEED[kind],
     burn: 0,
     flash: 0,
     stagger: 0,
-    tracks: blocker,
+    tracks: false,
     dying: 0,
+    attacking: 0,
   });
 }
 
@@ -686,7 +770,8 @@ function spawnBoss(st: State): void {
   const hp = bossHp(st.stage);
   st.enemies.push({
     id: st.nextId++,
-    kind: "boss",
+    kind: bossFor(st.stage),
+    tier: "boss",
     z: 1,
     nx: 0,
     hp,
@@ -697,8 +782,13 @@ function spawnBoss(st: State): void {
     stagger: 0,
     tracks: true,
     dying: 0,
+    attacking: 0,
   });
 }
+
+/** How close a boss gets before it starts swinging. */
+export const BOSS_ATTACK_Z = 0.3;
+export const BOSS_ATTACK_SECONDS = 0.9;
 
 // ─── Firing ──────────────────────────────────────────────────────────────────
 
@@ -741,27 +831,31 @@ function addPop(st: State, e: Enemy, text: string, good: boolean): void {
  * The floating number IS the feedback.
  */
 function missPenalty(st: State, e: Enemy): void {
-  if (e.kind === "boss") return;          // a boss cannot be dodged past
-  const cost = isGrunt(e.kind) ? PTS_MISS_GRUNT : PTS_MISS_BLOCKER;
-  if (isGrunt(e.kind)) st.misses.grunt++;
+  if (e.tier === "boss") return;          // a boss cannot be dodged past
+  const cost = e.tier === "grunt" ? PTS_MISS_GRUNT : PTS_MISS_BLOCKER;
+  if (e.tier === "grunt") st.misses.grunt++;
   else st.misses.blocker++;
   st.score = Math.max(0, st.score - cost);
   addPop(st, e, `-${cost}`, false);
 }
 
 function killReward(st: State, e: Enemy): void {
-  if (e.kind === "boss") {
+  if (e.tier === "boss") {
     st.kills.boss++;
     st.score += PTS_BOSS;
-  } else if (isGrunt(e.kind)) {
+  } else if (e.tier === "grunt") {
     st.kills.grunt++;
     st.score += PTS_GRUNT;
   } else {
     st.kills.blocker++;
-    st.score += PTS_BLOCKER;
+    // The elite is worth the extra trouble it costs to bring down.
+    st.score += e.kind === ELITE_BLOCKER ? PTS_BLOCKER * 2 : PTS_BLOCKER;
   }
   st.score = Math.min(MAX_SCORE, st.score);
-  if (e.kind !== "boss") addPop(st, e, `+${isGrunt(e.kind) ? PTS_GRUNT : PTS_BLOCKER}`, true);
+  if (e.tier !== "boss") {
+    addPop(st, e, `+${e.tier === "grunt" ? PTS_GRUNT
+      : e.kind === ELITE_BLOCKER ? PTS_BLOCKER * 2 : PTS_BLOCKER}`, true);
+  }
 }
 
 // ─── Step ────────────────────────────────────────────────────────────────────
@@ -900,6 +994,12 @@ export function update(st: State, dt: number): void {
 
     // A staggered enemy barely advances — the hit visibly stops it.
     if (e.stagger > 0) e.stagger -= dt;
+    if (e.attacking > 0) e.attacking -= dt;
+    // A boss winds up once it is close, which is what the attack frames are
+    // for — without this the art is drawn and never seen.
+    if (e.tier === "boss" && e.z <= BOSS_ATTACK_Z && e.attacking <= 0 && e.dying <= 0) {
+      e.attacking = BOSS_ATTACK_SECONDS;
+    }
     e.z -= e.speed * (e.stagger > 0 ? STAGGER_SPEED : 1) * dt;
     if (e.tracks) {
       const d = st.playerNx - e.nx;
@@ -940,10 +1040,10 @@ export function update(st: State, dt: number): void {
     if (e.hp <= 0) {
       e.dying = 0.35;
       killReward(st, e);
-      if (e.kind === "boss") {
+      if (e.tier === "boss") {
         st.phase = "bosskill";
         st.phaseT = 0;
-        st.enemies = st.enemies.filter((x) => x.kind === "boss");
+        st.enemies = st.enemies.filter((x) => x.tier === "boss");
         st.bullets = [];
         st.gate = null;
       }
@@ -955,7 +1055,7 @@ export function update(st: State, dt: number): void {
       damage(st, CONTACT_DAMAGE);
       // Helpers are bodies between you and them — one is lost per hit taken.
       if (st.helpers > 0) st.helpers -= 1;
-      if (e.kind === "boss") {
+      if (e.tier === "boss") {
         // A boss is NOT consumed by hitting you. Removing it here left the
         // phase stuck on "boss" with nothing on the field and no way to clear
         // the stage — an unrecoverable softlock. It falls back and comes again;
@@ -970,7 +1070,7 @@ export function update(st: State, dt: number): void {
 
     // Got past. Everything except a boss is charged for and leaves the field.
     if (e.z <= MISS_Z) {
-      if (e.kind === "boss") {
+      if (e.tier === "boss") {
         // The boss never leaves. It is the stage's exit condition, so removing
         // it here — for any reason — strands the run with nothing to kill.
         e.z = 0.3;

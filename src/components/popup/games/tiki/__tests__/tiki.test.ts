@@ -8,6 +8,7 @@ import {
   MAX_ARMOR, MAX_HEALTH, MAX_HELPERS, PTS_BLOCKER, PTS_BOSS, PTS_GRUNT,
   PTS_MISS_BLOCKER, PTS_MISS_GRUNT, spawnInterval, update, detonateBomb,
   enemyWalk, waveSize, worldSpeed, gruntHp, blockerHp, FOLLOW_RATE,
+  BLOCKERS, BOSSES, bossFor, ELITE_BLOCKER, BOSS_ATTACK_Z,
   MAX_TRAVERSE, GATE_REACH, GATE_CURE_HITS, cureGateOption, LADDERS,
   rungOf, type State,
 } from "../tikiCore";
@@ -40,8 +41,8 @@ check("a grunt survives one shot and dies to a few", () => {
   const st = fresh();
   assert.ok(gruntHp(1) > 1, "grunts are back to dying in a single shot");
   st.enemies = [{
-    id: 1, kind: "lime", z: 0.5, nx: 0, hp: gruntHp(1), maxHp: gruntHp(1), speed: 0,
-    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0,
+    id: 1, kind: "lime", tier: "grunt", z: 0.5, nx: 0, hp: gruntHp(1), maxHp: gruntHp(1), speed: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
   }];
   st.bullets = [{ z: 0.5, nx: 0, vnx: 0, damage: GUNS.pistol.damage, side: 1 }];
   update(st, DT);
@@ -70,8 +71,8 @@ check("a blocker is still clearly tougher than a grunt", () => {
 check("a hit staggers the target and shoves it back", () => {
   const st = fresh();
   st.enemies = [{
-    id: 1, kind: "sugarcane", z: 0.5, nx: 0, hp: 20, maxHp: 20, speed: 0.2,
-    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0,
+    id: 1, kind: "sugarcane", tier: "blocker", z: 0.5, nx: 0, hp: 20, maxHp: 20, speed: 0.2,
+    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
   }];
   st.bullets = [{ z: 0.5, nx: 0, vnx: 0, damage: 1, side: 1 }];
   update(st, DT);
@@ -85,8 +86,8 @@ check("a staggered enemy barely advances", () => {
     const st = fresh();
     st.gun = "flame";                  // no fresh bullets to re-stagger it
     st.enemies = [{
-      id: 1, kind: "sugarcane", z: 0.9, nx: 0.9, hp: 20, maxHp: 20, speed: 0.4,
-      burn: 0, flash: 0, stagger, tracks: false, dying: 0,
+      id: 1, kind: "sugarcane", tier: "blocker", z: 0.9, nx: 0.9, hp: 20, maxHp: 20, speed: 0.4,
+      burn: 0, flash: 0, stagger, tracks: false, dying: 0, attacking: 0,
     }];
     st.playerNx = -0.9;
     run(st, 0.1);
@@ -98,7 +99,7 @@ check("a staggered enemy barely advances", () => {
 check("grunts are grunts and the blocker is not", () => {
   for (const k of GRUNTS) assert.ok(isGrunt(k));
   assert.ok(!isGrunt("sugarcane"));
-  assert.ok(!isGrunt("boss"));
+  assert.ok(!isGrunt("baby"));
 });
 
 check("a blocker takes several shots and scales with the stage", () => {
@@ -139,8 +140,8 @@ check("invulnerability stops one contact becoming five", () => {
 check("an enemy that reaches the player deals contact damage", () => {
   const st = fresh();
   st.enemies = [{
-    id: 1, kind: "lime", z: CONTACT_Z * 0.5, nx: 0, hp: 1, maxHp: 1, speed: 0,
-    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0,
+    id: 1, kind: "lime", tier: "grunt", z: CONTACT_Z * 0.5, nx: 0, hp: 1, maxHp: 1, speed: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
   }];
   st.gun = "flame";           // no bullets, so the hit is unambiguous
   st.playerNx = 0;
@@ -151,8 +152,8 @@ check("an enemy that reaches the player deals contact damage", () => {
 check("a dodged grunt costs no HEALTH (it costs points instead)", () => {
   const st = fresh();
   st.enemies = [{
-    id: 1, kind: "lime", z: 0.1, nx: -0.9, hp: 1, maxHp: 1, speed: 0.4,
-    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0,
+    id: 1, kind: "lime", tier: "grunt", z: 0.1, nx: -0.9, hp: 1, maxHp: 1, speed: 0.4,
+    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
   }];
   st.gun = "flame";
   st.playerNx = 0.9;
@@ -168,8 +169,8 @@ check("a grunt that walks past unkilled costs points", () => {
   st.gun = "flame";                    // no bullets, so nothing dies by accident
   st.playerNx = 1;                     // stand well clear: dodge, not contact
   st.enemies = [{
-    id: 1, kind: "lime", z: 0.05, nx: -0.9, hp: 1, maxHp: 1, speed: 0.5,
-    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0,
+    id: 1, kind: "lime", tier: "grunt", z: 0.05, nx: -0.9, hp: 1, maxHp: 1, speed: 0.5,
+    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
   }];
   run(st, 0.6);
   assert.equal(st.score, 500 - PTS_MISS_GRUNT, "dodging a grunt was free");
@@ -183,8 +184,8 @@ check("a blocker that gets past costs more than a grunt", () => {
   st.gun = "flame";
   st.playerNx = 1;
   st.enemies = [{
-    id: 1, kind: "sugarcane", z: 0.05, nx: -0.9, hp: 9, maxHp: 9, speed: 0.5,
-    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0,
+    id: 1, kind: "sugarcane", tier: "blocker", z: 0.05, nx: -0.9, hp: 9, maxHp: 9, speed: 0.5,
+    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
   }];
   run(st, 0.6);
   assert.equal(st.score, 500 - PTS_MISS_BLOCKER);
@@ -203,8 +204,8 @@ check("an enemy that HITS you is not also charged as a dodge", () => {
   st.gun = "flame";
   st.playerNx = 0;
   st.enemies = [{
-    id: 1, kind: "lime", z: 0.04, nx: 0, hp: 1, maxHp: 1, speed: 0.5,
-    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0,
+    id: 1, kind: "lime", tier: "grunt", z: 0.04, nx: 0, hp: 1, maxHp: 1, speed: 0.5,
+    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
   }];
   run(st, 0.6);
   assert.ok(st.health < MAX_HEALTH, "should have taken the hit");
@@ -218,8 +219,8 @@ check("score never goes negative from penalties", () => {
   st.gun = "flame";
   st.playerNx = 1;
   st.enemies = [{
-    id: 1, kind: "sugarcane", z: 0.05, nx: -0.9, hp: 9, maxHp: 9, speed: 0.5,
-    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0,
+    id: 1, kind: "sugarcane", tier: "blocker", z: 0.05, nx: -0.9, hp: 9, maxHp: 9, speed: 0.5,
+    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
   }];
   run(st, 0.6);
   assert.equal(st.score, 0);
@@ -230,8 +231,8 @@ check("a miss leaves a floating number, because the HUD has no score", () => {
   st.gun = "flame";
   st.playerNx = 1;
   st.enemies = [{
-    id: 1, kind: "lime", z: 0.05, nx: -0.9, hp: 1, maxHp: 1, speed: 0.5,
-    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0,
+    id: 1, kind: "lime", tier: "grunt", z: 0.05, nx: -0.9, hp: 1, maxHp: 1, speed: 0.5,
+    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
   }];
   run(st, 0.15);
   assert.ok(st.pops.length > 0, "penalty was applied with no feedback at all");
@@ -245,12 +246,12 @@ check("a boss that touches you is NOT consumed", () => {
   st.gun = "flame";
   st.playerNx = 0;
   st.enemies = [{
-    id: 1, kind: "boss", z: 0.04, nx: 0, hp: 40, maxHp: 40, speed: 0.3,
-    burn: 0, flash: 0, stagger: 0, tracks: true, dying: 0,
+    id: 1, kind: "boss", tier: "boss", z: 0.04, nx: 0, hp: 40, maxHp: 40, speed: 0.3,
+    burn: 0, flash: 0, stagger: 0, tracks: true, dying: 0, attacking: 0,
   }];
   st.phase = "boss";
   run(st, 1.0);
-  const boss = st.enemies.find((e) => e.kind === "boss");
+  const boss = st.enemies.find((e) => e.tier === "boss");
   assert.ok(boss, "the boss vanished after hitting the player — stage softlocks");
   assert.ok(boss!.hp > 0, "the boss died from touching the player");
 });
@@ -260,12 +261,12 @@ check("a boss can never walk off the field and strand the stage", () => {
   st.gun = "flame";
   st.playerNx = -1;                    // dodge as hard as possible
   st.enemies = [{
-    id: 1, kind: "boss", z: 0.02, nx: 1, hp: 40, maxHp: 40, speed: 0.9,
-    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0,
+    id: 1, kind: "boss", tier: "boss", z: 0.02, nx: 1, hp: 40, maxHp: 40, speed: 0.9,
+    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
   }];
   st.phase = "boss";
   run(st, 2.0);
-  assert.ok(st.enemies.some((e) => e.kind === "boss"), "boss walked past and left the stage unclearable");
+  assert.ok(st.enemies.some((e) => e.tier === "boss"), "boss walked past and left the stage unclearable");
   assert.equal(st.misses.blocker + st.misses.grunt, 0, "a boss was charged as a dodge");
 });
 
@@ -288,8 +289,8 @@ check("the flamethrower burns, and the burn outlives the stream", () => {
   st.gun = "flame";
   st.playerNx = 0;
   st.enemies = [{
-    id: 1, kind: "sugarcane", z: 0.2, nx: 0, hp: 40, maxHp: 40, speed: 0,
-    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0,
+    id: 1, kind: "sugarcane", tier: "blocker", z: 0.2, nx: 0, hp: 40, maxHp: 40, speed: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
   }];
   update(st, DT);
   const e = st.enemies[0];
@@ -306,8 +307,8 @@ check("the flamethrower cannot reach the horizon", () => {
   st.gun = "flame";
   st.playerNx = 0;
   st.enemies = [{
-    id: 1, kind: "sugarcane", z: 0.9, nx: 0, hp: 40, maxHp: 40, speed: 0,
-    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0,
+    id: 1, kind: "sugarcane", tier: "blocker", z: 0.9, nx: 0, hp: 40, maxHp: 40, speed: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
   }];
   update(st, DT);
   assert.equal(st.enemies[0].burn, 0, "flame reached far up the field");
@@ -333,8 +334,8 @@ check("a bomb clears the near field and leaves the far field alone", () => {
   const st = fresh();
   st.bombs = 1;
   st.enemies = [
-    { id: 1, kind: "sugarcane", z: 0.2, nx: 0, hp: 20, maxHp: 20, speed: 0, burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0 },
-    { id: 2, kind: "sugarcane", z: 0.9, nx: 0, hp: 20, maxHp: 20, speed: 0, burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0 },
+    { id: 1, kind: "sugarcane", tier: "blocker", z: 0.2, nx: 0, hp: 20, maxHp: 20, speed: 0, burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0 },
+    { id: 2, kind: "sugarcane", tier: "blocker", z: 0.9, nx: 0, hp: 20, maxHp: 20, speed: 0, burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0 },
   ];
   assert.ok(detonateBomb(st));
   assert.ok(st.enemies[0].hp <= 0, "near enemy survived the bomb");
@@ -658,6 +659,89 @@ check("steering never leaves the road", () => {
   assert.ok(st.playerNx >= -1);
 });
 
+// ── The full roster ─────────────────────────────────────────────────────────
+
+check("every soldier, blocker and boss the artist drew is reachable", () => {
+  // The owner's ask: nothing he draws should sit unused. These are the three
+  // lists spawning reads from, so a sprite missing here never appears.
+  assert.equal(GRUNTS.length, 6, "soldier roster changed");
+  assert.equal(BLOCKERS.length, 14, "blocker roster changed");
+  assert.equal(BOSSES.length, 4, "boss roster changed");
+  for (const list of [GRUNTS, BLOCKERS, BOSSES]) {
+    assert.equal(new Set(list).size, list.length, "a roster has a duplicate");
+  }
+});
+
+check("spawning reaches every soldier and every blocker", () => {
+  const st = fresh();
+  st.stage = 8;                        // deep enough that blockers are common
+  const seenG = new Set<string>(), seenB = new Set<string>();
+  for (let i = 0; i < 4000; i++) {
+    st.enemies = [];
+    run(st, 0.5);
+    for (const e of st.enemies) {
+      if (e.tier === "grunt") seenG.add(e.kind);
+      else if (e.tier === "blocker") seenB.add(e.kind);
+    }
+    if (seenG.size === GRUNTS.length && seenB.size === BLOCKERS.length) break;
+  }
+  assert.equal(seenG.size, GRUNTS.length,
+    `never spawned: ${GRUNTS.filter((g) => !seenG.has(g)).join(", ")}`);
+  assert.equal(seenB.size, BLOCKERS.length,
+    `never spawned: ${BLOCKERS.filter((b) => !seenB.has(b)).join(", ")}`);
+});
+
+check("all four bosses are met if you keep going", () => {
+  const seen = new Set(Array.from({ length: 8 }, (_, i) => bossFor(i + 1)));
+  assert.equal(seen.size, BOSSES.length, "some bosses can never appear");
+  assert.equal(bossFor(1), "baby", "the beach boss is not first");
+});
+
+check("all six soldiers share one health value", () => {
+  // Variety is colour and speed, never health.
+  const st = fresh();
+  st.stage = 3;
+  const hps = new Set<number>();
+  for (let i = 0; i < 400; i++) {
+    st.enemies = [];
+    run(st, 0.5);
+    for (const e of st.enemies) if (e.tier === "grunt") hps.add(e.maxHp);
+  }
+  assert.equal(hps.size, 1, `soldiers have differing health: ${Array.from(hps).join(", ")}`);
+});
+
+check("the blender is the elite — tougher and worth more", () => {
+  assert.ok((BLOCKERS as readonly string[]).includes(ELITE_BLOCKER));
+  const st = fresh();
+  st.score = 0;
+  const mk = (kind: string) => ({
+    id: 1, kind, tier: "blocker" as const, z: 0.5, nx: 0, hp: 0, maxHp: 9,
+    speed: 0, burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
+  });
+  st.enemies = [mk("sugarcane")];
+  update(st, DT);
+  const plain = st.score;
+  st.score = 0;
+  st.enemies = [mk(ELITE_BLOCKER)];
+  update(st, DT);
+  assert.ok(st.score > plain, "the elite pays the same as an ordinary blocker");
+});
+
+check("a boss winds up when it gets close, so its attack art is seen", () => {
+  const st = fresh();
+  st.gun = "flame";
+  st.phase = "boss";
+  st.enemies = [{
+    id: 1, kind: "baby", tier: "boss", z: BOSS_ATTACK_Z + 0.05, nx: 0.9,
+    hp: 99, maxHp: 99, speed: 0.3, burn: 0, flash: 0, stagger: 0,
+    tracks: false, dying: 0, attacking: 0,
+  }];
+  st.playerNx = -0.9;
+  run(st, 1.2);
+  const boss = st.enemies.find((e) => e.tier === "boss");
+  assert.ok(boss && boss.attacking > 0, "the boss never entered its attack");
+});
+
 // ── Density ─────────────────────────────────────────────────────────────────
 
 check("enemies arrive in waves, not one at a time", () => {
@@ -741,7 +825,7 @@ check("a stage runs, sends a boss, and the boss kill is its own beat", () => {
   const st = fresh();
   run(st, 47);
   assert.equal(st.phase, "boss", "no boss after the spawn window closed");
-  const boss = st.enemies.find((e) => e.kind === "boss");
+  const boss = st.enemies.find((e) => e.tier === "boss");
   assert.ok(boss, "boss phase with no boss on the field");
   boss!.hp = 0;
   update(st, DT);
