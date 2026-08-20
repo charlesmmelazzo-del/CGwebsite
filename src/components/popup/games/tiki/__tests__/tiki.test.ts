@@ -1,5 +1,7 @@
 // Tiki Wars — driving the real rules frame by frame.
 import assert from "node:assert";
+import { unrenderable } from "../../arcade";
+import { QUIPS, QUIP_LIMITS, QuipBag } from "../quips";
 import {
   applyEffect, armorCost, blockerChance, bombCost, CONTACT_Z,
   damage, enemySpeed, freshState, gateGoodChance, GRUNTS, GUNS, isGrunt,
@@ -521,6 +523,76 @@ check("every difficulty lever keeps scaling past any build", () => {
   assert.ok(blockerChance(30) > blockerChance(1), "blockers did not get denser");
   assert.ok(blockerHp(60) > blockerHp(30), "blocker health hit a ceiling");
   assert.ok(enemySpeed(60) > enemySpeed(30), "speed hit a ceiling");
+});
+
+// ── Quips ───────────────────────────────────────────────────────────────────
+
+check("every quip can actually be drawn by the cabinet font", () => {
+  // drawText substitutes "?" for a missing glyph, so a curly apostrophe ships
+  // as "IT?S GOOD TO BE THE KING" with nothing failing anywhere.
+  for (const [pool, lines] of Object.entries(QUIPS)) {
+    for (const line of lines) {
+      const bad = unrenderable(line);
+      assert.equal(bad.length, 0,
+        `${pool}: ${JSON.stringify(line)} contains unprintable ${JSON.stringify(bad)}`);
+    }
+  }
+});
+
+check("no quip is too long to read in the time it is on screen", () => {
+  for (const [pool, lines] of Object.entries(QUIPS)) {
+    const limit = QUIP_LIMITS[pool as keyof typeof QUIP_LIMITS];
+    for (const line of lines) {
+      assert.ok(line.length <= limit,
+        `${pool}: ${JSON.stringify(line)} is ${line.length} chars, limit ${limit}`);
+    }
+  }
+});
+
+check("no pool has duplicate lines", () => {
+  for (const [pool, raw] of Object.entries(QUIPS)) {
+    const lines = raw as readonly string[];
+    const dupes = lines.filter((l, i) => lines.indexOf(l) !== i);
+    assert.equal(dupes.length, 0, `${pool}: repeated ${JSON.stringify(dupes)}`);
+  }
+});
+
+check("every pool has enough lines to feel fresh", () => {
+  for (const [pool, lines] of Object.entries(QUIPS)) {
+    assert.ok(lines.length >= 10, `${pool}: only ${lines.length} lines`);
+  }
+});
+
+check("the shuffle bag uses every line before repeating one", () => {
+  const bag = new QuipBag(seeded(11));
+  const n = QUIPS.downgrade.length;
+  const seen = new Set<string>();
+  for (let i = 0; i < n; i++) seen.add(bag.draw("downgrade"));
+  assert.equal(seen.size, n, "a line repeated before the pool was exhausted");
+});
+
+check("a bad gate draws from downgrade, a good one from pickup", () => {
+  const st = fresh();
+  // tier 0 on the helpers ladder is -3 RUM; tier 6 is +3 RUM.
+  st.gate = { z: 0.05, left: helperOpt(0), right: helperOpt(6), taken: false, flipped: 0 };
+  st.playerNx = -0.5;
+  run(st, 0.2);
+  assert.equal(st.lastGate, "bad", "a -3 RUM did not report itself as bad");
+
+  const st2 = fresh();
+  st2.gate = { z: 0.05, left: helperOpt(6), right: helperOpt(0), taken: false, flipped: 0 };
+  st2.playerNx = -0.5;
+  run(st2, 0.2);
+  assert.equal(st2.lastGate, "good");
+});
+
+check("a neutral gate reports neutral, so nothing is said", () => {
+  const st = fresh();
+  st.gate = { z: 0.05, left: helperOpt(3), right: helperOpt(0), taken: false, flipped: 0 };
+  st.playerNx = -0.5;
+  st.cooldown = 99;
+  run(st, 0.2);
+  assert.equal(st.lastGate, "neutral");
 });
 
 // ── Steering ────────────────────────────────────────────────────────────────

@@ -364,6 +364,15 @@ export interface State {
   bullets: Bullet[];
   gate: Gate | null;
   bark: Bark | null;
+  /**
+   * What the gate the player just went through actually did.
+   *
+   * Set when a gate applies and cleared by whoever reads it. The renderer needs
+   * this to pick between the cheerful pickup lines and the downgrade lines —
+   * without it there is no way to tell a +3 RUM from a POISON after the fact,
+   * since the gate is gone by the time the bark is raised.
+   */
+  lastGate: "good" | "bad" | "neutral" | null;
   /** Rate-limits pickup barks so a run of gates doesn't become a wall of chat. */
   barkCooldown: number;
 
@@ -417,6 +426,7 @@ export function freshState(opts: StartOpts = {}): State {
     bullets: [],
     gate: null,
     bark: null,
+    lastGate: null,
     barkCooldown: 0,
     score: opts.score ?? 0,
     kills: { grunt: 0, blocker: 0, boss: 0 },
@@ -870,7 +880,9 @@ export function update(st: State, dt: number): void {
       // apply. That is the whole point of leaving the edges open.
       if (Math.abs(st.playerNx) <= GATE_REACH) {
         const chosen = st.playerNx < 0 ? gate.left : gate.right;
-        applyEffect(st, rungOf(chosen).effect);
+        const rung = rungOf(chosen);
+        applyEffect(st, rung.effect);
+        st.lastGate = rung.tone;
         st.gatesTaken++;
       }
     }

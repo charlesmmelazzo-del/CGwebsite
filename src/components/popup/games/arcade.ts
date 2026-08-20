@@ -136,6 +136,31 @@ const GLYPH_H = 7;
 export type TextAlign = "left" | "center" | "right";
 
 /** Width in buffer pixels that `text` will occupy at `scale`. */
+/**
+ * Every character this font can actually draw.
+ *
+ * drawText silently substitutes a question mark for anything missing, which is
+ * exactly the kind of bug that ships: the game runs, nothing errors, and a
+ * guest reads "IT?S GOOD TO BE THE KING". Curly apostrophes and ellipsis
+ * characters are the usual culprits, since they arrive invisibly from anything
+ * that autocorrects. Text destined for the screen should be checked against
+ * this rather than eyeballed.
+ */
+export function isRenderable(text: string): boolean {
+  const upper = text.toUpperCase();
+  for (const ch of upper) if (!(ch in FONT)) return false;
+  return true;
+}
+
+/** The characters of `text` this font cannot draw. Empty when all are fine. */
+export function unrenderable(text: string): string[] {
+  const bad: string[] = [];
+  for (const ch of text.toUpperCase()) {
+    if (!(ch in FONT) && bad.indexOf(ch) < 0) bad.push(ch);
+  }
+  return bad;
+}
+
 export function textWidth(text: string, scale = 1): number {
   if (!text.length) return 0;
   return (text.length * (GLYPH_W + 1) - 1) * scale;

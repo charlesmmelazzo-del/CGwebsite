@@ -235,10 +235,20 @@ export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeG
       // and the game does NOT pause. Rate-limited, and suppressed whenever
       // something is close enough to kill, because being interrupted is worse
       // than missing a joke.
-      if (s.gate?.taken && wasPhase === "play" && !s.bark && s.barkCooldown <= 0) {
+      // A gate bark: the hero turns to camera, says one line, turns back — and
+      // the game does NOT pause. The pool depends on what the gate actually
+      // did, so a POISON gets a groan rather than a cheer. A neutral rung says
+      // nothing at all, because nothing happened.
+      if (s.lastGate) {
+        const tone = s.lastGate;
+        s.lastGate = null;
         const danger = s.enemies.some((e) => e.dying <= 0 && e.z < 0.3);
-        if (!danger) {
-          s.bark = { text: bag.current.draw("pickup"), life: 1.2, kind: "pickup" };
+        if (tone !== "neutral" && !s.bark && s.barkCooldown <= 0 && !danger) {
+          s.bark = {
+            text: bag.current.draw(tone === "good" ? "pickup" : "downgrade"),
+            life: 1.2,
+            kind: "pickup",
+          };
           s.barkCooldown = 8;
         }
       }

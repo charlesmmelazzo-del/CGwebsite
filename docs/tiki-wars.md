@@ -580,10 +580,16 @@ hearing new material.
 
 Three triggers, each with its own pool and its own staging.
 
-### 1. Powerup pickup — non-blocking
+### 1. Gate pickup — non-blocking
 
 The hero turns to camera (`player-turn.png`), a small bubble pops, he turns
 back. **The game does not pause.**
+
+**Two pools, chosen by what the gate actually did.** A `+3 RUM` gets a cheer
+from `pickup`; a `POISON` gets a groan from `downgrade`. A neutral rung says
+nothing at all, because nothing happened. The core records the outcome as it
+applies the gate — by the time the bark is raised the gate is gone, so there is
+no way to tell after the fact.
 
 This is the one that can go wrong. In a runner, a balloon over the road at the
 wrong moment gets someone killed and feels cheap. So:
@@ -622,20 +628,30 @@ Plain string lists in `src/components/popup/games/tiki/quips.ts`:
 
 ```ts
 export const QUIPS = {
-  pickup: [ /* ... */ ],
-  shop:   [ /* ... */ ],
-  boss:   [ /* ... */ ],
+  pickup:    [ /* gate helped   */ ],
+  downgrade: [ /* gate hurt     */ ],
+  shop:      [ /* purchase      */ ],
+  boss:      [ /* boss defeated */ ],
 };
 ```
+
+Currently 152 lines: 33 pickup, 14 downgrade, 13 shop, 92 boss.
 
 * **Anti-repeat**: draws shuffle through the whole pool before any line repeats,
   rather than picking at random each time. Random picking will visibly repeat
   within a handful of draws and make a large pool feel small.
 * **Length cap**: bubbles are readable at a glance or they are not read at all.
-  Keep pickup lines **under ~40 characters** (they get 1.2 seconds); shop and
-  boss lines can run to ~70.
+  `QUIP_LIMITS` holds the cap per pool — 44 characters for the two gate pools
+  (they get 1.2 seconds), 72 for shop and boss, which block.
+* **Renderable characters only.** These are drawn with the cabinet's bitmap
+  font, and `drawText` silently substitutes a question mark for a glyph it does
+  not have. That is a bug that ships happily: nothing errors, and a guest reads
+  `IT?S GOOD TO BE THE KING`. Curly apostrophes and ellipsis characters are the
+  usual culprits, since anything that autocorrects inserts them invisibly — use
+  a straight `'` and three full stops.
 * Pools can be extended at any time by editing that one file — no other change
-  needed.
+  needed. **Every rule above is enforced by a test**, so a line that breaks one
+  fails the build rather than reaching a guest.
 
 ---
 
