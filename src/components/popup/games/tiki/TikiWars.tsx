@@ -5,7 +5,7 @@ import { drawText, textWidth } from "../arcade";
 import type { ArcadeGameProps } from "../registry";
 import TikiCanvas from "./TikiCanvas";
 import { QuipBag } from "./quips";
-import { drawSprite, loadTikiArt, type SpriteKey } from "./sprites";
+import { drawSprite, getImage, loadTikiArt, type GunArt, type SpriteKey } from "./sprites";
 import {
   C, horizonY, PIXEL_SCALE, playerY, projectScale, projectX, projectY,
   roadHalf, W,
@@ -14,7 +14,7 @@ import {
   armorCost, bombCost, canBuyArmor, canBuyBomb, freshState, GUNS, MAX_ARMOR,
   MAX_BOMBS, MAX_HEALTH, runDetail, update, detonateBomb, worldSpeed,
   DRAG_RANGE, GATE_REACH, GATE_CURE_HITS, rungOf, isGoodOption,
-  isMaxedOption, type Enemy, type State,
+  isMaxedOption, type Enemy, type GunKind, type State,
 } from "./tikiCore";
 
 // ─── Progress (the save file) ────────────────────────────────────────────────
@@ -248,6 +248,7 @@ export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeG
             text: bag.current.draw(tone === "good" ? "pickup" : "downgrade"),
             life: 1.2,
             kind: "pickup",
+            tone,
           };
           s.barkCooldown = 8;
         }
@@ -303,31 +304,79 @@ type Hits = Record<string, [number, number, number, number]>;
 const TOP_INSET = 12;
 const BOTTOM_INSET = 26;
 
-/**
- * Whether the walk cycle art has NO arms drawn into it.
- *
- * The weapon overlays are wired up and working, but they cannot be switched on
- * against the current body: it already holds two pistols, so overlaying a
- * shotgun leaves the hero visibly carrying both. Verified on screen — it is
- * four arms of hardware, not a weapon swap.
- *
- * Flip this to true when an armless walk sheet lands, and the shotgun and uzi
- * appear with no other change. Until then the hero keeps his painted-on
- * pistols and a gun upgrade still changes how the weapon FIRES, just not how
- * it looks.
- */
-const ARMLESS_BODY = false;
+/** Which art sheet each gun uses. */
+const GUN_SHEET: Record<GunKind, GunArt> = {
+  pistol: "pistols",
+  shotgun: "shotgun",
+  uzi: "uzi",
+  flame: "flame",
+  laser: "laser",
+};
 
-// Hand-tuned placement for the weapon overlays. See the note where they're drawn.
-const GUN_SCALE = 1.0;
-const GUN_DX = 0;
-const GUN_DY = 0;
-
-/** Scenery is fixed to the field, so it streams past at the same rate as enemies. */
-const PALMS = [
-  { nx: -1.55, phase: 0.0 }, { nx: 1.62, phase: 0.28 },
-  { nx: -1.8, phase: 0.55 }, { nx: 1.45, phase: 0.81 },
+/** Roadside dressing, fixed to the field so it streams past with the ground. */
+const SCENERY: { key: SpriteKey; nx: number; phase: number; h: number }[] = [
+  { key: "prop-palm", nx: -1.55, phase: 0.0, h: 150 },
+  { key: "prop-beachgoer-1", nx: 1.72, phase: 0.17, h: 96 },
+  { key: "prop-palm", nx: 1.62, phase: 0.34, h: 150 },
+  { key: "prop-beachgoer-2", nx: -1.85, phase: 0.5, h: 96 },
+  { key: "prop-palm", nx: -1.8, phase: 0.66, h: 150 },
+  { key: "prop-palm", nx: 1.45, phase: 0.83, h: 150 },
 ];
+
+/**
+ * Draw a full-bleed image if its art has loaded. Returns false if it has not,
+ * so the caller can fall back to the code-drawn version.
+ */
+function drawImageSprite(
+  ctx: CanvasRenderingContext2D,
+  key: SpriteKey,
+  x: number, y: number, w: number, hh: number
+): boolean {
+  const img = getImage(key);
+  if (!img) return false;
+  ctx.drawImage(img, x, y, w, hh);
+  return true;
+}
+
+/** Bands of sand, each tiled at the scale its depth calls for. */
+function drawSandBands(
+  ctx: CanvasRenderingContext2D,
+  h: number,
+  hy: number,
+  scroll: number
+): void {
+  const img = getImage("tex-sand");
+  if (!img) return;
+  const BANDS = 7;
+  for (let i = 0; i < BANDS; i++) {
+    const z0 = 1 - i / BANDS, z1 = 1 - (i + 1) / BANDS;
+    const y0 = projectY(z0, h);
+    // The last band runs to the bottom of the screen. z=0 is the player's feet,
+    // and there is still ground below that — without this the texture stopped
+    // at his heels and left a flat strip along the bottom.
+    const y1 = i === BANDS - 1 ? h : projectY(z1, h);
+    const bandH = y1 - y0;
+    if (bandH <= 0.5) continue;
+    // Nearer bands show the grain bigger, which is what sells the depth — but
+    // capped: the nearest band runs to the bottom of the screen, and scaling
+    // the tile to its height put shells on the sand bigger than the hero's
+    // boot.
+    const tile = Math.max(12, Math.min(bandH * 2.4, 132));
+    const off = (scroll * tile * 6) % tile;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, y0, W, bandH + 1);
+    ctx.clip();
+    ctx.globalAlpha = 0.85;
+    for (let x = -tile; x < W + tile; x += tile) {
+      for (let y = y0 - tile + off; y < y0 + bandH + tile; y += tile) {
+        ctx.drawImage(img, x, y, tile, tile);
+      }
+    }
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+}
 
 function drawField(
   ctx: CanvasRenderingContext2D,
@@ -342,51 +391,50 @@ function drawField(
   const py = playerY(h);
 
   // ── Sky ────────────────────────────────────────────────────────────────
-  // The whole reason the logical height flexes: a taller phone gets more sky,
-  // never a stretched picture or a letterbox.
-  const sky = ctx.createLinearGradient(0, 0, 0, hy);
-  sky.addColorStop(0, C.skyHigh);
-  sky.addColorStop(1, C.skyLow);
-  ctx.fillStyle = sky;
-  ctx.fillRect(0, 0, W, hy + 1);
-
-  ctx.fillStyle = C.sun;
-  ctx.beginPath();
-  ctx.arc(W * 0.5, hy - 34, 26, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Clouds drift slowly and wrap — parallax, so they read as far away.
-  ctx.fillStyle = "rgba(255,255,255,0.72)";
-  for (let i = 0; i < 5; i++) {
-    const cw = 34 + (i % 3) * 13;
-    const cx = ((i * 79 + t * 5) % (W + 90)) - 45;
-    const cy = 18 + ((i * 31) % Math.max(20, hy - 70));
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, cw * 0.5, 6.5, 0, 0, Math.PI * 2);
-    ctx.ellipse(cx + cw * 0.2, cy - 4, cw * 0.3, 5.5, 0, 0, Math.PI * 2);
-    ctx.fill();
+  // The painted sky, stretched across the full width and pinned to the
+  // horizon. The whole reason the logical height flexes: a taller phone gets
+  // MORE SKY, never a stretched picture or a letterbox — so this is drawn from
+  // the horizon upward and simply runs off the top of a tall screen.
+  const skyH = Math.max(hy, W * 0.62);
+  if (!drawImageSprite(ctx, "bg-beach-sky", 0, hy - skyH, W, skyH)) {
+    const sky = ctx.createLinearGradient(0, 0, 0, hy);
+    sky.addColorStop(0, C.skyHigh);
+    sky.addColorStop(1, C.skyLow);
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, hy + 1);
+  }
+  // Anything above the artwork is the sky's own top colour, so a very tall
+  // phone gets more of the same rather than a hard edge.
+  if (hy - skyH > 0) {
+    ctx.fillStyle = C.skyHigh;
+    ctx.fillRect(0, 0, W, hy - skyH + 1);
   }
 
-  // ── Sea ────────────────────────────────────────────────────────────────
-  ctx.fillStyle = C.sea;
-  ctx.fillRect(0, hy - 7, W, 8);
-  ctx.fillStyle = C.seaFoam;
-  for (let i = 0; i < 9; i++) {
-    const x = ((i * 41 + Math.sin(t * 0.7 + i) * 6) % (W + 20)) - 10;
-    ctx.fillRect(x, hy - 2, 7, 1);
+  // ── Horizon ────────────────────────────────────────────────────────────
+  const horizonH = W * 0.34;
+  if (!drawImageSprite(ctx, "bg-beach-horizon", 0, hy - horizonH * 0.82, W, horizonH)) {
+    ctx.fillStyle = C.sea;
+    ctx.fillRect(0, hy - 7, W, 8);
   }
 
   // ── Ground ─────────────────────────────────────────────────────────────
   ctx.fillStyle = C.sand;
   ctx.fillRect(0, hy, W, h - hy);
 
-  // Perspective rungs: the cheapest strong motion cue there is, and the thing
-  // that tells the guest how fast they are travelling — which is exactly why it
-  // has to be the SAME speed the world actually moves at. This used to scroll
-  // at a made-up 0.42 while enemies closed at 0.155, so the sand tore past
-  // nearly three times faster than the things walking on it.
+  // Sand, laid in bands that grow toward the camera.
+  //
+  // A single tiled fill would read as a flat wall, and a true per-row
+  // perspective map is hundreds of draw calls a frame on a phone. Bands are the
+  // middle: each is tiled at the scale its depth calls for, so the grain opens
+  // out as it approaches, and the scroll makes it move.
   const world = worldSpeed(s.stage);
+  drawSandBands(ctx, h, hy, t * world);
+
+  // Perspective rungs on top: the cheapest strong motion cue there is, and the
+  // thing that tells the guest how fast they are travelling — which is why it
+  // has to be the SAME speed the world actually moves at.
   const scroll = (t * world) % 0.08;
+  ctx.globalAlpha = 0.35;
   ctx.fillStyle = C.sandDark;
   for (let z = scroll; z < 1; z += 0.08) {
     const y = projectY(z, h);
@@ -394,6 +442,7 @@ function drawField(
     const th = Math.max(0.6, 2.4 * (1 - z));
     ctx.fillRect(W / 2 - hw, y, hw * 2, th);
   }
+  ctx.globalAlpha = 1;
 
   // Road edges.
   ctx.strokeStyle = C.sandDark;
@@ -406,14 +455,15 @@ function drawField(
   }
 
   // ── Scenery ────────────────────────────────────────────────────────────
-  for (const p of PALMS) {
-    // Palms are scenery: they approach at exactly the world's speed, like the
-    // ground they are standing in.
+  // Roadside dressing: palms and the odd sunbather, none of it interactive.
+  // All of it approaches at exactly the world's speed, like the ground it is
+  // standing in — see the note on worldSpeed.
+  for (const p of SCENERY) {
     const z = 1 - ((t * world + p.phase) % 1);
     if (z <= 0.02 || z >= 0.99) continue;
     const sc = projectScale(z);
-    drawSprite(ctx, "prop-palm", 0, projectX(p.nx, z), projectY(z, h), {
-      h: 150 * sc, pixelScale: PIXEL_SCALE,
+    drawSprite(ctx, p.key, 0, projectX(p.nx, z), projectY(z, h), {
+      h: p.h * sc, pixelScale: PIXEL_SCALE,
     });
   }
 
@@ -586,35 +636,25 @@ function drawField(
   }
 
   const px = projectX(s.playerNx, 0);
-  const turning = !!s.bark;
-  const shades = s.bark?.kind === "boss";
-  const hurt = s.invuln > 0 && Math.floor(t * 20) % 2 === 0;
-  drawSprite(
-    ctx,
-    turning ? (shades ? "player-turn-shades" : "player-turn") : "player-walk",
-    walk,
-    px,
-    py,
-    { h: 84, pixelScale: PIXEL_SCALE, flash: hurt ? 0.6 : 0 }
-  );
 
-  // ── Equipped weapon ────────────────────────────────────────────────────
-  // Drawn OVER the walk cycle, so the body animates once for every gun rather
-  // than needing a whole walk sheet per weapon.
-  //
-  // The offsets below are hand-tuned rather than derived. The body and the arms
-  // were authored on different canvases (768 vs 1024 wide), so there is no
-  // shared framing to compute an exact alignment from. If the body is ever
-  // redrawn WITHOUT arms on the same canvas as the weapons, these constants go
-  // away and the overlay simply lands where it was drawn.
-  const overlay: SpriteKey | null =
-    !ARMLESS_BODY || turning ? null
-      : s.gun === "shotgun" ? "gun-shotgun"
-        : s.gun === "uzi" ? "gun-uzi"
-          : null;
-  if (overlay) {
-    drawSprite(ctx, overlay, 0, px + GUN_DX, py + GUN_DY, {
-      h: 84 * GUN_SCALE, pixelScale: PIXEL_SCALE, flash: hurt ? 0.6 : 0,
+  // ── The hero ───────────────────────────────────────────────────────────
+  // One sheet per weapon, each carrying its own walk, hit, celebration and sad
+  // poses — so which gun he holds and what he is doing are the same lookup.
+  const art = GUN_SHEET[s.gun];
+  const bossBeat = s.bark?.kind === "boss";
+  const struck = s.invuln > 0;
+  const pose: SpriteKey =
+    struck ? `player-${art}-hit`
+      : s.bark?.tone === "good" ? `player-${art}-cheer`
+        : s.bark?.tone === "bad" ? `player-${art}-sad`
+          : `player-${art}-walk`;
+
+  if (bossBeat) {
+    // The boss kill keeps its own turn-to-camera pose with the sunglasses.
+    drawSprite(ctx, "player-turn-shades", 0, px, py, { h: 84, pixelScale: PIXEL_SCALE });
+  } else {
+    drawSprite(ctx, pose, struck ? Math.floor(t * 12) : walk, px, py, {
+      h: 84, pixelScale: PIXEL_SCALE,
     });
   }
 

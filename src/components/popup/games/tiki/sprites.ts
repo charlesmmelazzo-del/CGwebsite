@@ -61,6 +61,19 @@ export const BLOCKERS = [
   "milk", "beercan", "coconutcream", "gingerbeer", "cherry", "almond", "blender",
 ] as const;
 
+/**
+ * The hero, one 8-frame sheet PER WEAPON.
+ *
+ * Walk x4, Hit x2, Celebration, Sad. A whole sheet per gun rather than a body
+ * plus arm overlays — nothing needs aligning, and the previous body had pistols
+ * painted into it, so overlaying a shotgun put him on screen holding both.
+ */
+export const GUN_ART = ["pistols", "shotgun", "uzi", "flame", "laser"] as const;
+export type GunArt = (typeof GUN_ART)[number];
+
+/** Where each animation starts in the 8-frame strip. */
+export const PLAYER_POSE = { walk: 0, hit: 4, cheer: 6, sad: 7 } as const;
+
 /** Bosses: 5 frames — walk x2, attack x2, then hit. */
 export const BOSSES = ["baby", "knight", "santa", "king"] as const;
 
@@ -77,8 +90,10 @@ export interface SheetDef {
 
 /** Every character sheet, built from the rosters above. */
 export const SHEETS: Record<string, SheetDef> = {
-  player: { file: "player", cols: 4, rows: 1 },
   helper: { file: "helper", cols: 2, rows: 1 },
+  ...Object.fromEntries(GUN_ART.map((g) => [
+    `player-${g}`, { file: `player-${g}`, cols: 8, rows: 1 },
+  ])),
   ...Object.fromEntries(SOLDIERS.map((n) => [n, { file: n, cols: 4, rows: 1 }])),
   // blk-/boss- prefixes keep the two cherries apart: there is a cherry SOLDIER
   // and a cherry BLOCKER, and they are different characters.
@@ -110,9 +125,13 @@ export interface SpriteMeta {
 }
 
 export type SpriteKey =
-  | "player-walk" | "player-turn" | "player-turn-shades" | "player-hit"
-  | "helper-walk" | "gun-shotgun" | "gun-uzi"
-  | "prop-palm" | "shopkeeper-scotch"
+  | "player-turn" | "player-turn-shades"
+  | "helper-walk"
+  | "prop-palm" | "prop-beachgoer-1" | "prop-beachgoer-2"
+  | "bg-beach-sky" | "bg-beach-horizon" | "tex-sand"
+  | "shopkeeper-scotch"
+  | `player-${GunArt}-walk` | `player-${GunArt}-hit`
+  | `player-${GunArt}-cheer` | `player-${GunArt}-sad`
   | `${SoldierName}-walk`
   | `blk-${BlockerName}-walk` | `blk-${BlockerName}-hit`
   | `boss-${BossName}-walk` | `boss-${BossName}-attack` | `boss-${BossName}-hit`;
@@ -122,23 +141,27 @@ const BLOCKER_H = 104;
 const BOSS_H = 170;
 
 export const SPRITES: Record<SpriteKey, SpriteMeta> = {
-  // player.png is the WALK CYCLE ONLY — 4 cols x 1 row. The turn-to-camera
-  // poses are single images and stay loose files.
-  "player-walk": { sheet: { name: "player", row: 0 }, file: "player-walk", frames: 4, onScreen: 84 },
+  // The turn-to-camera poses are single images and stay loose files.
   "player-turn": { file: "player-turn", frames: 1, onScreen: 84 },
   "player-turn-shades": { file: "player-turn-shades", frames: 1, onScreen: 84 },
-  "player-hit": { file: "player-hit", frames: 1, onScreen: 84 },
-
-  // Weapon overlays — drawn OVER the walk cycle so the body animates once for
-  // every gun, instead of a separate walk sheet per weapon.
-  "gun-shotgun": { file: "gun-shotgun", frames: 1, onScreen: 84 },
-  "gun-uzi": { file: "gun-uzi", frames: 1, onScreen: 84 },
   "helper-walk": { sheet: { name: "helper", row: 0 }, file: "helper-walk", frames: 2, onScreen: 62 },
 
-  // Scenery and the shopkeeper stay loose files — one image each with nothing
-  // to animate, so a sheet would only add a layout to get wrong.
+  // Scenery — one image each with nothing to animate, so a sheet would only add
+  // a layout to get wrong.
   "prop-palm": { file: "prop-palm", frames: 1, onScreen: 150 },
+  "prop-beachgoer-1": { file: "prop-beachgoer-1", frames: 1, onScreen: 120 },
+  "prop-beachgoer-2": { file: "prop-beachgoer-2", frames: 1, onScreen: 120 },
+  "bg-beach-sky": { file: "bg-beach-sky", frames: 1, onScreen: 0 },
+  "bg-beach-horizon": { file: "bg-beach-horizon", frames: 1, onScreen: 0 },
+  "tex-sand": { file: "tex-sand", frames: 1, onScreen: 0 },
   "shopkeeper-scotch": { file: "shopkeeper-scotch", frames: 1, onScreen: 180 },
+
+  ...Object.fromEntries(GUN_ART.flatMap((g) => [
+    [`player-${g}-walk`, { sheet: { name: `player-${g}`, row: 0, col: PLAYER_POSE.walk }, frames: 4, onScreen: 84 }],
+    [`player-${g}-hit`, { sheet: { name: `player-${g}`, row: 0, col: PLAYER_POSE.hit }, frames: 2, onScreen: 84 }],
+    [`player-${g}-cheer`, { sheet: { name: `player-${g}`, row: 0, col: PLAYER_POSE.cheer }, frames: 1, onScreen: 84 }],
+    [`player-${g}-sad`, { sheet: { name: `player-${g}`, row: 0, col: PLAYER_POSE.sad }, frames: 1, onScreen: 84 }],
+  ])),
 
   ...Object.fromEntries(SOLDIERS.map((n) => [
     `${n}-walk`, { sheet: { name: n, row: 0 }, frames: 4, onScreen: SOLDIER_H },
@@ -192,7 +215,7 @@ const buckets = new Map<string, HTMLCanvasElement>();
  */
 export function loadTikiArt(): void {
   if (typeof window === "undefined") return;
-  tryLoad(sheetUrl("player"));
+  tryLoad(sheetUrl("player-pistols"));
   for (const key of ["player-turn", "player-turn-shades"] as SpriteKey[]) {
     const url = spriteUrl(key, 0);
     if (url) tryLoad(url);
@@ -296,6 +319,22 @@ function resolve(
   if (!url || missing.has(url)) return null;
   tryLoad(url);
   return scaledCell(url, null, targetH, pixelScale);
+}
+
+/**
+ * The raw loaded image for a single-frame sprite.
+ *
+ * For backdrops and the tiling sand, which are drawn stretched or repeated
+ * rather than as a figure standing on the ground — the depth-bucket path would
+ * be wrong for both.
+ */
+export function getImage(key: SpriteKey): HTMLImageElement | null {
+  const m: SpriteMeta = SPRITES[key];
+  const url = m.file ? spriteUrl(key, 0) : null;
+  if (!url || missing.has(url)) return null;
+  tryLoad(url);
+  const img = loaded.get(url);
+  return img && img.width ? img : null;
 }
 
 // ─── Drawing ─────────────────────────────────────────────────────────────────
@@ -824,15 +863,6 @@ function drawShopkeeper(ctx: CanvasRenderingContext2D, h: number) {
 }
 
 /**
- * Weapon overlays have NO placeholder, deliberately.
- *
- * The walk cycle already draws the hero holding his base pistols, so with no
- * overlay art the sensible fallback is simply to show that — not to invent a
- * shape. A missing shotgun therefore looks like pistols rather than like a bug.
- */
-const noOverlay: Placeholder = () => {};
-
-/**
  * Stand-in for anything without hand-drawn placeholder art.
  *
  * There are now 46 sprite keys and writing a bespoke placeholder for each would
@@ -862,8 +892,6 @@ function genericFoe(h: number, frame: number, ctx: CanvasRenderingContext2D) {
 }
 
 const PLACEHOLDERS: Partial<Record<SpriteKey, Placeholder>> = {
-  "gun-shotgun": noOverlay,
-  "gun-uzi": noOverlay,
   "lime-walk": drawGrunt(C.lime, "#6FA81E"),
   "lemon-walk": drawGrunt(C.lemon, "#C9B31E"),
   "orange-walk": drawGrunt(C.orange, "#C96A12"),
@@ -873,9 +901,13 @@ const PLACEHOLDERS: Partial<Record<SpriteKey, Placeholder>> = {
   "kiwi-walk": drawGrunt(C.kiwi, C.kiwiSkin, -0.12),
   "blk-sugarcane-walk": drawSugarcane,
   "boss-baby-walk": drawBabyPineapple,
-  "player-walk": drawPlayerBack,
-  "player-hit": (ctx, h) => drawPlayerBack(ctx, h, 0),
   "player-turn": drawPlayerTurn(false),
+  ...Object.fromEntries(GUN_ART.flatMap((g) => [
+    [`player-${g}-walk`, drawPlayerBack],
+    [`player-${g}-hit`, (c: CanvasRenderingContext2D, h: number) => drawPlayerBack(c, h, 0)],
+    [`player-${g}-cheer`, drawPlayerTurn(false)],
+    [`player-${g}-sad`, drawPlayerTurn(false)],
+  ])),
   "player-turn-shades": drawPlayerTurn(true),
   "helper-walk": drawHelper,
 

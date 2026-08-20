@@ -145,6 +145,18 @@ Three unrelated speeds, with the sand tearing past nearly three times faster
 than the things standing on it. If a new kind of scenery is added, it takes
 `worldSpeed` too.
 
+### The hero's art
+
+**One 8-frame sheet per weapon** — walk x4, hit x2, celebration, sad — rather
+than a body with arm overlays. The overlay approach was tried and abandoned: the
+body had pistols painted into it, so a shotgun overlay put him on screen holding
+both. A sheet per gun means nothing has to be aligned and the gun he is holding
+and the pose he is pulling are the same lookup.
+
+The celebration and sad poses are driven by the gate tone, so the face matches
+the quip pool — he grins with a `pickup` line and sulks with a `downgrade` one.
+The boss kill keeps its own turn-to-camera pose with the sunglasses.
+
 ### Firing
 
 Bullets are drawn **after** the hero, never before. A bullet spawns at `z=0.02`,
@@ -355,6 +367,7 @@ holding.
 | **Pistol** | Base. Single bullet, straight, base tempo. |
 | **Shotgun** | Three bullets in a spray. |
 | **Uzi** | Single bullet, straight, much faster tempo. |
+| **Laser** | Slower than the uzi, but a round **passes through** what it hits. The answer to a wall of blockers rather than to a crowd. |
 | **Flamethrower** | Shortest range, widest spread, high damage. Sets enemies alight - they keep burning and taking damage after the stream leaves them, so a sweep across a crowd kills things that walked out of range. The close-range panic button: devastating if they reach you, useless at distance. |
 
 ### Helpers

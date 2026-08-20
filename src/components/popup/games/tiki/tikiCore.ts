@@ -89,7 +89,7 @@ export const MISS_Z = -0.02;
 /** Mirrors the DB cap in scores.ts. Clamped, never rejected. */
 export const MAX_SCORE = 10_000_000;
 
-export type GunKind = "pistol" | "shotgun" | "uzi" | "flame";
+export type GunKind = "pistol" | "shotgun" | "uzi" | "flame" | "laser";
 
 export const GUNS: Record<GunKind, {
   /** Shots per second. */
@@ -110,7 +110,13 @@ export const GUNS: Record<GunKind, {
   // plus a burn that keeps ticking after the stream moves off. Devastating up
   // close, useless at any distance — the panic button, not an upgrade.
   flame: { rate: 0, damage: 9, count: 0, spread: 0.55, range: 0.34 },
+  // The top of the ladder: slower than the uzi but each shot goes straight
+  // through, so it is the answer to a wall of blockers rather than to a crowd.
+  laser: { rate: 6, damage: 3, count: 1, spread: 0, range: 1 },
 };
+
+/** Guns whose rounds are not consumed by the first thing they hit. */
+export const PIERCING: Partial<Record<GunKind, boolean>> = { laser: true };
 
 export const BURN_DPS = 3.5;
 export const BURN_SECONDS = 2.6;
@@ -243,6 +249,8 @@ export interface Bullet {
   damage: number;
   /** Which gun it left. Purely so the renderer can start it at that muzzle. */
   side: -1 | 1;
+  /** Carries on through what it hits, instead of stopping at the first. */
+  pierce?: boolean;
   /**
    * Set once this round has been counted against a gate panel.
    *
@@ -303,6 +311,7 @@ export const LADDERS: Record<GateFamily, Rung[]> = {
     { effect: { kind: "gun", gun: "shotgun" }, label: "SHOTGUN", tone: "good" },
     { effect: { kind: "gun", gun: "uzi" }, label: "UZI", tone: "good" },
     { effect: { kind: "gun", gun: "flame" }, label: "FLAME", tone: "good" },
+    { effect: { kind: "gun", gun: "laser" }, label: "LASER", tone: "good" },
   ],
   health: [
     { effect: { kind: "health", n: -20 }, label: "POISON", tone: "bad" },
@@ -377,6 +386,14 @@ export interface Bark {
   text: string;
   life: number;
   kind: "pickup" | "boss";
+  /**
+   * Which way the gate went, so the hero can pull the right face.
+   *
+   * The art carries a celebration pose and a sad pose, and this is what picks
+   * between them — the quip pool and the pose have to agree, or he grins while
+   * saying "NOOOOO".
+   */
+  tone?: "good" | "bad";
 }
 
 export type Phase = "play" | "boss" | "bosskill" | "cleared" | "over";
@@ -802,6 +819,7 @@ function fire(st: State): void {
     st.bullets.push({
       z: 0.02, nx: st.playerNx, vnx: off * g.spread, damage: g.damage,
       side: g.count === 1 ? st.muzzle : off < 0 ? -1 : 1,
+      pierce: PIERCING[st.gun] ?? false,
     });
   }
   // Helpers flank the player and always carry the base pistol, whatever the
@@ -1028,6 +1046,7 @@ export function update(st: State, dt: number): void {
       if (Math.abs(b.z - e.z) < 0.05 && Math.abs(b.nx - e.nx) < 0.16) {
         e.hp -= b.damage;
         e.flash = 0.12;
+        if (b.pierce) { e.stagger = STAGGER_SECONDS; continue; }
         // Weight: stall it and shove it back up the field. Without this a hit
         // is an invisible subtraction and the gun feels like it is doing
         // nothing until the enemy abruptly disappears.

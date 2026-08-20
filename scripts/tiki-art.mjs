@@ -51,12 +51,25 @@ const DEST = path.join(process.cwd(), "public", "popup", "art", "tiki");
  * characters with different frame counts.
  */
 const MAP = {
-  // ── Player ──
-  "Player Walking Sheet.png": "player.png",     // the 4x1 walk SHEET
+  // ── Player: one 8-frame sheet PER WEAPON ──
+  // Walk x4, Hit x2, Celebration, Sad. A whole sheet per gun rather than a
+  // body plus arm overlays: nothing has to be aligned, and the old body had
+  // pistols painted on, so an overlay left him holding two guns at once.
+  "Player Pistols.png": "player-pistols.png",
+  "Player Shotgun.png": "player-shotgun.png",
+  "Player Uzis.png": "player-uzi.png",
+  "Player Flamethrower.png": "player-flame.png",
+  "Player LAser.png": "player-laser.png",       // sic: his spelling
   "Player Turn .png": "player-turn.png",
   "Player Turn Shades.png": "player-turn-shades.png",
-  "Shotgun Arms.png": "gun-shotgun.png",
-  "Uzi Arms.png": "gun-uzi.png",
+
+  // ── Beach scenery ──
+  "Beach Sky.png": "bg-beach-sky.png",
+  "Beach Horizon.png": "bg-beach-horizon.png",
+  "Beach Palm Tree.png": "prop-palm.png",
+  "Beach Beachgoer 1.png": "prop-beachgoer-1.png",
+  "Beach Beachgoer 2.png": "prop-beachgoer-2.png",
+  "Beach Sand Textile.png": "tex-sand.png",
 
   // ── Soldiers: 4 frames, walk only ──
   "Lime Soldier Sheet.png": "lime.png",
@@ -89,16 +102,26 @@ const MAP = {
   "King Boss.png": "boss-king.png",
 };
 
-/** Frame count by target-name prefix. */
+/** Frame count by target name. */
 function framesFor(name) {
   if (name.startsWith("blk-") || name.startsWith("boss-")) return 5;
-  if (name === "player.png") return 4;
+  if (name.startsWith("player-") && name !== "player-turn.png" && name !== "player-turn-shades.png") return 8;
   if (["lime.png","kiwi.png","lemon.png","orange.png","cherry.png","sugarcube.png"].includes(name)) return 4;
   return 1;
 }
 
-/** Overlays keep the body's framing — trimming them would slide the arms off. */
-const OVERLAY = { "gun-shotgun.png": true, "gun-uzi.png": true };
+/**
+ * Sheets whose frames are LABELLED beneath each pose.
+ *
+ * The player sheets have "WALK 1", "HIT 2" and so on drawn into the image. That
+ * is genuinely helpful for reading the sheet, and harmless — every one has the
+ * captions in a band below the characters with a clear gap above it, so the
+ * band is found and dropped on import rather than shipped into the game.
+ */
+const LABELLED = (name) => name.startsWith("player-") && framesFor(name) > 1;
+
+/** Full-bleed images: no background to cut, nothing to centre or crop. */
+const FULLBLEED = { "bg-beach-sky.png": true, "tex-sand.png": true };
 
 
 
@@ -201,7 +224,11 @@ function bgTest(img) {
   for (let x = 0; x < w; x += 4) { look(x, 0); look(x, h - 1); }
   for (let y = 0; y < h; y += 4) { look(0, y); look(w - 1, y); }
 
-  if (mag / n > 0.6) {
+  // Chroma wins on ANY clear magenta presence, not a majority. A backdrop is
+  // mostly picture: the beach horizon is half ocean, so magenta was only 56% of
+  // its border and a 60% threshold sent it down the checkerboard path — which
+  // matched nothing, and the magenta shipped as a bright band across the sky.
+  if (mag > grey && mag / n > 0.15) {
     return { kind: "chroma", is: (r, g, b) => r > 140 && g < 120 && b > 140 };
   }
   return { kind: "checkerboard", is: (r, g, b) =>
@@ -277,6 +304,38 @@ function straighten(img, frames) {
     }
   }
   return { data: out, shifts };
+}
+
+// ─── Caption band ────────────────────────────────────────────────────────────
+
+/**
+ * Erase a trailing band of content, which on these sheets is the frame labels.
+ *
+ * Detected structurally rather than by looking for text: the artwork forms one
+ * run of non-empty rows, then a gap, then the captions form a second. Anything
+ * after the first run is dropped. Colour would be the wrong test here — the
+ * captions are white, and so is most of the hero.
+ */
+function dropCaptions(img) {
+  const { w, h, data } = img;
+  const rowHas = new Array(h).fill(false);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x += 2) {
+      if (data[(y * w + x) * 4 + 3] > 24) { rowHas[y] = true; break; }
+    }
+  }
+  const runs = []; let s2 = -1;
+  for (let y = 0; y <= h; y++) {
+    const on = y < h && rowHas[y];
+    if (on && s2 < 0) s2 = y;
+    else if (!on && s2 >= 0) { runs.push([s2, y - 1]); s2 = -1; }
+  }
+  if (runs.length < 2) return { img, cut: 0 };
+  const from = runs[1][0];
+  for (let y = from; y < h; y++) {
+    for (let x = 0; x < w; x++) data[(y * w + x) * 4 + 3] = 0;
+  }
+  return { img, cut: h - from };
 }
 
 // ─── Trim ────────────────────────────────────────────────────────────────────
@@ -364,7 +423,9 @@ const TARGET_H = 384;
 function targetHeight(name) {
   if (name.startsWith("boss-")) return 384;          // 170 logical -> 340 device
   if (name.startsWith("blk-")) return 288;           // 104 logical -> 208 device
-  if (name.startsWith("player") || name.startsWith("gun-")) return 256;  // 84 -> 168
+  if (name.startsWith("player")) return 256;         // 84 logical -> 168 device
+  if (name.startsWith("bg-") || name === "tex-sand.png") return 512;
+  if (name.startsWith("prop-")) return 320;
   return 192;                                         // soldiers: 60 -> 120
 }
 
@@ -377,11 +438,14 @@ function targetHeight(name) {
  * pale halo. Weighting by alpha means fully transparent pixels contribute
  * nothing at all to the colour.
  */
-function downscale(img, targetH) {
+function downscale(img, targetH, maxW = Infinity) {
   const { w, h, data } = img;
-  if (h <= targetH) return img;
-  const scale = targetH / h;
-  const nw = Math.max(1, Math.round(w * scale)), nh = targetH;
+  // Backdrops are very wide and short, so height alone never caps them: the
+  // beach horizon came out 1774px across for a 540px screen. Whichever limit
+  // bites first wins.
+  const scale = Math.min(targetH / h, maxW / w, 1);
+  if (scale >= 1) return img;
+  const nw = Math.max(1, Math.round(w * scale)), nh = Math.max(1, Math.round(h * scale));
   const out = Buffer.alloc(nw * nh * 4);
 
   for (let y = 0; y < nh; y++) {
@@ -436,25 +500,32 @@ for (const [from, to] of Object.entries(MAP)) {
   if (!src) { console.log(`  skip  ${from}  (not found)`); continue; }
 
   const img = readPNG(src);
-  const cutInfo = img.hadAlpha ? { kind: "already had alpha", cut: 0 } : cutBackground(img);
+  const full = FULLBLEED[to];
+  const cutInfo = full
+    ? { kind: "full-bleed", cut: 0 }
+    : img.hadAlpha ? { kind: "already had alpha", cut: 0 } : cutBackground(img);
+  let captions = 0;
+  if (LABELLED(to)) ({ cut: captions } = dropCaptions(img));
   let shifts = null;
   // Straighten BEFORE downscaling, so the shift is measured at full resolution.
   const nFrames = framesFor(to);
-  if (nFrames > 1) ({ data: img.data, shifts } = straighten(img, nFrames));
+  if (nFrames > 1 && !full) ({ data: img.data, shifts } = straighten(img, nFrames));
 
   const srcW = img.w, srcH = img.h;
   // Weapon overlays are NOT trimmed: they have to keep the same framing as the
   // body they sit on top of, and cropping them to their own content would slide
   // the arms off the character.
-  const trimmed = OVERLAY[to] ? img : trim(img, nFrames);
-  const small = downscale(trimmed, targetHeight(to));
+  const trimmed = full ? img : trim(img, nFrames);
+  // 1080 = twice the 540px device width the game ever draws into.
+  const small = downscale(trimmed, targetHeight(to), to.startsWith("bg-") ? 1080 : Infinity);
 
   if (!dry) writePNG(path.join(DEST, to), small.w, small.h, small.data);
   done++;
   const bytes = dry ? 0 : fs.statSync(path.join(DEST, to)).size;
   console.log(
     `  ${to.padEnd(24)} ${srcW}x${srcH} -> ${small.w}x${small.h}` +
-    (OVERLAY[to] ? "  [overlay: untrimmed]" : "") +
+    (full ? "  [full-bleed]" : "") +
+    (captions ? `  captions -${captions}px` : "") +
     `  bg:${cutInfo.kind}` +
     (shifts ? `  recentred [${shifts.join(", ")}]px` : "") +
     (bytes ? `  ${(bytes / 1024).toFixed(0)}KB` : "")
