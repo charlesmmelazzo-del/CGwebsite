@@ -345,6 +345,91 @@ each must work as a **flat two-colour shape with a heavy outline**. Square canva
 
 ---
 
+# Effects — gunfire and flame
+
+Everything in this section is currently **drawn from code** and works. These
+sheets replace that, so they are an upgrade rather than a blocker, and each one
+can land on its own.
+
+## The one rule that is different here
+
+Characters stand on the ground and are drawn upright. **Effects point away from
+the camera, up the screen.**
+
+So draw every one of these **vertically, firing UPWARD, with the muzzle end at
+the BOTTOM edge of the cell.** The bottom edge is the anchor — the game pins it
+to the gun and stretches the rest up the field. A flame drawn horizontally, or
+floating in the middle of its cell, cannot be placed.
+
+Same as everywhere else: **flat magenta `#FF00FF` background**, one row, equal
+cells, and the game scales them.
+
+## Flamethrower
+
+| File | Grid | Deliver | Frames |
+|---|---|---|---|
+| `fx-flame.png` | **6 x 1** | 256 x 512 per cell | 6, looping |
+
+This is the big one — the flame fills **216 x 59 logical pixels**, over a third
+of the screen's height, so it is the only effect where real detail will read.
+
+> A roaring jet of flame seen from behind, firing straight up and away from the
+> viewer. Narrow and white-hot at the bottom where it leaves the nozzle,
+> widening as it climbs into orange, then deep red, then breaking into
+> individual licks and dark smoke curls at the top. Chunky pixel art, heavy
+> black keyline on the outer edge only, no outline inside the flame. Flat
+> saturated bands of colour rather than a smooth gradient — white, yellow,
+> orange, red — like a Metal Slug fire effect. Transparent (magenta) either
+> side. Bottom edge is the nozzle and must be flat and full-width.
+
+**Six frames that loop seamlessly** — frame 6 must flow back into frame 1. Vary
+the licks and the smoke between frames, but keep the overall silhouette and
+height near-constant so the jet does not pulse in length.
+
+## Bullets
+
+| File | Grid | Deliver | Frames |
+|---|---|---|---|
+| `fx-bullet.png` | **2 x 1** | 96 x 256 per cell | 2 |
+| `fx-laser.png` | **2 x 1** | 96 x 256 per cell | 2 |
+| `fx-muzzle.png` | **4 x 1** | 256 x 256 per cell | 4 |
+| `fx-impact.png` | **4 x 1** | 256 x 256 per cell | 4 |
+
+**Manage your expectations on the two tracers.** A bullet is about **3 x 14
+logical pixels** on screen and moving fast — roughly six device pixels wide.
+Almost no detail survives that. What matters is the SILHOUETTE and the colour,
+so keep them simple; this is not where to spend an hour.
+
+**`fx-bullet.png`** — the pistol, shotgun and uzi round.
+> A vertical tracer round, hot white at the leading top tip fading down through
+> cyan to transparent at the tail. Hard black keyline. Two frames, differing
+> only in the flicker of the tail. Currently drawn as a cyan streak because
+> warm colours vanish against the sand — keep it COLD.
+
+**`fx-laser.png`** — the laser bolt. Must read as *different* at a glance,
+because it behaves differently: it passes through what it hits.
+> A vertical energy bolt, longer and thinner than the bullet, with a bright
+> white core and a magenta-violet glow around it. Faint horizontal ripple lines
+> across the beam. Two frames alternating the ripple.
+
+**`fx-muzzle.png`** — the flash at the gun, about **22 logical px** across.
+> A four-point starburst of flame at the barrel: white at the centre, yellow,
+> then orange at the tips, with a few sparks thrown outward. Frame 1 smallest,
+> frames 2-3 largest, frame 4 fading — it plays ONCE per shot, it does not loop.
+
+**`fx-impact.png`** — currently just a white flash on the enemy.
+> A small burst where a round lands: white flash, a ring of yellow-orange
+> sparks, then dispersing embers. Four frames, playing once and fading out.
+
+## What is NOT worth drawing
+
+The bomb blast, the burn on a lit enemy, the gate panels, the HUD, floating
+score numbers and all text stay code-drawn. They are either full-screen washes,
+tints applied over another sprite, or type — none of them gain anything from a
+picture, and several would be harder to change.
+
+---
+
 # Phase 2 — The world
 
 Desert, Winter and Castle stages, plus luck. Not needed until v1 plays well.
