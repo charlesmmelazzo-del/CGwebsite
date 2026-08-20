@@ -19,6 +19,15 @@ export const MAX_ARMOR = 10;
 export const MAX_BOMBS = 3;
 export const MAX_HELPERS = 6;
 
+/**
+ * How far a helper stands from the hero, in nx.
+ *
+ * Widened when the camera dropped and everything grew: at the old spacing the
+ * flanking bottles overlapped his arms and the group read as one cluttered
+ * shape rather than a squad.
+ */
+export const HELPER_SPACING = 0.34;
+
 export const PLAYER_SPEED = 2.6;          // keyboard only: nx per second
 
 /**
@@ -458,6 +467,16 @@ export interface State {
   moneyEarned: number;
   gatesTaken: number;
 
+  /**
+   * Running average of the depth at which enemies stop existing.
+   *
+   * High means they are dying at the horizon and the guest is over-gunned; low
+   * means they are getting through.
+   */
+  killDepth: number;
+  /** Spawn-rate multiplier the loop above is driving. */
+  pressure: number;
+
   cooldown: number;
   spawnT: number;
   gateT: number;
@@ -508,6 +527,8 @@ export function freshState(opts: StartOpts = {}): State {
     pops: [],
     moneyEarned: 0,
     gatesTaken: 0,
+    killDepth: PRESSURE_TARGET_Z,
+    pressure: PRESSURE_MIN,
     cooldown: 0,
     spawnT: 0.8,
     gateT: GATE_EVERY,
@@ -541,6 +562,36 @@ export function spawnInterval(stage: number): number {
 export function waveSize(stage: number): number {
   return Math.min(6, 2 + Math.floor((stage - 1) * 0.35));
 }
+
+// ─── Pressure ────────────────────────────────────────────────────────────────
+//
+// The stage curve sets a floor, but it cannot see how the run is actually
+// going. A guest who takes three good gates in a row can out-gun the wave
+// entirely — everything dies at the horizon, the field goes empty, and the
+// stage plays out as a walk down a beach with nothing to do.
+//
+// So the game watches HOW DEEP enemies get before they die and opens the taps
+// until they are reaching the middle of the field again. It is a closed loop,
+// not a difficulty setting: lose the gun at the next gate and the pressure
+// falls back on its own.
+
+/** Where we want kills to be happening — mid-field. */
+export const PRESSURE_TARGET_Z = 0.45;
+/** Never gentler than the stage curve, and never more than this much harder. */
+export const PRESSURE_MIN = 1;
+export const PRESSURE_MAX = 4;
+/** How fast the loop responds, in multiplier per second at full error. */
+const PRESSURE_RATE = 0.6;
+/** Weight of one death in the running average of kill depth. */
+const DEPTH_WEIGHT = 0.25;
+/**
+ * Weight of one MISS.
+ *
+ * Heavier than a kill on purpose. An enemy walking past is the clearest signal
+ * there is that the guest is already at their limit, and pressure has to come
+ * off faster than it went on — the loop should never be the reason a run ends.
+ */
+const MISS_WEIGHT = 0.4;
 
 export function blockerChance(stage: number): number {
   return Math.min(0.55, 0.08 + (stage - 1) * 0.035);
@@ -829,7 +880,7 @@ function fire(st: State): void {
     const rank = Math.floor(i / 2) + 1;
     st.bullets.push({
       z: 0.02,
-      nx: st.playerNx + side * rank * 0.2,
+      nx: st.playerNx + side * rank * HELPER_SPACING,
       vnx: 0,
       damage: 1,
       side: side as -1 | 1,
@@ -854,7 +905,15 @@ function missPenalty(st: State, e: Enemy): void {
   if (e.tier === "grunt") st.misses.grunt++;
   else st.misses.blocker++;
   st.score = Math.max(0, st.score - cost);
+  // Got all the way past: the strongest evidence there is that the guest is at
+  // their limit, so it pulls the average down hard.
+  noteDepth(st, 0, MISS_WEIGHT);
   addPop(st, e, `-${cost}`, false);
+}
+
+/** Feed one outcome into the running average. z is where it happened. */
+function noteDepth(st: State, z: number, weight: number): void {
+  st.killDepth += (Math.max(0, Math.min(1, z)) - st.killDepth) * weight;
 }
 
 function killReward(st: State, e: Enemy): void {
@@ -870,6 +929,8 @@ function killReward(st: State, e: Enemy): void {
     st.score += e.kind === ELITE_BLOCKER ? PTS_BLOCKER * 2 : PTS_BLOCKER;
   }
   st.score = Math.min(MAX_SCORE, st.score);
+  // A boss is a set piece, not a sample of how the wave is going.
+  if (e.tier !== "boss") noteDepth(st, e.z, DEPTH_WEIGHT);
   if (e.tier !== "boss") {
     addPop(st, e, `+${e.tier === "grunt" ? PTS_GRUNT
       : e.kind === ELITE_BLOCKER ? PTS_BLOCKER * 2 : PTS_BLOCKER}`, true);
@@ -949,10 +1010,16 @@ export function update(st: State, dt: number): void {
   // ── Stage progression ──
   if (st.phase === "play") {
     st.stageT += dt;
+
+    // Close the loop. Positive error means kills are happening too far away.
+    const err = st.killDepth - PRESSURE_TARGET_Z;
+    st.pressure = Math.max(PRESSURE_MIN,
+      Math.min(PRESSURE_MAX, st.pressure + err * PRESSURE_RATE * dt));
+
     st.spawnT -= dt;
     if (st.spawnT <= 0) {
       spawnWave(st);
-      st.spawnT = spawnInterval(st.stage);
+      st.spawnT = spawnInterval(st.stage) / st.pressure;
     }
     st.gateT -= dt;
     // A gate gets its own moment — never overlapping a blocker in the danger
@@ -1117,6 +1184,7 @@ export function runDetail(st: State, runs: number): Record<string, unknown> {
     misses: st.misses,
     moneyEarned: st.moneyEarned,
     gatesTaken: st.gatesTaken,
+    pressure: Math.round(st.pressure * 100) / 100,
     armor: st.armor,
     luck: st.luck,
     helpers: st.helpers,

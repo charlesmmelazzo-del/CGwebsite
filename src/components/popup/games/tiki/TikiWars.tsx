@@ -5,7 +5,10 @@ import { drawText, textWidth } from "../arcade";
 import type { ArcadeGameProps } from "../registry";
 import TikiCanvas from "./TikiCanvas";
 import { QuipBag } from "./quips";
-import { drawSprite, getImage, loadTikiArt, type GunArt, type SpriteKey } from "./sprites";
+import {
+  drawSprite, getImage, loadTikiArt, BLOCKER_H, BOSS_H, HELPER_H, PLAYER_H,
+  SOLDIER_H, type GunArt, type SpriteKey,
+} from "./sprites";
 import {
   C, horizonY, PIXEL_SCALE, playerY, projectScale, projectX, projectY,
   roadHalf, W,
@@ -13,7 +16,7 @@ import {
 import {
   armorCost, bombCost, canBuyArmor, canBuyBomb, freshState, GUNS, MAX_ARMOR,
   MAX_BOMBS, MAX_HEALTH, runDetail, update, detonateBomb, worldSpeed,
-  DRAG_RANGE, GATE_REACH, GATE_CURE_HITS, rungOf, isGoodOption,
+  DRAG_RANGE, GATE_REACH, GATE_CURE_HITS, HELPER_SPACING, rungOf, isGoodOption,
   isMaxedOption, type Enemy, type GunKind, type State,
 } from "./tikiCore";
 
@@ -547,7 +550,7 @@ function drawField(
         : e.tier === "blocker"
           ? (hurt ? `blk-${e.kind}-hit` : `blk-${e.kind}-walk`) as SpriteKey
           : (`${e.kind}-walk` as SpriteKey);
-    const base = e.tier === "boss" ? 170 : e.tier === "blocker" ? 104 : 60;
+    const base = e.tier === "boss" ? BOSS_H : e.tier === "blocker" ? BLOCKER_H : SOLDIER_H;
     const x = projectX(e.nx, e.z);
     const y = projectY(e.z, h);
     // The attack frames are a one-shot swing, not a loop, so they run off their
@@ -629,9 +632,9 @@ function drawField(
   for (let i = 0; i < s.helpers; i++) {
     const side = i % 2 === 0 ? -1 : 1;
     const rank = Math.floor(i / 2) + 1;
-    const nx = Math.max(-1.1, Math.min(1.1, s.playerNx + side * rank * 0.2));
+    const nx = Math.max(-1.1, Math.min(1.1, s.playerNx + side * rank * HELPER_SPACING));
     drawSprite(ctx, "helper-walk", walk + i, projectX(nx, 0.03), projectY(0.03, h), {
-      h: 62, pixelScale: PIXEL_SCALE,
+      h: HELPER_H, pixelScale: PIXEL_SCALE,
     });
   }
 
@@ -651,10 +654,10 @@ function drawField(
 
   if (bossBeat) {
     // The boss kill keeps its own turn-to-camera pose with the sunglasses.
-    drawSprite(ctx, "player-turn-shades", 0, px, py, { h: 84, pixelScale: PIXEL_SCALE });
+    drawSprite(ctx, "player-turn-shades", 0, px, py, { h: PLAYER_H, pixelScale: PIXEL_SCALE });
   } else {
     drawSprite(ctx, pose, struck ? Math.floor(t * 12) : walk, px, py, {
-      h: 84, pixelScale: PIXEL_SCALE,
+      h: PLAYER_H, pixelScale: PIXEL_SCALE,
     });
   }
 
@@ -692,7 +695,7 @@ function drawField(
   // middle distance on their own.
   if (s.firing > 0 && s.gun !== "flame") {
     const fx = projectX(s.playerNx, 0);
-    const fy = py - 48;
+    const fy = py - PLAYER_H * 0.55;
     const k = Math.min(1, s.firing / 0.06);
     for (const side of [-1, 1] as const) {
       const mx = fx + side * 12;
@@ -714,7 +717,7 @@ function drawField(
   }
 
   // ── Bark bubble ────────────────────────────────────────────────────────
-  if (s.bark) drawBubble(ctx, s.bark.text, px, py - 92, h, s.bark.kind === "boss");
+  if (s.bark) drawBubble(ctx, s.bark.text, px, py - PLAYER_H - 12, h, s.bark.kind === "boss");
 
   // ── Damage flash ───────────────────────────────────────────────────────
   if (s.hitFlash > 0) {
@@ -863,37 +866,45 @@ function drawShop(
   ctx.fillStyle = "#160E1E";
   ctx.fillRect(0, 0, W, h);
 
-  // ── Booth ──────────────────────────────────────────────────────────────
-  const boothTop = TOP_INSET + 34;
-  const boothH = Math.round(Math.min(190, Math.max(148, h * 0.30)));
-  const boothBottom = boothTop + boothH;
+  // ── The booth ──────────────────────────────────────────────────────────
+  // Painted art if it has arrived, the code-drawn hut otherwise. The keeper is
+  // a separate image so he can change expression without redrawing the stall.
+  const boothImg = getImage("shop-booth");
+  const boothW = Math.min(W - 16, 230);
+  const boothH = boothImg ? boothW * (boothImg.height / boothImg.width) : 180;
+  const boothX = (W - boothW) / 2;
+  const boothY = 34;
 
-  ctx.fillStyle = "#7A5A28";
-  ctx.beginPath();
-  ctx.moveTo(12, boothTop);
-  ctx.lineTo(W / 2, boothTop - 30);
-  ctx.lineTo(W - 12, boothTop);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = "#3A2A1A";
-  ctx.fillRect(24, boothTop, W - 48, boothH);
-  ctx.fillStyle = "#4E3722";
-  ctx.fillRect(24, boothTop, W - 48, 16);
-  drawText(ctx, "SHOP", W / 2, boothTop - 18, "#FFE24A", 2, "center");
+  if (boothImg) {
+    ctx.drawImage(boothImg, boothX, boothY, boothW, boothH);
+  } else {
+    ctx.fillStyle = "#3A2A1A";
+    ctx.fillRect(24, 54, W - 48, 148);
+    ctx.fillStyle = "#4E3722";
+    ctx.fillRect(24, 54, W - 48, 16);
+    ctx.fillStyle = "#7A5A28";
+    ctx.beginPath();
+    ctx.moveTo(12, 54);
+    ctx.lineTo(W / 2, 22);
+    ctx.lineTo(W - 12, 54);
+    ctx.closePath();
+    ctx.fill();
+    drawText(ctx, "SHOP", W / 2, 40, "#FFE24A", 2, "center");
+    ctx.fillStyle = "#1A1208";
+    ctx.fillRect(44, 78, W - 88, 112);
+  }
 
-  ctx.fillStyle = "#1A1208";
-  ctx.fillRect(44, boothTop + 24, W - 88, boothH - 48);
-  drawSprite(ctx, "shopkeeper-scotch", 0, W / 2, boothBottom - 12, {
-    h: 106, pixelScale: PIXEL_SCALE,
-  });
+  // The keeper stands in the booth window, and grins for a beat after a sale.
+  drawSprite(ctx, quip ? "shopkeeper-scotch-happy" : "shopkeeper-scotch", 0,
+    W / 2, boothY + boothH * 0.92, { h: boothH * 0.62, pixelScale: PIXEL_SCALE });
 
-  if (quip) drawBubble(ctx, quip, W / 2, boothTop + 22, h, false);
+  if (quip) drawBubble(ctx, quip, W / 2, boothY + boothH * 0.28, h, false);
 
   // Money and luck are shown HERE and nowhere else — the run's own HUD stays
   // down to health and armor, because that is all it can act on.
   drawText(ctx, `$${s.money}`, 10, TOP_INSET, C.money, 2, "left");
   drawText(ctx, `LUCK ${s.luck}%`, W - 10, TOP_INSET + 2, "#C9B6FF", 1, "right");
-  drawText(ctx, `STAGE ${s.stage} CLEAR`, W / 2, boothBottom + 12, "rgba(255,255,255,0.55)", 1, "center");
+  drawText(ctx, `STAGE ${s.stage} CLEAR`, W / 2, boothY + boothH + 10, "rgba(255,255,255,0.55)", 1, "center");
 
   // ── Purchases ──────────────────────────────────────────────────────────
   // Anchored to the BOTTOM, not centred. The logical height flexes from 480 to
@@ -903,7 +914,7 @@ function drawShop(
   const rowH = 34;
   const btnH = 40;
   const blockH = rowH * 2 + 10 + 22 + btnH;
-  const top = Math.max(boothBottom + 26, h - BOTTOM_INSET - 16 - blockH);
+  const top = Math.max(boothY + boothH + 24, h - BOTTOM_INSET - 16 - blockH);
 
   const bw = W - 40;
   let y = top;

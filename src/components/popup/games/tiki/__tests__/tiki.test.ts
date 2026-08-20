@@ -10,6 +10,7 @@ import {
   enemyWalk, waveSize, worldSpeed, gruntHp, blockerHp, FOLLOW_RATE,
   BLOCKERS, BOSSES, bossFor, ELITE_BLOCKER, BOSS_ATTACK_Z,
   MAX_TRAVERSE, GATE_REACH, GATE_CURE_HITS, cureGateOption, LADDERS,
+  PRESSURE_TARGET_Z, PRESSURE_MIN, PRESSURE_MAX,
   rungOf, type State,
 } from "../tikiCore";
 
@@ -740,6 +741,92 @@ check("a boss winds up when it gets close, so its attack art is seen", () => {
   run(st, 1.2);
   const boss = st.enemies.find((e) => e.tier === "boss");
   assert.ok(boss && boss.attacking > 0, "the boss never entered its attack");
+});
+
+// ── Adaptive pressure ───────────────────────────────────────────────────────
+
+check("killing everything at the horizon sends MORE", () => {
+  const st = fresh();
+  const before = st.pressure;
+  // Simulate an over-gunned guest: every wave dies the moment it appears.
+  for (let i = 0; i < 60; i++) {
+    st.enemies = [];
+    run(st, 0.25);
+    for (const e of st.enemies) { e.z = 0.95; e.hp = 0; }
+    run(st, 1 / 60);
+  }
+  assert.ok(st.pressure > before + 0.2,
+    `pressure only reached ${st.pressure.toFixed(2)} — the field would stay empty`);
+  assert.ok(st.killDepth > PRESSURE_TARGET_Z, "kill depth did not register as too far");
+});
+
+check("letting enemies through eases off again", () => {
+  const st = fresh();
+  st.pressure = 3;
+  st.killDepth = 0.9;
+  // Now they start getting past — the loop must back down.
+  for (let i = 0; i < 40; i++) {
+    st.misses.grunt = 0;
+    st.killDepth = 0;                   // as a run of misses would leave it
+    run(st, 0.3);
+  }
+  assert.ok(st.pressure < 3, `pressure stayed at ${st.pressure.toFixed(2)} while enemies got through`);
+});
+
+check("pressure never drops below the stage curve, nor runs away", () => {
+  const st = fresh();
+  st.killDepth = 0;
+  run(st, 30);
+  assert.ok(st.pressure >= PRESSURE_MIN, "pressure went below the stage floor");
+
+  const st2 = fresh();
+  st2.killDepth = 1;
+  for (let i = 0; i < 200; i++) { st2.killDepth = 1; run(st2, 0.5); }
+  assert.ok(st2.pressure <= PRESSURE_MAX, `pressure ran away to ${st2.pressure}`);
+});
+
+check("more pressure really does mean more enemies", () => {
+  const count = (pressure: number) => {
+    const st = fresh();
+    st.pressure = pressure;
+    let spawned = 0;
+    for (let i = 0; i < 600; i++) {
+      const before = st.enemies.length;
+      update(st, DT);
+      if (st.enemies.length > before) spawned += st.enemies.length - before;
+      st.killDepth = PRESSURE_TARGET_Z;   // hold the loop still
+    }
+    return spawned;
+  };
+  const slow = count(1), fast = count(3);
+  assert.ok(fast > slow * 1.5,
+    `pressure 3 spawned ${fast} against ${slow} at pressure 1`);
+});
+
+check("a miss counts for more than a kill", () => {
+  // Pressure must come off faster than it goes on: the loop should never be
+  // the reason a run ends.
+  const up = fresh();
+  up.killDepth = PRESSURE_TARGET_Z;
+  up.enemies = [{
+    id: 1, kind: "lime", tier: "grunt", z: 0.9, nx: 0, hp: 0, maxHp: 2, speed: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
+  }];
+  update(up, DT);
+  const kickUp = up.killDepth - PRESSURE_TARGET_Z;
+
+  const down = fresh();
+  down.killDepth = PRESSURE_TARGET_Z;
+  down.gun = "flame";
+  down.playerNx = 1;
+  down.enemies = [{
+    id: 1, kind: "lime", tier: "grunt", z: 0.02, nx: -0.9, hp: 1, maxHp: 2, speed: 0.6,
+    burn: 0, flash: 0, stagger: 0, tracks: false, dying: 0, attacking: 0,
+  }];
+  run(down, 0.4);
+  const kickDown = PRESSURE_TARGET_Z - down.killDepth;
+
+  assert.ok(kickDown > kickUp, "a miss moves the loop no harder than a far kill");
 });
 
 // ── Density ─────────────────────────────────────────────────────────────────

@@ -54,10 +54,21 @@ export const PIXEL_SCALE = 2;
 // ─── The field ───────────────────────────────────────────────────────────────
 
 /** Distance from the player's feet to the horizon, in logical pixels. */
-export const FIELD_DEPTH_PX = 250;
+export const FIELD_DEPTH_PX = 300;
 
-/** Where the player stands, measured UP from the bottom edge. */
-export const PLAYER_FROM_BOTTOM = 110;
+/**
+ * Where the player stands, measured UP from the bottom edge.
+ *
+ * Low on purpose. Sitting him further up the screen left a dead strip of sand
+ * beneath him and, worse, meant everything reached its largest while still well
+ * inside the frame — the fight always happened at arm's length. Dropping him
+ * toward the bottom edge lets an enemy keep growing right up to the moment it
+ * arrives, so the action closes on the person holding the phone.
+ *
+ * FIELD_DEPTH_PX grew with it, so the horizon stays where it was and the extra
+ * room becomes playing field rather than sky.
+ */
+export const PLAYER_FROM_BOTTOM = 56;
 
 export function playerY(h: number): number {
   return h - PLAYER_FROM_BOTTOM;

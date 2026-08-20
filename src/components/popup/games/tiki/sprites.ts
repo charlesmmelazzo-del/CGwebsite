@@ -90,7 +90,8 @@ export interface SheetDef {
 
 /** Every character sheet, built from the rosters above. */
 export const SHEETS: Record<string, SheetDef> = {
-  helper: { file: "helper", cols: 2, rows: 1 },
+  // The helper shares the hero's 8-frame layout; only its walk is used.
+  helper: { file: "helper", cols: 8, rows: 1 },
   ...Object.fromEntries(GUN_ART.map((g) => [
     `player-${g}`, { file: `player-${g}`, cols: 8, rows: 1 },
   ])),
@@ -129,22 +130,29 @@ export type SpriteKey =
   | "helper-walk"
   | "prop-palm" | "prop-beachgoer-1" | "prop-beachgoer-2"
   | "bg-beach-sky" | "bg-beach-horizon" | "tex-sand"
-  | "shopkeeper-scotch"
+  | "shopkeeper-scotch" | "shopkeeper-scotch-happy" | "shop-booth"
   | `player-${GunArt}-walk` | `player-${GunArt}-hit`
   | `player-${GunArt}-cheer` | `player-${GunArt}-sad`
   | `${SoldierName}-walk`
   | `blk-${BlockerName}-walk` | `blk-${BlockerName}-hit`
   | `boss-${BossName}-walk` | `boss-${BossName}-attack` | `boss-${BossName}-hit`;
 
-const SOLDIER_H = 60;
-const BLOCKER_H = 104;
-const BOSS_H = 170;
+// On-screen heights at closest approach.
+//
+// Scaled up together with the camera drop — the point of moving the player
+// toward the bottom edge is that things get BIG before they reach him, so these
+// have to grow in step or the field just looks emptier.
+export const PLAYER_H = 114;
+export const SOLDIER_H = 80;
+export const BLOCKER_H = 140;
+export const BOSS_H = 226;
+export const HELPER_H = 84;
 
 export const SPRITES: Record<SpriteKey, SpriteMeta> = {
   // The turn-to-camera poses are single images and stay loose files.
-  "player-turn": { file: "player-turn", frames: 1, onScreen: 84 },
-  "player-turn-shades": { file: "player-turn-shades", frames: 1, onScreen: 84 },
-  "helper-walk": { sheet: { name: "helper", row: 0 }, file: "helper-walk", frames: 2, onScreen: 62 },
+  "player-turn": { file: "player-turn", frames: 1, onScreen: PLAYER_H },
+  "player-turn-shades": { file: "player-turn-shades", frames: 1, onScreen: PLAYER_H },
+  "helper-walk": { sheet: { name: "helper", row: 0 }, frames: 4, onScreen: HELPER_H },
 
   // Scenery — one image each with nothing to animate, so a sheet would only add
   // a layout to get wrong.
@@ -155,12 +163,14 @@ export const SPRITES: Record<SpriteKey, SpriteMeta> = {
   "bg-beach-horizon": { file: "bg-beach-horizon", frames: 1, onScreen: 0 },
   "tex-sand": { file: "tex-sand", frames: 1, onScreen: 0 },
   "shopkeeper-scotch": { file: "shopkeeper-scotch", frames: 1, onScreen: 180 },
+  "shopkeeper-scotch-happy": { file: "shopkeeper-scotch-happy", frames: 1, onScreen: 180 },
+  "shop-booth": { file: "shop-booth", frames: 1, onScreen: 0 },
 
   ...Object.fromEntries(GUN_ART.flatMap((g) => [
-    [`player-${g}-walk`, { sheet: { name: `player-${g}`, row: 0, col: PLAYER_POSE.walk }, frames: 4, onScreen: 84 }],
-    [`player-${g}-hit`, { sheet: { name: `player-${g}`, row: 0, col: PLAYER_POSE.hit }, frames: 2, onScreen: 84 }],
-    [`player-${g}-cheer`, { sheet: { name: `player-${g}`, row: 0, col: PLAYER_POSE.cheer }, frames: 1, onScreen: 84 }],
-    [`player-${g}-sad`, { sheet: { name: `player-${g}`, row: 0, col: PLAYER_POSE.sad }, frames: 1, onScreen: 84 }],
+    [`player-${g}-walk`, { sheet: { name: `player-${g}`, row: 0, col: PLAYER_POSE.walk }, frames: 4, onScreen: PLAYER_H }],
+    [`player-${g}-hit`, { sheet: { name: `player-${g}`, row: 0, col: PLAYER_POSE.hit }, frames: 2, onScreen: PLAYER_H }],
+    [`player-${g}-cheer`, { sheet: { name: `player-${g}`, row: 0, col: PLAYER_POSE.cheer }, frames: 1, onScreen: PLAYER_H }],
+    [`player-${g}-sad`, { sheet: { name: `player-${g}`, row: 0, col: PLAYER_POSE.sad }, frames: 1, onScreen: PLAYER_H }],
   ])),
 
   ...Object.fromEntries(SOLDIERS.map((n) => [
@@ -914,4 +924,5 @@ const PLACEHOLDERS: Partial<Record<SpriteKey, Placeholder>> = {
 
   "prop-palm": drawPalm,
   "shopkeeper-scotch": drawShopkeeper,
+  "shopkeeper-scotch-happy": drawShopkeeper,
 };

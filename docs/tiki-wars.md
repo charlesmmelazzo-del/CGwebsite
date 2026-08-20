@@ -132,6 +132,19 @@ No stage number, no money, no luck, no score. Money and luck are shown in the
 shop between stages, where they are actually actionable. The run itself stays
 clean - the guest is watching the field, not reading statistics.
 
+### Where the camera sits
+
+The player stands close to the **bottom edge**, not partway up. Sitting him
+higher left a dead strip of sand beneath him and, worse, meant everything
+reached its largest while still well inside the frame — the fight always
+happened at arm's length. Low and large, an enemy keeps growing right up to the
+moment it arrives.
+
+`FIELD_DEPTH_PX` grew with it so the horizon stayed put and the extra room
+became playing field rather than sky, and `ROAD_HALF_NEAR` shrank because a
+114px-tall hero is about 66 wide and would otherwise hang off the screen edge at
+full lock.
+
 ### One speed for the world
 
 The player walks forward at `worldSpeed`. **Everything that isn't alive
@@ -561,6 +574,36 @@ The game is endless by design; runs are not capped. The risk is therefore not
 length but **stalemate**: a returning guest with 100% luck and 10 armor who
 cannot die, gets bored at stage 40, and posts an unbeatable score without ever
 reaching an ending. Every lever below must scale past any possible build.
+
+### Pressure — the game watching the run
+
+The stage curve sets a floor, but it cannot see how a run is actually going. A
+guest who takes three good gates in a row out-guns the wave entirely:
+everything dies at the horizon, the field empties, and the stage becomes a walk
+down a beach with nothing to do.
+
+So the game measures **how deep enemies get before they die** and opens the taps
+until they are reaching mid-field again.
+
+* `killDepth` is a running average of where enemies stop existing. A **miss**
+  counts nearly twice as heavily as a kill — an enemy getting past is the
+  clearest evidence the guest is at their limit, and pressure has to come off
+  faster than it went on. The loop must never be the reason a run ends.
+* `pressure` multiplies the spawn rate, between **1x and 4x**.
+* It is floored at 1, so it can only ever ADD to the stage curve. A struggling
+  guest is left alone.
+
+It is a closed loop, not a difficulty setting — lose the gun at the next gate
+and the pressure falls back on its own. Measured behaviour:
+
+| Guest | Pressure | What happens |
+|---|---|---|
+| Kills everything at the horizon | 1 -> 4 over ~20s | Field fills from 0 to 13 enemies |
+| Killing around mid-field | 1.00, flat | Loop never interferes |
+| Only killing close in | 1.00 floor | No extra pressure piled on |
+| Barely killing anything | 1.00 floor | Left alone entirely |
+
+### The stage curve
 
 | Lever | Direction |
 |---|---|

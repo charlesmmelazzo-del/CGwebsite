@@ -26,7 +26,10 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
-const ROOT = path.join(os.homedir(), "Desktop", "Game Assets", "Tiki Wars", "Character Assets");
+// The whole Tiki Wars folder: Character Assets, Stage Assets, Shop Assets and
+// whatever comes next. Rooting on one subfolder meant a new sibling folder was
+// invisible until this line was edited.
+const ROOT = path.join(os.homedir(), "Desktop", "Game Assets", "Tiki Wars");
 
 /** ROOT and every folder beneath it — he reorganises, and art must not vanish. */
 function srcDirs() {
@@ -55,6 +58,7 @@ const MAP = {
   // Walk x4, Hit x2, Celebration, Sad. A whole sheet per gun rather than a
   // body plus arm overlays: nothing has to be aligned, and the old body had
   // pistols painted on, so an overlay left him holding two guns at once.
+  "Helper Bottle.png": "helper.png",            // same 8-frame layout
   "Player Pistols.png": "player-pistols.png",
   "Player Shotgun.png": "player-shotgun.png",
   "Player Uzis.png": "player-uzi.png",
@@ -70,6 +74,11 @@ const MAP = {
   "Beach Beachgoer 1.png": "prop-beachgoer-1.png",
   "Beach Beachgoer 2.png": "prop-beachgoer-2.png",
   "Beach Sand Textile.png": "tex-sand.png",
+
+  // ── Shop ──
+  "Shop Booth.png": "shop-booth.png",
+  "Shopkeeper-Scotch.png": "shopkeeper-scotch.png",
+  "shopkeeper-scotch-happy.png": "shopkeeper-scotch-happy.png",
 
   // ── Soldiers: 4 frames, walk only ──
   "Lime Soldier Sheet.png": "lime.png",
@@ -105,6 +114,7 @@ const MAP = {
 /** Frame count by target name. */
 function framesFor(name) {
   if (name.startsWith("blk-") || name.startsWith("boss-")) return 5;
+  if (name === "helper.png") return 8;
   if (name.startsWith("player-") && name !== "player-turn.png" && name !== "player-turn-shades.png") return 8;
   if (["lime.png","kiwi.png","lemon.png","orange.png","cherry.png","sugarcube.png"].includes(name)) return 4;
   return 1;
@@ -118,7 +128,8 @@ function framesFor(name) {
  * captions in a band below the characters with a clear gap above it, so the
  * band is found and dropped on import rather than shipped into the game.
  */
-const LABELLED = (name) => name.startsWith("player-") && framesFor(name) > 1;
+const LABELLED = (name) =>
+  (name.startsWith("player-") || name === "helper.png") && framesFor(name) > 1;
 
 /** Full-bleed images: no background to cut, nothing to centre or crop. */
 const FULLBLEED = { "bg-beach-sky.png": true, "tex-sand.png": true };
@@ -421,12 +432,13 @@ const TARGET_H = 384;
  * can show. Each is boxed to roughly 1.5x its own maximum instead.
  */
 function targetHeight(name) {
-  if (name.startsWith("boss-")) return 384;          // 170 logical -> 340 device
-  if (name.startsWith("blk-")) return 288;           // 104 logical -> 208 device
-  if (name.startsWith("player")) return 256;         // 84 logical -> 168 device
+  if (name.startsWith("boss-")) return 480;          // 226 logical -> 452 device
+  if (name.startsWith("blk-")) return 320;           // 140 logical -> 280 device
+  if (name.startsWith("player") || name === "helper.png") return 288;
   if (name.startsWith("bg-") || name === "tex-sand.png") return 512;
+  if (name.startsWith("shop")) return 448;
   if (name.startsWith("prop-")) return 320;
-  return 192;                                         // soldiers: 60 -> 120
+  return 224;                                         // soldiers: 80 -> 160
 }
 
 /**
