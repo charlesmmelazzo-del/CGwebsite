@@ -745,8 +745,11 @@ a fraction of the art, and it reads better on a phone.
 | **Winter** | Snowy pines, snow-capped mountains | Lime soldier | Cinnamon stick with hammer; coconut with lightsaber; grapefruit with a bat; zombie candy cane | Pineapple dressed as Santa, with a whip |
 | **Castle** | Battle fences, evil castle, scary moon, night | Lime soldier | Pineapple knights; the three earlier bosses as regular blockers | **King Pineapple**, holding your rum bottle hostage |
 
-**After the castle** — the King escapes in a blimp: *"You think you can catch me
-that easily?"* Then the endless randomised tail begins.
+**Beating the King** plays the blimp escape — *"You think you can catch me that
+easily?"* — before the shop, rather than instead of it. Bosses cycle, so it
+comes round again, which is the intended shape: the King gets away and the next
+loop is harder. Once the real stages exist this belongs to the Castle rather
+than to a boss name.
 
 ---
 

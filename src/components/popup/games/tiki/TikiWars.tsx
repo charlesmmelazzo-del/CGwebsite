@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { drawText, pad, textWidth } from "../arcade";
+import { blink, drawText, pad, textWidth } from "../arcade";
 import type { ArcadeGameProps } from "../registry";
 import TikiCanvas from "./TikiCanvas";
 import { QuipBag } from "./quips";
@@ -19,7 +19,7 @@ import {
   MAX_BOMBS, MAX_HEALTH, MAX_SCORE, runDetail, update, detonateBomb, worldSpeed,
   DRAG_RANGE, GATE_REACH, GATE_CURE_HITS, HELPER_SPACING, HELPER_NX_LIMIT,
   rungOf, isGoodOption,
-  isMaxedOption, type Enemy, type GunKind, type State,
+  isMaxedOption, isFinaleBoss, type Enemy, type GunKind, type State,
 } from "./tikiCore";
 
 // ─── Progress (the save file) ────────────────────────────────────────────────
@@ -48,10 +48,37 @@ function startStage(p: Progress): number {
 
 // ─── Screen phases the component owns (the run's own phases live in core) ────
 
-type Screen = "play" | "shop";
+type Screen = "story" | "play" | "shop";
+
+/**
+ * One beat of a story sequence: a picture and a line under it.
+ *
+ * Captions are drawn in code rather than baked into the art, so they can be
+ * reworded or translated without redrawing a panel.
+ */
+interface Beat {
+  art: SpriteKey;
+  caption: string | null;
+}
+
+const INTRO: Beat[] = [
+  { art: "logo-tiki-wars", caption: null },
+  { art: "intro-1", caption: "A good night. The best night." },
+  { art: "intro-2", caption: "Somebody was watching." },
+  { art: "intro-3", caption: "SAVE ME!" },
+  { art: "intro-4", caption: "Nobody takes my girl." },
+];
+
+const ENDING: Beat[] = [
+  { art: "ending-blimp", caption: "You think you can catch me that easily?" },
+];
 
 export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeGameProps) {
+  // The intro plays on a guest's FIRST run at this pop-up and never again. It
+  // is the hook for someone who has just walked up to the bar; for the fourth
+  // Go Again in a row it is an obstacle between them and the game.
   const [screen, setScreen] = useState<Screen>("play");
+  const story = useRef<{ beats: Beat[]; i: number; then: Screen } | null>(null);
   const [, forceRender] = useState(0);
 
   const progress = useRef<Progress>({ ...BLANK });
@@ -59,12 +86,19 @@ export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeG
   const bag = useRef(new QuipBag());
   const reported = useRef(false);
   const shopQuip = useRef<string>("");
+  /** Set when the King dies, so the blimp escape plays at the stage break. */
+  const finaleDue = useRef(false);
   const bombPulse = useRef(0);
 
   // Hit rectangles, written by the renderer each frame and read by the tap
   // handler. Buttons live in the canvas — the game is full-bleed and a DOM
   // control panel below it would eat the screen the art is drawn for.
   const hits = useRef<Record<string, [number, number, number, number]>>({});
+
+  const startStory = useCallback((beats: Beat[], then: Screen) => {
+    story.current = { beats, i: 0, then };
+    setScreen("story");
+  }, []);
 
   // ── Load the save file ───────────────────────────────────────────────────
   useEffect(() => {
@@ -73,6 +107,9 @@ export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeG
     async function load() {
       if (demo || !menuId || !viewerId) {
         st.current = freshState();
+        // No save file to consult, so show the story to anyone who is not the
+        // attract loop. Demo mode never gets it — it has to be the game.
+        if (!demo) startStory(INTRO, "play");
         return;
       }
       try {
@@ -88,6 +125,10 @@ export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeG
           luck: p.luck,
           score: p.totalScore,
         });
+        // First run at this pop-up only. It is the hook for someone who has
+        // just walked up to the bar; by the fourth Go Again it is an obstacle
+        // between them and the game.
+        if (p.runs === 0) startStory(INTRO, "play");
       } catch {
         /* a save file that won't load must never stop someone playing */
       }
@@ -96,7 +137,7 @@ export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeG
     return () => {
       alive = false;
     };
-  }, [demo, menuId, viewerId]);
+  }, [demo, menuId, viewerId, startStory]);
 
   // ── Saving ───────────────────────────────────────────────────────────────
   const save = useCallback(async (s: State) => {
@@ -162,6 +203,20 @@ export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeG
   // from here, so lifting and re-planting a thumb never moves the character.
   const anchorNx = useRef(0);
 
+  /** Advance a story beat, or leave the sequence if that was the last. */
+  const nextBeat = useCallback(() => {
+    const s2 = story.current;
+    if (!s2) return;
+    if (s2.i + 1 < s2.beats.length) {
+      s2.i += 1;
+      forceRender((n) => n + 1);
+      return;
+    }
+    const then = s2.then;
+    story.current = null;
+    setScreen(then);
+  }, []);
+
   const onDragStart = useCallback(() => {
     if (demo) return;
     anchorNx.current = st.current.playerNx;
@@ -189,6 +244,18 @@ export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeG
   const onTap = useCallback((x: number, y: number) => {
     if (demo) return;
     const s = st.current;
+
+    if (screen === "story") {
+      // Skip jumps the whole sequence; anywhere else advances one beat.
+      if (inside(x, y, hits.current.skip)) {
+        const then = story.current?.then ?? "play";
+        story.current = null;
+        setScreen(then);
+      } else {
+        nextBeat();
+      }
+      return;
+    }
     if (screen === "shop") {
       if (inside(x, y, hits.current.armor) && canBuyArmor(s)) {
         s.money -= armorCost(s.armor);
@@ -226,7 +293,7 @@ export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeG
     if (inside(x, y, hits.current.bombBtn)) {
       if (detonateBomb(s)) bombPulse.current = 0.4;
     }
-  }, [demo, screen]);
+  }, [demo, screen, nextBeat]);
 
   // ── Frame ────────────────────────────────────────────────────────────────
   const onFrame = useCallback((ctx: CanvasRenderingContext2D, dt: number, t: number, h: number) => {
@@ -267,11 +334,19 @@ export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeG
       }
       if (wasPhase !== "bosskill" && s.phase === "bosskill") {
         s.bark = { text: bag.current.draw("boss"), life: 3, kind: "boss" };
+        finaleDue.current = isFinaleBoss(s.stage);
       }
       if (s.phase === "cleared") {
         shopQuip.current = "";
         s.cloverBought = false;          // a fresh clover each stop
-        setScreen("shop");
+        // Beating the King is the end of the story, so the blimp escape plays
+        // before the shop rather than instead of it.
+        if (finaleDue.current) {
+          finaleDue.current = false;
+          startStory(ENDING, "shop");
+        } else {
+          setScreen("shop");
+        }
       }
       if (s.phase === "over" && !reported.current) {
         reported.current = true;
@@ -285,9 +360,10 @@ export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeG
       }
     }
 
-    if (screen === "shop") drawShop(ctx, s, h, hits.current, shopQuip.current, t);
+    if (screen === "story") drawStory(ctx, story.current, h, hits.current, t);
+    else if (screen === "shop") drawShop(ctx, s, h, hits.current, shopQuip.current, t);
     else drawField(ctx, s, h, t, hits.current, demo ?? false, bombPulse.current);
-  }, [screen, demo, botDrag, onGameOver, save]);
+  }, [screen, demo, botDrag, onGameOver, save, startStory]);
 
   return (
     <div className="absolute inset-0 bg-black">
@@ -964,6 +1040,73 @@ function drawShop(
   ctx.fillRect(12, y, W - 24, btnH);
   ctx.globalAlpha = 1;
   drawText(ctx, `START STAGE ${s.stage + 1}`, W / 2, y + btnH / 2 - 7, "#1A1206", 2, "center");
+}
+
+/**
+ * A story beat: the picture, letterboxed, with its caption beneath.
+ *
+ * The panels are portrait 4:5 and the screen is nearer 1:2, so they are fitted
+ * rather than stretched — the surrounding black is deliberate and reads as a
+ * comic page rather than as a bug.
+ */
+function drawStory(
+  ctx: CanvasRenderingContext2D,
+  story: { beats: Beat[]; i: number } | null,
+  h: number,
+  hits: Hits,
+  t: number
+): void {
+  ctx.fillStyle = "#0A0710";
+  ctx.fillRect(0, 0, W, h);
+  if (!story) return;
+
+  const beat = story.beats[story.i];
+  const img = getImage(beat.art);
+  const capH = beat.caption ? 30 : 0;
+  const topSafe = TOP_INSET + 18;
+  const availH = h - topSafe - BOTTOM_INSET - capH - 34;
+  const availW = W - 16;
+
+  let drawW = availW;
+  let drawH = availH;
+  if (img) {
+    const scale = Math.min(availW / img.width, availH / img.height);
+    drawW = img.width * scale;
+    drawH = img.height * scale;
+  }
+  const x = (W - drawW) / 2;
+  const y = topSafe + (availH - drawH) / 2;
+
+  if (img) {
+    ctx.drawImage(img, x, y, drawW, drawH);
+  } else {
+    ctx.fillStyle = "rgba(255,255,255,0.06)";
+    ctx.fillRect(x, y, drawW, drawH);
+  }
+
+  if (beat.caption) {
+    drawBubble(ctx, beat.caption, W / 2, y + drawH + capH + 6, h, false);
+  }
+
+  // Progress pips, so the guest can see how much is left before they commit.
+  const pips = story.beats.length;
+  if (pips > 1) {
+    const pw = 7, gap = 4;
+    const total = pips * pw + (pips - 1) * gap;
+    for (let i = 0; i < pips; i++) {
+      ctx.fillStyle = i === story.i ? "#FFD500" : "rgba(255,255,255,0.22)";
+      ctx.fillRect((W - total) / 2 + i * (pw + gap), h - BOTTOM_INSET - 14, pw, 3);
+    }
+  }
+
+  // Skip, top right. Always available — nobody should be trapped in a cutscene
+  // they have already seen, least of all someone standing at a bar.
+  const sw = 46, sh = 20;
+  hits.skip = [W - sw - 8, TOP_INSET - 4, sw, sh];
+  drawText(ctx, "SKIP >>", W - 10, TOP_INSET + 2, "rgba(255,255,255,0.5)", 1, "right");
+
+  drawText(ctx, "TAP", W / 2, h - BOTTOM_INSET - 26,
+    blink(t, 1.2) ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.16)", 1, "center");
 }
 
 interface ShopRow {

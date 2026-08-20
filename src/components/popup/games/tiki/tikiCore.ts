@@ -223,6 +223,17 @@ export function bossFor(stage: number): BossName {
 }
 
 /**
+ * The King is the end of the story, so beating him plays the blimp escape.
+ *
+ * Bosses cycle, so this comes round again — which is the intended shape: the
+ * King gets away, and the next loop is harder. Once the real stages exist this
+ * belongs to the Castle rather than to a boss name.
+ */
+export function isFinaleBoss(stage: number): boolean {
+  return bossFor(stage) === "king";
+}
+
+/**
  * Grunt health.
  *
  * These used to die in exactly one shot, on the reasoning that the guest needs

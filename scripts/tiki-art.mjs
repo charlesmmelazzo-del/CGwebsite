@@ -91,6 +91,14 @@ const MAP = {
   "Luck Icon.png": "icon-clover.png",
   "Laser Icon.png": "icon-laser.png",
 
+  // ── Intro, ending and marquee ──
+  "Tiki Wars Logo.png": "logo-tiki-wars.png",
+  "Intro 1.png": "intro-1.png",
+  "Intro 2.png": "intro-2.png",
+  "Intro 3.png": "intro-3.png",
+  "Intro 4.png": "intro-4.png",
+  "Ending Blimp.png": "ending-blimp.png",
+
   // ── Shop ──
   "Shop Booth.png": "shop-booth.png",
   "Shopkeeper-Scotch.png": "shopkeeper-scotch.png",
@@ -148,7 +156,11 @@ const LABELLED = (name) =>
   (name.startsWith("player-") || name === "helper.png") && framesFor(name) > 1;
 
 /** Full-bleed images: no background to cut, nothing to centre or crop. */
-const FULLBLEED = { "bg-beach-sky.png": true, "tex-sand.png": true };
+const FULLBLEED = {
+  "bg-beach-sky.png": true, "tex-sand.png": true,
+  "intro-1.png": true, "intro-2.png": true, "intro-3.png": true,
+  "intro-4.png": true, "ending-blimp.png": true,
+};
 
 
 
@@ -455,6 +467,10 @@ function targetHeight(name) {
   if (name.startsWith("shop")) return 448;
   // Icons read at ~34 logical px; 128 is ample and keeps them tiny.
   if (name.startsWith("icon-")) return 128;
+  // Story panels are letterboxed to roughly the screen width, so height buys
+  // nothing past about twice what they are drawn at.
+  if (name.startsWith("intro-") || name === "ending-blimp.png") return 560;
+  if (name === "logo-tiki-wars.png") return 320;
   if (name.startsWith("prop-")) return 320;
   return 224;                                         // soldiers: 80 -> 160
 }

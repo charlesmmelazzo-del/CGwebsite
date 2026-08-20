@@ -131,6 +131,8 @@ export type SpriteKey =
   | "prop-palm" | "prop-beachgoer-1" | "prop-beachgoer-2"
   | "bg-beach-sky" | "bg-beach-horizon" | "tex-sand"
   | "shopkeeper-scotch" | "shopkeeper-scotch-happy" | "shop-booth"
+  | "logo-tiki-wars" | "intro-1" | "intro-2" | "intro-3" | "intro-4"
+  | "ending-blimp"
   | "icon-armor" | "icon-bomb" | "icon-clover" | "icon-money" | "icon-rum"
   | "icon-poison" | "icon-black-cat" | "icon-pistol" | "icon-shotgun"
   | "icon-uzi" | "icon-flame" | "icon-laser"
@@ -168,6 +170,15 @@ export const SPRITES: Record<SpriteKey, SpriteMeta> = {
   "shopkeeper-scotch": { file: "shopkeeper-scotch", frames: 1, onScreen: 180 },
   "shopkeeper-scotch-happy": { file: "shopkeeper-scotch-happy", frames: 1, onScreen: 180 },
   "shop-booth": { file: "shop-booth", frames: 1, onScreen: 0 },
+
+  // Story art: drawn letterboxed at whatever the screen allows, never planted
+  // on the ground like a figure, so onScreen means nothing for these.
+  "logo-tiki-wars": { file: "logo-tiki-wars", frames: 1, onScreen: 0 },
+  "intro-1": { file: "intro-1", frames: 1, onScreen: 0 },
+  "intro-2": { file: "intro-2", frames: 1, onScreen: 0 },
+  "intro-3": { file: "intro-3", frames: 1, onScreen: 0 },
+  "intro-4": { file: "intro-4", frames: 1, onScreen: 0 },
+  "ending-blimp": { file: "ending-blimp", frames: 1, onScreen: 0 },
 
   // Icons. Read at roughly 30 logical px, so they live or die on silhouette.
   ...Object.fromEntries((
