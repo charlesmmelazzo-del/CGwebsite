@@ -735,6 +735,29 @@ and the pressure falls back on its own. Measured behaviour:
 | Only killing close in | 1.00 floor | No extra pressure piled on |
 | Barely killing anything | 1.00 floor | Left alone entirely |
 
+### A stage is a sequence, not a sprinkler
+
+Enemies arrive as **beats**, the way an arcade game does — a wave of soldiers, a
+breath, a pair of blockers, a breath, a gate. The order is shuffled and the
+sizes scale, but the shape is always *wave, pause, wave, pause, gate*.
+
+They used to arrive on a timer, which gave a stage no rhythm at all: the road
+was equally busy from the first second to the last, and a gate turned up
+whenever its own clock said so — usually in the middle of a crowd. Pressure and
+the stage ramp now shorten the *holds* rather than opening a tap, so a busy
+stage is a faster sequence of waves and never a continuous stream.
+
+Every fight is followed by a rest, so a gate always arrives on clear road
+without needing a special case for it.
+
+### Each stage has its own blockers
+
+A stage casts **four** of the fourteen blockers when it begins, and draws only
+from those. Two reasons, and the second is the one that shows: a stage gets a
+recognisable cast instead of fourteen strangers, and those four sheets can be
+fetched up front — so a blocker never turns up as a placeholder and pops into
+itself a second later. The stage's boss is prefetched the same way.
+
 ### The shape of one stage
 
 A stage is not one flat rate. Spawning ramps about 40% between the opening and

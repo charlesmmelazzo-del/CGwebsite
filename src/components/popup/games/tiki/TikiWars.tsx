@@ -6,8 +6,8 @@ import type { ArcadeGameProps } from "../registry";
 import TikiCanvas from "./TikiCanvas";
 import { QuipBag } from "./quips";
 import {
-  drawSprite, getImage, loadTikiArt, BLOCKER_H, BOSS_H, HELPER_H, PLAYER_H,
-  SOLDIER_H, type GunArt, type SpriteKey,
+  drawSprite, getImage, loadTikiArt, prefetchSheet, BLOCKER_H, BOSS_H, HELPER_H,
+  PLAYER_H, SOLDIER_H, type GunArt, type SpriteKey,
 } from "./sprites";
 import {
   C, horizonY, PIXEL_SCALE, playerY, projectScale, projectX, projectY,
@@ -17,8 +17,10 @@ import {
   armorCost, bombCost, canBuyArmor, canBuyBomb, canBuyClover, cloverCost,
   freshState, GUNS, LUCK_STEP, MAX_ARMOR, MAX_LUCK,
   MAX_BOMBS, MAX_HEALTH, MAX_SCORE, runDetail, update, detonateBomb, worldSpeed,
-  DRAG_RANGE, GATE_REACH, GATE_CURE_HITS, helperSlots, rungOf, isGoodOption,
-  isMaxedOption, isFinaleBoss, type Enemy, type GunKind, type State,
+  DRAG_RANGE, GATE_REACH, GATE_GAP, GATE_CURE_HITS, helperSlots, rungOf,
+  isGoodOption,
+  isMaxedOption, isFinaleBoss, bossFor, pickStageBlockers,
+  type Enemy, type GunKind, type State,
 } from "./tikiCore";
 
 // ─── Progress (the save file) ────────────────────────────────────────────────
@@ -122,6 +124,8 @@ export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeG
   const bombPulse = useRef(0);
   /** Seconds the current story beat has been up, for demo mode's auto-advance. */
   const storyHold = useRef(0);
+  /** Last stage whose boss and blockers were fetched ahead of time. */
+  const prefetchedStage = useRef(-1);
 
   // Hit rectangles, written by the renderer each frame and read by the tap
   // handler. Buttons live in the canvas — the game is full-bleed and a DOM
@@ -347,6 +351,15 @@ export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeG
         s.targetNx = Math.max(-1, Math.min(1, s.playerNx + botDrag(s) * 0.35));
       }
 
+      // Fetch the stage's boss and its blocker cast the moment the stage
+      // begins, rather than when they first need drawing.
+      if (prefetchedStage.current !== s.stage) {
+        prefetchedStage.current = s.stage;
+        if (s.stageBlockers.length === 0) s.stageBlockers = pickStageBlockers(s.rng);
+        prefetchSheet(`boss-${bossFor(s.stage)}`);
+        for (const b of s.stageBlockers) prefetchSheet(`blk-${b}`);
+      }
+
       const wasPhase = s.phase;
       update(s, dt);
 
@@ -442,6 +455,14 @@ type Hits = Record<string, [number, number, number, number]>;
  * guest has to read or press goes inside these.
  */
 const TOP_INSET = 12;
+
+/**
+ * Room reserved at the top left for the shell's EXIT button.
+ *
+ * That button is DOM, drawn over the canvas, so nothing in here knows it is
+ * there — the health bar has to be told to get out from under it.
+ */
+const EXIT_CLEARANCE = 40;
 const BOTTOM_INSET = 26;
 
 /** Which art sheet each gun uses. */
@@ -619,7 +640,10 @@ function drawField(
 
     for (const [side, o] of [[-1, g.left] as const, [1, g.right] as const]) {
       const rung = rungOf(o);
-      const x0 = side < 0 ? W / 2 - reach : W / 2;
+      // Split apart at the centre. Meeting on the middle line read as one wide
+      // sign rather than a choice, and the two labels ran together at distance.
+      const gap = hw * GATE_GAP;
+      const x0 = side < 0 ? W / 2 - gap - reach : W / 2 + gap;
       const tone =
         rung.tone === "good" ? { fill: "rgba(60,220,120,0.34)", line: "#5CE08A" }
           : rung.tone === "neutral" ? { fill: "rgba(230,200,90,0.30)", line: "#F0D264" }
@@ -641,20 +665,22 @@ function drawField(
       ctx.lineWidth = g.flipped > 0 ? 2.6 : 1.4;
       ctx.strokeRect(x0, y - gh, reach, gh);
 
-      // Largest size that fits, and CLIPPED to its own panel either way.
-      //
-      // Fixed sizing drew "NOTHING" and "POISON" straight through each other
-      // into one unreadable smear at distance. Refusing to draw anything that
-      // didn't fit was worse — a gate with no label is a gate you cannot make
-      // a decision about, and "POISON" misses fitting by a single pixel at the
-      // range where you most need to read it. Clipping means the label is
-      // always there and can never bleed into its neighbour.
+      // Icon above, label below. The icon is what carries at distance — the
+      // text only becomes readable once the gate is close, by which point the
+      // guest has usually already committed to a side.
+      const iconH = Math.min(gh * 0.46, reach * 0.5);
+      if (iconH > 6) {
+        drawSprite(ctx, rung.icon as SpriteKey, 0,
+          x0 + reach / 2, y - gh + iconH + gh * 0.1,
+          { h: iconH, pixelScale: PIXEL_SCALE });
+      }
+
       const sc = textWidth(rung.label, 2) <= reach - 6 ? 2 : 1;
       ctx.save();
       ctx.beginPath();
       ctx.rect(x0, y - gh, reach, gh);
       ctx.clip();
-      drawText(ctx, rung.label, x0 + reach / 2, y - gh / 2 - 3 * sc, "#FFFFFF", sc, "center");
+      drawText(ctx, rung.label, x0 + reach / 2, y - gh * 0.26, "#FFFFFF", sc, "center");
       ctx.restore();
     }
 
@@ -662,7 +688,9 @@ function drawField(
     if (g.flipped > 0) {
       ctx.globalAlpha = Math.min(0.5, g.flipped);
       ctx.fillStyle = "#FFFFFF";
-      ctx.fillRect(W / 2 - reach, y - gh, reach * 2, gh);
+      const gap = hw * GATE_GAP;
+      ctx.fillRect(W / 2 - gap - reach, y - gh, reach, gh);
+      ctx.fillRect(W / 2 + gap, y - gh, reach, gh);
       ctx.globalAlpha = 1;
     }
   }
@@ -809,20 +837,17 @@ function drawField(
     const muzzleFade = Math.max(0, 1 - b.z / 0.22);
     const x = projectX(b.nx, b.z) + b.side * 12 * sc * muzzleFade;
     const y = projectY(b.z, h) - (26 + 24 * muzzleFade) * sc;
-    // Drawn as a TRACER, not a dot. A round travelling this fast covers more
-    // ground between frames than a dot is wide, so a dot strobes; a streak
-    // reads as a continuous line of fire.
-    const w = Math.max(1.4, 3 * sc);
-    const len = Math.max(5, 14 * sc);
-    // Cyan with a hard black keyline. The old warm yellow was almost exactly
-    // the value and hue of the sand it flew over and simply disappeared; a cold
-    // colour is the one thing this palette has that sand, sky and fruit do not.
-    ctx.fillStyle = C.outline;
-    ctx.fillRect(x - w / 2 - 0.9, y - len - 0.9, w + 1.8, len + 1.8);
-    ctx.fillStyle = C.bulletCore;
-    ctx.fillRect(x - w / 2, y - len, w, len);
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(x - w / 2, y - len, w, len * 0.45);
+    // A laser has to read as different at a glance, because it behaves
+    // differently: its round goes THROUGH what it hits.
+    const key: SpriteKey = b.pierce ? "fx-laser" : "fx-bullet";
+    // Rotating the art left it tall and narrow — a bullet drawn at 16px was
+    // under three pixels across and simply could not be seen.
+    const artH = Math.max(10, (b.pierce ? 34 : 26) * Math.max(0.45, sc));
+    // The trailing frame alternates per muzzle, so a stream of rounds does not
+    // pulse in step with itself.
+    drawSprite(ctx, key, Math.floor(t * 16) + (b.side > 0 ? 1 : 0), x, y + artH, {
+      h: artH, pixelScale: PIXEL_SCALE,
+    });
   }
 
   // Muzzle flash. This is what actually anchors the shooting to the character —
@@ -831,23 +856,14 @@ function drawField(
   if (s.firing > 0 && s.gun !== "flame") {
     const fx = projectX(s.playerNx, 0);
     const fy = py - PLAYER_H * 0.55;
-    const k = Math.min(1, s.firing / 0.06);
+    // The four frames run off the firing countdown, so the flash plays ONCE per
+    // shot rather than looping on wall-clock time.
+    const k = Math.min(1, Math.max(0, s.firing / 0.06));
+    const frame = Math.min(3, Math.floor((1 - k) * 4));
     for (const side of [-1, 1] as const) {
-      const mx = fx + side * 12;
-      ctx.globalAlpha = 0.9 * k;
-      ctx.fillStyle = C.flameHot;
-      ctx.beginPath();
-      ctx.moveTo(mx, fy - 11 * k);
-      ctx.lineTo(mx + 5 * k, fy);
-      ctx.lineTo(mx, fy + 4 * k);
-      ctx.lineTo(mx - 5 * k, fy);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = "#FFFFFF";
-      ctx.beginPath();
-      ctx.arc(mx, fy, 2.6 * k, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
+      drawSprite(ctx, "fx-muzzle", frame, fx + side * 12, fy + 13, {
+        h: 26, pixelScale: PIXEL_SCALE,
+      });
     }
   }
 
@@ -882,7 +898,10 @@ function drawField(
 function drawHud(ctx: CanvasRenderingContext2D, s: State) {
   const x = 8;
   const w = 92;
-  const y = TOP_INSET;
+  // Pushed clear of the shell's EXIT button, which is a DOM element sitting
+  // over the top-left corner of the canvas — the health bar was running
+  // straight underneath it.
+  const y = TOP_INSET + EXIT_CLEARANCE;
 
   ctx.fillStyle = C.hpBack;
   ctx.fillRect(x, y, w, 7);

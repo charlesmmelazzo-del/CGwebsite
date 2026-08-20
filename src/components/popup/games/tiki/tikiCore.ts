@@ -150,11 +150,16 @@ export const CONTACT_NX = 0.30;           // how wide a body is, in nx
  * How far a TRACKING enemy may follow the player across the road.
  *
  * Sized to each one's sprite, because they are drawn at wildly different
- * widths. A boss is 176 logical px across on a 270px screen — nearly
- * two-thirds of it — so following the guest out to the edge hung a third of the
- * boss off the side of the display. Grunts do not track, so they are not here.
+ * widths. A boss is around 190 logical px across on a 270px screen — nearly
+ * three-quarters of it — so following the guest out to the edge hung a third
+ * of the boss off the side of the display. Grunts do not track, so they are
+ * not here.
+ *
+ * The boss figure is set by the WIDEST of them, measured from the imported
+ * sheets rather than assumed: Baby and Knight are about 189px where King is
+ * 176, and a limit fitted to the narrowest clipped the other two.
  */
-export const TRACK_LIMIT: Record<string, number> = { blocker: 0.74, boss: 0.34 };
+export const TRACK_LIMIT: Record<string, number> = { blocker: 0.74, boss: 0.30 };
 
 /**
  * Contact half-width, by tier.
@@ -196,15 +201,6 @@ export function gateSpeed(stage: number): number {
   return Math.max(GATE_SPEED, enemySpeed(stage) * 1.35);
 }
 
-/**
- * Quiet road before a gate arrives.
- *
- * Spawning stops for this long before a gate appears, so it does not come down
- * the field inside a crowd. Enemies walk FASTER than the gate — see below — so
- * a gap opened in front of it keeps opening rather than closing, and the gate
- * gets its own moment without the field having to be empty.
- */
-export const GATE_QUIET_LEAD = 2.2;
 
 export const PTS_GRUNT = 10;
 export const PTS_BLOCKER = 50;
@@ -248,12 +244,16 @@ export const GUNS: Record<GunKind, {
   range: number;
 }> = {
   pistol: { rate: 5.5, damage: 1, count: 1, spread: 0, range: 1 },
-  shotgun: { rate: 3.2, damage: 1, count: 3, spread: 0.42, range: 1 },
-  uzi: { rate: 13, damage: 1, count: 1, spread: 0.04, range: 1 },
+  // Every upgrade is tuned to sit HALFWAY between where it used to be and the
+  // pistol. They were two to three times the base gun, which made the first
+  // gun gate the moment a run stopped being a game — and made the pistol feel
+  // like a punishment rather than a starting point.
+  shotgun: { rate: 2.5, damage: 1, count: 3, spread: 0.42, range: 1 },
+  uzi: { rate: 9.2, damage: 1, count: 1, spread: 0.04, range: 1 },
   // Damage is per second and applies to everything inside the cone at once,
   // plus a burn that keeps ticking after the stream moves off. Devastating up
   // close, useless at any distance — the panic button, not an upgrade.
-  flame: { rate: 0, damage: 9, count: 0, spread: 0.55, range: 0.34 },
+  flame: { rate: 0, damage: 7.2, count: 0, spread: 0.55, range: 0.34 },
   // The answer to a wall of blockers rather than to a crowd: each shot goes
   // straight THROUGH what it hits.
   //
@@ -261,7 +261,7 @@ export const GUNS: Record<GunKind, {
   // AND piercing — over three times the pistol against a single target and
   // far more against a column, which made every other gun pointless. The
   // piercing is the weapon; the rate of fire is what it pays for it.
-  laser: { rate: 2.4, damage: 3, count: 1, spread: 0, range: 1 },
+  laser: { rate: 2.1, damage: 3, count: 1, spread: 0, range: 1 },
 };
 
 /** Guns whose rounds are not consumed by the first thing they hit. */
@@ -320,6 +320,19 @@ export const ELITE_BLOCKER: BlockerName = "blender";
  * guest who keeps going meets every one of them. Once the real stages exist
  * this becomes a property of the stage instead.
  */
+/** How many different blockers one stage draws on. */
+export const BLOCKERS_PER_STAGE = 4;
+
+/** Pick this stage's blocker cast. Deterministic given the run's rng. */
+export function pickStageBlockers(rng: () => number): BlockerName[] {
+  const pool = [...BLOCKERS];
+  const out: BlockerName[] = [];
+  for (let i = 0; i < BLOCKERS_PER_STAGE && pool.length; i++) {
+    out.push(pool.splice(Math.floor(rng() * pool.length), 1)[0]);
+  }
+  return out;
+}
+
 export function bossFor(stage: number): BossName {
   return BOSSES[(stage - 1) % BOSSES.length];
 }
@@ -480,6 +493,8 @@ export interface Rung {
   effect: GateEffect | null;
   label: string;
   tone: "bad" | "neutral" | "good";
+  /** Sprite key for the panel's icon, drawn above the label. */
+  icon: string;
 }
 
 /**
@@ -490,31 +505,31 @@ export const LADDERS: Record<GateFamily, Rung[]> = {
   // Tops out at +2, so no single gate hands over a full squad — a rank of
   // three has to be built across two of them.
   helpers: [
-    { effect: { kind: "helpers", n: -2 }, label: "-2 RUM", tone: "bad" },
-    { effect: { kind: "helpers", n: -1 }, label: "-1 RUM", tone: "bad" },
-    { effect: null, label: "NOTHING", tone: "neutral" },
-    { effect: { kind: "helpers", n: 1 }, label: "+1 RUM", tone: "good" },
-    { effect: { kind: "helpers", n: 2 }, label: "+2 RUM", tone: "good" },
+    { effect: { kind: "helpers", n: -2 }, label: "-2 RUM", tone: "bad", icon: "icon-rum" },
+    { effect: { kind: "helpers", n: -1 }, label: "-1 RUM", tone: "bad", icon: "icon-rum" },
+    { effect: null, label: "NOTHING", tone: "neutral", icon: "icon-black-cat" },
+    { effect: { kind: "helpers", n: 1 }, label: "+1 RUM", tone: "good", icon: "icon-rum" },
+    { effect: { kind: "helpers", n: 2 }, label: "+2 RUM", tone: "good", icon: "icon-rum" },
   ],
   money: [
-    { effect: { kind: "money", n: -5 }, label: "-$5", tone: "bad" },
-    { effect: null, label: "NOTHING", tone: "neutral" },
-    { effect: { kind: "money", n: 5 }, label: "+$5", tone: "good" },
-    { effect: { kind: "money", n: 8 }, label: "+$8", tone: "good" },
+    { effect: { kind: "money", n: -5 }, label: "-$5", tone: "bad", icon: "icon-money" },
+    { effect: null, label: "NOTHING", tone: "neutral", icon: "icon-black-cat" },
+    { effect: { kind: "money", n: 5 }, label: "+$5", tone: "good", icon: "icon-money" },
+    { effect: { kind: "money", n: 8 }, label: "+$8", tone: "good", icon: "icon-money" },
   ],
   gun: [
-    { effect: { kind: "gun", gun: "pistol" }, label: "PISTOL", tone: "bad" },
-    { effect: null, label: "NOTHING", tone: "neutral" },
-    { effect: { kind: "gun", gun: "shotgun" }, label: "SHOTGUN", tone: "good" },
-    { effect: { kind: "gun", gun: "uzi" }, label: "UZI", tone: "good" },
-    { effect: { kind: "gun", gun: "flame" }, label: "FLAME", tone: "good" },
-    { effect: { kind: "gun", gun: "laser" }, label: "LASER", tone: "good" },
+    { effect: { kind: "gun", gun: "pistol" }, label: "PISTOL", tone: "bad", icon: "icon-pistol" },
+    { effect: null, label: "NOTHING", tone: "neutral", icon: "icon-black-cat" },
+    { effect: { kind: "gun", gun: "shotgun" }, label: "SHOTGUN", tone: "good", icon: "icon-shotgun" },
+    { effect: { kind: "gun", gun: "uzi" }, label: "UZI", tone: "good", icon: "icon-uzi" },
+    { effect: { kind: "gun", gun: "flame" }, label: "FLAME", tone: "good", icon: "icon-flame" },
+    { effect: { kind: "gun", gun: "laser" }, label: "LASER", tone: "good", icon: "icon-laser" },
   ],
   health: [
-    { effect: { kind: "health", n: -20 }, label: "POISON", tone: "bad" },
-    { effect: null, label: "NOTHING", tone: "neutral" },
-    { effect: { kind: "health", n: 18 }, label: "+HEALTH", tone: "good" },
-    { effect: { kind: "bomb" }, label: "BOMB", tone: "good" },
+    { effect: { kind: "health", n: -20 }, label: "POISON", tone: "bad", icon: "icon-poison" },
+    { effect: null, label: "NOTHING", tone: "neutral", icon: "icon-black-cat" },
+    { effect: { kind: "health", n: 18 }, label: "+HEALTH", tone: "good", icon: "icon-rum" },
+    { effect: { kind: "bomb" }, label: "BOMB", tone: "good", icon: "icon-bomb" },
   ],
 };
 
@@ -560,6 +575,16 @@ export interface Gate {
  * else is coming.
  */
 export const GATE_REACH = 0.72;
+
+/**
+ * Gap between the two panels, as a fraction of the road's half-width.
+ *
+ * The panels used to meet at the centre line, which read as one wide sign
+ * rather than a choice between two — and at distance the labels ran together.
+ * Splitting them apart makes the decision legible from further away, which is
+ * the only distance at which there is still time to act on it.
+ */
+export const GATE_GAP = 0.14;
 
 /**
  * Rounds needed to move a panel up ONE rung.
@@ -673,6 +698,22 @@ export interface State {
   /** Spawn-rate multiplier the loop above is driving. */
   pressure: number;
 
+  /**
+   * The blockers this stage draws from.
+   *
+   * A handful chosen when the stage starts rather than the whole roster rolled
+   * per spawn. Two reasons, and the second is the one that shows: a stage gets
+   * a recognisable cast instead of fourteen strangers, and the art for four
+   * sheets can be fetched up front so a blocker never arrives as a placeholder
+   * and pops into itself a second later.
+   */
+  stageBlockers: BlockerName[];
+
+  /** The remaining beats of this stage's current cycle. */
+  waves: WaveBeat[];
+  /** Seconds left in the beat being played. */
+  waveT: number;
+
   cooldown: number;
   spawnT: number;
   gateT: number;
@@ -727,6 +768,9 @@ export function freshState(opts: StartOpts = {}): State {
     gatesTaken: 0,
     killDepth: PRESSURE_TARGET_Z,
     pressure: PRESSURE_MIN,
+    stageBlockers: [],
+    waves: [],
+    waveT: 0.8,                          // a breath before the first wave
     cooldown: 0,
     spawnT: 0.8,
     gateT: GATE_EVERY,
@@ -752,6 +796,59 @@ export function freshState(opts: StartOpts = {}): State {
  * outer lane is where the guest sits to refuse a gate anyway.
  */
 export const WAVE_SPREAD = 0.78;
+
+/**
+ * A stage is a SEQUENCE, not a sprinkler.
+ *
+ * Enemies used to arrive on a timer, which gave a stage no rhythm at all: the
+ * road was equally busy from the first second to the last and a gate turned up
+ * whenever its own clock said so, usually in the middle of a crowd.
+ *
+ * A stage now runs as beats, the way an arcade game does — a wave of soldiers,
+ * a breath, a pair of blockers, a breath, a gate. The order is shuffled and the
+ * sizes scale, but the SHAPE is always wave, pause, wave, pause, gate.
+ */
+export type WaveKind = "soldiers" | "blockers" | "mixed" | "gate" | "rest";
+
+export interface WaveBeat {
+  kind: WaveKind;
+  /** Seconds to hold before moving to the next beat. */
+  hold: number;
+}
+
+/** How long the road stays empty between waves. */
+export const REST_SECONDS = 1.5;
+
+/**
+ * One cycle of a stage. Two fights, a gate, two fights, a gate.
+ *
+ * Always ends on a gate so cycles chain without two gates ever landing back to
+ * back, and every fight is followed by a rest so nothing overlaps a gate.
+ */
+export function buildWaveCycle(rng: () => number): WaveBeat[] {
+  const fight = (): WaveKind => {
+    const r = rng();
+    if (r < 0.45) return "soldiers";
+    if (r < 0.75) return "mixed";
+    return "blockers";
+  };
+  const out: WaveBeat[] = [];
+  const push = (kind: WaveKind, hold: number) => out.push({ kind, hold });
+
+  push("soldiers", 3.4);
+  push("rest", REST_SECONDS);
+  push(fight(), 3.8);
+  push("rest", REST_SECONDS);
+  push("gate", 4.2);
+  push("rest", REST_SECONDS);
+  push(fight(), 3.6);
+  push("rest", REST_SECONDS);
+  push(fight(), 3.8);
+  push("rest", REST_SECONDS);
+  push("gate", 4.2);
+  push("rest", REST_SECONDS);
+  return out;
+}
 
 /** How far off the player a blocker aims, so they don't stack into a column. */
 export const BLOCKER_AIM_SPREAD = 0.3;
@@ -786,7 +883,14 @@ export function stageRamp(stageT: number): number {
  * what actually fills the screen.
  */
 export function waveSize(stage: number): number {
-  return Math.min(5, 2 + Math.floor((stage - 1) * 0.25));
+  // Scales more slowly than it did: the count climbs with depth, but a stage is
+  // now paced by its beats rather than by how fast the sprinkler runs.
+  return Math.min(6, 2 + Math.floor((stage - 1) * 0.18));
+}
+
+/** How many blockers a blocker beat sends. */
+export function blockerWaveSize(stage: number): number {
+  return Math.min(4, 1 + Math.floor((stage - 1) * 0.14));
 }
 
 // ─── Pressure ────────────────────────────────────────────────────────────────
@@ -1044,15 +1148,15 @@ export function detonateBomb(st: State): boolean {
  */
 const SPAWN_LIMIT = { grunt: 0.86, blocker: 0.74 } as const;
 
-function spawnOne(st: State, rawNx: number): void {
-  const blocker = st.rng() < blockerChance(st.stage);
+function spawnOne(st: State, rawNx: number, blocker: boolean): void {
   const lim = blocker ? SPAWN_LIMIT.blocker : SPAWN_LIMIT.grunt;
   const nx = Math.max(-lim, Math.min(lim, rawNx));
   const world = worldSpeed(st.stage);
   const walk = enemyWalk(st.stage);
 
   if (blocker) {
-    const kind = pick(BLOCKERS, st.rng);
+    if (st.stageBlockers.length === 0) st.stageBlockers = pickStageBlockers(st.rng);
+    const kind = pick(st.stageBlockers, st.rng);
     const elite = kind === ELITE_BLOCKER;
     const hp = Math.round(blockerHp(st.stage) * (elite ? 1.6 : 1));
     st.enemies.push({
@@ -1104,22 +1208,38 @@ function spawnOne(st: State, rawNx: number): void {
   });
 }
 
-/** A wave, spread across the road so it cannot all be dodged with one step. */
-function spawnWave(st: State): void {
-  const n = waveSize(st.stage);
+/**
+ * A wave, spread across the road so it cannot all be dodged with one step.
+ *
+ * Takes explicit counts rather than rolling a chance per enemy: a beat is "four
+ * soldiers" or "two blockers", and the shape of a wave is the point of it.
+ */
+function spawnWave(st: State, soldiers: number, blockers: number): void {
+  const n = soldiers + blockers;
+  if (n <= 0) return;
+
   // Slots are the CENTRES of n equal lanes, not the endpoints of the road.
   //
   // Endpoints were the bug: with a wave of two, i/(n-1) gives exactly -1 and
   // +1, so every pair spawned hard against both kerbs with the whole middle of
   // the road empty. Cell centres put a wave of two at roughly a third out from
   // the middle and a wave of one straight down it.
+  const order: boolean[] = [];
+  for (let i = 0; i < blockers; i++) order.push(true);
+  for (let i = 0; i < soldiers; i++) order.push(false);
+  // Shuffle so blockers are not always the leftmost thing on the road.
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(st.rng() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+
   for (let i = 0; i < n; i++) {
     const slot = ((i + 0.5) / n) * 2 - 1;
     // Jitter stays inside its own lane, so spread never collapses back into a
     // clump — an exact grid reads as mechanical, but a wandering one leaves an
     // obvious free lane.
     const jitter = (st.rng() * 2 - 1) * (WAVE_SPREAD / n) * 0.8;
-    spawnOne(st, slot * WAVE_SPREAD + jitter);
+    spawnOne(st, slot * WAVE_SPREAD + jitter, order[i]);
   }
 }
 
@@ -1328,24 +1448,26 @@ export function update(st: State, dt: number): void {
     st.pressure = Math.max(PRESSURE_MIN,
       Math.min(PRESSURE_MAX, st.pressure + err * PRESSURE_RATE * dt));
 
-    st.spawnT -= dt;
-    // Hold the road clear either side of a gate. Longer stages are the price,
-    // and worth it: a gate the guest cannot read is a decision they cannot make.
-    const gateComing = st.gateT <= GATE_QUIET_LEAD;
-    // A short hold after it appears too, so nothing spawns into the space it
-    // has just been given.
-    const gateHere = st.gate !== null && st.gate.z > 0.5;
-    if (st.spawnT <= 0 && !gateComing && !gateHere) {
-      spawnWave(st);
-      st.spawnT = spawnInterval(st.stage) / (st.pressure * stageRamp(st.stageT));
+    // ── Beats ──
+    // The stage plays its cycle: wave, pause, wave, pause, gate. Pressure and
+    // the stage ramp shorten the holds rather than opening a tap, so a busy
+    // stage is a FASTER sequence of waves, never a continuous stream.
+    st.waveT -= dt * st.pressure * stageRamp(st.stageT);
+    if (st.waveT <= 0) {
+      if (st.waves.length === 0) st.waves = buildWaveCycle(st.rng);
+      const beat = st.waves.shift()!;
+      st.waveT = beat.hold;
+
+      if (beat.kind === "soldiers") spawnWave(st, waveSize(st.stage), 0);
+      else if (beat.kind === "blockers") spawnWave(st, 0, blockerWaveSize(st.stage));
+      else if (beat.kind === "mixed") {
+        spawnWave(st, Math.max(1, waveSize(st.stage) - 1), 1);
+      } else if (beat.kind === "gate" && !st.gate) {
+        st.gate = makeGate(st);
+      }
+      // "rest" spawns nothing, which is the whole point of it.
     }
-    st.gateT -= dt;
-    // A gate gets its own moment — never overlapping a blocker in the danger
-    // band, where a panel over the road would get someone killed unfairly.
-    if (st.gateT <= 0 && !st.gate) {
-      st.gate = makeGate(st);
-      st.gateT = GATE_EVERY;
-    }
+
     if (st.stageT >= STAGE_SECONDS) {
       st.phase = "boss";
       st.phaseT = 0;

@@ -100,6 +100,10 @@ export const SHEETS: Record<string, SheetDef> = {
   // and a cherry BLOCKER, and they are different characters.
   ...Object.fromEntries(BLOCKERS.map((n) => [`blk-${n}`, { file: `blk-${n}`, cols: 5, rows: 1 }])),
   ...Object.fromEntries(BOSSES.map((n) => [`boss-${n}`, { file: `boss-${n}`, cols: 5, rows: 1 }])),
+  "fx-bullet": { file: "fx-bullet", cols: 2, rows: 1 },
+  "fx-laser": { file: "fx-laser", cols: 2, rows: 1 },
+  "fx-muzzle": { file: "fx-muzzle", cols: 4, rows: 1 },
+  "fx-impact": { file: "fx-impact", cols: 4, rows: 1 },
 };
 
 export type SheetName = string;
@@ -133,6 +137,7 @@ export type SpriteKey =
   | "shopkeeper-scotch" | "shopkeeper-scotch-happy" | "shop-booth"
   | "logo-tiki-wars" | "intro-1" | "intro-2" | "intro-3" | "intro-4"
   | "ending-blimp"
+  | "fx-bullet" | "fx-laser" | "fx-muzzle" | "fx-impact"
   | "icon-armor" | "icon-bomb" | "icon-clover" | "icon-money" | "icon-rum"
   | "icon-poison" | "icon-black-cat" | "icon-pistol" | "icon-shotgun"
   | "icon-uzi" | "icon-flame" | "icon-laser"
@@ -179,6 +184,13 @@ export const SPRITES: Record<SpriteKey, SpriteMeta> = {
   "intro-3": { file: "intro-3", frames: 1, onScreen: 0 },
   "intro-4": { file: "intro-4", frames: 1, onScreen: 0 },
   "ending-blimp": { file: "ending-blimp", frames: 1, onScreen: 0 },
+
+  // Effects. Delivered pointing right and rotated on import, so these are all
+  // drawn pointing up the field with no transform at the draw call.
+  "fx-bullet": { sheet: { name: "fx-bullet", row: 0 }, frames: 2, onScreen: 26 },
+  "fx-laser": { sheet: { name: "fx-laser", row: 0 }, frames: 2, onScreen: 34 },
+  "fx-muzzle": { sheet: { name: "fx-muzzle", row: 0 }, frames: 4, onScreen: 26 },
+  "fx-impact": { sheet: { name: "fx-impact", row: 0 }, frames: 4, onScreen: 24 },
 
   // Icons. Read at roughly 30 logical px, so they live or die on silhouette.
   ...Object.fromEntries((
@@ -256,6 +268,8 @@ export function loadTikiArt(): void {
   // this list exists to prevent.
   tryLoad(sheetUrl("player-pistols"));
   tryLoad(sheetUrl("helper"));
+  // Fired from the first frame, so never lazy.
+  for (const fx of ["fx-bullet", "fx-muzzle"]) tryLoad(sheetUrl(fx));
   for (const key of ["player-turn", "player-turn-shades"] as SpriteKey[]) {
     const url = spriteUrl(key, 0);
     if (url) tryLoad(url);
@@ -272,6 +286,20 @@ export function loadTikiArt(): void {
   window.setTimeout(() => {
     for (const g of GUN_ART) if (g !== "pistols") tryLoad(sheetUrl(`player-${g}`));
   }, 1200);
+}
+
+/**
+ * Fetch a sheet ahead of when it is drawn.
+ *
+ * For things whose arrival is KNOWN in advance — the boss of the stage being
+ * played, the handful of blockers that stage will use. Lazy loading is right
+ * for the rest of the cast, but not for something the game already knows is
+ * coming: it turns up as a placeholder and pops into itself a second later.
+ */
+export function prefetchSheet(name: string): void {
+  if (typeof window === "undefined") return;
+  if (!SHEETS[name]) return;
+  tryLoad(sheetUrl(name));
 }
 
 function tryLoad(url: string): void {

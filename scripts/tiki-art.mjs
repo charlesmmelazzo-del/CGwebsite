@@ -75,6 +75,14 @@ const MAP = {
   "Beach Beachgoer 2.png": "prop-beachgoer-2.png",
   "Beach Sand Textile.png": "tex-sand.png",
 
+  // ── Effects ──
+  // Drawn pointing RIGHT; the game fires up the screen, so these are rotated
+  // on import rather than at every draw call. See ROTATE_CCW.
+  "FX bullet.png": "fx-bullet.png",
+  "FX Laser.png": "fx-laser.png",
+  "FX Muzzle Flash.png": "fx-muzzle.png",
+  "FX hit.png": "fx-impact.png",
+
   // ── Icons ──
   // Two arrived with a doubled extension; mapping by exact name means the
   // script tells us about anything unexpected rather than guessing.
@@ -139,6 +147,8 @@ const MAP = {
 function framesFor(name) {
   if (name.startsWith("blk-") || name.startsWith("boss-")) return 5;
   if (name === "helper.png") return 8;
+  if (name === "fx-muzzle.png" || name === "fx-impact.png") return 4;
+  if (name === "fx-bullet.png" || name === "fx-laser.png") return 2;
   if (name.startsWith("player-") && name !== "player-turn.png" && name !== "player-turn-shades.png") return 8;
   if (["lime.png","kiwi.png","lemon.png","orange.png","cherry.png","sugarcube.png"].includes(name)) return 4;
   return 1;
@@ -154,6 +164,18 @@ function framesFor(name) {
  */
 const LABELLED = (name) =>
   (name.startsWith("player-") || name === "helper.png") && framesFor(name) > 1;
+
+/**
+ * Sheets delivered pointing RIGHT that the game draws pointing UP.
+ *
+ * Rotated once here rather than on every draw: the effects are blitted dozens
+ * of times a frame, and a per-draw transform would also break the depth-bucket
+ * cache, which keys on a flat blit.
+ */
+const ROTATE_CCW = {
+  "fx-bullet.png": true, "fx-laser.png": true, "fx-muzzle.png": true,
+  // The impact burst is radial, so it needs no turning.
+};
 
 /** Full-bleed images: no background to cut, nothing to centre or crop. */
 const FULLBLEED = {
@@ -353,6 +375,36 @@ function straighten(img, frames) {
   return { data: out, shifts };
 }
 
+// ─── Rotation ────────────────────────────────────────────────────────────────
+
+/**
+ * Turn a right-facing sheet 90 degrees counter-clockwise so it faces up.
+ *
+ * Frames are rotated INDIVIDUALLY and re-laid left to right, so a horizontal
+ * strip of n frames stays a horizontal strip of n frames — rotating the whole
+ * image would stack them vertically and the grid would no longer describe it.
+ */
+function rotateCCW(img, frames) {
+  const { w, h, data } = img;
+  const cw = Math.floor(w / frames);
+  const nw = h, nh = cw;                   // each cell's dimensions swap
+  const outW = nw * frames;
+  const out = Buffer.alloc(outW * nh * 4);
+
+  for (let f = 0; f < frames; f++) {
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < cw; x++) {
+        // (x, y) in the cell becomes (y, cw-1-x) once turned left.
+        const si = (y * w + f * cw + x) * 4;
+        const di = ((cw - 1 - x) * outW + f * nw + y) * 4;
+        out[di] = data[si]; out[di+1] = data[si+1];
+        out[di+2] = data[si+2]; out[di+3] = data[si+3];
+      }
+    }
+  }
+  return { w: outW, h: nh, data: out, hadAlpha: true };
+}
+
 // ─── Chroma clean-up ─────────────────────────────────────────────────────────
 
 /**
@@ -548,6 +600,9 @@ function targetHeight(name) {
   if (name.startsWith("shop")) return 448;
   // Icons read at ~34 logical px; 128 is ample and keeps them tiny.
   if (name.startsWith("icon-")) return 128;
+  // The flame is the only effect big enough for detail; the rest are tiny.
+  if (name === "fx-flame.png") return 512;
+  if (name.startsWith("fx-")) return 192;
   // Story panels are letterboxed to roughly the screen width, so height buys
   // nothing past about twice what they are drawn at.
   if (name.startsWith("intro-") || name === "ending-blimp.png") return 560;
@@ -641,6 +696,13 @@ for (const [from, to] of Object.entries(MAP)) {
   }
   let captions = 0;
   if (LABELLED(to)) ({ cut: captions } = dropCaptions(img));
+
+  let rotated = false;
+  if (ROTATE_CCW[to]) {
+    const r = rotateCCW(img, framesFor(to));
+    img.w = r.w; img.h = r.h; img.data = r.data;
+    rotated = true;
+  }
   let shifts = null;
   // Straighten BEFORE downscaling, so the shift is measured at full resolution.
   const nFrames = framesFor(to);
@@ -661,6 +723,7 @@ for (const [from, to] of Object.entries(MAP)) {
     `  ${to.padEnd(24)} ${srcW}x${srcH} -> ${small.w}x${small.h}` +
     (full ? "  [full-bleed]" : "") +
     (captions ? `  captions -${captions}px` : "") +
+    (rotated ? "  rotated" : "") +
     (strays ? `  strays -${strays}` : "") +
     (despilled ? `  despill ${despilled}` : "") +
     `  bg:${cutInfo.kind}` +

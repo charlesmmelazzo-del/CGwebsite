@@ -11,10 +11,11 @@ import {
   PTS_MISS_BLOCKER, PTS_MISS_GRUNT, spawnInterval, update, detonateBomb,
   enemyWalk, waveSize, worldSpeed, gruntHp, blockerHp, FOLLOW_RATE,
   BLOCKERS, BOSSES, bossFor, ELITE_BLOCKER, BOSS_ATTACK_Z,
+  pickStageBlockers, BLOCKERS_PER_STAGE,
   MAX_TRAVERSE, GATE_REACH, GATE_CURE_HITS, cureGateOption, LADDERS,
   PRESSURE_TARGET_Z, PRESSURE_MIN, PRESSURE_MAX, BLOCKER_AIM_SPREAD,
   STAGGER_SPEED, BOSS_STAGGER_SPEED, stageRamp, STAGE_SECONDS,
-  TRACK_LIMIT, contactNx, GATE_QUIET_LEAD, GATE_EVERY, gateSpeed, makeGate,
+  TRACK_LIMIT, contactNx, gateSpeed, buildWaveCycle, makeGate,
   PLAYER_NX_LIMIT, HELPER_NX_LIMIT, HELPER_DAMAGE, helperSlots,
   rungOf, type State,
 } from "../tikiCore";
@@ -784,15 +785,24 @@ check("every soldier, blocker and boss the artist drew is reachable", () => {
 });
 
 check("spawning reaches every soldier and every blocker", () => {
-  const st = fresh();
-  st.stage = 8;                        // deep enough that blockers are common
+  // The owner's ask: nothing he draws should sit unused.
+  //
+  // Blockers are now cast PER STAGE — four of the fourteen — so this walks
+  // across stages rather than holding one open. A single stage seeing only its
+  // own four is the intended behaviour, not a gap in the roster.
   const seenG = new Set<string>(), seenB = new Set<string>();
-  for (let i = 0; i < 4000; i++) {
-    st.enemies = [];
-    run(st, 0.5);
-    for (const e of st.enemies) {
-      if (e.tier === "grunt") seenG.add(e.kind);
-      else if (e.tier === "blocker") seenB.add(e.kind);
+  for (let stage = 1; stage <= 400; stage++) {
+    const st = fresh({ stage });
+    st.rng = seeded(stage * 31 + 7);
+    st.stageBlockers = [];
+    for (let i = 0; i < 240; i++) {
+      run(st, 0.5);
+      for (const e of st.enemies) {
+        if (e.tier === "grunt") seenG.add(e.kind);
+        else if (e.tier === "blocker") seenB.add(e.kind);
+      }
+      st.enemies = st.enemies.filter((e) => e.tier === "boss");
+      st.stageT = 10;                  // hold this stage open
     }
     if (seenG.size === GRUNTS.length && seenB.size === BLOCKERS.length) break;
   }
@@ -800,6 +810,30 @@ check("spawning reaches every soldier and every blocker", () => {
     `never spawned: ${GRUNTS.filter((g) => !seenG.has(g)).join(", ")}`);
   assert.equal(seenB.size, BLOCKERS.length,
     `never spawned: ${BLOCKERS.filter((b) => !seenB.has(b)).join(", ")}`);
+});
+
+check("one stage draws on a handful of blockers, not the whole roster", () => {
+  // A recognisable cast per stage, and only those sheets need fetching.
+  const cast = pickStageBlockers(seeded(3));
+  assert.equal(cast.length, BLOCKERS_PER_STAGE);
+  assert.equal(new Set(cast).size, cast.length, "the same blocker twice in one cast");
+  assert.ok(BLOCKERS_PER_STAGE < BLOCKERS.length, "a stage uses the entire roster");
+});
+
+check("a stage only ever sends its own cast", () => {
+  const st = fresh({ stage: 5 });
+  st.stageBlockers = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < 400; i++) {
+    run(st, 0.5);
+    for (const e of st.enemies) if (e.tier === "blocker") seen.add(e.kind);
+    st.enemies = st.enemies.filter((e) => e.tier === "boss");
+    st.stageT = 10;
+  }
+  for (const kind of Array.from(seen)) {
+    assert.ok(st.stageBlockers.includes(kind as never),
+      `${kind} turned up in a stage that never cast it — its art was never fetched`);
+  }
 });
 
 check("all four bosses are met if you keep going", () => {
@@ -889,35 +923,47 @@ check("armor absorbing the hit still costs the squad", () => {
 
 // ── Gates get clear road ────────────────────────────────────────────────────
 
-check("nothing spawns into the run-up to a gate", () => {
-  const st = fresh();
-  st.gateT = GATE_QUIET_LEAD - 0.1;     // a gate is imminent
-  st.spawnT = 0;
-  const before = st.enemies.length;
-  run(st, 1.5);
-  assert.equal(st.enemies.length, before,
-    "a wave spawned on top of an arriving gate");
+check("a stage runs as waves, with a breather between each", () => {
+  // The shape is the point: wave, pause, wave, pause, gate. Enemies used to
+  // arrive on a timer, which gave a stage no rhythm and dropped gates into the
+  // middle of a crowd.
+  const cycle = buildWaveCycle(seeded(5));
+  for (let i = 0; i < cycle.length - 1; i++) {
+    const a = cycle[i].kind, b = cycle[i + 1].kind;
+    if (a !== "rest") {
+      assert.equal(b, "rest", `${a} runs straight into ${b} with no breather`);
+    }
+  }
+  assert.ok(cycle.every((b) => b.hold > 0), "a beat with no duration");
 });
 
-check("nor into the space it has just been given", () => {
-  const st = fresh();
-  st.gate = makeGate(st);
-  st.gate.z = 0.9;
-  st.gateT = GATE_EVERY;
-  st.spawnT = 0;
-  const before = st.enemies.length;
-  run(st, 1);
-  assert.equal(st.enemies.length, before, "a wave spawned behind a fresh gate");
+check("every gate arrives on clear road", () => {
+  const cycle = buildWaveCycle(seeded(9));
+  cycle.forEach((beat, i) => {
+    if (beat.kind !== "gate") return;
+    assert.ok(i > 0 && cycle[i - 1].kind === "rest",
+      "a gate follows a wave directly, so it comes down inside a crowd");
+  });
 });
 
-check("spawning resumes once the gate is through", () => {
-  const st = fresh();
-  st.gate = makeGate(st);
-  st.gate.z = 0.2;                     // well past the hold
-  st.gateT = GATE_EVERY;
-  st.spawnT = 0;
-  run(st, 1.2);
-  assert.ok(st.enemies.length > 0, "the road stayed empty after the gate passed");
+check("no two gates land back to back", () => {
+  for (const seed of [1, 2, 3, 4, 5]) {
+    const cycle = buildWaveCycle(seeded(seed));
+    const gates = cycle.map((b, i) => (b.kind === "gate" ? i : -1)).filter((i) => i >= 0);
+    for (let i = 1; i < gates.length; i++) {
+      assert.ok(gates[i] - gates[i - 1] > 2,
+        `two gates only ${gates[i] - gates[i - 1]} beats apart`);
+    }
+  }
+});
+
+check("a cycle always contains fighting and always contains a gate", () => {
+  for (const seed of [1, 7, 13]) {
+    const kinds = buildWaveCycle(seeded(seed)).map((b) => b.kind);
+    assert.ok(kinds.includes("gate"), "a cycle with no gate — no decisions in it");
+    assert.ok(kinds.some((k) => k === "soldiers" || k === "blockers" || k === "mixed"),
+      "a cycle with nothing to shoot");
+  }
 });
 
 check("a gate outruns the wave, so only the road ahead needs clearing", () => {
