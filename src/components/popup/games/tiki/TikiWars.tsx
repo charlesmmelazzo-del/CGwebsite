@@ -64,10 +64,20 @@ interface Beat {
   caption: string | null;
 }
 
+/**
+ * The intro, logo first.
+ *
+ * `intro-2` is deliberately NOT in here. It and `intro-3` are the same beat —
+ * the King leaning out of the helicopter with her, the hero reaching up from
+ * the beach — drawn at two different crops, so playing both read as the same
+ * panel showing twice. `intro-3` is the tighter composition of the two.
+ *
+ * The story wants a jealous-pineapple-watching beat in that slot instead. Put
+ * the panel back in this list when that art exists.
+ */
 const INTRO: Beat[] = [
   { art: "logo-tiki-wars", caption: null },
   { art: "intro-1", caption: null },
-  { art: "intro-2", caption: null },
   { art: "intro-3", caption: null },
   { art: "intro-4", caption: null },
 ];
@@ -92,10 +102,13 @@ export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeG
   /**
    * Blocks a second advance landing on the same tap.
    *
-   * A cutscene beat was being skipped — panel two appeared to show twice
-   * because panel three was consumed by a duplicate advance. A short guard is
-   * right regardless of where the second event came from: nobody taps a
-   * comic panel twice in a tenth of a second on purpose.
+   * Guards against one press producing two events, which some browsers do by
+   * firing a touch and a mouse event for the same tap.
+   *
+   * Kept SHORT. This was originally added on a wrong diagnosis — a panel
+   * appearing twice turned out to be two panels that look alike, not a
+   * duplicate advance — and a long window here would swallow a deliberate
+   * second tap, which is the very thing it was meant to prevent.
    */
   const lastAdvance = useRef(0);
 
@@ -231,7 +244,7 @@ export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeG
     const s2 = story.current;
     if (!s2) return;
     const now = performance.now();
-    if (now - lastAdvance.current < 220) return;
+    if (now - lastAdvance.current < 140) return;
     lastAdvance.current = now;
     if (s2.i + 1 < s2.beats.length) {
       s2.i += 1;
@@ -1136,9 +1149,11 @@ function drawStory(
   // they have already seen, least of all someone standing at a bar. Hidden in
   // demo mode, where there is nobody to press it.
   if (!demo) {
-    const sw = 46, sh = 20;
-    hits.skip = [W - sw - 8, TOP_INSET - 4, sw, sh];
-    drawText(ctx, "SKIP >>", W - 10, TOP_INSET + 2, "rgba(255,255,255,0.5)", 1, "right");
+    // Bottom right, NOT top right: the shell's Exit button sits over the top
+    // right corner, and the two were landing on top of each other.
+    const sw = 54, sh = 24;
+    hits.skip = [W - sw - 6, h - BOTTOM_INSET - sh - 2, sw, sh];
+    drawText(ctx, "SKIP >>", W - 10, h - BOTTOM_INSET - 20, "rgba(255,255,255,0.55)", 1, "right");
     drawText(ctx, "TAP", W / 2, h - BOTTOM_INSET - 26,
       blink(t, 1.2) ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.16)", 1, "center");
   } else {

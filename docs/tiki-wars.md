@@ -769,10 +769,22 @@ the castle, stages randomise and the curve above takes over.
 **Intro** — 3–4 static comic panels, tap to advance, skippable. Not animation:
 a fraction of the art, and it reads better on a phone.
 
-1. Two rum bottles holding hands, kissing.
-2. An evil crowned pineapple, frowning jealously.
-3. The pineapple hanging out of a helicopter with the female bottle — "SAVE ME!"
-4. The male rum bottle, furious.
+1. Two rum bottles holding hands, kissing. **Drawn.**
+2. An evil crowned pineapple, frowning jealously, watching them. **Still needed
+   — see below.**
+3. The pineapple hanging out of a helicopter with the female bottle. **Drawn.**
+4. The male rum bottle, furious, as the helicopter leaves. **Drawn.**
+
+**Panel 2 is currently skipped.** The art delivered as `intro-2` is the same
+beat as `intro-3` — the King leaning out of the helicopter with her, the hero
+reaching up from the beach — drawn at a wider crop. Playing both read as the
+same panel showing twice, which is exactly what it looked like. `intro-3` is the
+tighter composition, so that is the one in the sequence.
+
+The slot wants the **jealous watcher**: the King in the foreground of the
+kissing scene, glaring, before anything has happened. It is the beat that gives
+the kidnap a motive, and without it the story opens on a kiss and cuts straight
+to a helicopter.
 
 **Stages**
 

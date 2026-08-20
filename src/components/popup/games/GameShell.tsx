@@ -170,13 +170,22 @@ export default function GameShell({
     return (
       <div className="fixed inset-0 z-[70] bg-black">
         <Game onGameOver={handleGameOver} menuId={menuId} viewerId={viewerId} />
+        {/*
+          The way out, and it has to be findable.
+
+          Top LEFT, because the game draws its own controls into the canvas on
+          the right — a cutscene's SKIP sat directly under this and the two were
+          indistinguishable. Given a panel and a border rather than bare text,
+          since it lands on bright sky, dark sea and painted art by turns, and
+          40%-opacity type over a beach is not a button anyone can see.
+        */}
         <button
           onClick={leave}
-          aria-label="Quit"
-          className="absolute top-2 right-2 z-10 px-3 py-1.5 text-[10px] tracking-[0.25em] uppercase text-white/40 hover:text-white/90 transition-colors"
+          aria-label="Exit to game select"
+          className="absolute top-3 left-3 z-10 flex min-h-[44px] min-w-[76px] items-center justify-center gap-1.5 rounded-sm border border-white/30 bg-black/55 px-4 text-[10px] font-bold tracking-[0.2em] uppercase text-white/85 backdrop-blur-sm active:bg-black/80 hover:border-white/60 hover:text-white transition-colors"
           style={{ WebkitTapHighlightColor: "transparent" }}
         >
-          Quit
+          <span aria-hidden>&lt;</span> Exit
         </button>
       </div>
     );
