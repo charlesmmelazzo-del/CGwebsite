@@ -258,8 +258,29 @@ export function gruntHp(stage: number): number {
 export const STAGGER_SECONDS = 0.12;
 /** Fraction of normal walking speed while staggered. */
 export const STAGGER_SPEED = 0.15;
+
+/**
+ * A boss is only SLOWED by a hit, never stopped.
+ *
+ * Sharing the ordinary stagger meant a fast gun pinned one in place: every
+ * round refreshed the stall before the last had run out, so a boss under
+ * sustained uzi fire never advanced at all. It stopped being a fight and became
+ * a stationary target that happened to have a lot of health.
+ */
+export const BOSS_STAGGER_SPEED = 0.7;
 /** How far back up the field a hit shoves an enemy. */
 export const STAGGER_KNOCKBACK = 0.012;
+
+/**
+ * Share of that knockback a boss takes.
+ *
+ * Almost none, and this — not the stagger — was what really pinned them. An uzi
+ * lands thirteen rounds a second, each shoving 0.012 back up the field: 0.156 a
+ * second against a boss that only walks forward at 0.087. It was being pushed
+ * BACKWARDS faster than it could advance, so sustained fire held it at the
+ * horizon indefinitely. Small arms should not visibly move something that size.
+ */
+export const BOSS_KNOCKBACK_SCALE = 0.15;
 
 /**
  * Per-soldier walking speed.
@@ -623,7 +644,24 @@ export const WAVE_SPREAD = 0.78;
 export const BLOCKER_AIM_SPREAD = 0.3;
 
 export function spawnInterval(stage: number): number {
-  return Math.max(0.55, 1.25 / (1 + (stage - 1) * 0.12));
+  return Math.max(0.6, 1.45 / (1 + (stage - 1) * 0.12));
+}
+
+/**
+ * How much denser a stage gets between its opening and its boss.
+ *
+ * A stage used to arrive at one flat rate, so it opened at exactly the pressure
+ * it ended at — no build, and the first ten seconds were the same as the last
+ * ten. Ramping within the stage gives it a shape: it starts light enough to
+ * find your feet after the shop, and is pressing by the time the boss shows up.
+ *
+ * This is separate from the adaptive pressure loop, which reacts to how the
+ * guest is doing. This one always happens.
+ */
+export const STAGE_RAMP = 0.4;
+
+export function stageRamp(stageT: number): number {
+  return 1 + STAGE_RAMP * Math.min(1, Math.max(0, stageT) / STAGE_SECONDS);
 }
 
 /**
@@ -1158,7 +1196,7 @@ export function update(st: State, dt: number): void {
     st.spawnT -= dt;
     if (st.spawnT <= 0) {
       spawnWave(st);
-      st.spawnT = spawnInterval(st.stage) / st.pressure;
+      st.spawnT = spawnInterval(st.stage) / (st.pressure * stageRamp(st.stageT));
     }
     st.gateT -= dt;
     // A gate gets its own moment — never overlapping a blocker in the danger
@@ -1224,7 +1262,10 @@ export function update(st: State, dt: number): void {
     if (e.tier === "boss" && e.z <= BOSS_ATTACK_Z && e.attacking <= 0 && e.dying <= 0) {
       e.attacking = BOSS_ATTACK_SECONDS;
     }
-    e.z -= e.speed * (e.stagger > 0 ? STAGGER_SPEED : 1) * dt;
+    const stalled = e.stagger > 0
+      ? (e.tier === "boss" ? BOSS_STAGGER_SPEED : STAGGER_SPEED)
+      : 1;
+    e.z -= e.speed * stalled * dt;
     if (e.tracks) {
       const want = st.playerNx + e.aim;
       const d = want - e.nx;
@@ -1258,7 +1299,8 @@ export function update(st: State, dt: number): void {
         // is an invisible subtraction and the gun feels like it is doing
         // nothing until the enemy abruptly disappears.
         e.stagger = STAGGER_SECONDS;
-        e.z = Math.min(1.1, e.z + STAGGER_KNOCKBACK);
+        e.z = Math.min(1.1, e.z + STAGGER_KNOCKBACK *
+          (e.tier === "boss" ? BOSS_KNOCKBACK_SCALE : 1));
         b.damage = 0;
       }
     }

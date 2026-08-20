@@ -13,6 +13,7 @@ import {
   BLOCKERS, BOSSES, bossFor, ELITE_BLOCKER, BOSS_ATTACK_Z,
   MAX_TRAVERSE, GATE_REACH, GATE_CURE_HITS, cureGateOption, LADDERS,
   PRESSURE_TARGET_Z, PRESSURE_MIN, PRESSURE_MAX, BLOCKER_AIM_SPREAD,
+  STAGGER_SPEED, BOSS_STAGGER_SPEED, stageRamp, STAGE_SECONDS,
   PLAYER_NX_LIMIT, HELPER_NX_LIMIT, HELPER_SPACING, HELPER_DAMAGE,
   rungOf, type State,
 } from "../tikiCore";
@@ -879,6 +880,72 @@ check("fewer but tougher: a soldier takes real fire to drop", () => {
   // A stage-1 soldier should be over half a second of sustained pistol fire.
   const seconds = gruntHp(1) / (GUNS.pistol.rate * GUNS.pistol.damage);
   assert.ok(seconds > 0.4, `a soldier dies in ${seconds.toFixed(2)}s — no weight to it`);
+});
+
+// ── A boss cannot be pinned ─────────────────────────────────────────────────
+
+check("a boss keeps advancing under sustained fire", () => {
+  // Sharing the ordinary stagger meant every round refreshed the stall before
+  // the last expired, so a boss under uzi fire never moved at all.
+  const st = fresh();
+  st.phase = "boss";
+  st.gun = "uzi";
+  st.playerNx = 0;
+  st.enemies = [{
+    id: 1, kind: "baby", tier: "boss", z: 0.9, nx: 0, hp: 99999, maxHp: 99999,
+    speed: 0.16, burn: 0, flash: 0, stagger: 0, tracks: false, aim: 0,
+    dying: 0, attacking: 0,
+  }];
+  const startZ = st.enemies[0].z;
+  run(st, 3);
+  const boss = st.enemies.find((e) => e.tier === "boss")!;
+  assert.ok(boss.stagger > 0, "the boss was never actually being hit");
+  assert.ok(startZ - boss.z > 0.15,
+    `the boss advanced only ${(startZ - boss.z).toFixed(3)} under fire — it is pinned`);
+});
+
+check("an ordinary enemy IS all but stopped by a hit", () => {
+  // The weight of a landed round still has to read on everything else.
+  assert.ok(STAGGER_SPEED < BOSS_STAGGER_SPEED);
+  assert.ok(STAGGER_SPEED < 0.3, "a hit barely slows a grunt");
+});
+
+// ── Stage shape ─────────────────────────────────────────────────────────────
+
+check("a stage builds from its opening to its boss", () => {
+  assert.ok(stageRamp(STAGE_SECONDS) > stageRamp(0) * 1.2,
+    "a stage arrives at one flat rate — no build toward the boss");
+  assert.equal(stageRamp(0), 1, "the opening should be the baseline, not already ramped");
+});
+
+check("the ramp cannot run away past the boss", () => {
+  assert.equal(stageRamp(STAGE_SECONDS * 5), stageRamp(STAGE_SECONDS));
+});
+
+check("stage one opens gently", () => {
+  const opening = waveSize(1) / spawnInterval(1) * stageRamp(0);
+  assert.ok(opening < 1.5,
+    `stage one opens at ${opening.toFixed(2)} enemies a second — too busy to find your feet`);
+});
+
+check("the within-stage ramp really does spawn more", () => {
+  const spawned = (stageT: number) => {
+    const st = fresh();
+    let n = 0;
+    for (let i = 0; i < 900; i++) {
+      // Just short of the boss: at STAGE_SECONDS exactly the stage hands over
+      // to the boss and stops spawning waves entirely.
+      st.stageT = stageT;
+      st.killDepth = PRESSURE_TARGET_Z;   // and the pressure loop
+      const before = st.enemies.length;
+      update(st, DT);
+      if (st.enemies.length > before) n += st.enemies.length - before;
+    }
+    return n;
+  };
+  const opening = spawned(0), late = spawned(STAGE_SECONDS * 0.95);
+  assert.ok(late > opening * 1.15,
+    `late stage spawned ${late} against ${opening} at the opening`);
 });
 
 // ── Adaptive pressure ───────────────────────────────────────────────────────

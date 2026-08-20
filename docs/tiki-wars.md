@@ -256,6 +256,14 @@ forever. Each has its own attack frames, which play when it closes inside
 `BOSS_ATTACK_Z`. Once the real stages exist the boss becomes a property of the
 stage instead.
 
+**A boss can never be pinned.** It takes only 15% of the normal knockback and
+is merely slowed by a stagger rather than stopped. Sharing the ordinary values
+meant an uzi shoved it back up the field at 0.156 z/s while it only walked
+forward at 0.087 — it was being pushed BACKWARDS faster than it could advance,
+so sustained fire held it at the horizon indefinitely and the fight became a
+stationary target with a lot of health. Heavy fire should slow a boss; it should
+never stop one.
+
 **A boss is never consumed by contact.** It hits you, falls back, and comes
 again. Killing it is the only way past — it is the stage's exit condition, so
 removing it from the field for any other reason strands the run with nothing
@@ -688,6 +696,16 @@ and the pressure falls back on its own. Measured behaviour:
 | Killing around mid-field | 1.00, flat | Loop never interferes |
 | Only killing close in | 1.00 floor | No extra pressure piled on |
 | Barely killing anything | 1.00 floor | Left alone entirely |
+
+### The shape of one stage
+
+A stage is not one flat rate. Spawning ramps about 40% between the opening and
+the boss, so it starts light enough to find your feet after the shop and is
+pressing by the time the boss arrives. Stage one opens at roughly 1.4 enemies a
+second and reaches 1.9 by the end.
+
+This is separate from the pressure loop above: the ramp **always** happens,
+where pressure only responds to how the guest is actually doing.
 
 ### The stage curve
 
