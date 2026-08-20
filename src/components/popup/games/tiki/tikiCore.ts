@@ -38,6 +38,17 @@ export const HELPER_SPACING = 0.38;
 export const HELPER_NX_LIMIT = 0.86;
 
 /**
+ * Where each helper stands, given where the hero is.
+ *
+ * They flank him, alternating sides — but a slot that would fall off the screen
+ * is MIRRORED to the other side rather than clamped. Clamping stacked them: at
+ * full lock the outside helper was pinned to the screen edge, which is a few
+ * pixels from the hero himself, so the squad collapsed into one overlapping
+ * shape exactly when the guest was dodging hardest.
+ *
+ * Shared by the rules and the renderer so a helper is drawn where it shoots.
+ */
+/**
  * Damage of one helper's round, against a pistol round's 1.
  *
  * A fifth. Helpers carry the base pistol whatever the hero is holding, and they
@@ -47,18 +58,46 @@ export const HELPER_NX_LIMIT = 0.86;
  */
 export const HELPER_DAMAGE = 0.2;
 
-/**
- * How far the hero may travel, as a fraction of the road's half-width.
- *
- * Short of the kerb, so a 66px-wide sprite stays fully on screen at full lock.
- * Road width and player travel used to be the same number, which meant the road
- * could only ever be as wide as the hero could go without hanging off the edge
- * — so the whole field stayed cramped purely because the sprite got bigger.
- * Separating them lets the wave have room the guest does not need to reach.
- *
- * Still well past GATE_REACH, so refusing a gate by hugging the outside remains
- * possible.
- */
+export function helperSlots(playerNx: number, count: number): number[] {
+  const out: number[] = [];
+  // Each side keeps its OWN rank count. Mirroring a blocked slot to the same
+  // rank on the other side put two helpers in exactly the same place — the
+  // mirrored one has to take the next free slot over there, not the twin of the
+  // one it could not use.
+  let left = 0;
+  let right = 0;
+
+  const at = (isLeft: boolean): number | null => {
+    const rank = (isLeft ? left : right) + 1;
+    const nx = playerNx + (isLeft ? -1 : 1) * rank * HELPER_SPACING;
+    return Math.abs(nx) <= HELPER_NX_LIMIT ? nx : null;
+  };
+
+  for (let i = 0; i < count; i++) {
+    const preferLeft = i % 2 === 0;
+    let nx = at(preferLeft);
+    let onLeft = preferLeft;
+
+    if (nx === null) {
+      nx = at(!preferLeft);
+      onLeft = !preferLeft;
+    }
+    if (nx === null) {
+      // Both sides out of room — a full rank with the hero at the kerb. Take
+      // the next rank inward and let it clamp; better bunched than off screen.
+      const rank = Math.max(left, right) + 1;
+      onLeft = preferLeft;
+      nx = Math.max(-HELPER_NX_LIMIT, Math.min(HELPER_NX_LIMIT,
+        playerNx + (onLeft ? -1 : 1) * rank * HELPER_SPACING));
+    }
+
+    if (onLeft) left++;
+    else right++;
+    out.push(nx);
+  }
+  return out;
+}
+
 export const PLAYER_NX_LIMIT = 0.81;
 
 export const PLAYER_SPEED = 2.6;          // keyboard only: nx per second
@@ -98,6 +137,28 @@ export const DRAG_RANGE = 0.88;
 export const MAX_TRAVERSE = 7.5;
 export const CONTACT_Z = 0.045;           // where an enemy is "on top of" you
 export const CONTACT_NX = 0.30;           // how wide a body is, in nx
+
+/**
+ * How far a TRACKING enemy may follow the player across the road.
+ *
+ * Sized to each one's sprite, because they are drawn at wildly different
+ * widths. A boss is 176 logical px across on a 270px screen — nearly
+ * two-thirds of it — so following the guest out to the edge hung a third of the
+ * boss off the side of the display. Grunts do not track, so they are not here.
+ */
+export const TRACK_LIMIT: Record<string, number> = { blocker: 0.74, boss: 0.34 };
+
+/**
+ * Contact half-width, by tier.
+ *
+ * A boss reaches much further than an ordinary body simply because it IS much
+ * bigger. It also has to: capping how far it can follow the guest would
+ * otherwise make hugging the kerb a place a boss could never touch you, which
+ * turns the one enemy that must be killed into one that can be ignored.
+ */
+export function contactNx(tier: EnemyTier): number {
+  return tier === "boss" ? 0.55 : CONTACT_NX;
+}
 export const CONTACT_DAMAGE = 18;
 
 export const STAGE_SECONDS = 46;          // spawning time before the boss shows
@@ -1054,15 +1115,14 @@ function fire(st: State): void {
  * curve.
  */
 function fireHelpers(st: State): void {
-  for (let i = 0; i < st.helpers; i++) {
-    const side = i % 2 === 0 ? -1 : 1;
-    const rank = Math.floor(i / 2) + 1;
+  const slots = helperSlots(st.playerNx, st.helpers);
+  for (const nx of slots) {
     st.bullets.push({
       z: 0.02,
-      nx: st.playerNx + side * rank * HELPER_SPACING,
+      nx,
       vnx: 0,
       damage: HELPER_DAMAGE,
-      side: side as -1 | 1,
+      side: nx < st.playerNx ? -1 : 1,
     });
   }
 }
@@ -1278,9 +1338,14 @@ export function update(st: State, dt: number): void {
       : 1;
     e.z -= e.speed * stalled * dt;
     if (e.tracks) {
-      const want = st.playerNx + e.aim;
+      const lim = TRACK_LIMIT[e.tier] ?? 1;
+      const want = Math.max(-lim, Math.min(lim, st.playerNx + e.aim));
       const d = want - e.nx;
       e.nx += Math.sign(d) * Math.min(Math.abs(d), 0.42 * dt);
+      // Belt and braces: a boss spawned or knocked outside its limit walks back
+      // inside it rather than staying half off the screen.
+      if (e.nx > lim) e.nx = lim;
+      if (e.nx < -lim) e.nx = -lim;
     }
 
     if (e.burn > 0) {
@@ -1330,7 +1395,7 @@ export function update(st: State, dt: number): void {
     }
 
     // Contact.
-    if (e.z <= CONTACT_Z && Math.abs(e.nx - st.playerNx) < CONTACT_NX) {
+    if (e.z <= CONTACT_Z && Math.abs(e.nx - st.playerNx) < contactNx(e.tier)) {
       damage(st, CONTACT_DAMAGE);
       // Helpers are bodies between you and them — one is lost per hit taken.
       if (st.helpers > 0) st.helpers -= 1;

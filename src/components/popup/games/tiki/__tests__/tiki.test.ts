@@ -14,7 +14,8 @@ import {
   MAX_TRAVERSE, GATE_REACH, GATE_CURE_HITS, cureGateOption, LADDERS,
   PRESSURE_TARGET_Z, PRESSURE_MIN, PRESSURE_MAX, BLOCKER_AIM_SPREAD,
   STAGGER_SPEED, BOSS_STAGGER_SPEED, stageRamp, STAGE_SECONDS,
-  PLAYER_NX_LIMIT, HELPER_NX_LIMIT, HELPER_SPACING, HELPER_DAMAGE,
+  TRACK_LIMIT, contactNx,
+  PLAYER_NX_LIMIT, HELPER_NX_LIMIT, HELPER_DAMAGE, helperSlots,
   rungOf, type State,
 } from "../tikiCore";
 
@@ -718,10 +719,31 @@ check("steering stops short of the kerb, so the hero stays on screen", () => {
 });
 
 check("a helper never gets pushed off the screen", () => {
-  // The hero at full lock puts his outside helper further out than himself.
-  assert.ok(HELPER_NX_LIMIT < 1, "helpers can reach the kerb");
-  assert.ok(PLAYER_NX_LIMIT + HELPER_SPACING > HELPER_NX_LIMIT,
-    "this test is meaningless unless a helper would otherwise overhang");
+  for (const nx of [-PLAYER_NX_LIMIT, -0.4, 0, 0.4, PLAYER_NX_LIMIT]) {
+    for (const slot of helperSlots(nx, MAX_HELPERS)) {
+      assert.ok(Math.abs(slot) <= HELPER_NX_LIMIT + 1e-9,
+        `helper at ${slot.toFixed(2)} with the hero at ${nx}`);
+    }
+  }
+});
+
+check("helpers flank the hero instead of stacking on him at the kerb", () => {
+  // Clamping put the outside helper on the screen edge, a few pixels from the
+  // hero himself, so the squad collapsed into one overlapping shape exactly
+  // when the guest was dodging hardest. Mirrored slots keep them apart.
+  const slots = helperSlots(PLAYER_NX_LIMIT, 4);
+  for (const slot of slots) {
+    assert.ok(Math.abs(slot - PLAYER_NX_LIMIT) > 0.2,
+      `a helper sits ${Math.abs(slot - PLAYER_NX_LIMIT).toFixed(2)} from the hero — on top of him`);
+  }
+  assert.equal(new Set(slots.map((x) => x.toFixed(3))).size, slots.length,
+    "two helpers landed in the same place");
+});
+
+check("helpers still flank both sides in open road", () => {
+  const slots = helperSlots(0, 2);
+  assert.ok(Math.min(...slots) < 0 && Math.max(...slots) > 0,
+    "both helpers ended up on the same side with the whole road available");
 });
 
 check("the road is wider than the hero can travel", () => {
@@ -880,6 +902,49 @@ check("fewer but tougher: a soldier takes real fire to drop", () => {
   // A stage-1 soldier should be over half a second of sustained pistol fire.
   const seconds = gruntHp(1) / (GUNS.pistol.rate * GUNS.pistol.damage);
   assert.ok(seconds > 0.4, `a soldier dies in ${seconds.toFixed(2)}s — no weight to it`);
+});
+
+// ── A boss stays on screen ──────────────────────────────────────────────────
+
+check("a boss never follows the player off the side of the screen", () => {
+  // A boss is 176 logical px across on a 270px screen, so tracking the guest to
+  // the kerb hung a third of it off the display.
+  const st = fresh();
+  st.phase = "boss";
+  st.gun = "flame";
+  st.playerNx = PLAYER_NX_LIMIT;
+  st.enemies = [{
+    id: 1, kind: "king", tier: "boss", z: 0.5, nx: 0, hp: 999, maxHp: 999,
+    speed: 0.05, burn: 0, flash: 0, stagger: 0, tracks: true, aim: 0,
+    dying: 0, attacking: 0,
+  }];
+  run(st, 4);
+  const boss = st.enemies.find((e) => e.tier === "boss")!;
+  assert.ok(Math.abs(boss.nx) <= TRACK_LIMIT.boss + 1e-6,
+    `boss reached nx ${boss.nx.toFixed(2)}, past its ${TRACK_LIMIT.boss} limit`);
+});
+
+check("but the kerb is not a safe spot from a boss", () => {
+  // Capping how far a boss can follow would otherwise make hugging the edge a
+  // place it could never touch you — which turns the one enemy that MUST be
+  // killed into one that can be ignored.
+  const gap = PLAYER_NX_LIMIT - TRACK_LIMIT.boss;
+  assert.ok(gap < contactNx("boss"),
+    `a guest at the kerb sits ${gap.toFixed(2)} from a boss that only reaches ${contactNx("boss")}`);
+  assert.ok(contactNx("boss") > contactNx("grunt"), "a boss reaches no further than a grunt");
+});
+
+check("a blocker stays on screen too", () => {
+  const st = fresh();
+  st.gun = "flame";
+  st.playerNx = PLAYER_NX_LIMIT;
+  st.enemies = [{
+    id: 1, kind: "blender", tier: "blocker", z: 0.5, nx: 0, hp: 999, maxHp: 999,
+    speed: 0.05, burn: 0, flash: 0, stagger: 0, tracks: true, aim: 0,
+    dying: 0, attacking: 0,
+  }];
+  run(st, 4);
+  assert.ok(Math.abs(st.enemies[0].nx) <= TRACK_LIMIT.blocker + 1e-6);
 });
 
 // ── A boss cannot be pinned ─────────────────────────────────────────────────

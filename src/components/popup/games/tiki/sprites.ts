@@ -245,14 +245,33 @@ const buckets = new Map<string, HTMLCanvasElement>();
  */
 export function loadTikiArt(): void {
   if (typeof window === "undefined") return;
+
+  // ── Now: anything that can appear with NO warning ────────────────────────
+  //
+  // The rule is about how much notice a sprite gives. A blocker walks in from
+  // the horizon, so it has seconds to arrive over the wire and the placeholder
+  // is never seen. A HELPER appears the instant a gate is taken, and the hero
+  // SWAPS WEAPON in the same instant — so a sheet that is still downloading
+  // shows a code-drawn stand-in for a beat and then pops. That glitch is what
+  // this list exists to prevent.
   tryLoad(sheetUrl("player-pistols"));
+  tryLoad(sheetUrl("helper"));
   for (const key of ["player-turn", "player-turn-shades"] as SpriteKey[]) {
     const url = spriteUrl(key, 0);
     if (url) tryLoad(url);
   }
-  // The soldiers fill the screen from the first wave, so they are worth having
-  // ready; they are also the smallest sheets in the game.
+  // Soldiers fill the screen from the first wave, and are the smallest sheets.
   for (const n of SOLDIERS) tryLoad(sheetUrl(n));
+
+  // ── Shortly: the other weapons ───────────────────────────────────────────
+  //
+  // A gun gate can arrive about eleven seconds in, so these have time — but
+  // not if they are left until the swap itself. Fetched a moment later so they
+  // queue behind the sprites needed to draw the first frame rather than
+  // competing with them.
+  window.setTimeout(() => {
+    for (const g of GUN_ART) if (g !== "pistols") tryLoad(sheetUrl(`player-${g}`));
+  }, 1200);
 }
 
 function tryLoad(url: string): void {

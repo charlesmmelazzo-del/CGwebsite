@@ -17,8 +17,7 @@ import {
   armorCost, bombCost, canBuyArmor, canBuyBomb, canBuyClover, cloverCost,
   freshState, GUNS, LUCK_STEP, MAX_ARMOR, MAX_LUCK,
   MAX_BOMBS, MAX_HEALTH, MAX_SCORE, runDetail, update, detonateBomb, worldSpeed,
-  DRAG_RANGE, GATE_REACH, GATE_CURE_HITS, HELPER_SPACING, HELPER_NX_LIMIT,
-  rungOf, isGoodOption,
+  DRAG_RANGE, GATE_REACH, GATE_CURE_HITS, helperSlots, rungOf, isGoodOption,
   isMaxedOption, isFinaleBoss, type Enemy, type GunKind, type State,
 } from "./tikiCore";
 
@@ -719,18 +718,12 @@ function drawField(
 
   // ── Helpers and the hero ───────────────────────────────────────────────
   const walk = Math.floor(t * 8);
-  for (let i = 0; i < s.helpers; i++) {
-    const side = i % 2 === 0 ? -1 : 1;
-    const rank = Math.floor(i / 2) + 1;
-    // Clamped to the screen, not to the road. A helper flanking the hero at
-    // full lock sits further out than he does, and on the wider road that put
-    // the outside one clean off the edge.
-    const nx = Math.max(-HELPER_NX_LIMIT,
-      Math.min(HELPER_NX_LIMIT, s.playerNx + side * rank * HELPER_SPACING));
+  // The same slots the rules fire from, so a helper is drawn where it shoots.
+  helperSlots(s.playerNx, s.helpers).forEach((nx, i) => {
     drawSprite(ctx, "helper-walk", walk + i, projectX(nx, 0.03), projectY(0.03, h), {
       h: HELPER_H, pixelScale: PIXEL_SCALE,
     });
-  }
+  });
 
   const px = projectX(s.playerNx, 0);
 

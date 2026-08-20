@@ -256,6 +256,14 @@ forever. Each has its own attack frames, which play when it closes inside
 `BOSS_ATTACK_Z`. Once the real stages exist the boss becomes a property of the
 stage instead.
 
+**A boss never leaves the screen.** It is 176 logical px across on a 270px
+screen — nearly two-thirds of it — so following the guest out to the kerb hung a
+third of the boss off the side of the display. Tracking is capped per tier,
+sized to each sprite. To stop that making the kerb a safe spot, a boss also
+**reaches much further** on contact than an ordinary body does: capping how far
+the one enemy that MUST be killed can follow you would otherwise turn it into
+one that can be ignored.
+
 **A boss can never be pinned.** It takes only 15% of the normal knockback and
 is merely slowed by a stagger rather than stopped. Sharing the ordinary values
 meant an uzi shoved it back up the field at 0.156 z/s while it only walked
@@ -453,6 +461,14 @@ holding.
 Rum-bottle companions that flank the player, move with them, and fire the base
 pistol. Killed by contact with any enemy that reaches them. **Reset to zero at
 the end of every stage.**
+
+Helper positions come from one shared function, so a helper is drawn exactly
+where it shoots. A slot that would fall off the screen is **mirrored to the
+other side rather than clamped** — clamping pinned the outside helper to the
+screen edge, a few pixels from the hero, so the squad collapsed into one
+overlapping shape precisely when the guest was dodging hardest. Each side keeps
+its own rank count, or the mirrored helper lands on top of the one it was
+avoiding.
 
 They are extra bodies, **not a multiplier on the hero's gun**, and two separate
 things enforce that:
