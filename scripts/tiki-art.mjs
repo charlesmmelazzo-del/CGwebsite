@@ -75,6 +75,20 @@ const MAP = {
   "Beach Beachgoer 2.png": "prop-beachgoer-2.png",
   "Beach Sand Textile.png": "tex-sand.png",
 
+  // ── Icons ──
+  // Two arrived with a doubled extension; mapping by exact name means the
+  // script tells us about anything unexpected rather than guessing.
+  "icon-armor.png.png": "icon-armor.png",
+  "icon-pistol.png.png": "icon-pistol.png",
+  "icon-black-cat.png": "icon-black-cat.png",
+  "icon-bomb.png": "icon-bomb.png",
+  "icon-flamethrower.png": "icon-flame.png",
+  "icon-money.png": "icon-money.png",
+  "icon-poison.png": "icon-poison.png",
+  "icon-rum-bottle.png": "icon-rum.png",
+  "icon-shotgun.png": "icon-shotgun.png",
+  "icon-uzi.png": "icon-uzi.png",
+
   // ── Shop ──
   "Shop Booth.png": "shop-booth.png",
   "Shopkeeper-Scotch.png": "shopkeeper-scotch.png",
@@ -437,6 +451,8 @@ function targetHeight(name) {
   if (name.startsWith("player") || name === "helper.png") return 288;
   if (name.startsWith("bg-") || name === "tex-sand.png") return 512;
   if (name.startsWith("shop")) return 448;
+  // Icons read at ~34 logical px; 128 is ample and keeps them tiny.
+  if (name.startsWith("icon-")) return 128;
   if (name.startsWith("prop-")) return 320;
   return 224;                                         // soldiers: 80 -> 160
 }

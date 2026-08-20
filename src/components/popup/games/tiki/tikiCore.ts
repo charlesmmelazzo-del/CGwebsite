@@ -152,9 +152,14 @@ export const GUNS: Record<GunKind, {
   // plus a burn that keeps ticking after the stream moves off. Devastating up
   // close, useless at any distance — the panic button, not an upgrade.
   flame: { rate: 0, damage: 9, count: 0, spread: 0.55, range: 0.34 },
-  // The top of the ladder: slower than the uzi but each shot goes straight
-  // through, so it is the answer to a wall of blockers rather than to a crowd.
-  laser: { rate: 6, damage: 3, count: 1, spread: 0, range: 1 },
+  // The answer to a wall of blockers rather than to a crowd: each shot goes
+  // straight THROUGH what it hits.
+  //
+  // Deliberately slow. At six rounds a second it was eighteen damage a second
+  // AND piercing — over three times the pistol against a single target and
+  // far more against a column, which made every other gun pointless. The
+  // piercing is the weapon; the rate of fire is what it pays for it.
+  laser: { rate: 2.4, damage: 3, count: 1, spread: 0, range: 1 },
 };
 
 /** Guns whose rounds are not consumed by the first thing they hit. */
@@ -487,6 +492,9 @@ export interface State {
   bombs: number;
   helpers: number;
   gun: GunKind;
+  /** Set when a clover is bought, cleared on entering the next shop. */
+  cloverBought: boolean;
+
   /** Ticks down; the flamethrower is drawn while > 0. */
   firing: number;
   /**
@@ -567,6 +575,7 @@ export function freshState(opts: StartOpts = {}): State {
     bombs: 0,
     helpers: 0,
     gun: "pistol",
+    cloverBought: false,
     firing: 0,
     helperCooldown: 0,
     muzzle: 1,
@@ -792,6 +801,24 @@ export function canBuyArmor(st: { money: number; armor: number }): boolean {
 }
 export function canBuyBomb(st: { money: number; bombs: number }): boolean {
   return st.bombs < MAX_BOMBS && st.money >= bombCost(st.bombs);
+}
+
+export const MAX_LUCK = 100;
+/** Luck moves in tens, so one clover is one step. */
+export const LUCK_STEP = 10;
+
+/**
+ * One clover per shop visit, by design.
+ *
+ * Luck is the only stat that persists AND compounds — it makes every future
+ * gate better — so letting a rich guest buy the whole track in one stop would
+ * end the gate decision permanently. Rationing it to one per visit means
+ * maximum luck is a thing you build over a run, not something you purchase.
+ */
+export function canBuyClover(st: {
+  money: number; luck: number; cloverBought: boolean;
+}): boolean {
+  return !st.cloverBought && st.luck < MAX_LUCK && st.money >= cloverCost(st.luck);
 }
 
 // ─── Damage ──────────────────────────────────────────────────────────────────

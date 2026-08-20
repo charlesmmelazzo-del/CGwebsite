@@ -131,6 +131,9 @@ export type SpriteKey =
   | "prop-palm" | "prop-beachgoer-1" | "prop-beachgoer-2"
   | "bg-beach-sky" | "bg-beach-horizon" | "tex-sand"
   | "shopkeeper-scotch" | "shopkeeper-scotch-happy" | "shop-booth"
+  | "icon-armor" | "icon-bomb" | "icon-clover" | "icon-money" | "icon-rum"
+  | "icon-poison" | "icon-black-cat" | "icon-pistol" | "icon-shotgun"
+  | "icon-uzi" | "icon-flame"
   | `player-${GunArt}-walk` | `player-${GunArt}-hit`
   | `player-${GunArt}-cheer` | `player-${GunArt}-sad`
   | `${SoldierName}-walk`
@@ -165,6 +168,12 @@ export const SPRITES: Record<SpriteKey, SpriteMeta> = {
   "shopkeeper-scotch": { file: "shopkeeper-scotch", frames: 1, onScreen: 180 },
   "shopkeeper-scotch-happy": { file: "shopkeeper-scotch-happy", frames: 1, onScreen: 180 },
   "shop-booth": { file: "shop-booth", frames: 1, onScreen: 0 },
+
+  // Icons. Read at roughly 30 logical px, so they live or die on silhouette.
+  ...Object.fromEntries((
+    ["armor", "bomb", "clover", "money", "rum", "poison", "black-cat",
+     "pistol", "shotgun", "uzi", "flame"] as const
+  ).map((n) => [`icon-${n}`, { file: `icon-${n}`, frames: 1, onScreen: 30 }])),
 
   ...Object.fromEntries(GUN_ART.flatMap((g) => [
     [`player-${g}-walk`, { sheet: { name: `player-${g}`, row: 0, col: PLAYER_POSE.walk }, frames: 4, onScreen: PLAYER_H }],
@@ -901,7 +910,23 @@ function genericFoe(h: number, frame: number, ctx: CanvasRenderingContext2D) {
   ctx.stroke();
 }
 
+/**
+ * Stand-in for an icon.
+ *
+ * Icons must NOT fall through to the generic enemy blob — an armour pickup
+ * drawn as a grey foe is worse than an obvious blank. A plain rounded tile
+ * reads as "an icon that has not arrived".
+ */
+function genericIcon(ctx: CanvasRenderingContext2D, h: number) {
+  ro(ctx, -h * 0.4, -h * 0.8, h * 0.8, h * 0.8, h * 0.14);
+  ink(ctx, "#5A5A66", h, 0.05);
+}
+
 const PLACEHOLDERS: Partial<Record<SpriteKey, Placeholder>> = {
+  ...Object.fromEntries((
+    ["armor", "bomb", "clover", "money", "rum", "poison", "black-cat",
+     "pistol", "shotgun", "uzi", "flame"] as const
+  ).map((n) => [`icon-${n}`, (c: CanvasRenderingContext2D, hh: number) => genericIcon(c, hh)])),
   "lime-walk": drawGrunt(C.lime, "#6FA81E"),
   "lemon-walk": drawGrunt(C.lemon, "#C9B31E"),
   "orange-walk": drawGrunt(C.orange, "#C96A12"),

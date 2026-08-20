@@ -437,7 +437,7 @@ holding.
 | **Pistol** | Base. Single bullet, straight, base tempo. |
 | **Shotgun** | Three bullets in a spray. |
 | **Uzi** | Single bullet, straight, much faster tempo. |
-| **Laser** | Slower than the uzi, but a round **passes through** what it hits. The answer to a wall of blockers rather than to a crowd. |
+| **Laser** | A round **passes through** what it hits — the answer to a wall of blockers rather than to a crowd. Deliberately slow: at six rounds a second it was eighteen damage a second AND piercing, which made every other gun pointless. The piercing is the weapon; the rate of fire is what it pays for it. |
 | **Flamethrower** | Shortest range, widest spread, high damage. Sets enemies alight - they keep burning and taking damage after the stream leaves them, so a sweep across a crowd kills things that walked out of range. The close-range panic button: devastating if they reach you, useless at distance. |
 
 ### Helpers
@@ -538,13 +538,29 @@ gate you cannot make a decision about.
 
 ### Shop (between stages)
 
+Three purchases, each a row: **icon · label · count · a segmented bar that
+fills · a priced buy button**.
+
+The bars are segmented rather than continuous because every one of these is a
+small countable stock — ten armour plates, three bombs, ten steps of luck — and
+a guest deciding whether to spend needs to see "three more" at a glance, which a
+smooth bar never tells them. A row with nothing left to buy drops its button for
+`FULL`, and luck shows `ONE PER STOP` once its clover is spent.
+
+Luck sits beside armor because those two are what **persist**: what a guest is
+really buying at this stall is a better next run, not a better next stage.
+
+The rows are anchored to the BOTTOM of the screen, under the thumb already
+holding the phone — the logical height flexes 480..620, so fixed offsets strand
+the buttons in the middle of a tall display.
+
 Fronted by the **shopkeeper — a Scotch bottle** leaning in the window of a tiki
 market booth, who has something to say about every purchase (see Quips). Money
 and luck are displayed here, since this is the only place they're actionable.
 
 | Item | Cost | Effect |
 |---|---|---|
-| Four-leaf clover | Rises with current luck | +10% luck. **Max one per shop visit.** |
+| Four-leaf clover | Rises with current luck | +10% luck. **Max one per shop visit** — luck compounds into every future gate, so letting a rich guest buy the whole track in one stop would end the gate decision permanently. |
 | Armor | Rises as slots fill | +1 slot, up to 10. |
 | Bomb | Rises with quantity held | +1 bomb. **Max 3 held.** |
 | Gun | Fixed per gun | One random gun offered each visit; applies to the next stage only. |

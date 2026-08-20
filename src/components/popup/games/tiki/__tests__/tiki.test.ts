@@ -3,7 +3,9 @@ import assert from "node:assert";
 import { unrenderable } from "../../arcade";
 import { QUIPS, QUIP_LIMITS, QuipBag } from "../quips";
 import {
-  applyEffect, armorCost, blockerChance, bombCost, CONTACT_Z,
+  applyEffect, armorCost, blockerChance, bombCost, canBuyArmor, canBuyBomb,
+  canBuyClover, cloverCost,
+  LUCK_STEP, MAX_LUCK, CONTACT_Z,
   damage, enemySpeed, freshState, gateGoodChance, GRUNTS, GUNS, isGrunt,
   MAX_ARMOR, MAX_HEALTH, MAX_HELPERS, PTS_BLOCKER, PTS_BOSS, PTS_GRUNT,
   PTS_MISS_BLOCKER, PTS_MISS_GRUNT, spawnInterval, update, detonateBomb,
@@ -1071,6 +1073,41 @@ check("a boss is worth far more than a grunt", () => {
 check("shop prices rise as you stock up", () => {
   assert.ok(armorCost(9) > armorCost(0));
   assert.ok(bombCost(2) > bombCost(0));
+});
+
+// ── The shop ────────────────────────────────────────────────────────────────
+
+check("luck can be bought, one clover per stop", () => {
+  const st = fresh({ money: 10_000 });
+  assert.equal(st.luck, 0);
+  assert.ok(canBuyClover(st), "a clover should be affordable with money in hand");
+
+  st.money -= cloverCost(st.luck);
+  st.luck += LUCK_STEP;
+  st.cloverBought = true;
+
+  assert.equal(st.luck, LUCK_STEP);
+  assert.ok(!canBuyClover(st), "a second clover was buyable in the same stop");
+
+  st.cloverBought = false;              // next shop
+  assert.ok(canBuyClover(st));
+});
+
+check("clover price climbs as luck does", () => {
+  assert.ok(cloverCost(80) > cloverCost(0),
+    "buying luck never gets more expensive — the whole track is cheap");
+});
+
+check("luck stops at full", () => {
+  const st = fresh({ money: 10_000, luck: MAX_LUCK });
+  assert.ok(!canBuyClover(st), "sold a clover at 100% luck");
+});
+
+check("nothing is buyable without the money", () => {
+  const broke = fresh({ money: 0 });
+  assert.ok(!canBuyArmor(broke));
+  assert.ok(!canBuyBomb(broke));
+  assert.ok(!canBuyClover(broke));
 });
 
 // ── Go Again ────────────────────────────────────────────────────────────────

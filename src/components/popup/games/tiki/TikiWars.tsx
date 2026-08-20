@@ -14,7 +14,8 @@ import {
   roadHalf, W,
 } from "./constants";
 import {
-  armorCost, bombCost, canBuyArmor, canBuyBomb, freshState, GUNS, MAX_ARMOR,
+  armorCost, bombCost, canBuyArmor, canBuyBomb, canBuyClover, cloverCost,
+  freshState, GUNS, LUCK_STEP, MAX_ARMOR, MAX_LUCK,
   MAX_BOMBS, MAX_HEALTH, MAX_SCORE, runDetail, update, detonateBomb, worldSpeed,
   DRAG_RANGE, GATE_REACH, GATE_CURE_HITS, HELPER_SPACING, HELPER_NX_LIMIT,
   rungOf, isGoodOption,
@@ -197,6 +198,13 @@ export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeG
         s.money -= bombCost(s.bombs);
         s.bombs += 1;
         shopQuip.current = bag.current.draw("shop");
+      } else if (inside(x, y, hits.current.clover) && canBuyClover(s)) {
+        s.money -= cloverCost(s.luck);
+        s.luck = Math.min(MAX_LUCK, s.luck + LUCK_STEP);
+        // One per stop: luck compounds into every future gate, so a rich guest
+        // buying the whole track at once would end the gate decision for good.
+        s.cloverBought = true;
+        shopQuip.current = bag.current.draw("shop");
       } else if (inside(x, y, hits.current.next)) {
         s.stage += 1;
         progress.current.bestStage = Math.max(progress.current.bestStage, s.stage);
@@ -262,6 +270,7 @@ export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeG
       }
       if (s.phase === "cleared") {
         shopQuip.current = "";
+        s.cloverBought = false;          // a fresh clover each stop
         setScreen("shop");
       }
       if (s.phase === "over" && !reported.current) {
@@ -879,93 +888,159 @@ function drawShop(
   hits: Hits,
   quip: string,
   t: number
-) {
+): void {
   ctx.fillStyle = "#160E1E";
   ctx.fillRect(0, 0, W, h);
 
   // ── The booth ──────────────────────────────────────────────────────────
-  // Painted art if it has arrived, the code-drawn hut otherwise. The keeper is
-  // a separate image so he can change expression without redrawing the stall.
   const boothImg = getImage("shop-booth");
-  const boothW = Math.min(W - 16, 230);
-  const boothH = boothImg ? boothW * (boothImg.height / boothImg.width) : 180;
+  // Sized to fill the space above the purchase rows rather than leaving a
+  // pool of empty panel between the two.
+  const boothW = Math.min(W - 26, 232);
+  const boothH = boothImg ? boothW * (boothImg.height / boothImg.width) : 150;
   const boothX = (W - boothW) / 2;
-  const boothY = 34;
+  const boothY = TOP_INSET + 14;
 
   if (boothImg) {
     ctx.drawImage(boothImg, boothX, boothY, boothW, boothH);
   } else {
     ctx.fillStyle = "#3A2A1A";
-    ctx.fillRect(24, 54, W - 48, 148);
-    ctx.fillStyle = "#4E3722";
-    ctx.fillRect(24, 54, W - 48, 16);
-    ctx.fillStyle = "#7A5A28";
-    ctx.beginPath();
-    ctx.moveTo(12, 54);
-    ctx.lineTo(W / 2, 22);
-    ctx.lineTo(W - 12, 54);
-    ctx.closePath();
-    ctx.fill();
-    drawText(ctx, "SHOP", W / 2, 40, "#FFE24A", 2, "center");
-    ctx.fillStyle = "#1A1208";
-    ctx.fillRect(44, 78, W - 88, 112);
+    ctx.fillRect(boothX, boothY, boothW, boothH);
+    drawText(ctx, "SHOP", W / 2, boothY + 10, "#FFE24A", 2, "center");
   }
 
-  // The keeper stands in the booth window, and grins for a beat after a sale.
   drawSprite(ctx, quip ? "shopkeeper-scotch-happy" : "shopkeeper-scotch", 0,
     W / 2, boothY + boothH * 0.92, { h: boothH * 0.62, pixelScale: PIXEL_SCALE });
 
-  if (quip) drawBubble(ctx, quip, W / 2, boothY + boothH * 0.28, h, false);
+  if (quip) drawBubble(ctx, quip, W / 2, boothY + boothH * 0.3, h, false);
 
-  // Money and luck are shown HERE and nowhere else — the run's own HUD stays
-  // down to health and armor, because that is all it can act on.
+  // Money is the only number that matters here, so it gets the size.
   drawText(ctx, `$${s.money}`, 10, TOP_INSET, C.money, 2, "left");
-  drawText(ctx, `LUCK ${s.luck}%`, W - 10, TOP_INSET + 2, "#C9B6FF", 1, "right");
-  drawText(ctx, `STAGE ${s.stage} CLEAR`, W / 2, boothY + boothH + 10, "rgba(255,255,255,0.55)", 1, "center");
+  drawText(ctx, `STAGE ${s.stage} CLEAR`, W - 10, TOP_INSET + 2,
+    "rgba(255,255,255,0.5)", 1, "right");
 
   // ── Purchases ──────────────────────────────────────────────────────────
-  // Anchored to the BOTTOM, not centred. The logical height flexes from 480 to
-  // 620, so fixed offsets leave a tall phone with a pool of dead space — and
-  // bottom-anchoring puts the buttons under the thumb that is already holding
-  // the phone, instead of stranding them in the middle of the screen.
-  const rowH = 34;
-  const btnH = 40;
-  const blockH = rowH * 2 + 10 + 22 + btnH;
-  const top = Math.max(boothY + boothH + 24, h - BOTTOM_INSET - 16 - blockH);
+  // Anchored to the BOTTOM, under the thumb already holding the phone. The
+  // logical height flexes 480..620, so fixed offsets strand the buttons in the
+  // middle of a tall screen.
+  const rows: ShopRow[] = [
+    {
+      key: "armor", icon: "icon-armor", label: "ARMOR",
+      have: s.armor, max: MAX_ARMOR, colour: C.armor,
+      cost: armorCost(s.armor), can: canBuyArmor(s),
+    },
+    {
+      key: "bomb", icon: "icon-bomb", label: "BOMBS",
+      have: s.bombs, max: MAX_BOMBS, colour: C.flame,
+      cost: bombCost(s.bombs), can: canBuyBomb(s),
+    },
+    {
+      // Luck sits beside armor because they are the two that PERSIST — what a
+      // guest is really buying here is a better next run, not a better stage.
+      key: "clover", icon: "icon-clover", label: "LUCK",
+      have: s.luck / LUCK_STEP, max: MAX_LUCK / LUCK_STEP, colour: "#7BE38B",
+      cost: cloverCost(s.luck), can: canBuyClover(s),
+      note: s.cloverBought ? "ONE PER STOP" : null,
+    },
+  ];
 
-  const bw = W - 40;
-  let y = top;
+  const rowH = 42;
+  const gap = 6;
+  const btnH = 42;
+  const blockH = rows.length * (rowH + gap) + 12 + btnH;
+  let y = Math.max(boothY + boothH + 12, h - BOTTOM_INSET - 12 - blockH);
 
-  hits.armor = [20, y, bw, rowH];
-  shopRow(ctx, 20, y, bw, `ARMOR ${s.armor}/${MAX_ARMOR}`, `$${armorCost(s.armor)}`,
-    s.armor >= MAX_ARMOR ? "FULL" : null, canBuyArmor(s), C.armor);
-  y += rowH + 10;
+  for (const row of rows) {
+    hits[row.key] = [12, y, W - 24, rowH];
+    drawShopRow(ctx, row, y, rowH);
+    y += rowH + gap;
+  }
 
-  hits.bomb = [20, y, bw, rowH];
-  shopRow(ctx, 20, y, bw, `BOMB ${s.bombs}/${MAX_BOMBS}`, `$${bombCost(s.bombs)}`,
-    s.bombs >= MAX_BOMBS ? "FULL" : null, canBuyBomb(s), C.flame);
-  y += rowH + 22;
-
-  hits.next = [20, y, bw, btnH];
-  ctx.globalAlpha = Math.sin(t * 4) * 0.15 + 0.85;
+  y += 12;
+  hits.next = [12, y, W - 24, btnH];
+  const pulse = Math.sin(t * 4) * 0.12 + 0.88;
+  ctx.globalAlpha = pulse;
   ctx.fillStyle = "#FFD500";
-  ctx.fillRect(20, y, bw, btnH);
+  ctx.fillRect(12, y, W - 24, btnH);
   ctx.globalAlpha = 1;
   drawText(ctx, `START STAGE ${s.stage + 1}`, W / 2, y + btnH / 2 - 7, "#1A1206", 2, "center");
 }
 
-function shopRow(
-  ctx: CanvasRenderingContext2D,
-  x: number, y: number, w: number,
-  label: string, cost: string, note: string | null,
-  affordable: boolean, accent: string
-) {
-  ctx.fillStyle = affordable ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.04)";
-  ctx.fillRect(x, y, w, 34);
-  ctx.strokeStyle = affordable ? accent : "rgba(255,255,255,0.16)";
-  ctx.lineWidth = 1.4;
-  ctx.strokeRect(x + 0.7, y + 0.7, w - 1.4, 34 - 1.4);
-  drawText(ctx, label, x + 8, y + 7, affordable ? "#FFFFFF" : "rgba(255,255,255,0.4)", 2, "left");
-  drawText(ctx, note ?? cost, x + w - 8, y + 11,
-    note ? "rgba(255,255,255,0.35)" : affordable ? C.money : "rgba(255,255,255,0.3)", 1, "right");
+interface ShopRow {
+  key: string;
+  icon: SpriteKey;
+  label: string;
+  /** Filled segments. */
+  have: number;
+  max: number;
+  colour: string;
+  cost: number;
+  can: boolean;
+  note?: string | null;
 }
+
+/**
+ * One shop line: what it is, how full it is, and a button to add one.
+ *
+ * The bar is SEGMENTED rather than continuous. Every one of these is a small
+ * countable stock — ten armour plates, three bombs, ten steps of luck — and a
+ * guest deciding whether to spend needs to see "three more" at a glance, which
+ * a smooth bar never tells them.
+ */
+function drawShopRow(
+  ctx: CanvasRenderingContext2D,
+  row: ShopRow,
+  y: number,
+  rowH: number
+): void {
+  const full = row.have >= row.max;
+  const dim = !row.can;
+
+  ctx.fillStyle = "rgba(255,255,255,0.06)";
+  ctx.fillRect(12, y, W - 24, rowH);
+  ctx.strokeStyle = dim ? "rgba(255,255,255,0.13)" : row.colour;
+  ctx.lineWidth = 1.3;
+  ctx.strokeRect(12.6, y + 0.6, W - 25.2, rowH - 1.2);
+
+  // Icon
+  const iconH = 26;
+  ctx.globalAlpha = dim ? 0.45 : 1;
+  drawSprite(ctx, row.icon, 0, 32, y + rowH / 2 + iconH / 2, {
+    h: iconH, pixelScale: PIXEL_SCALE,
+  });
+  ctx.globalAlpha = 1;
+
+  const barX = 52;
+  const barW = 126;
+  drawText(ctx, row.label, barX, y + 7, dim ? "rgba(255,255,255,0.5)" : "#FFFFFF", 1, "left");
+  drawText(ctx, `${row.have}/${row.max}`, barX + barW, y + 7,
+    "rgba(255,255,255,0.45)", 1, "right");
+
+  // Segmented fill
+  const segY = y + 20;
+  const segH = 10;
+  const segGap = 1.6;
+  const segW = (barW - segGap * (row.max - 1)) / row.max;
+  for (let i = 0; i < row.max; i++) {
+    const sx = barX + i * (segW + segGap);
+    ctx.fillStyle = i < row.have ? row.colour : "rgba(255,255,255,0.10)";
+    ctx.fillRect(sx, segY, segW, segH);
+  }
+
+  // Buy button
+  const bw = 62;
+  const bx = W - 12 - bw - 6;
+  const by = y + 6;
+  const bh = rowH - 12;
+  if (full || row.note) {
+    drawText(ctx, row.note ?? "FULL", bx + bw / 2, by + bh / 2 - 3,
+      "rgba(255,255,255,0.35)", 1, "center");
+  } else {
+    ctx.fillStyle = row.can ? row.colour : "rgba(255,255,255,0.08)";
+    ctx.fillRect(bx, by, bw, bh);
+    const label = `$${row.cost}`;
+    drawText(ctx, label, bx + bw / 2, by + bh / 2 - 7,
+      row.can ? "#151018" : "rgba(255,255,255,0.35)", 2, "center");
+  }
+}
+
