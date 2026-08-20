@@ -173,16 +173,22 @@ export default function GameShell({
         {/*
           The way out, and it has to be findable.
 
-          Top LEFT, because the game draws its own controls into the canvas on
-          the right — a cutscene's SKIP sat directly under this and the two were
-          indistinguishable. Given a panel and a border rather than bare text,
-          since it lands on bright sky, dark sea and painted art by turns, and
-          40%-opacity type over a beach is not a button anyone can see.
+          Top RIGHT, at the end of the game's own HUD row, immediately after the
+          score. On the left it had the top of the screen to itself and the
+          health bar was pushed down below it, so a whole row of a full-bleed
+          game was spent on one button. The canvas keeps this corner clear —
+          see EXIT_CLEARANCE in TikiWars.tsx — and the only other in-canvas
+          control, a cutscene's SKIP, is at the BOTTOM right, well clear of it.
+
+          Given a panel and a border rather than bare text, since it lands on
+          bright sky, dark sea and painted art by turns, and 40%-opacity type
+          over a beach is not a button anyone can see. Still 44px tall: it is
+          the one control a guest must always be able to hit.
         */}
         <button
           onClick={leave}
           aria-label="Exit to game select"
-          className="absolute top-3 left-3 z-10 flex min-h-[44px] min-w-[76px] items-center justify-center gap-1.5 rounded-sm border border-white/30 bg-black/55 px-4 text-[10px] font-bold tracking-[0.2em] uppercase text-white/85 backdrop-blur-sm active:bg-black/80 hover:border-white/60 hover:text-white transition-colors"
+          className="absolute top-2 right-2 z-10 flex min-h-[44px] min-w-[60px] items-center justify-center gap-1 rounded-sm border border-white/30 bg-black/55 px-3 text-[10px] font-bold tracking-[0.2em] uppercase text-white/85 backdrop-blur-sm active:bg-black/80 hover:border-white/60 hover:text-white transition-colors"
           style={{ WebkitTapHighlightColor: "transparent" }}
         >
           <span aria-hidden>&lt;</span> Exit

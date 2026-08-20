@@ -6,9 +6,11 @@ import type { ArcadeGameProps } from "../registry";
 import TikiCanvas from "./TikiCanvas";
 import { QuipBag } from "./quips";
 import {
-  drawSprite, getImage, loadTikiArt, prefetchSheet, BLOCKER_H, BOSS_H, HELPER_H,
+  drawSprite, getImage, hasArt, loadTikiArt, prefetchSheet, prefetchSprite,
+  BLOCKER_H, BOSS_H, HELPER_H,
   PLAYER_H, SOLDIER_H, MUZZLES, muzzleFor, type GunArt, type SpriteKey,
 } from "./sprites";
+import { HORIZON_SINK, themeArt, themeFor, type Theme } from "./stages";
 import {
   C, horizonY, PIXEL_SCALE, playerY, projectScale, projectX, projectY,
   roadHalf, W,
@@ -358,6 +360,11 @@ export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeG
         if (s.stageBlockers.length === 0) s.stageBlockers = pickStageBlockers(s.rng);
         prefetchSheet(`boss-${bossFor(s.stage)}`);
         for (const b of s.stageBlockers) prefetchSheet(`blk-${b}`);
+        // This stage's scenery, and the NEXT one's, so a stage never opens on
+        // its fallback colours. The sky and the ground texture are the two
+        // biggest files a stage pulls and both are on screen from frame one.
+        for (const k of themeArt(themeFor(s.stage))) prefetchSprite(k);
+        for (const k of themeArt(themeFor(s.stage + 1))) prefetchSprite(k);
       }
 
       const wasPhase = s.phase;
@@ -457,12 +464,17 @@ type Hits = Record<string, [number, number, number, number]>;
 const TOP_INSET = 12;
 
 /**
- * Room reserved at the top left for the shell's EXIT button.
+ * Room reserved at the top RIGHT for the shell's EXIT button.
  *
  * That button is DOM, drawn over the canvas, so nothing in here knows it is
- * there — the health bar has to be told to get out from under it.
+ * there — whatever shares its row has to be told to get out from under it.
+ *
+ * It used to sit top LEFT, which cost a whole row: the health bar was pushed
+ * down clear of it and the top of the screen held one button and nothing else.
+ * Moving it to the end of the HUD's own row puts health, armour, score and the
+ * way out on one line, and gives the sky back the strip they were using.
  */
-const EXIT_CLEARANCE = 40;
+const EXIT_CLEARANCE = 56;
 const BOTTOM_INSET = 26;
 
 /** Which art sheet each gun uses. */
@@ -490,16 +502,6 @@ const MUZZLE_FLASH_H = 26;
  */
 const HELPER_MUZZLE = { x: 0.271, y: 0.535 };
 
-/** Roadside dressing, fixed to the field so it streams past with the ground. */
-const SCENERY: { key: SpriteKey; nx: number; phase: number; h: number }[] = [
-  { key: "prop-palm", nx: -1.55, phase: 0.0, h: 150 },
-  { key: "prop-beachgoer-1", nx: 1.72, phase: 0.17, h: 96 },
-  { key: "prop-palm", nx: 1.62, phase: 0.34, h: 150 },
-  { key: "prop-beachgoer-2", nx: -1.85, phase: 0.5, h: 96 },
-  { key: "prop-palm", nx: -1.8, phase: 0.66, h: 150 },
-  { key: "prop-palm", nx: 1.45, phase: 0.83, h: 150 },
-];
-
 /**
  * Draw a full-bleed image if its art has loaded. Returns false if it has not,
  * so the caller can fall back to the code-drawn version.
@@ -515,14 +517,15 @@ function drawImageSprite(
   return true;
 }
 
-/** Bands of sand, each tiled at the scale its depth calls for. */
-function drawSandBands(
+/** Bands of ground, each tiled at the scale its depth calls for. */
+function drawGroundBands(
   ctx: CanvasRenderingContext2D,
+  theme: Theme,
   h: number,
   hy: number,
   scroll: number
 ): void {
-  const img = getImage("tex-sand");
+  const img = getImage(theme.ground);
   if (!img) return;
   const BANDS = 7;
   for (let i = 0; i < BANDS; i++) {
@@ -566,6 +569,10 @@ function drawField(
 ) {
   const hy = horizonY(h);
   const py = playerY(h);
+  // Which stage this is, as a LOOK. Beach, desert, winter, castle, and round
+  // again — see stages.ts.
+  const theme = themeFor(s.stage);
+  const fb = theme.fallback;
 
   // ── Sky ────────────────────────────────────────────────────────────────
   // The painted sky, stretched across the full width and pinned to the
@@ -573,69 +580,64 @@ function drawField(
   // MORE SKY, never a stretched picture or a letterbox — so this is drawn from
   // the horizon upward and simply runs off the top of a tall screen.
   const skyH = Math.max(hy, W * 0.62);
-  if (!drawImageSprite(ctx, "bg-beach-sky", 0, hy - skyH, W, skyH)) {
+  if (!drawImageSprite(ctx, theme.sky, 0, hy - skyH, W, skyH)) {
     const sky = ctx.createLinearGradient(0, 0, 0, hy);
-    sky.addColorStop(0, C.skyHigh);
-    sky.addColorStop(1, C.skyLow);
+    sky.addColorStop(0, fb.skyHigh);
+    sky.addColorStop(1, fb.skyLow);
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, W, hy + 1);
   }
   // Anything above the artwork is the sky's own top colour, so a very tall
   // phone gets more of the same rather than a hard edge.
   if (hy - skyH > 0) {
-    ctx.fillStyle = C.skyHigh;
+    ctx.fillStyle = fb.skyHigh;
     ctx.fillRect(0, 0, W, hy - skyH + 1);
   }
 
   // ── Horizon ────────────────────────────────────────────────────────────
-  const horizonH = W * 0.34;
-  if (!drawImageSprite(ctx, "bg-beach-horizon", 0, hy - horizonH * 0.82, W, horizonH)) {
-    ctx.fillStyle = C.sea;
+  //
+  // Drawn at the art's OWN aspect, across the full width, with its foot sunk
+  // slightly below the horizon line so it meets the ground rather than hovering
+  // over it. A fixed height was fine while there was one skyline; with four it
+  // squashed the castle on its crag into the same band as a strip of desert
+  // mesas.
+  const skyline = getImage(theme.horizon);
+  if (skyline && skyline.width) {
+    const horizonH = W * (skyline.height / skyline.width);
+    ctx.drawImage(skyline, 0, hy - horizonH * (1 - HORIZON_SINK), W, horizonH);
+  } else {
+    ctx.fillStyle = fb.far;
     ctx.fillRect(0, hy - 7, W, 8);
   }
 
   // ── Ground ─────────────────────────────────────────────────────────────
-  ctx.fillStyle = C.sand;
+  ctx.fillStyle = fb.ground;
   ctx.fillRect(0, hy, W, h - hy);
 
-  // Sand, laid in bands that grow toward the camera.
+  // The ground texture, laid in bands that grow toward the camera.
   //
   // A single tiled fill would read as a flat wall, and a true per-row
   // perspective map is hundreds of draw calls a frame on a phone. Bands are the
   // middle: each is tiled at the scale its depth calls for, so the grain opens
   // out as it approaches, and the scroll makes it move.
   const world = worldSpeed(s.stage);
-  drawSandBands(ctx, h, hy, t * world);
+  drawGroundBands(ctx, theme, h, hy, t * world);
 
-  // Perspective rungs on top: the cheapest strong motion cue there is, and the
-  // thing that tells the guest how fast they are travelling — which is why it
-  // has to be the SAME speed the world actually moves at.
-  const scroll = (t * world) % 0.08;
-  ctx.globalAlpha = 0.35;
-  ctx.fillStyle = C.sandDark;
-  for (let z = scroll; z < 1; z += 0.08) {
-    const y = projectY(z, h);
-    const hw = roadHalf(z);
-    const th = Math.max(0.6, 2.4 * (1 - z));
-    ctx.fillRect(W / 2 - hw, y, hw * 2, th);
-  }
-  ctx.globalAlpha = 1;
-
-  // Road edges.
-  ctx.strokeStyle = C.sandDark;
-  ctx.lineWidth = 1.2;
-  for (const side of [-1, 1]) {
-    ctx.beginPath();
-    ctx.moveTo(projectX(side, 1), projectY(1, h));
-    ctx.lineTo(projectX(side, 0), projectY(0, h));
-    ctx.stroke();
-  }
+  // NO perspective grid.
+  //
+  // There used to be rungs across the road and a line down each kerb, drawn as
+  // a motion cue — and as a wireframe over painted ground they read as exactly
+  // that, a grid the hero was running on top of rather than sand, snow or
+  // flagstone. The bands above already carry the speed: the texture opens out
+  // as it approaches and scrolls at the world's own rate, which is the same
+  // information without a diagram drawn over the picture.
 
   // ── Scenery ────────────────────────────────────────────────────────────
-  // Roadside dressing: palms and the odd sunbather, none of it interactive.
+  // Roadside dressing — palms, cacti, pines, barricades — none of it
+  // interactive, and all of it chosen by the stage's theme.
   // All of it approaches at exactly the world's speed, like the ground it is
   // standing in — see the note on worldSpeed.
-  for (const p of SCENERY) {
+  for (const p of theme.scenery) {
     const z = 1 - ((t * world + p.phase) % 1);
     if (z <= 0.02 || z >= 0.99) continue;
     const sc = projectScale(z);
@@ -770,30 +772,52 @@ function drawField(
     }
   }
 
-  // ── Flame cone ─────────────────────────────────────────────────────────
+  // ── Flame jet ──────────────────────────────────────────────────────────
   if (s.gun === "flame" && s.phase !== "over") {
     const range = GUNS.flame.range;
     const tipY = projectY(range, h);
-    const px = projectX(s.playerNx, 0);
+    const fpx = projectX(s.playerNx, 0);
     const tipX = projectX(s.playerNx, range);
-    const spread = GUNS.flame.spread * roadHalf(range);
     // Out of the NOZZLE, which he holds low in his left hand. The stream used
     // to start four pixels left of his middle and halfway up him, so the fire
     // came out of the bottle rather than out of the thing he is carrying.
     const noz = MUZZLES.flame[0];
-    const nozX = px + noz.x * PLAYER_H;
+    const nozX = fpx + noz.x * PLAYER_H;
     const nozY = py - noz.y * PLAYER_H;
-    ctx.globalAlpha = 0.75;
-    for (const [col, k] of [[C.flame, 1], [C.flameHot, 0.55]] as const) {
-      ctx.fillStyle = col;
-      ctx.beginPath();
-      ctx.moveTo(nozX, nozY);
-      ctx.lineTo(tipX - spread * k + Math.sin(t * 22) * 2, tipY);
-      ctx.lineTo(tipX + spread * k + Math.cos(t * 19) * 2, tipY);
-      ctx.closePath();
-      ctx.fill();
+
+    if (hasArt("fx-flame")) {
+      // The six-frame jet, stretched from the nozzle to the far end of the
+      // weapon's reach. It is drawn standing on its base, exactly as a
+      // character stands on its feet, so the nozzle needs no offset.
+      const jetH = Math.max(40, nozY - tipY);
+      // SHEARED rather than drawn straight up. The nozzle is at his hip and the
+      // far end is on his aim line, which are different points — a vertical jet
+      // separates from what it is actually burning the moment he steps aside.
+      // The lean puts the top of the flame exactly where the damage lands.
+      ctx.save();
+      ctx.translate(nozX, nozY);
+      ctx.transform(1, 0, -(tipX - nozX) / jetH, 1, 0, 0);
+      // 14fps: fast enough to roar, slow enough that the six frames read as six
+      // rather than as a flicker.
+      drawSprite(ctx, "fx-flame", Math.floor(t * 14), 0, 0, {
+        h: jetH, pixelScale: PIXEL_SCALE,
+      });
+      ctx.restore();
+    } else {
+      // Code-drawn stand-in, for a build without the sheet.
+      const spread = GUNS.flame.spread * roadHalf(range);
+      ctx.globalAlpha = 0.75;
+      for (const [col, k] of [[C.flame, 1], [C.flameHot, 0.55]] as const) {
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.moveTo(nozX, nozY);
+        ctx.lineTo(tipX - spread * k + Math.sin(t * 22) * 2, tipY);
+        ctx.lineTo(tipX + spread * k + Math.cos(t * 19) * 2, tipY);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
     }
-    ctx.globalAlpha = 1;
   }
 
   // ── Floating score text ────────────────────────────────────────────────
@@ -934,10 +958,8 @@ function drawField(
 function drawHud(ctx: CanvasRenderingContext2D, s: State) {
   const x = 8;
   const w = 92;
-  // Pushed clear of the shell's EXIT button, which is a DOM element sitting
-  // over the top-left corner of the canvas — the health bar was running
-  // straight underneath it.
-  const y = TOP_INSET + EXIT_CLEARANCE;
+  // Right at the top. Nothing is above this any more — see EXIT_CLEARANCE.
+  const y = TOP_INSET;
 
   ctx.fillStyle = C.hpBack;
   ctx.fillRect(x, y, w, 7);
@@ -964,9 +986,13 @@ function drawHud(ctx: CanvasRenderingContext2D, s: State) {
   // Again, so it can be a large number — hence right-aligned, growing leftward
   // into empty sky instead of pushing anything else around.
   // Zero-padded, matching the score screen and every cabinet ever built.
+  //
+  // It stops short of the right edge by the width of the EXIT button, which is
+  // its neighbour on this row rather than something in another corner.
   const score = pad(Math.min(MAX_SCORE, Math.floor(s.score)));
-  drawText(ctx, score, W - 7, y + 1, "rgba(0,0,0,0.75)", 2, "right");
-  drawText(ctx, score, W - 8, y, "#FFFFFF", 2, "right");
+  const sx = W - EXIT_CLEARANCE - 6;
+  drawText(ctx, score, sx + 1, y + 1, "rgba(0,0,0,0.75)", 2, "right");
+  drawText(ctx, score, sx, y, "#FFFFFF", 2, "right");
 }
 
 function drawBombButton(ctx: CanvasRenderingContext2D, s: State, h: number, hits: Hits) {
@@ -985,15 +1011,15 @@ function drawBombButton(ctx: CanvasRenderingContext2D, s: State, h: number, hits
   ctx.strokeStyle = C.flameHot;
   ctx.lineWidth = 1.6;
   ctx.strokeRect(x + 0.8, y + 0.8, size - 1.6, size - 1.6);
-  ctx.fillStyle = "#22222A";
-  ctx.beginPath();
-  ctx.arc(x + size / 2, y + size / 2 + 2, 10, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = C.flame;
-  ctx.beginPath();
-  ctx.moveTo(x + size / 2 + 6, y + size / 2 - 7);
-  ctx.lineTo(x + size / 2 + 11, y + size / 2 - 13);
-  ctx.stroke();
+  // The bomb the SHOP sells, so the button and the thing being bought are the
+  // same picture. It used to be a circle and a line drawn here, which is a
+  // different bomb from the one on the shop shelf.
+  //
+  // Standing on its feet like everything else drawn from the sheet, so the
+  // ground line is the bottom of the panel less the room the counter needs.
+  drawSprite(ctx, "icon-bomb", 0, x + size / 2, y + size - 9, {
+    h: size - 15, pixelScale: PIXEL_SCALE,
+  });
   drawText(ctx, `X${s.bombs}`, x + size - 4, y + size - 9, "#FFFFFF", 1, "right");
   ctx.globalAlpha = 1;
 }

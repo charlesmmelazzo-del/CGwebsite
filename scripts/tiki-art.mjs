@@ -67,13 +67,35 @@ const MAP = {
   "Player Turn .png": "player-turn.png",
   "Player Turn Shades.png": "player-turn-shades.png",
 
-  // ── Beach scenery ──
+  // ── Stage scenery ──
+  // One sky, one horizon, one ground texture and a handful of roadside props
+  // per stage. The names on the right are what stages.ts asks for, so a whole
+  // stage arrives without touching the game.
   "Beach Sky.png": "bg-beach-sky.png",
   "Beach Horizon.png": "bg-beach-horizon.png",
   "Beach Palm Tree.png": "prop-palm.png",
   "Beach Beachgoer 1.png": "prop-beachgoer-1.png",
   "Beach Beachgoer 2.png": "prop-beachgoer-2.png",
   "Beach Sand Textile.png": "tex-sand.png",
+
+  "Desert Sky.png": "bg-desert-sky.png",
+  "Desert Skyline.png": "bg-desert-horizon.png",
+  "Desert Texture.png": "tex-desert.png",
+  "Desert Cactus 1.png": "prop-cactus-1.png",
+  "Desert Cactus 2.png": "prop-cactus-2.png",
+  "Desert Coyote.png": "prop-coyote.png",
+
+  "Winter SKy.png": "bg-winter-sky.png",      // sic: his capitalisation
+  "Winter Horizon.png": "bg-winter-horizon.png",
+  "Winter Texture.png": "tex-snow.png",
+  "Winter Tree .png": "prop-pine.png",
+  "Winter Elf.png": "prop-elf.png",
+  "Winter Yeti.png": "prop-yeti.png",
+
+  "Castle Sky.png": "bg-castle-sky.png",
+  "Castle Horizon.png": "bg-castle-horizon.png",
+  "Castle Texture.png": "tex-castle-ground.png",
+  "Castle Battle Fence.png": "prop-battle-fence.png",
 
   // ── Effects ──
   // Drawn pointing RIGHT; the game fires up the screen, so these are rotated
@@ -82,6 +104,9 @@ const MAP = {
   "FX Laser.png": "fx-laser.png",
   "FX Muzzle Flash.png": "fx-muzzle.png",
   "FX hit.png": "fx-impact.png",
+  // The flame is the exception: it was drawn standing UP already, so it is the
+  // one effect that must not be turned. See ROTATE_CCW.
+  "FX Flame.png": "fx-flame.png",
 
   // ── Icons ──
   // Two arrived with a doubled extension; mapping by exact name means the
@@ -147,6 +172,7 @@ const MAP = {
 function framesFor(name) {
   if (name.startsWith("blk-") || name.startsWith("boss-")) return 5;
   if (name === "helper.png") return 8;
+  if (name === "fx-flame.png") return 6;
   if (name === "fx-muzzle.png" || name === "fx-impact.png") return 4;
   if (name === "fx-bullet.png" || name === "fx-laser.png") return 2;
   if (name.startsWith("player-") && name !== "player-turn.png" && name !== "player-turn-shades.png") return 8;
@@ -177,9 +203,19 @@ const ROTATE_CCW = {
   // The impact burst is radial, so it needs no turning.
 };
 
-/** Full-bleed images: no background to cut, nothing to centre or crop. */
+/**
+ * Full-bleed images: no background to cut, nothing to centre or crop.
+ *
+ * Every SKY and every ground TEXTURE, because both are drawn edge to edge —
+ * a sky with its corners eaten shows black triangles, and a texture that has
+ * been trimmed to its content no longer tiles. HORIZONS are not in here: they
+ * arrive on magenta above the skyline precisely so the sky shows through.
+ */
 const FULLBLEED = {
-  "bg-beach-sky.png": true, "tex-sand.png": true,
+  "bg-beach-sky.png": true, "bg-desert-sky.png": true,
+  "bg-winter-sky.png": true, "bg-castle-sky.png": true,
+  "tex-sand.png": true, "tex-desert.png": true,
+  "tex-snow.png": true, "tex-castle-ground.png": true,
   "intro-1.png": true, "intro-2.png": true, "intro-3.png": true,
   "intro-4.png": true, "ending-blimp.png": true,
 };
@@ -768,7 +804,7 @@ function targetHeight(name) {
   if (name.startsWith("boss-")) return 480;          // 226 logical -> 452 device
   if (name.startsWith("blk-")) return 320;           // 140 logical -> 280 device
   if (name.startsWith("player") || name === "helper.png") return 288;
-  if (name.startsWith("bg-") || name === "tex-sand.png") return 512;
+  if (name.startsWith("bg-") || name.startsWith("tex-")) return 512;
   if (name.startsWith("shop")) return 448;
   // Icons read at ~34 logical px; 128 is ample and keeps them tiny.
   if (name.startsWith("icon-")) return 128;
@@ -834,22 +870,76 @@ function downscale(img, targetH, maxW = Infinity, frames = 1) {
 const dry = process.argv.includes("--dry");
 fs.mkdirSync(DEST, { recursive: true });
 
-/** Look for a source file in every folder he uses. */
-function find(name) {
+/**
+ * A source name with any .png dropped.
+ *
+ * Several files arrive with NO EXTENSION at all — an export saved straight out
+ * of a chat window keeps the title and loses the suffix, so "Castle Sky" and
+ * "FX Flame" landed beside "Castle Horizon.png". They are PNGs; only the name
+ * is short. Matching on the stem means a missing suffix costs nothing, which
+ * matters because the old exact-name lookup skipped them in total silence and
+ * the flame and two whole skies simply never reached the game.
+ */
+function stem(name) {
+  return name.replace(/\.png$/i, "");
+}
+
+/**
+ * Every source file, indexed by name AND by stem.
+ *
+ * Built once — srcDirs() walks the whole tree, and the old find() walked it
+ * again for each of ninety entries.
+ */
+let index = null;
+function sources() {
+  if (index) return index;
+  index = new Map();
+  const files = [];
   for (const d of srcDirs()) {
-    const p = path.join(d, name);
-    if (fs.existsSync(p)) return p;
+    for (const f of fs.readdirSync(d)) {
+      if (f.startsWith(".")) continue;
+      const p = path.join(d, f);
+      if (fs.statSync(p).isFile()) files.push([f, p]);
+    }
   }
-  return null;
+  // Exact names first, stems second, so a real "X.png" is never shadowed by a
+  // stray "X" sitting in another folder.
+  for (const [f, p] of files) if (!index.has(f)) index.set(f, p);
+  for (const [f, p] of files) {
+    const st = stem(f);
+    if (!index.has(st)) index.set(st, p);
+  }
+  return index;
+}
+
+/** Look for a source file in every folder he uses, extension or not. */
+function find(name) {
+  return sources().get(name) ?? sources().get(stem(name)) ?? null;
 }
 
 // Anything sitting in his folders that this script does not know about is
-// almost certainly art that will silently never appear in the game.
-const known = new Set(Object.keys(MAP));
+// almost certainly art that will silently never appear in the game. Compared on
+// STEMS, so this reports a genuinely unmapped file rather than every file whose
+// extension went missing.
+const known = new Set(Object.keys(MAP).map(stem));
+const claimed = new Set();
+for (const name of Object.keys(MAP)) {
+  const p = find(name);
+  if (p) claimed.add(p);
+}
 for (const d of srcDirs()) {
-  if (!fs.existsSync(d)) continue;
   for (const f of fs.readdirSync(d)) {
-    if (f.toLowerCase().endsWith(".png") && !known.has(f)) {
+    if (f.startsWith(".")) continue;
+    const p = path.join(d, f);
+    if (!fs.statSync(p).isFile()) continue;
+    if (known.has(stem(f)) || claimed.has(p)) continue;
+    // Read the signature rather than trusting the name — that is the whole
+    // point here, since the names are what cannot be trusted.
+    const head = Buffer.alloc(8);
+    const fd = fs.openSync(p, "r");
+    fs.readSync(fd, head, 0, 8, 0);
+    fs.closeSync(fd);
+    if (head[0] === 0x89 && head.toString("ascii", 1, 4) === "PNG") {
       console.log(`  UNMAPPED  ${f}  <- in ${path.basename(d)}/, not imported`);
     }
   }

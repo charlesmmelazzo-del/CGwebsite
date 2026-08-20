@@ -100,6 +100,8 @@ export const SHEETS: Record<string, SheetDef> = {
   // and a cherry BLOCKER, and they are different characters.
   ...Object.fromEntries(BLOCKERS.map((n) => [`blk-${n}`, { file: `blk-${n}`, cols: 5, rows: 1 }])),
   ...Object.fromEntries(BOSSES.map((n) => [`boss-${n}`, { file: `boss-${n}`, cols: 5, rows: 1 }])),
+  // Six frames, and the only effect big enough on screen to need that many.
+  "fx-flame": { file: "fx-flame", cols: 6, rows: 1 },
   "fx-bullet": { file: "fx-bullet", cols: 2, rows: 1 },
   "fx-laser": { file: "fx-laser", cols: 2, rows: 1 },
   "fx-muzzle": { file: "fx-muzzle", cols: 4, rows: 1 },
@@ -133,11 +135,17 @@ export type SpriteKey =
   | "player-turn" | "player-turn-shades"
   | "helper-walk"
   | "prop-palm" | "prop-beachgoer-1" | "prop-beachgoer-2"
+  | "prop-cactus-1" | "prop-cactus-2" | "prop-coyote"
+  | "prop-pine" | "prop-elf" | "prop-yeti"
+  | "prop-battle-fence"
   | "bg-beach-sky" | "bg-beach-horizon" | "tex-sand"
+  | "bg-desert-sky" | "bg-desert-horizon" | "tex-desert"
+  | "bg-winter-sky" | "bg-winter-horizon" | "tex-snow"
+  | "bg-castle-sky" | "bg-castle-horizon" | "tex-castle-ground"
   | "shopkeeper-scotch" | "shopkeeper-scotch-happy" | "shop-booth"
   | "logo-tiki-wars" | "intro-1" | "intro-2" | "intro-3" | "intro-4"
   | "ending-blimp"
-  | "fx-bullet" | "fx-laser" | "fx-muzzle" | "fx-impact"
+  | "fx-bullet" | "fx-laser" | "fx-muzzle" | "fx-impact" | "fx-flame"
   | "icon-armor" | "icon-bomb" | "icon-clover" | "icon-money" | "icon-rum"
   | "icon-poison" | "icon-black-cat" | "icon-pistol" | "icon-shotgun"
   | "icon-uzi" | "icon-flame" | "icon-laser"
@@ -222,12 +230,32 @@ export const SPRITES: Record<SpriteKey, SpriteMeta> = {
 
   // Scenery — one image each with nothing to animate, so a sheet would only add
   // a layout to get wrong.
+  //
+  // Grouped by the stage that uses them; stages.ts is what decides which set is
+  // on screen. A backdrop or a tiling texture is never drawn as a figure
+  // standing on the ground, so onScreen means nothing for those and is 0.
   "prop-palm": { file: "prop-palm", frames: 1, onScreen: 150 },
   "prop-beachgoer-1": { file: "prop-beachgoer-1", frames: 1, onScreen: 120 },
   "prop-beachgoer-2": { file: "prop-beachgoer-2", frames: 1, onScreen: 120 },
+  "prop-cactus-1": { file: "prop-cactus-1", frames: 1, onScreen: 140 },
+  "prop-cactus-2": { file: "prop-cactus-2", frames: 1, onScreen: 110 },
+  "prop-coyote": { file: "prop-coyote", frames: 1, onScreen: 90 },
+  "prop-pine": { file: "prop-pine", frames: 1, onScreen: 152 },
+  "prop-elf": { file: "prop-elf", frames: 1, onScreen: 90 },
+  "prop-yeti": { file: "prop-yeti", frames: 1, onScreen: 120 },
+  "prop-battle-fence": { file: "prop-battle-fence", frames: 1, onScreen: 100 },
   "bg-beach-sky": { file: "bg-beach-sky", frames: 1, onScreen: 0 },
   "bg-beach-horizon": { file: "bg-beach-horizon", frames: 1, onScreen: 0 },
   "tex-sand": { file: "tex-sand", frames: 1, onScreen: 0 },
+  "bg-desert-sky": { file: "bg-desert-sky", frames: 1, onScreen: 0 },
+  "bg-desert-horizon": { file: "bg-desert-horizon", frames: 1, onScreen: 0 },
+  "tex-desert": { file: "tex-desert", frames: 1, onScreen: 0 },
+  "bg-winter-sky": { file: "bg-winter-sky", frames: 1, onScreen: 0 },
+  "bg-winter-horizon": { file: "bg-winter-horizon", frames: 1, onScreen: 0 },
+  "tex-snow": { file: "tex-snow", frames: 1, onScreen: 0 },
+  "bg-castle-sky": { file: "bg-castle-sky", frames: 1, onScreen: 0 },
+  "bg-castle-horizon": { file: "bg-castle-horizon", frames: 1, onScreen: 0 },
+  "tex-castle-ground": { file: "tex-castle-ground", frames: 1, onScreen: 0 },
   "shopkeeper-scotch": { file: "shopkeeper-scotch", frames: 1, onScreen: 180 },
   "shopkeeper-scotch-happy": { file: "shopkeeper-scotch-happy", frames: 1, onScreen: 180 },
   "shop-booth": { file: "shop-booth", frames: 1, onScreen: 0 },
@@ -243,6 +271,10 @@ export const SPRITES: Record<SpriteKey, SpriteMeta> = {
 
   // Effects. Delivered pointing right and rotated on import, so these are all
   // drawn pointing up the field with no transform at the draw call.
+  // The jet is drawn stretched from the nozzle to the end of the weapon's
+  // range, so onScreen is only the resolution it is asked for — see FLAME_H in
+  // TikiWars.tsx for the height it actually reaches.
+  "fx-flame": { sheet: { name: "fx-flame", row: 0 }, frames: 6, onScreen: 200 },
   "fx-bullet": { sheet: { name: "fx-bullet", row: 0 }, frames: 2, onScreen: 26 },
   "fx-laser": { sheet: { name: "fx-laser", row: 0 }, frames: 2, onScreen: 34 },
   "fx-muzzle": { sheet: { name: "fx-muzzle", row: 0 }, frames: 4, onScreen: 26 },
@@ -341,6 +373,13 @@ export function loadTikiArt(): void {
   // competing with them.
   window.setTimeout(() => {
     for (const g of GUN_ART) if (g !== "pistols") tryLoad(sheetUrl(`player-${g}`));
+    // The flame jet goes with the flamethrower, and it is on screen CONTINUOUSLY
+    // while that gun is held rather than for a few frames per shot — so a sheet
+    // that arrives late means seconds of the code-drawn cone and then a swap in
+    // the middle of a fight.
+    tryLoad(sheetUrl("fx-flame"));
+    // The laser bolt, for the same reason as its weapon.
+    tryLoad(sheetUrl("fx-laser"));
   }, 1200);
 }
 
@@ -356,6 +395,47 @@ export function prefetchSheet(name: string): void {
   if (typeof window === "undefined") return;
   if (!SHEETS[name]) return;
   tryLoad(sheetUrl(name));
+}
+
+/**
+ * Fetch a loose-file sprite ahead of when it is drawn.
+ *
+ * Same reasoning as prefetchSheet, for the things that are not sheets: a whole
+ * stage's backdrop, skyline, ground texture and props are known the moment the
+ * previous stage is cleared, and they are the LARGEST files in the game. Left
+ * to load lazily the guest gets a flat gradient for the first second of a new
+ * stage and then the real sky snaps in underneath the fight.
+ */
+export function prefetchSprite(key: SpriteKey): void {
+  if (typeof window === "undefined") return;
+  const m: SpriteMeta = SPRITES[key];
+  if (m.sheet) { prefetchSheet(m.sheet.name); return; }
+  const url = spriteUrl(key, 0);
+  if (url) tryLoad(url);
+}
+
+/**
+ * Has this sprite's REAL art arrived?
+ *
+ * Almost nothing needs to ask — drawSprite falls back to a placeholder on its
+ * own, and that is the point of the system. The exception is an effect with a
+ * code-drawn version that is not a stand-in but a genuinely different drawing:
+ * the flame cone is a shape the canvas can make convincingly, and it has to be
+ * turned OFF rather than drawn underneath once the sheet is there.
+ */
+export function hasArt(key: SpriteKey): boolean {
+  const m: SpriteMeta = SPRITES[key];
+  if (m.sheet) {
+    const url = sheetUrl(m.sheet.name);
+    tryLoad(url);
+    const img = loaded.get(url);
+    if (img && img.width) return true;
+  }
+  const url = spriteUrl(key, 0);
+  if (!url || missing.has(url)) return false;
+  tryLoad(url);
+  const img = loaded.get(url);
+  return Boolean(img && img.width);
 }
 
 function tryLoad(url: string): void {
