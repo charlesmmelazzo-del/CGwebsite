@@ -11,6 +11,7 @@ import {
   BLOCKERS, BOSSES, bossFor, ELITE_BLOCKER, BOSS_ATTACK_Z,
   MAX_TRAVERSE, GATE_REACH, GATE_CURE_HITS, cureGateOption, LADDERS,
   PRESSURE_TARGET_Z, PRESSURE_MIN, PRESSURE_MAX, BLOCKER_AIM_SPREAD,
+  PLAYER_NX_LIMIT, HELPER_NX_LIMIT, HELPER_SPACING,
   rungOf, type State,
 } from "../tikiCore";
 
@@ -612,16 +613,16 @@ check("the character is pinned to the thumb, not towed behind it", () => {
 
 check("a full road crossing is quick", () => {
   const st = fresh();
-  st.playerNx = -1;
+  st.playerNx = -PLAYER_NX_LIMIT;
   st.targetNx = 1;
   run(st, 0.35);
-  assert.ok(st.playerNx > 0.9,
+  assert.ok(st.playerNx > PLAYER_NX_LIMIT - 0.02,
     `crossing the road took longer than 350ms (reached ${st.playerNx.toFixed(2)})`);
 });
 
 check("but a violent flick cannot teleport across the road", () => {
   const st = fresh();
-  st.playerNx = -1;
+  st.playerNx = -PLAYER_NX_LIMIT;
   st.targetNx = 1;
   update(st, DT);
   assert.ok(st.playerNx < 0.2,
@@ -650,14 +651,31 @@ check("keyboard steering still works when no thumb is down", () => {
   assert.ok(st.playerNx > 0.2, "arrow keys no longer move the character");
 });
 
-check("steering never leaves the road", () => {
+check("steering stops short of the kerb, so the hero stays on screen", () => {
   const st = fresh();
   st.targetNx = 5;
   run(st, 1);
-  assert.ok(st.playerNx <= 1);
+  assert.ok(st.playerNx <= PLAYER_NX_LIMIT + 1e-9,
+    `hero reached ${st.playerNx.toFixed(2)} — wide enough to hang off the edge`);
   st.targetNx = -5;
   run(st, 1);
-  assert.ok(st.playerNx >= -1);
+  assert.ok(st.playerNx >= -PLAYER_NX_LIMIT - 1e-9);
+});
+
+check("a helper never gets pushed off the screen", () => {
+  // The hero at full lock puts his outside helper further out than himself.
+  assert.ok(HELPER_NX_LIMIT < 1, "helpers can reach the kerb");
+  assert.ok(PLAYER_NX_LIMIT + HELPER_SPACING > HELPER_NX_LIMIT,
+    "this test is meaningless unless a helper would otherwise overhang");
+});
+
+check("the road is wider than the hero can travel", () => {
+  // The whole point of separating them: the wave gets room the guest does not
+  // need to reach, instead of the field being cramped by the sprite's width.
+  assert.ok(PLAYER_NX_LIMIT < 1, "player travel is back to the full road width");
+  // ...but still far enough out to refuse a gate by hugging the outside.
+  assert.ok(PLAYER_NX_LIMIT > GATE_REACH,
+    "the hero can no longer reach past a gate panel to avoid it");
 });
 
 // ── The full roster ─────────────────────────────────────────────────────────

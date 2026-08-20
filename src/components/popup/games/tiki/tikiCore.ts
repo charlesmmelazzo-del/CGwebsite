@@ -26,7 +26,30 @@ export const MAX_HELPERS = 6;
  * flanking bottles overlapped his arms and the group read as one cluttered
  * shape rather than a squad.
  */
-export const HELPER_SPACING = 0.34;
+export const HELPER_SPACING = 0.38;
+
+/**
+ * How far out a helper may sit.
+ *
+ * Wider than the hero's own limit, because a helper is a smaller sprite and
+ * flanks him — but still short of the screen edge. Without it, the hero at full
+ * lock pushed his outside helper clean off the side of the display.
+ */
+export const HELPER_NX_LIMIT = 0.86;
+
+/**
+ * How far the hero may travel, as a fraction of the road's half-width.
+ *
+ * Short of the kerb, so a 66px-wide sprite stays fully on screen at full lock.
+ * Road width and player travel used to be the same number, which meant the road
+ * could only ever be as wide as the hero could go without hanging off the edge
+ * — so the whole field stayed cramped purely because the sprite got bigger.
+ * Separating them lets the wave have room the guest does not need to reach.
+ *
+ * Still well past GATE_REACH, so refusing a gate by hugging the outside remains
+ * possible.
+ */
+export const PLAYER_NX_LIMIT = 0.81;
 
 export const PLAYER_SPEED = 2.6;          // keyboard only: nx per second
 
@@ -795,8 +818,19 @@ export function detonateBomb(st: State): boolean {
 
 // ─── Spawning ────────────────────────────────────────────────────────────────
 
-function spawnOne(st: State, nx: number): void {
+/**
+ * How far out a spawn may sit, by tier.
+ *
+ * Not one number for everything: a blocker is about 84 logical px across and a
+ * soldier barely half that, so a shared limit either lets a blocker hang a
+ * shoulder off the screen or needlessly keeps the soldiers away from the kerb.
+ */
+const SPAWN_LIMIT = { grunt: 0.86, blocker: 0.74 } as const;
+
+function spawnOne(st: State, rawNx: number): void {
   const blocker = st.rng() < blockerChance(st.stage);
+  const lim = blocker ? SPAWN_LIMIT.blocker : SPAWN_LIMIT.grunt;
+  const nx = Math.max(-lim, Math.min(lim, rawNx));
   const world = worldSpeed(st.stage);
   const walk = enemyWalk(st.stage);
 
@@ -868,7 +902,7 @@ function spawnWave(st: State): void {
     // clump — an exact grid reads as mechanical, but a wandering one leaves an
     // obvious free lane.
     const jitter = (st.rng() * 2 - 1) * (WAVE_SPREAD / n) * 0.8;
-    spawnOne(st, Math.max(-0.9, Math.min(0.9, slot * WAVE_SPREAD + jitter)));
+    spawnOne(st, slot * WAVE_SPREAD + jitter);
   }
 }
 
@@ -1023,8 +1057,8 @@ export function update(st: State, dt: number): void {
   } else {
     st.playerNx += st.drag * PLAYER_SPEED * dt;
   }
-  if (st.playerNx < -1) st.playerNx = -1;
-  if (st.playerNx > 1) st.playerNx = 1;
+  if (st.playerNx < -PLAYER_NX_LIMIT) st.playerNx = -PLAYER_NX_LIMIT;
+  if (st.playerNx > PLAYER_NX_LIMIT) st.playerNx = PLAYER_NX_LIMIT;
 
   // ── Firing ──
   const g = GUNS[st.gun];

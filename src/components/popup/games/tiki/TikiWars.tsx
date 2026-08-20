@@ -16,7 +16,8 @@ import {
 import {
   armorCost, bombCost, canBuyArmor, canBuyBomb, freshState, GUNS, MAX_ARMOR,
   MAX_BOMBS, MAX_HEALTH, runDetail, update, detonateBomb, worldSpeed,
-  DRAG_RANGE, GATE_REACH, GATE_CURE_HITS, HELPER_SPACING, rungOf, isGoodOption,
+  DRAG_RANGE, GATE_REACH, GATE_CURE_HITS, HELPER_SPACING, HELPER_NX_LIMIT,
+  rungOf, isGoodOption,
   isMaxedOption, type Enemy, type GunKind, type State,
 } from "./tikiCore";
 
@@ -632,7 +633,11 @@ function drawField(
   for (let i = 0; i < s.helpers; i++) {
     const side = i % 2 === 0 ? -1 : 1;
     const rank = Math.floor(i / 2) + 1;
-    const nx = Math.max(-1.1, Math.min(1.1, s.playerNx + side * rank * HELPER_SPACING));
+    // Clamped to the screen, not to the road. A helper flanking the hero at
+    // full lock sits further out than he does, and on the wider road that put
+    // the outside one clean off the edge.
+    const nx = Math.max(-HELPER_NX_LIMIT,
+      Math.min(HELPER_NX_LIMIT, s.playerNx + side * rank * HELPER_SPACING));
     drawSprite(ctx, "helper-walk", walk + i, projectX(nx, 0.03), projectY(0.03, h), {
       h: HELPER_H, pixelScale: PIXEL_SCALE,
     });

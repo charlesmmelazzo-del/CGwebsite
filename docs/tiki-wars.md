@@ -289,6 +289,30 @@ The base numbers are tuned for someone who is **struggling**. Anyone who is not
 gets more enemies from the pressure loop above, which is the right way round:
 the floor is generous and the ceiling is earned.
 
+### Road width vs travel
+
+**They are different numbers, deliberately.** `ROAD_HALF_NEAR` is how much room
+the wave has to spread across; `PLAYER_NX_LIMIT` is how far the guest may lean
+into it, and it stops short of the kerb so a 64px-wide hero stays fully on
+screen at full lock.
+
+They used to be one number, which meant the road could only ever be as wide as a
+sprite could travel without hanging off the edge — so the whole field got
+cramped purely because the hero grew. Separating them widened the road by about
+15% with no clipping anywhere.
+
+Everything that sits near the edge has its own limit, sized to its own sprite:
+
+| | Limit | Why |
+|---|---|---|
+| Hero | 0.81 | ~64px wide, and must clear the screen edge at full lock |
+| Soldier spawns | 0.86 | Narrow sprites, so they can use more of the road |
+| Blocker spawns | 0.74 | ~84px across — a shared limit would hang a shoulder off |
+| Helpers | 0.86 | Flank the hero, so they sit further out than he does |
+
+One number for all of them either lets the widest sprite overhang or needlessly
+keeps the narrowest away from the kerb.
+
 ### Where a wave lands
 
 Wave slots are the **centres of n equal lanes**, not the endpoints of the road.

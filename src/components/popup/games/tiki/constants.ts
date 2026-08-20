@@ -82,12 +82,14 @@ export function horizonY(h: number): number {
  * Half-width of the road at the player. The horizon width falls out of the
  * perspective divide below.
  *
- * NEAR is deliberately less than W/2: at full deflection the hero's centre sits
- * at W/2 - ROAD_HALF_NEAR, and the sprite is about 35 logical px wide, so a
- * wider road would clip him against the edge of the screen exactly when the
- * guest is dodging hardest.
+ * This is how much room the WAVE has to spread across. It used to double as the
+ * hero's travel limit, which meant the road could only ever be as wide as a
+ * sprite could go without hanging off the screen — so the field stayed cramped
+ * purely because the hero got bigger. How far the guest may actually lean into
+ * it is PLAYER_NX_LIMIT, over in tikiCore.ts, and it is deliberately short of
+ * the kerb.
  */
-export const ROAD_HALF_NEAR = 110;
+export const ROAD_HALF_NEAR = 126;
 
 // ─── Depth ───────────────────────────────────────────────────────────────────
 //
