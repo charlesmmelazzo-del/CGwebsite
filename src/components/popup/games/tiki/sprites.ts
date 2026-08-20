@@ -133,7 +133,7 @@ export type SpriteKey =
   | "shopkeeper-scotch" | "shopkeeper-scotch-happy" | "shop-booth"
   | "icon-armor" | "icon-bomb" | "icon-clover" | "icon-money" | "icon-rum"
   | "icon-poison" | "icon-black-cat" | "icon-pistol" | "icon-shotgun"
-  | "icon-uzi" | "icon-flame"
+  | "icon-uzi" | "icon-flame" | "icon-laser"
   | `player-${GunArt}-walk` | `player-${GunArt}-hit`
   | `player-${GunArt}-cheer` | `player-${GunArt}-sad`
   | `${SoldierName}-walk`
@@ -172,7 +172,7 @@ export const SPRITES: Record<SpriteKey, SpriteMeta> = {
   // Icons. Read at roughly 30 logical px, so they live or die on silhouette.
   ...Object.fromEntries((
     ["armor", "bomb", "clover", "money", "rum", "poison", "black-cat",
-     "pistol", "shotgun", "uzi", "flame"] as const
+     "pistol", "shotgun", "uzi", "flame", "laser"] as const
   ).map((n) => [`icon-${n}`, { file: `icon-${n}`, frames: 1, onScreen: 30 }])),
 
   ...Object.fromEntries(GUN_ART.flatMap((g) => [
@@ -925,7 +925,7 @@ function genericIcon(ctx: CanvasRenderingContext2D, h: number) {
 const PLACEHOLDERS: Partial<Record<SpriteKey, Placeholder>> = {
   ...Object.fromEntries((
     ["armor", "bomb", "clover", "money", "rum", "poison", "black-cat",
-     "pistol", "shotgun", "uzi", "flame"] as const
+     "pistol", "shotgun", "uzi", "flame", "laser"] as const
   ).map((n) => [`icon-${n}`, (c: CanvasRenderingContext2D, hh: number) => genericIcon(c, hh)])),
   "lime-walk": drawGrunt(C.lime, "#6FA81E"),
   "lemon-walk": drawGrunt(C.lemon, "#C9B31E"),

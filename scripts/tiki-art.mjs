@@ -88,6 +88,8 @@ const MAP = {
   "icon-rum-bottle.png": "icon-rum.png",
   "icon-shotgun.png": "icon-shotgun.png",
   "icon-uzi.png": "icon-uzi.png",
+  "Luck Icon.png": "icon-clover.png",
+  "Laser Icon.png": "icon-laser.png",
 
   // ── Shop ──
   "Shop Booth.png": "shop-booth.png",
