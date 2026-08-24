@@ -51,6 +51,20 @@ export const GAMES: Record<string, GameMeta> = {
     ],
     playable: true,
   },
+  "lets-do-shots": {
+    key: "lets-do-shots",
+    title: "Let's Do Shots!",
+    blurb: "Match the bottles. Pour the order.",
+    howToPlay: [
+      "Flick a bottle into the one next to it.",
+      "Three in a row breaks. Four or more takes the neighbours with it.",
+      "Fill the guest's order before the swipes run out.",
+      "Pour the bonus shot in recipe order for double.",
+      "Break a coffee cup and you get swipes back.",
+    ],
+    playable: true,
+    fullBleed: true,
+  },
   "tiki-wars": {
     key: "tiki-wars",
     title: "Tiki Wars",

@@ -13,6 +13,7 @@
 
 import type { ComponentType } from "react";
 import BehindTheStick from "./BehindTheStick";
+import LetsDoShots from "./shots/LetsDoShots";
 import TikiWars from "./tiki/TikiWars";
 import TopShelf from "./TopShelf";
 
@@ -56,6 +57,7 @@ const COMPONENTS: Record<string, ComponentType<ArcadeGameProps>> = {
   "behind-the-stick": BehindTheStick,
   "top-shelf": TopShelf,
   "tiki-wars": TikiWars,
+  "lets-do-shots": LetsDoShots,
 };
 
 export function getGameComponent(key: string): ComponentType<ArcadeGameProps> | null {
