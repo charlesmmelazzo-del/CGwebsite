@@ -160,3 +160,35 @@ export const C = {
 
   shadow: "rgba(0,0,0,0.45)",
 } as const;
+
+// ─── The bar back's run ──────────────────────────────────────────────────────
+
+/**
+ * A run is TWO passes: in from the right, a turn, then back out to the right.
+ *
+ * Turning round rather than looping off one edge and reappearing at the other
+ * is what makes it read as one man fetching stock instead of a queue of
+ * identical ones.
+ */
+export const BARBACK_RUN = 2.2;
+
+/** How tall he is, crossing the middle of the screen. About two cells. */
+export const BARBACK_BODY_H = 64;
+
+/** How far past each edge he starts and finishes, so he is never popped in. */
+const BARBACK_EDGE = 40;
+
+/**
+ * Where he is, and which way he is facing, `t` seconds into a run.
+ *
+ * HIS SHEET IS DRAWN FACING LEFT. So `flip` is true exactly when he is heading
+ * RIGHT, and the rule this encodes is simply that he faces the way he is going.
+ * If the sheet is ever re-exported facing the other way, this is the one place
+ * that changes — and the test on it will say so.
+ */
+export function barBackPass(t: number): { x: number; flip: boolean } {
+  const half = BARBACK_RUN / 2;
+  const span = W + BARBACK_EDGE * 2;
+  if (t < half) return { x: W + BARBACK_EDGE - (t / half) * span, flip: false };
+  return { x: -BARBACK_EDGE + ((t - half) / half) * span, flip: true };
+}

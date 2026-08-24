@@ -10,7 +10,8 @@ import { GUESTS, GUEST_COUNT } from "../guestArt";
 import { BARBACK_FRAMES, MOODS } from "../sprites";
 import { HOWTO_COPY, PARAGRAPH_GAP, lineHeight, wrapLines } from "../text";
 import {
-  COLS, ROWS, W, layoutFor, EXIT_CLEARANCE_H, HUD_CONTENT, H_MAX, H_MIN,
+  COLS, ROWS, W, barBackPass, layoutFor,
+  BARBACK_RUN, EXIT_CLEARANCE_H, HUD_CONTENT, H_MAX, H_MIN,
 } from "../constants";
 import {
   COFFEE_SWIPES, MAX_COFFEE_ON_BOARD, SCORE_PER_SWIPE_LEFT,
@@ -567,6 +568,38 @@ check("a competent player clears the early stages and struggles with the late on
 });
 
 // ── Layout ──────────────────────────────────────────────────────────────────
+
+check("the bar back always faces the way he is running", () => {
+  // His sheet is drawn facing LEFT, so `flip` has to be true exactly while he
+  // is heading right. Get it backwards and he moonwalks across the board, which
+  // is the bug this replaced. Stated per LEG rather than by sampling deltas:
+  // at the turn he is momentarily stationary, and a delta test reads that one
+  // frame as a direction change.
+  const half = BARBACK_RUN / 2;
+  const at = (t: number) => barBackPass(t);
+
+  assert.ok(at(0).x > W, "he starts off the right-hand edge");
+  assert.ok(at(half).x < 0, "he reaches the left-hand edge at the turn");
+  assert.ok(at(BARBACK_RUN).x > W, "he finishes off the right-hand edge again");
+
+  // Leg one: right to left, unmirrored.
+  let previous = at(0).x;
+  for (let i = 1; i <= 40; i++) {
+    const p = at((i / 40) * half * 0.999);
+    assert.equal(p.flip, false, "on the way in he must not be mirrored");
+    assert.ok(p.x < previous, "on the way in he must keep heading left");
+    previous = p.x;
+  }
+
+  // Leg two: left to right, mirrored.
+  previous = at(half).x;
+  for (let i = 1; i <= 40; i++) {
+    const p = at(half + (i / 40) * half);
+    assert.equal(p.flip, true, "on the way out he must be mirrored");
+    assert.ok(p.x > previous, "on the way out he must keep heading right");
+    previous = p.x;
+  }
+});
 
 check("the HUD stays clear of the cabinet's exit button", () => {
   // A full-bleed game gets GameShell's EXIT floated over its top-right corner.

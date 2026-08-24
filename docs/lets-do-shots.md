@@ -103,10 +103,16 @@ the game is broken.
 
 ## The panels
 
-Story panels are fitted WHOLE, letterboxed if they have to be. Filling the
-screen edge to edge and cropping the overflow cost the top of the speech bubble
-on the taller panels, so a guest could be halfway through a line the player
-never got to read. The dialogue is the entire point of those screens.
+Every story panel is shown through the same fixed FRAME, centred on black, with
+the picture contained inside it — never cropped. Fitting each panel to the
+screen instead meant every one was scaled differently, so the cast turned up at
+a different size each time and the sequence looked unsteady; and cropping the
+overflow took the top off the speech bubble on the taller panels, so a guest
+could be halfway through a line the player never got to read.
+
+The footer bands — the round tally, the continue count — sit INSIDE the frame
+along its bottom edge. Outside it they float on the black surround and read as
+a second, unrelated panel.
 
 ## The stage flow
 
@@ -144,7 +150,16 @@ own shot. Louder reactions interrupt quieter ones, never the other way round,
 and each settles back to concentrating after a second or two — a grin still on
 his face three moves later stops being feedback and becomes wallpaper.
 
-He is the game's only continuous feedback that is not a number.
+He is the game's only continuous feedback that is not a number, so he is given
+the room to be read at a glance: centred, cut off by the top of the grid, and
+filling everything above it. There is no scenery between him and the board —
+there used to be a drawn shelf, and losing it roughly doubled his size. Only his
+WIDTH is capped, because on a tall phone the height alone would make him more
+than half the screen across and the readouts would end up on his shoulders.
+
+The readouts are keylined rather than sitting on a panel, since a panel would
+simply have erased him, and the order meter runs along the very top edge — at
+the foot of the HUD it was exactly where his chest is now.
 
 All four moods are cut from ONE shared rectangle at import time, so they are
 identical in size and register with each other; he changes expression without
@@ -185,4 +200,7 @@ not divide leaves every cell boundary a fraction of a pixel out and smears a
 sliver of the next frame into this one.
 
 The bar back throws his own bottles — they are drawn into his frames — so the
-game plays the sheet and adds no particles of its own.
+game plays the sheet and adds no particles of its own. He crosses the middle of
+the screen in front of the board: in from the right, a turn, then back out to
+the right. His sheet faces LEFT, so he is mirrored on the return leg only, and
+`barBackPass` in constants.ts is the one place that rule lives.

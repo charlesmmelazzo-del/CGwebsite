@@ -379,7 +379,9 @@ export function drawBarBack(
   cx: number,
   groundY: number,
   bodyH: number,
-  frame: number
+  frame: number,
+  /** True to mirror him. The sheet is drawn facing LEFT. */
+  flip = false
 ): void {
   const sheet = getImage(barbackUrl());
   if (sheet && sheet.naturalWidth) {
@@ -387,12 +389,19 @@ export function drawBarBack(
     const frameH = bodyH / BARBACK_BODY;
     const frameW = (cw / sheet.naturalHeight) * frameH;
     const top = groundY - BARBACK_FEET * frameH;
+    ctx.save();
     ctx.imageSmoothingEnabled = true;
+    if (flip) {
+      ctx.translate(Math.round(cx), 0);
+      ctx.scale(-1, 1);
+      ctx.translate(-Math.round(cx), 0);
+    }
     ctx.drawImage(
       sheet,
       Math.floor((frame % BARBACK_FRAMES) * cw), 0, Math.floor(cw), sheet.naturalHeight,
       Math.round(cx - frameW / 2), Math.round(top), Math.round(frameW), Math.round(frameH)
     );
+    ctx.restore();
     ctx.imageSmoothingEnabled = false;
     return;
   }

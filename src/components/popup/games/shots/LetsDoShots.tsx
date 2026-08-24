@@ -6,8 +6,8 @@ import { drawText, drawTextMarquee, textWidth } from "../arcade";
 import ShotsCanvas, { type SwipeDir } from "./ShotsCanvas";
 import { HOWTO_COPY, PARAGRAPH_GAP, lineHeight, wrapLines } from "./text";
 import {
-  BOARD_H, BOARD_W, BOARD_X, C, CELL, COLS, HUD_CONTENT, RECIPE_H, ROWS, W,
-  layoutFor, type Layout,
+  BARBACK_BODY_H, BARBACK_RUN, BOARD_H, BOARD_W, BOARD_X, C, CELL, COLS,
+  HUD_CONTENT, RECIPE_H, ROWS, W, barBackPass, layoutFor, type Layout,
 } from "./constants";
 import { BOTTLES, type CellKind } from "./bottles";
 import { GUESTS, type BubbleRect, type GuestArt } from "./guestArt";
@@ -449,11 +449,7 @@ function startBarBack(g: Game) {
   g.barback.t = 0;
 }
 
-/** How far across he is, for a run that lasts BARBACK_RUN seconds. */
-const BARBACK_RUN = 1.6;
-function barBackX(t: number): number {
-  return -30 + (t * (W + 60)) / BARBACK_RUN;
-}
+
 
 // ─── Update ──────────────────────────────────────────────────────────────────
 
@@ -751,22 +747,31 @@ function drawHud(ctx: CanvasRenderingContext2D, g: Game, layout: Layout) {
 }
 
 /**
- * How far above the bar the bartender is allowed to reach.
+ * The widest the bartender may be, in logical pixels.
  *
- * He stands on the shelf line and CENTRED, so the readouts either side of him
- * stay where they are while he gets to be nearly twice the height the band
- * alone would allow. Everything the HUD draws over him is keylined, so he reads
- * as standing behind the counter rather than in front of the numbers.
+ * The only limit on him. He is cut off by the board's top edge and rises to
+ * fill everything above it, so on a tall phone the height alone would make him
+ * more than half the screen across — at which point the readouts are sitting on
+ * his shoulders rather than beside him. Capping the WIDTH keeps him large
+ * without letting him take over the whole bar.
  */
-const BARTENDER_BLEED = 44;
+const BARTENDER_MAX_W = 122;
 
+/**
+ * Where he stands: torso cut off by the top of the grid, centred, filling
+ * everything above it.
+ *
+ * There used to be a drawn shelf between him and the board, with the bar back
+ * running along it. Losing it gave him the whole upper third and let him be
+ * nearly twice the size — the difference between a decorative sprite and a
+ * character whose face can be read without looking away from the board.
+ */
 function bartenderBox(layout: Layout) {
-  const bandH = layout.boardY - layout.backbarY;
-  const h = bandH + BARTENDER_BLEED;
-  // 0.61 is the moods' own aspect; they are all cut from one frame, so one
-  // number covers all four.
+  // 0.61 is the moods' own aspect; all four are cut from one frame, so one
+  // number covers the set.
+  const h = Math.min(layout.boardY - 10, BARTENDER_MAX_W / 0.61);
   const w = h * 0.61;
-  return { cx: W / 2, groundY: layout.boardY - 5, h, left: W / 2 - w / 2, right: W / 2 + w / 2 };
+  return { cx: W / 2, groundY: layout.boardY, h, left: W / 2 - w / 2, right: W / 2 + w / 2 };
 }
 
 function drawBartender(ctx: CanvasRenderingContext2D, g: Game, layout: Layout) {
@@ -774,30 +779,24 @@ function drawBartender(ctx: CanvasRenderingContext2D, g: Game, layout: Layout) {
   drawMood(ctx, g.mood, box.cx, box.groundY, box.h);
 }
 
-function drawBackBar(ctx: CanvasRenderingContext2D, g: Game, layout: Layout) {
-  const y = layout.backbarY;
-  const bandH = layout.boardY - y;
-  fillRect(ctx, 0, y, W, bandH, C.night);
-
-  const shelfY = layout.boardY - 5;
-  const silhouetteH = Math.min(20, bandH - 8);
-  for (let i = 0; i < 22; i++) {
-    // Fixed, uneven spacing rather than a regular pitch: a perfectly even row
-    // of bottles reads as a fence.
-    const bx = 6 + i * 12 + ((i * 7) % 5);
-    const bh = silhouetteH - ((i * 3) % 5);
-    fillRect(ctx, bx, shelfY - bh, 5, bh, C.panel);
-    fillRect(ctx, bx + 1, shelfY - bh - 3, 2, 4, C.panel);
-  }
-  fillRect(ctx, 0, shelfY, W, 3, C.panelLip);
-  fillRect(ctx, 0, shelfY, W, 1, C.brassDark);
-  fillRect(ctx, 0, layout.boardY - 2, W, 2, C.panelLip);
-
-  const bb = g.barback;
-  if (!bb.running) return;
-  // Two thirds of the band: his frame is more than twice his own height, and
-  // the bottles he throws use the rest of it, climbing up past the shelf.
-  drawBarBack(ctx, barBackX(bb.t), shelfY, Math.round(bandH * 0.62), Math.floor(bb.t * 14));
+/**
+ * The bar back, crossing the play field.
+ *
+ * He used to run along a drawn shelf above the board. That shelf is gone — the
+ * bartender fills the space now, and two characters sharing it left neither of
+ * them room — so the runner comes through the middle of the screen instead,
+ * where there is nothing to crowd and the bottles he throws arc up out of the
+ * board toward the bar.
+ *
+ * Cosmetic from top to bottom: nothing waits for him and no bottle on the board
+ * is one he threw. He exists because a board that silently refills from nowhere
+ * feels like a spreadsheet, and one that gets restocked by somebody running
+ * past feels like a bar.
+ */
+function drawBarBackRunner(ctx: CanvasRenderingContext2D, g: Game, h: number) {
+  if (!g.barback.running) return;
+  const pass = barBackPass(g.barback.t);
+  drawBarBack(ctx, pass.x, Math.round(h * 0.5), BARBACK_BODY_H, Math.floor(g.barback.t * 14), pass.flip);
 }
 
 function drawRecipe(ctx: CanvasRenderingContext2D, g: Game, layout: Layout) {
@@ -821,33 +820,89 @@ function drawRecipe(ctx: CanvasRenderingContext2D, g: Game, layout: Layout) {
 
 // ─── Story panels ────────────────────────────────────────────────────────────
 
+interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 /**
- * Fit a story panel on screen WHOLE, and report where it landed.
+ * The window every story panel is shown through.
  *
- * Contain, not cover. Covering filled the screen edge to edge and cropped
- * whatever did not fit — which on the taller panels was the top of the speech
- * bubble, so a guest could be halfway through a line the player never got to
- * read. The letterbox that contain leaves is the lesser problem by a distance:
- * the whole point of these screens is the dialogue.
+ * A FIXED shape, sized to the screen and centred, with black all around it.
+ * Fitting each panel to the screen instead meant every one was scaled
+ * differently — one edge to edge, the next letterboxed by a different amount —
+ * so the cast appeared at a different size every time and the whole sequence
+ * looked unsteady. A frame that never moves makes them a set.
+ *
+ * The aspect is the panels' own, so the picture very nearly fills the window
+ * and what little slack there is falls inside the border rather than reading as
+ * a mistake.
  */
-function drawPanel(ctx: CanvasRenderingContext2D, url: string, h: number) {
-  // Not black: on a slow connection this is what the guest looks at for a
-  // second or two, and a flat black screen reads as something having gone
-  // wrong. A dark room with a floor line reads as a picture still arriving.
-  fillRect(ctx, 0, 0, W, h, C.night);
-  fillRect(ctx, 0, Math.round(h * 0.72), W, Math.round(h * 0.28), C.panel);
-  fillRect(ctx, 0, Math.round(h * 0.72), W, 2, C.panelLip);
+const FRAME_ASPECT = 0.465;
+const FRAME_BORDER = 3;
+
+function panelFrame(h: number): Rect {
+  const maxW = W - 26;
+  // Room above for the order meter, and below for the tap hint.
+  const maxH = h - 44;
+  let fw = maxW;
+  let fh = fw / FRAME_ASPECT;
+  if (fh > maxH) {
+    fh = maxH;
+    fw = fh * FRAME_ASPECT;
+  }
+  return {
+    x: Math.round((W - fw) / 2),
+    y: Math.round((h - fh) / 2) - 6,
+    w: Math.round(fw),
+    h: Math.round(fh),
+  };
+}
+
+interface PanelDraw {
+  frame: Rect;
+  /** Where the artwork landed inside the frame, or null until it loads. */
+  image: Rect | null;
+}
+
+/**
+ * Draw a story panel inside the frame, whole.
+ *
+ * Contained, never cropped: covering the frame and cutting the overflow took
+ * the top off the speech bubble on the taller panels, so a guest could be
+ * halfway through a line the player never got to read. The dialogue is the
+ * entire point of these screens.
+ */
+function drawPanel(ctx: CanvasRenderingContext2D, url: string, h: number): PanelDraw {
+  fillRect(ctx, 0, 0, W, h, C.black);
+  const frame = panelFrame(h);
+
+  fillRect(ctx, frame.x - FRAME_BORDER, frame.y - FRAME_BORDER,
+    frame.w + FRAME_BORDER * 2, frame.h + FRAME_BORDER * 2, C.panelLip);
+  fillRect(ctx, frame.x - 1, frame.y - 1, frame.w + 2, frame.h + 2, C.black);
+  fillRect(ctx, frame.x, frame.y, frame.w, frame.h, C.night);
+
   const img = getImage(url);
-  if (!img || !img.naturalWidth) return null;
-  const scale = Math.min(W / img.naturalWidth, h / img.naturalHeight);
+  if (!img || !img.naturalWidth) return { frame, image: null };
+
+  const scale = Math.min(frame.w / img.naturalWidth, frame.h / img.naturalHeight);
   const dw = img.naturalWidth * scale;
   const dh = img.naturalHeight * scale;
-  const dx = (W - dw) / 2;
-  const dy = (h - dh) / 2;
+  const dx = frame.x + (frame.w - dw) / 2;
+  const dy = frame.y + (frame.h - dh) / 2;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(frame.x, frame.y, frame.w, frame.h);
+  ctx.clip();
   ctx.imageSmoothingEnabled = true;
   ctx.drawImage(img, dx, dy, dw, dh);
   ctx.imageSmoothingEnabled = false;
-  return { dx, dy, dw, dh };
+  ctx.restore();
+
+  return { frame, image: { x: dx, y: dy, w: dw, h: dh } };
 }
 
 /**
@@ -862,19 +917,24 @@ function drawBubble(
   ctx: CanvasRenderingContext2D,
   text: string,
   rect: BubbleRect,
-  panel: { dx: number; dy: number; dw: number; dh: number } | null,
-  h: number
+  panel: PanelDraw
 ) {
-  const box = panel
+  const art = panel.image;
+  const box = art
     ? {
-        x: panel.dx + rect.x * panel.dw,
-        y: panel.dy + rect.y * panel.dh,
-        w: rect.w * panel.dw,
-        h: rect.h * panel.dh,
+        x: art.x + rect.x * art.w,
+        y: art.y + rect.y * art.h,
+        w: rect.w * art.w,
+        h: rect.h * art.h,
       }
-    : { x: 22, y: h * 0.06, w: W - 44, h: h * 0.16 };
+    : {
+        x: panel.frame.x + 12,
+        y: panel.frame.y + panel.frame.h * 0.06,
+        w: panel.frame.w - 24,
+        h: panel.frame.h * 0.17,
+      };
 
-  if (!panel) {
+  if (!art) {
     // No art yet — draw the bubble too, so the line is never floating in space.
     fillRect(ctx, box.x - 8, box.y - 8, box.w + 16, box.h + 16, C.black);
     fillRect(ctx, box.x - 6, box.y - 6, box.w + 12, box.h + 12, C.bone);
@@ -894,28 +954,28 @@ function drawBubble(
 }
 
 /** A band across the bottom of a story panel, for anything that is not dialogue. */
-function drawFooter(ctx: CanvasRenderingContext2D, lines: string[], h: number, accent: string) {
+function drawFooter(ctx: CanvasRenderingContext2D, lines: string[], frame: Rect, accent: string) {
+  // Inside the frame, along its bottom edge: outside it the band would float on
+  // the black surround and read as a second, unrelated panel.
   const boxH = 22 + lines.length * 12;
-  const y = h - boxH - 14;
+  const y = frame.y + frame.h - boxH;
   ctx.globalAlpha = 0.86;
-  fillRect(ctx, 12, y, W - 24, boxH, C.black);
+  fillRect(ctx, frame.x, y, frame.w, boxH, C.black);
   ctx.globalAlpha = 1;
-  fillRect(ctx, 12, y, W - 24, 1, accent);
-  fillRect(ctx, 12, y + boxH - 1, W - 24, 1, accent);
+  fillRect(ctx, frame.x, y, frame.w, 1, accent);
   lines.forEach((line, i) => {
     drawText(ctx, line, W / 2, y + 11 + i * 12, i === 0 ? accent : C.bone, 1, "center");
   });
 }
 
 /** The recipe, laid out for a story screen rather than the HUD. */
-function drawRecipeCard(ctx: CanvasRenderingContext2D, g: Game, h: number) {
+function drawRecipeCard(ctx: CanvasRenderingContext2D, g: Game, frame: Rect) {
   const cardH = 52;
-  const y = h - cardH - 14;
+  const y = frame.y + frame.h - cardH;
   ctx.globalAlpha = 0.88;
-  fillRect(ctx, 12, y, W - 24, cardH, C.black);
+  fillRect(ctx, frame.x, y, frame.w, cardH, C.black);
   ctx.globalAlpha = 1;
-  fillRect(ctx, 12, y, W - 24, 1, C.brass);
-  fillRect(ctx, 12, y + cardH - 1, W - 24, 1, C.brass);
+  fillRect(ctx, frame.x, y, frame.w, 1, C.brass);
   drawText(ctx, g.rules.shotName.toUpperCase(), W / 2, y + 6, C.brass, 1, "center");
   const step = 32;
   const startX = W / 2 - ((g.rules.recipe.length - 1) * step) / 2;
@@ -1374,10 +1434,11 @@ export default function LetsDoShots({ onGameOver, onShowScores, demo = false }: 
           );
         }
         fillRect(ctx, 0, 0, W, h, C.night);
-        drawBackBar(ctx, g, layout);
         drawBartender(ctx, g, layout);
         drawHud(ctx, g, layout);
         drawBoard(ctx, g, layout, t);
+        // In FRONT of the board: he runs through the play field, not behind it.
+        drawBarBackRunner(ctx, g, h);
         drawRecipe(ctx, g, layout);
         ctx.restore();
         return;
@@ -1424,20 +1485,20 @@ export default function LetsDoShots({ onGameOver, onShowScores, demo = false }: 
 
       if (g.phase === "order") {
         const panel = drawPanel(ctx, guestUrl(g.guest.slug, "order"), h);
-        drawBubble(ctx, g.rules.quip, g.guest.order, panel, h);
-        drawRecipeCard(ctx, g, h);
+        drawBubble(ctx, g.rules.quip, g.guest.order, panel);
+        drawRecipeCard(ctx, g, panel.frame);
         if (g.phaseT > (hold ?? PANEL_HOLD.order)) advance();
         return;
       }
 
       if (g.phase === "won") {
         const panel = drawPanel(ctx, guestUrl(g.guest.slug, "happy"), h);
-        drawBubble(ctx, "Bottoms up!", g.guest.happy, panel, h);
+        drawBubble(ctx, "Bottoms up!", g.guest.happy, panel);
         drawFooter(ctx, [
           `STAGE ${g.stageNo} CLEARED`,
           `ROUND ${g.state.score}`,
           `TOTAL ${g.total}`,
-        ], h, C.good);
+        ], panel.frame, C.good);
 
         drawTapHint(ctx, "TAP FOR NEXT ROUND", h, t);
         if (demo && g.phaseT > DEMO_HOLD) advance();
@@ -1446,19 +1507,19 @@ export default function LetsDoShots({ onGameOver, onShowScores, demo = false }: 
 
       if (g.phase === "lost") {
         const panel = drawPanel(ctx, guestUrl(g.guest.slug, "mad"), h);
-        drawBubble(ctx, "Where is my shot??", g.guest.mad, panel, h);
+        drawBubble(ctx, "Where is my shot??", g.guest.mad, panel);
         drawFooter(ctx, [
           `CONTINUES ${g.continues}`,
           "TAP TO POUR IT AGAIN",
-        ], h, C.hot);
+        ], panel.frame, C.hot);
         if (demo && g.phaseT > DEMO_HOLD) advance();
         return;
       }
 
       // Game over
       const panel = drawPanel(ctx, guestUrl(g.guest.slug, "mad"), h);
-      drawBubble(ctx, "Where is my shot??", g.guest.mad, panel, h);
-      drawFooter(ctx, ["GAME OVER", `SCORE ${g.total}`], h, C.hot);
+      drawBubble(ctx, "Where is my shot??", g.guest.mad, panel);
+      drawFooter(ctx, ["GAME OVER", `SCORE ${g.total}`], panel.frame, C.hot);
       drawTapHint(ctx, demo ? "" : "TAP TO FINISH", h, t);
       if (demo && g.phaseT > DEMO_HOLD * 2) advance();
     },
