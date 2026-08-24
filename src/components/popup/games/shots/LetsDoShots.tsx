@@ -17,7 +17,8 @@ import {
   type StageRules, type StageState, type Step,
 } from "./shotsCore";
 import {
-  bartenderUrl, bottleUrl, coffeeUrl, drawBarBack, drawBottle, getImage, guestUrl, prefetch,
+  bartenderUrl, bottleUrl, coffeeUrl, drawBarBack, drawBottle, drawMood, getImage,
+  guestUrl, logoUrl, MOODS, moodUrl, prefetch, type Mood,
 } from "./sprites";
 
 // ─── Timing ──────────────────────────────────────────────────────────────────
@@ -41,10 +42,46 @@ const MAX_FALL = 1150;
 /** How much of the impact comes back up. Enough to read as glass, not as rubber. */
 const BOUNCE = 0.18;
 
-const PANEL_HOLD = { ask: 2.4, order: 4.2, go: 2.2 } as const;
+const PANEL_HOLD = { ask: 2.4, order: 4.2, go: 2.2, recipe: 3.4 } as const;
 const DEMO_HOLD = 0.9;
 
 const CONTINUES = 3;
+
+/**
+ * How long each reaction holds before he settles back to concentrating.
+ *
+ * Short. He is answering the swipe that just happened, and a grin still on his
+ * face three moves later stops being feedback and becomes wallpaper.
+ */
+const MOOD_HOLD: Record<Mood, number> = {
+  concentrating: 0,
+  scared: 1.2,
+  happy: 1.0,
+  celebrating: 2.0,
+};
+
+/** Which reaction wins when two land in the same moment. */
+const MOOD_RANK: Record<Mood, number> = {
+  concentrating: 0, scared: 1, happy: 2, celebrating: 3,
+};
+
+/** The three how-to pages, shown once when a run starts. */
+const HOWTO_PAGES = 3;
+
+/** Every reaction, so he never pops in halfway through a stage. */
+const MOODS_TO_PREFETCH = MOODS.map(moodUrl);
+
+/**
+ * The bottles the how-to pages illustrate.
+ *
+ * They are chosen for how well they read side by side, not from the stage's
+ * palette, so they have to be asked for by name — otherwise the very first
+ * thing a new player sees is four stand-ins.
+ */
+const HOWTO_ART = [
+  bottleUrl("bourbon"), bottleUrl("gin"), bottleUrl("malort"),
+  bottleUrl("scotch"), bottleUrl("tequila"), coffeeUrl(),
+];
 
 // ─── Animation state ─────────────────────────────────────────────────────────
 
@@ -106,11 +143,32 @@ type Anim =
   | { kind: "fall"; t: number }
   | { kind: "settle"; t: number };
 
-type Phase = "ask" | "order" | "go" | "play" | "won" | "lost" | "gameover";
+type Phase =
+  /** The marquee: start the game, or go and look at the board. */
+  | "intro"
+  /** Three pages of how to play, once per run. */
+  | "howto"
+  /** The bartender takes the order. */
+  | "ask"
+  /** The guest asks for something invented. */
+  | "order"
+  /** The bartender agrees to attempt it. */
+  | "go"
+  /** The shot's recipe, full screen, immediately before play. */
+  | "recipe"
+  | "play"
+  | "won"
+  | "lost"
+  | "gameover";
 
 interface Game {
   phase: Phase;
   phaseT: number;
+  /** Which how-to page, while phase is "howto". */
+  page: number;
+  mood: Mood;
+  /** Seconds left on the current reaction. */
+  moodT: number;
   stageNo: number;
   /** Banked across cleared stages. The number that goes on the board. */
   total: number;
@@ -133,6 +191,19 @@ interface Game {
   recentGuests: number[];
   /** True once onGameOver has fired, so a run can only be reported once. */
   reported: boolean;
+}
+
+/**
+ * Put a reaction on the bartender's face.
+ *
+ * Louder reactions interrupt quieter ones, never the other way round: a break
+ * that also poured the guest's shot should leave him cheering, not grinning,
+ * whichever of the two the engine reported first.
+ */
+function setMood(g: Game, mood: Mood) {
+  if (g.moodT > 0 && MOOD_RANK[mood] < MOOD_RANK[g.mood]) return;
+  g.mood = mood;
+  g.moodT = MOOD_HOLD[mood];
 }
 
 // ─── Stage set-up ────────────────────────────────────────────────────────────
@@ -231,6 +302,7 @@ function beginStep(g: Game, step: Step) {
       tweenTo(b, targetX(a), targetY(a));
       g.anim = { kind: "swap", a, b, t: 0, dur: SWAP_BACK_TIME };
       g.shake = Math.max(g.shake, 1.4);
+      setMood(g, "scared");
     }
     return;
   }
@@ -268,7 +340,6 @@ function tweenToSlot(p: Piece, dur = SWAP_TIME) {
 }
 
 function applyClear(g: Game, step: ClearStep) {
-  const counted = step.combo > 0;
   for (const c of step.cleared) {
     const p = g.pieces.get(c.cell.id);
     const px = p ? p.px : ((c.i % COLS) + 0.5) * CELL;
@@ -281,7 +352,10 @@ function applyClear(g: Game, step: ClearStep) {
 
   g.shake = Math.min(6, g.shake + (step.recipeHit ? 5 : Math.min(3, step.cleared.length * 0.25)));
 
-  if (!counted) return;
+  // The opening deal cascades but pays nothing, and the bartender must not
+  // react to it — he was grinning at the board before the player had touched it.
+  if (!step.counted) return;
+  setMood(g, step.recipeHit ? "celebrating" : "happy");
   const mid = step.cleared.reduce(
     (acc, c) => {
       acc.x += ((c.i % COLS) + 0.5) * CELL;
@@ -454,6 +528,11 @@ function updatePlay(g: Game, dt: number) {
   }
 
   g.shake = Math.max(0, g.shake - dt * 14);
+
+  if (g.moodT > 0) {
+    g.moodT -= dt;
+    if (g.moodT <= 0) g.mood = "concentrating";
+  }
 
   // Bar back
   const bb = g.barback;
@@ -721,6 +800,16 @@ function drawBackBar(ctx: CanvasRenderingContext2D, g: Game, layout: Layout) {
   fillRect(ctx, 0, shelfY, W, 1, C.brassDark);
   fillRect(ctx, 0, layout.boardY - 2, W, 2, C.panelLip);
 
+  // The bartender, standing on the shelf line at the left, clipped to his own
+  // band so a raised bottle cannot poke up through the swipe counter.
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, y, W, bandH);
+  ctx.clip();
+  const moodH = bandH - 4;
+  drawMood(ctx, g.mood, 12 + moodH * 0.31, shelfY + 1, moodH);
+  ctx.restore();
+
   const bb = g.barback;
   if (!bb.running && !bb.tosses.length) return;
 
@@ -872,6 +961,186 @@ function drawRecipeCard(ctx: CanvasRenderingContext2D, g: Game, h: number) {
   });
 }
 
+// ─── Front page, how to play, and the round's recipe ─────────────────────────
+
+/** Where the two buttons on the marquee screen live, in logical pixels. */
+function introButtons(h: number) {
+  const w = W - 56;
+  const x = 28;
+  return {
+    start: { x, y: Math.round(h * 0.60), w, h: 46 },
+    scores: { x, y: Math.round(h * 0.60) + 58, w, h: 40 },
+  };
+}
+
+function inside(r: { x: number; y: number; w: number; h: number }, x: number, y: number) {
+  return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
+}
+
+function drawButton(
+  ctx: CanvasRenderingContext2D,
+  r: { x: number; y: number; w: number; h: number },
+  label: string,
+  fill: string,
+  text: string,
+  t: number,
+  pulse = false
+) {
+  const lift = pulse ? Math.round(Math.sin(t * 3.4) * 1.2) : 0;
+  fillRect(ctx, r.x, r.y + 3 + lift, r.w, r.h, C.black);
+  fillRect(ctx, r.x, r.y + lift, r.w, r.h, fill);
+  fillRect(ctx, r.x, r.y + lift, r.w, 2, "rgba(255,255,255,0.35)");
+  drawText(ctx, label, r.x + r.w / 2, r.y + lift + Math.round(r.h / 2) - 4, text, 1, "center");
+}
+
+function drawIntro(
+  ctx: CanvasRenderingContext2D,
+  h: number,
+  t: number,
+  withScores: boolean
+) {
+  fillRect(ctx, 0, 0, W, h, C.black);
+
+  // The marquee, as wide as the screen allows.
+  const logo = getImage(logoUrl());
+  if (logo && logo.naturalWidth) {
+    const lw = W - 20;
+    const lh = (logo.naturalHeight / logo.naturalWidth) * lw;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(logo, 10, Math.round(h * 0.30 - lh / 2), lw, Math.round(lh));
+    ctx.imageSmoothingEnabled = false;
+  } else {
+    drawTextMarquee(ctx, "LET'S DO", W / 2, Math.round(h * 0.24), C.brass, 3, "center", C.black);
+    drawTextMarquee(ctx, "SHOTS!", W / 2, Math.round(h * 0.24) + 26, C.brass, 4, "center", C.black);
+  }
+
+  const b = introButtons(h);
+  drawButton(ctx, b.start, "TAP TO START", C.brass, C.black, t, true);
+  if (withScores) drawButton(ctx, b.scores, "HIGH SCORES", C.panelLip, C.bone, t);
+
+  drawText(ctx, "COMMON GOOD COCKTAIL HOUSE", W / 2, h - 16, C.dim, 1, "center");
+}
+
+/**
+ * One page of how to play.
+ *
+ * Each page shows the rule being described rather than only stating it — real
+ * bottle sprites, laid out the way they would sit on the board. Somebody
+ * standing at a bar reads three lines of instructions at most, and a picture of
+ * four bourbons going off is worth all three of them.
+ */
+function drawHowTo(ctx: CanvasRenderingContext2D, page: number, h: number, t: number) {
+  fillRect(ctx, 0, 0, W, h, C.night);
+
+  const titles = ["THE MOVE", "BIGGER BREAKS", "THE BONUS SHOT"];
+  drawText(ctx, `${page + 1} OF ${HOWTO_PAGES}`, W / 2, Math.round(h * 0.11), C.dim, 1, "center");
+  drawTextMarquee(ctx, titles[page], W / 2, Math.round(h * 0.16), C.brass, 2, "center", C.black);
+
+  // The rule is DEMONSTRATED inside a framed panel, with the words underneath.
+  // Somebody standing at a bar reads three lines of instructions at most, and a
+  // picture of four scotches going off is worth all three of them. The panel
+  // also gives the page a middle: loose bottles floating on the background left
+  // the screen looking like three islands with holes between them.
+  const cy = Math.round(h * 0.44);
+  const panelTop = cy - 66;
+  fillRect(ctx, 20, panelTop, W - 40, 132, C.panel);
+  fillRect(ctx, 20, panelTop, W - 40, 1, C.panelLip);
+  fillRect(ctx, 20, panelTop + 131, W - 40, 1, C.panelLip);
+
+  const cell = 34;
+  const row = (kinds: CellKind[], y: number, lit = -1) => {
+    const startX = W / 2 - ((kinds.length - 1) * cell) / 2;
+    kinds.forEach((kind, i) => {
+      const cx = startX + i * cell;
+      const seat = kind === "coffee" ? C.brassDark : BOTTLES[kind].shade;
+      fillRect(ctx, cx - cell / 2 + 2, y - cell / 2 + 2, cell - 4, cell - 4, seat);
+      drawBottle(ctx, kind, cx, y, cell * 0.86);
+      // After the bottle, not before: drawn underneath, the sprite covered it.
+      if (i === lit) {
+        fillRect(ctx, cx - cell / 2 + 2, y - cell / 2 + 2, cell - 4, 2, C.good);
+        fillRect(ctx, cx - cell / 2 + 2, y + cell / 2 - 4, cell - 4, 2, C.good);
+      }
+    });
+    return startX;
+  };
+
+  /** A two-headed arrow, for the pair being swapped. */
+  const swapArrow = (fromX: number, toX: number, y: number) => {
+    fillRect(ctx, fromX, y, toX - fromX, 2, C.brass);
+    for (let i = 0; i < 4; i++) {
+      fillRect(ctx, fromX + i, y - i, 1, 1 + i * 2, C.brass);
+      fillRect(ctx, toX - 1 - i, y - i, 1, 1 + i * 2, C.brass);
+    }
+  };
+
+  let copy: string[];
+  if (page === 0) {
+    const startX = row(["bourbon", "gin", "gin", "malort"], cy - 42);
+    swapArrow(startX - 7, startX + cell + 7, cy - 20);
+    row(["gin", "gin", "gin", "malort"], cy + 8, 0);
+    drawText(ctx, "THREE IN A ROW BREAKS", W / 2, cy + 44, C.good, 1, "center");
+    copy = ["FLICK A BOTTLE INTO THE ONE", "NEXT TO IT TO SWAP THEM."];
+  } else if (page === 1) {
+    row(["scotch", "scotch", "scotch", "scotch"], cy - 44);
+    drawText(ctx, "FOUR TAKES THE NEIGHBOURS TOO", W / 2, cy - 22, C.good, 1, "center");
+    row(["coffee"], cy + 10);
+    drawText(ctx, "A COFFEE CUP GIVES SWIPES BACK", W / 2, cy + 44, C.good, 1, "center");
+    copy = ["THE MORE YOU LINE UP,", "THE MORE GOES WITH IT."];
+  } else {
+    row(["bourbon", "gin", "tequila", "scotch"], cy - 40);
+    drawTextMarquee(ctx, "X2", W / 2, cy - 12, C.brass, 2, "center", C.black);
+    drawText(ctx, "POUR THE GUEST'S SHOT IN ORDER", W / 2, cy + 20, C.good, 1, "center");
+    drawText(ctx, "IT CLEARS THE BAR AROUND IT", W / 2, cy + 34, C.dim, 1, "center");
+    copy = ["FILL THE GUEST'S ORDER BEFORE", "YOUR SWIPES RUN OUT."];
+  }
+
+  copy.forEach((line, i) => {
+    drawText(ctx, line, W / 2, cy + 86 + i * 12, C.bone, 1, "center");
+  });
+
+  drawTapHint(ctx, page === HOWTO_PAGES - 1 ? "TAP TO POUR" : "TAP TO CONTINUE", h, t);
+}
+
+/** The round's shot, full screen, immediately before the board comes up. */
+function drawRecipeScreen(ctx: CanvasRenderingContext2D, g: Game, h: number, t: number) {
+  fillRect(ctx, 0, 0, W, h, C.night);
+
+  drawText(ctx, `STAGE ${g.stageNo}`, W / 2, Math.round(h * 0.12), C.dim, 1, "center");
+  drawText(ctx, "BONUS SHOT", W / 2, Math.round(h * 0.17), C.dim, 1, "center");
+  drawTextMarquee(ctx, g.rules.shotName.toUpperCase(), W / 2, Math.round(h * 0.22), C.brass, 2, "center", C.black);
+
+  // The pour order, big.
+  const y = Math.round(h * 0.38);
+  const step = 46;
+  const startX = W / 2 - ((g.rules.recipe.length - 1) * step) / 2;
+  g.rules.recipe.forEach((kind, i) => {
+    const cx = startX + i * step;
+    fillRect(ctx, cx - 19, y - 22, 38, 44, C.panel);
+    fillRect(ctx, cx - 19, y + 19, 38, 3, BOTTLES[kind].color);
+    drawBottle(ctx, kind, cx, y - 2, 36);
+    drawText(ctx, String(i + 1), cx, y + 26, C.dim, 1, "center");
+    if (i < g.rules.recipe.length - 1) drawText(ctx, ">", cx + step / 2, y - 5, C.dim, 1, "center");
+  });
+
+  drawText(ctx, "LINE THESE UP IN ORDER", W / 2, Math.round(h * 0.52), C.bone, 1, "center");
+  drawText(ctx, "FOR DOUBLE SCORE", W / 2, Math.round(h * 0.52) + 12, C.brass, 1, "center");
+
+  // And what the guest actually ordered, so the goal is on screen too.
+  fillRect(ctx, 20, Math.round(h * 0.63), W - 40, 1, C.panelLip);
+  drawText(ctx, "THE ORDER", W / 2, Math.round(h * 0.66), C.dim, 1, "center");
+  const oy = Math.round(h * 0.74);
+  const ostep = 54;
+  const ox = W / 2 - ((g.rules.targets.length - 1) * ostep) / 2;
+  g.rules.targets.forEach((target, i) => {
+    const cx = ox + i * ostep;
+    drawBottle(ctx, target.kind, cx, oy, 28);
+    drawText(ctx, String(target.need), cx, oy + 18, C.bone, 1, "center");
+  });
+  drawText(ctx, `${g.state.swipesLeft} SWIPES`, W / 2, Math.round(h * 0.86), C.white, 2, "center");
+
+  drawTapHint(ctx, "TAP TO POUR", h, t);
+}
+
 function drawTapHint(ctx: CanvasRenderingContext2D, label: string, h: number, t: number) {
   if (Math.sin(t * 4) < -0.4) return;
   drawTextMarquee(ctx, label, W / 2, h - 10, C.bone, 1, "center", C.black);
@@ -911,7 +1180,7 @@ function botMove(g: Game): [number, number] | null {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function LetsDoShots({ onGameOver, demo = false }: ArcadeGameProps) {
+export default function LetsDoShots({ onGameOver, onShowScores, demo = false }: ArcadeGameProps) {
   const gameRef = useRef<Game | null>(null);
   const overRef = useRef(onGameOver);
   overRef.current = onGameOver;
@@ -920,8 +1189,11 @@ export default function LetsDoShots({ onGameOver, demo = false }: ArcadeGameProp
   const newRun = useCallback((): Game => {
     const rng = makeRng((Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0);
     const g: Game = {
-      phase: "ask",
+      phase: "intro",
       phaseT: 0,
+      page: 0,
+      mood: "concentrating",
+      moodT: 0,
       stageNo: 1,
       total: 0,
       continues: CONTINUES,
@@ -949,7 +1221,12 @@ export default function LetsDoShots({ onGameOver, demo = false }: ArcadeGameProp
 
   useEffect(() => {
     gameRef.current = newRun();
-    prefetch([bartenderUrl("ask"), bartenderUrl("go")]);
+    // The marquee is the first thing on screen and the moods are needed the
+    // moment play starts, so both go out ahead of the panels.
+    prefetch([
+      logoUrl(), ...HOWTO_ART, ...MOODS_TO_PREFETCH,
+      bartenderUrl("ask"), bartenderUrl("go"),
+    ]);
   }, [newRun]);
 
   // ── Advancing the story ──────────────────────────────────────────────────
@@ -957,6 +1234,20 @@ export default function LetsDoShots({ onGameOver, demo = false }: ArcadeGameProp
     const g = gameRef.current;
     if (!g) return;
     switch (g.phase) {
+      case "intro":
+        g.phase = "howto";
+        g.page = 0;
+        g.phaseT = 0;
+        break;
+      case "howto":
+        if (g.page < HOWTO_PAGES - 1) {
+          g.page++;
+          g.phaseT = 0;
+        } else {
+          g.phase = "ask";
+          g.phaseT = 0;
+        }
+        break;
       case "ask":
         g.phase = "order";
         g.phaseT = 0;
@@ -966,6 +1257,10 @@ export default function LetsDoShots({ onGameOver, demo = false }: ArcadeGameProp
         g.phaseT = 0;
         break;
       case "go":
+        g.phase = "recipe";
+        g.phaseT = 0;
+        break;
+      case "recipe":
         g.phase = "play";
         g.phaseT = 0;
         break;
@@ -985,8 +1280,12 @@ export default function LetsDoShots({ onGameOver, demo = false }: ArcadeGameProp
         // A continue re-pours the SAME stage, freshly dealt. Handing back the
         // board they just lost on would be handing back the position that beat
         // them, which is not another go at anything.
+        //
+        // Straight back to the recipe, skipping the three intro panels: they
+        // have just watched the guest order this and they are trying again, not
+        // starting over.
         startStage(g, g.stageNo);
-        g.phase = "order";
+        g.phase = "recipe";
         g.phaseT = 0;
         break;
       }
@@ -1014,6 +1313,18 @@ export default function LetsDoShots({ onGameOver, demo = false }: ArcadeGameProp
     (x: number, y: number, h: number) => {
       const g = gameRef.current;
       if (!g || demo) return;
+      if (g.phase === "intro") {
+        const b = introButtons(h);
+        if (onShowScores && inside(b.scores, x, y)) {
+          onShowScores();
+          return;
+        }
+        // Anywhere else on the marquee starts the game. Only the scores button
+        // is a target you have to hit — missing "start" on a front page is a
+        // guest deciding the game is broken.
+        advance();
+        return;
+      }
       if (g.phase !== "play") {
         advance();
         return;
@@ -1034,7 +1345,7 @@ export default function LetsDoShots({ onGameOver, demo = false }: ArcadeGameProp
       if (dx + dy === 1) commit(g, g.selected, cell);
       else g.selected = cell;
     },
-    [advance, demo]
+    [advance, demo, onShowScores]
   );
 
   const onSwipe = useCallback(
@@ -1103,6 +1414,25 @@ export default function LetsDoShots({ onGameOver, demo = false }: ArcadeGameProp
       // ── Story screens ─────────────────────────────────────────────────────
       const hold = demo ? DEMO_HOLD : undefined;
 
+      if (g.phase === "intro") {
+        drawIntro(ctx, h, t, Boolean(onShowScores));
+        // Attract mode walks itself in; a real guest decides when to start.
+        if (demo && g.phaseT > DEMO_HOLD) advance();
+        return;
+      }
+
+      if (g.phase === "howto") {
+        drawHowTo(ctx, g.page, h, t);
+        if (demo && g.phaseT > DEMO_HOLD) advance();
+        return;
+      }
+
+      if (g.phase === "recipe") {
+        drawRecipeScreen(ctx, g, h, t);
+        if (g.phaseT > (hold ?? PANEL_HOLD.recipe)) advance();
+        return;
+      }
+
       if (g.phase === "ask") {
         drawPanel(ctx, bartenderUrl("ask"), h);
         // The bartender's line is lettered into his artwork already.
@@ -1158,7 +1488,7 @@ export default function LetsDoShots({ onGameOver, demo = false }: ArcadeGameProp
       drawTapHint(ctx, demo ? "" : "TAP TO FINISH", h, t);
       if (demo && g.phaseT > DEMO_HOLD * 2) advance();
     },
-    [advance, demo]
+    [advance, demo, onShowScores]
   );
 
   return <ShotsCanvas onFrame={onFrame} running onSwipe={onSwipe} onTap={onTap} />;

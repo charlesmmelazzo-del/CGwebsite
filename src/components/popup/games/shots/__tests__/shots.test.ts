@@ -7,6 +7,7 @@ import { unrenderable } from "../../arcade";
 import { BOTTLES, BOTTLE_IDS, type BottleId, type CellKind } from "../bottles";
 import { ORDERS, recipeBottles } from "../orders";
 import { GUESTS, GUEST_COUNT } from "../guestArt";
+import { MOODS } from "../sprites";
 import {
   COLS, ROWS, layoutFor, EXIT_CLEARANCE_H, HUD_CONTENT, H_MAX, H_MIN,
 } from "../constants";
@@ -67,7 +68,19 @@ check("every quip and shot name can be drawn by the 5x7 font", () => {
 });
 
 check("every fixed line the game speaks can be drawn too", () => {
-  for (const line of ["Bottoms up!", "Where is my shot??", "GAME OVER", "BONUS SHOT", "SWIPES", "SCORE"]) {
+  for (const line of [
+    "Bottoms up!", "Where is my shot??", "GAME OVER", "BONUS SHOT", "SWIPES", "SCORE",
+    "TAP TO START", "HIGH SCORES", "COMMON GOOD COCKTAIL HOUSE",
+    "THE MOVE", "BIGGER BREAKS", "THE BONUS SHOT",
+    "THREE IN A ROW BREAKS", "FOUR TAKES THE NEIGHBOURS TOO",
+    "A COFFEE CUP GIVES SWIPES BACK", "POUR THE GUEST'S SHOT IN ORDER",
+    "FLICK A BOTTLE INTO THE ONE", "NEXT TO IT TO SWAP THEM.",
+    "THE MORE YOU LINE UP,", "THE MORE GOES WITH IT.",
+    "FILL THE GUEST'S ORDER BEFORE", "YOUR SWIPES RUN OUT.",
+    "LINE THESE UP IN ORDER", "FOR DOUBLE SCORE", "THE ORDER",
+    "TAP TO CONTINUE", "TAP TO POUR", "TAP TO FINISH", "TAP FOR NEXT ROUND",
+    "STAGE 1 CLEARED", "CONTINUES 3", "TAP TO POUR IT AGAIN", "1 OF 3",
+  ]) {
     assert.deepEqual(unrenderable(line), [], `cannot draw "${line}"`);
   }
   for (const id of BOTTLE_IDS) {
@@ -378,6 +391,34 @@ check("every column is full again once the dust settles", () => {
 
 // ── Opening a stage ─────────────────────────────────────────────────────────
 
+check("the opening deal is marked as paying nothing", () => {
+  // The renderer keys the bartender's reaction and the score pop off this flag.
+  // It cannot use the combo count: the deal runs one up exactly as a real chain
+  // does, so he ended up grinning at a board nobody had touched.
+  for (let seed = 1; seed <= 12; seed++) {
+    const rules = buildStage(1 + (seed % 8), makeRng(seed * 13));
+    const { steps } = createStage(rules, seed * 7717, COLS, ROWS);
+    for (const step of steps) {
+      if (step.t === "clear") {
+        assert.equal(step.counted, false, "the opening deal reported itself as a real break");
+        assert.equal(step.score, 0);
+      }
+    }
+  }
+});
+
+check("a real break is marked as paying", () => {
+  const st = rig([
+    "TGGGM",
+    "BMPMP",
+    "MPMPM",
+  ], { targets: [{ kind: "gin", need: 999 }] });
+  const res = trySwap(st, 0, 5);
+  assert.ok(res.ok);
+  const clear = res.steps.find((s) => s.t === "clear");
+  assert.ok(clear && clear.t === "clear" && clear.counted, "a player's own break must count");
+});
+
 check("the opening deal settles, pays nothing and fills no order", () => {
   for (let seed = 1; seed <= 25; seed++) {
     const rng = makeRng(seed);
@@ -555,6 +596,12 @@ check("the board fits on every screen the game allows", () => {
 
 const ART = path.join(process.cwd(), "public", "popup", "art", "shots");
 
+/** Width and height straight out of a PNG's IHDR. */
+function pngSize(file: string): { w: number; h: number } {
+  const b = fs.readFileSync(file);
+  return { w: b.readUInt32BE(16), h: b.readUInt32BE(20) };
+}
+
 check("every bottle has a sprite", () => {
   for (const id of BOTTLE_IDS) {
     const file = path.join(ART, `bottle-${id}.png`);
@@ -576,6 +623,24 @@ check("the bartender has both his lines", () => {
   for (const which of ["ask", "go"]) {
     assert.ok(fs.existsSync(path.join(ART, `bartender-${which}.png`)), `missing bartender-${which}.png`);
   }
+});
+
+check("the bartender has all four reactions, in one shared frame", () => {
+  // Same dimensions is the whole contract: they are cut from one rectangle at
+  // import time so he changes expression without changing size or shifting
+  // sideways. Different sizes here means the import regressed.
+  const sizes = MOODS.map((mood) => {
+    const file = path.join(ART, `bartender-${mood}.png`);
+    assert.ok(fs.existsSync(file), `missing bartender-${mood}.png`);
+    return pngSize(file);
+  });
+  for (const size of sizes) {
+    assert.deepEqual(size, sizes[0], `the reactions are not all the same size: ${JSON.stringify(sizes)}`);
+  }
+});
+
+check("the marquee is in the build", () => {
+  assert.ok(fs.existsSync(path.join(ART, "logo.png")), "missing logo.png — run scripts/shots-art.mjs");
 });
 
 check("every speech bubble is a sane rectangle inside its panel", () => {

@@ -217,6 +217,15 @@ export interface ClearStep {
   t: "clear";
   /** 1 for the break the player caused, 2 for what that break caused, and on. */
   combo: number;
+  /**
+   * Whether this break actually paid — score, order, swipes.
+   *
+   * False for the opening deal only, which cascades for the show of it. The
+   * renderer cannot work this out for itself: the deal runs up a combo count
+   * exactly like a real chain does, so anything reading `combo` alone
+   * congratulated the player for a board they had not touched yet.
+   */
+  counted: boolean;
   cleared: ClearedCell[];
   score: number;
   /** The guest's shot was in there. Worth calling out on screen. */
@@ -463,7 +472,7 @@ function applyBreak(
     state.swipesLeft += coffee * COFFEE_SWIPES;
   }
 
-  return { t: "clear", combo, cleared, score, recipeHit, coffee };
+  return { t: "clear", combo, counted: count, cleared, score, recipeHit, coffee };
 }
 
 // ─── Gravity ─────────────────────────────────────────────────────────────────

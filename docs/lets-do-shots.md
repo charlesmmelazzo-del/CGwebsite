@@ -88,24 +88,56 @@ The single biggest lever is the **palette**: five of the ten spirits early,
 seven later, never all ten. With the full cast on a seven-by-eight board a
 random three-in-a-row is rare enough that the board reads as broken.
 
+## Starting a run
+
+1. The marquee. **Tap to start**, or **high scores** — which hands the guest back
+   to the cabinet's own attract screen, where the board lives. That is what
+   `onShowScores` on `ArcadeGameProps` is for; it is optional, and the button is
+   not drawn for a game that does not pass it.
+2. Three pages of how to play, once per run. Each demonstrates its rule with
+   real bottles rather than only stating it.
+
+Only the scores button is a target you have to hit. Anywhere else on the
+marquee starts the game — missing "start" on a front page is a guest deciding
+the game is broken.
+
 ## The stage flow
 
 1. The bartender: *"Someone said you wanted to order a shot?"*
 2. The guest, with their line in the speech bubble, and the recipe underneath.
 3. The bartender: *"Weird… never heard of that one myself but let's do it!"*
-4. The board pours in. Anything that matches on the way down breaks — for the
+4. The round's shot, full screen: its name, the four bottles in pour order, what
+   the guest actually ordered, and how many swipes there are to do it in.
+5. The board pours in. Anything that matches on the way down breaks — for the
    show of it only: the deal pays no score and fills none of the order, because
    a stage that could be handed to you before you touched it is not a stage.
-5. Play.
-6. Cleared: the guest, delighted, holding the shot. Round score and running
+6. Play.
+7. Cleared: the guest, delighted, holding the shot. Round score and running
    total.
-7. Failed: the guest, furious. *"Where is my shot??"* Three continues; a
+8. Failed: the guest, furious. *"Where is my shot??"* Three continues; a
    continue re-deals the same stage rather than handing back the position that
-   just beat them.
+   just beat them, and drops straight back to the recipe — they have just
+   watched the guest order this, and they are trying again rather than starting
+   over.
 
 Each stage draws a random order and a random guest, avoiding what came up
 recently, so nobody at the bar is reading the same joke as the person next to
 them.
+
+## The bartender
+
+He stands on the bar above the board for the whole stage and reacts to the last
+thing that happened: **concentrating** by default, a **flinch** when a swipe
+breaks nothing, a **grin** when it does, and **both arms up** for the guest's
+own shot. Louder reactions interrupt quieter ones, never the other way round,
+and each settles back to concentrating after a second or two — a grin still on
+his face three moves later stops being feedback and becomes wallpaper.
+
+He is the game's only continuous feedback that is not a number.
+
+All four moods are cut from ONE shared rectangle at import time, so they are
+identical in size and register with each other; he changes expression without
+changing size or hopping sideways. A test asserts that.
 
 ## The art
 
@@ -135,3 +167,6 @@ in `public/popup/art/shots/`:
 
 Both are drawn in code until then — the cup as a mug of coffee, the bar back as
 a small figure in an apron.
+
+Already delivered and imported: the ten bottles, the guest panels, the
+bartender's two lettered panels, his four reactions, and the marquee.

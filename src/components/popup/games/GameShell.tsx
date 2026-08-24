@@ -169,7 +169,12 @@ export default function GameShell({
   if (bleed) {
     return (
       <div className="fixed inset-0 z-[70] bg-black">
-        <Game onGameOver={handleGameOver} menuId={menuId} viewerId={viewerId} />
+        <Game
+          onGameOver={handleGameOver}
+          menuId={menuId}
+          viewerId={viewerId}
+          onShowScores={() => setPhase("attract")}
+        />
         {/*
           The way out, and it has to be findable.
 

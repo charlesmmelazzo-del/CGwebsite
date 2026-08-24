@@ -55,6 +55,16 @@ const BOTTLE_ORDER = [
 const GUEST_PANELS = ["order", "mad", "happy"];
 
 /**
+ * The bartender's four reactions, in the order they are drawn on his sheet.
+ *
+ * He stands above the board for the whole stage and answers what the player
+ * just did, so these are the game's only continuous feedback that is not a
+ * number: a swipe that broke nothing gets a flinch, a break gets a grin, and
+ * the guest's own shot gets both arms in the air.
+ */
+const BARTENDER_MOODS = ["concentrating", "scared", "happy", "celebrating"];
+
+/**
  * How far into a cell to step before reading it.
  *
  * The rules are cleanly detected, but they are ANTI-ALIASED: a couple of pixels
@@ -291,8 +301,8 @@ function dropCaption(img) {
   return cut;
 }
 
-/** Crop to the opaque content, with a little breathing room. */
-function trimToContent(img, pad = 3) {
+/** The box the opaque pixels sit in, or null if there are none. */
+function contentBounds(img) {
   const { w, h, data } = img;
   let minx = w, maxx = -1, miny = h, maxy = -1;
   for (let y = 0; y < h; y++) {
@@ -303,7 +313,15 @@ function trimToContent(img, pad = 3) {
       }
     }
   }
-  if (maxx < 0) return img;
+  return maxx < 0 ? null : { minx, maxx, miny, maxy };
+}
+
+/** Crop to the opaque content, with a little breathing room. */
+function trimToContent(img, pad = 3) {
+  const { w, h } = img;
+  const b = contentBounds(img);
+  if (!b) return img;
+  let { minx, maxx, miny, maxy } = b;
   minx = Math.max(0, minx - pad); miny = Math.max(0, miny - pad);
   maxx = Math.min(w - 1, maxx + pad); maxy = Math.min(h - 1, maxy + pad);
   return crop(img, minx, miny, maxx - minx + 1, maxy - miny + 1);
@@ -488,7 +506,88 @@ if (!fs.existsSync(guestDir)) {
   }
 }
 
-// ── 3. Bartender ──
+// ── 3. Bartender reactions ──
+//
+// The sheet is a single row of four. Which colour he is ruled with is not
+// pinned down — the bottles use green and the guest panels magenta — so both
+// are tried and an even quarter-split is the fallback. A cut that is a few
+// pixels out on a character with a heavy black outline is invisible; refusing
+// to import him until the rule is the expected colour would not be.
+console.log("\nBartender reactions");
+const reactPath = [
+  path.join(ROOT, "Bartender React"),
+  path.join(ROOT, "Bartender React.png"),
+  path.join(ROOT, "Bartender react.png"),
+  path.join(ROOT, "Bartender react"),
+].find((p) => fs.existsSync(p));
+if (!reactPath) {
+  console.log("  skip  Bartender React (not found — the game draws a stand-in)");
+} else {
+  const sheet = await readRGBA(reactPath);
+  const cols = ruleRuns(sheet, isGreen, "col").length === 3
+    ? bandsFor(sheet, isGreen, "col", 4, "Bartender React")
+    : bandsFor(sheet, isMagenta, "col", 4, "Bartender React");
+
+  // Cut and key all four FIRST, then crop them all with ONE rectangle.
+  //
+  // Trimming each mood to its own content was wrong in a way that only shows
+  // up in motion: celebrating has both arms over his head and concentrating
+  // has none, so their content boxes differ by a third. Boxed to a common
+  // height afterwards, that made him visibly shrink the moment he cheered and
+  // swell again when he settled. What has to be constant between frames is the
+  // FRAME, not the character inside it.
+  const cells = [];
+  for (let i = 0; i < Math.min(4, cols.length); i++) {
+    const [x0, x1] = cols[i];
+    const cell = crop(sheet, x0 + RULE_FRINGE, RULE_FRINGE,
+      x1 - x0 + 1 - RULE_FRINGE * 2, sheet.h - RULE_FRINGE * 2);
+    cutMagenta(cell);
+    killStrays(cell);
+    despill(cell);
+    cells.push(cell);
+  }
+
+  const w = Math.min(...cells.map((c) => c.w));
+  const h = Math.min(...cells.map((c) => c.h));
+  let minx = w, maxx = -1, miny = h, maxy = -1;
+  for (const cell of cells) {
+    const b = contentBounds(cell);
+    if (!b) continue;
+    // Measured about each cell's own centre, so a mood drawn slightly off to
+    // one side does not drag the whole set sideways.
+    const cx = cell.w / 2;
+    minx = Math.min(minx, Math.round(w / 2 + (b.minx - cx)));
+    maxx = Math.max(maxx, Math.round(w / 2 + (b.maxx - cx)));
+    miny = Math.min(miny, b.miny);
+    maxy = Math.max(maxy, b.maxy);
+  }
+  const pad = 4;
+  const rx = Math.max(0, minx - pad), ry = Math.max(0, miny - pad);
+  const rw = Math.min(w - rx, maxx - minx + 1 + pad * 2);
+  const rh = Math.min(h - ry, maxy - miny + 1 + pad * 2);
+
+  for (let i = 0; i < cells.length; i++) {
+    const framed = crop(cells[i], rx + Math.round((cells[i].w - w) / 2), ry, rw, rh);
+    const size = await write(`bartender-${BARTENDER_MOODS[i]}.png`, framed, 320, 128);
+    console.log(`  bartender-${BARTENDER_MOODS[i]}.png`.padEnd(34) +
+      `${cells[i].w}x${cells[i].h} -> ${framed.w}x${framed.h}${size}`);
+  }
+}
+
+// ── 4. The marquee ──
+console.log("\nLogo");
+const logoPath = [path.join(ROOT, "Logo"), path.join(ROOT, "Logo.png")].find((p) => fs.existsSync(p));
+if (!logoPath) {
+  console.log("  skip  Logo (not found)");
+} else {
+  // Full-bleed: it is drawn as a banner with its own dark surround, so there is
+  // nothing to key and nothing to trim.
+  const logo = await readRGBA(logoPath);
+  const size = await write("logo.png", logo, 400, 128);
+  console.log(`  logo.png`.padEnd(34) + `${logo.w}x${logo.h}${size}`);
+}
+
+// ── 5. Bartender panels ──
 console.log("\nBartender");
 const barDir = path.join(ROOT, "Stage Intro Assets", "Bartender");
 const BAR_MAP = { "Bartender 1.png": "bartender-ask.png", "Bartender 2.png": "bartender-go.png" };
@@ -500,7 +599,7 @@ for (const [from, to] of Object.entries(BAR_MAP)) {
   console.log(`  ${to.padEnd(24)}${img.w}x${img.h}${size}`);
 }
 
-// ── 4. The generated bubble table ──
+// ── 6. The generated bubble table ──
 if (guests.length && !dry) {
   const rows = guests.map((g) => {
     const panels = GUEST_PANELS.map((p, i) => {

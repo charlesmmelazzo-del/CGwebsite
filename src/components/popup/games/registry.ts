@@ -43,6 +43,18 @@ export interface ArcadeGameProps {
   demo?: boolean;
 
   /**
+   * Hand the guest back to the cabinet's own attract screen, which is where
+   * the high score board lives.
+   *
+   * Optional, and only meaningful for a FULL-BLEED game. The cabinet normally
+   * shows its board before a run, but the string-art games are launched with
+   * autoStart from the carousel, so a game that draws its own front page has no
+   * other way to offer "see the scores". Undefined for a game that has no such
+   * screen — the button simply is not drawn.
+   */
+  onShowScores?: () => void;
+
+  /**
    * Pop-up and guest, for a game that keeps progress between runs.
    *
    * Both optional: the two string-art games are pure client-side — a run

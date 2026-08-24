@@ -61,14 +61,21 @@ export const BOARD_X = Math.round((W - BOARD_W) / 2);
  * whole game floating in the middle of a black field, which is what a fixed
  * HUD plus a centred stack produced.
  */
-export const HUD_MIN = 68;
-export const HUD_MAX = 104;
+export const HUD_MIN = 76;
+export const HUD_MAX = 112;
 /** Content height inside the HUD, anchored to its bottom edge. */
 export const HUD_CONTENT = 68;
 
-/** The strip the bar back runs along, between the HUD and the board. */
-export const BACKBAR_MIN = 26;
-export const BACKBAR_MAX = 64;
+/**
+ * The bar itself: the strip between the HUD and the board.
+ *
+ * The bartender stands here for the whole stage and the bar back runs past him
+ * to restock, so it is the one part of the layout that WANTS the spare height a
+ * tall phone has going. Hence the wide range and the split below favouring it —
+ * on a short screen it is a shelf, on a tall one it is a room.
+ */
+export const BACKBAR_MIN = 52;
+export const BACKBAR_MAX = 132;
 
 /** The bonus shot's recipe, under the board. */
 export const RECIPE_H = 46;
@@ -101,15 +108,16 @@ export interface Layout {
 /**
  * Where everything sits, for a given screen height.
  *
- * Spare height goes into the FURNITURE first — the HUD breathes, then the back
- * bar deepens so the bar back has somewhere to run — and only what is left over
- * falls below the recipe strip. That leftover is not waste: it is where the
+ * Spare height goes into the FURNITURE first, and mostly into the BAR: the HUD
+ * only needs so much room, while the bar is where the bartender stands and the
+ * bar back runs, and both of them read better the more of it there is. What is
+ * left over falls below the recipe strip, which is not waste — it is where the
  * thumb rests, directly under the control the thumb is on.
  */
 export function layoutFor(h: number): Layout {
   const fixed = BOARD_H + GAP + RECIPE_H + TOP_MARGIN;
   const spare = Math.max(HUD_MIN + BACKBAR_MIN, h - fixed);
-  const hudH = Math.round(Math.min(HUD_MAX, Math.max(HUD_MIN, spare * 0.58)));
+  const hudH = Math.round(Math.min(HUD_MAX, Math.max(HUD_MIN, spare * 0.45)));
   const backbarH = Math.round(Math.min(BACKBAR_MAX, Math.max(BACKBAR_MIN, spare - hudH)));
   const hudY = TOP_MARGIN;
   const backbarY = hudY + hudH;

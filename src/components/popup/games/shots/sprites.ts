@@ -90,6 +90,114 @@ export function bartenderUrl(which: "ask" | "go"): string {
   return `${ART_BASE}/bartender-${which}.png`;
 }
 
+/**
+ * How the bartender is taking it.
+ *
+ * He stands above the board for the whole stage, and he is the game's only
+ * continuous feedback that is not a number: a flinch when a swipe breaks
+ * nothing, a grin when it does, both arms up for the guest's own shot.
+ */
+export const MOODS = ["concentrating", "scared", "happy", "celebrating"] as const;
+export type Mood = (typeof MOODS)[number];
+
+export function moodUrl(mood: Mood): string {
+  return `${ART_BASE}/bartender-${mood}.png`;
+}
+
+/** The marquee, for the front page. */
+export function logoUrl(): string {
+  return `${ART_BASE}/logo.png`;
+}
+
+/**
+ * The bartender behind the bar, standing on `groundY`, `h` tall.
+ *
+ * All four moods are cut from one shared frame at import time, so they are the
+ * same size and register with each other — he changes expression without
+ * changing size or shifting sideways. See scripts/shots-art.mjs.
+ */
+export function drawMood(
+  ctx: CanvasRenderingContext2D,
+  mood: Mood,
+  cx: number,
+  groundY: number,
+  h: number
+): void {
+  const art = scaledTo(moodUrl(mood), Math.round(h));
+  if (art) {
+    ctx.drawImage(art, Math.round(cx - art.width / 2), Math.round(groundY - art.height));
+    return;
+  }
+  drawMoodShape(ctx, mood, cx, groundY, Math.round(h));
+}
+
+/**
+ * The stand-in bartender: a bust, with the expression carried by the eyebrows
+ * and the mouth alone.
+ *
+ * Those two are enough at this size, and they are the two the real art changes
+ * most — so the fallback reads as the same character in the same mood rather
+ * than as a different placeholder for each.
+ */
+function drawMoodShape(
+  ctx: CanvasRenderingContext2D,
+  mood: Mood,
+  cx: number,
+  groundY: number,
+  h: number
+): void {
+  const w = Math.round(h * 0.62);
+  const left = Math.round(cx - w / 2);
+  const top = groundY - h;
+  const headH = Math.round(h * 0.44);
+  const headW = Math.round(w * 0.62);
+  const hx = Math.round(cx - headW / 2);
+
+  // Shirt
+  ctx.fillStyle = C.black;
+  ctx.fillRect(left - 1, top + headH - 1, w + 2, h - headH + 2);
+  ctx.fillStyle = "#232C55";
+  ctx.fillRect(left, top + headH, w, h - headH);
+
+  // Head
+  ctx.fillStyle = C.black;
+  ctx.fillRect(hx - 1, top - 1, headW + 2, headH + 2);
+  ctx.fillStyle = "#F0C89A";
+  ctx.fillRect(hx, top, headW, headH);
+  ctx.fillStyle = "#7A4A22";
+  ctx.fillRect(hx, top, headW, Math.max(2, Math.round(headH * 0.22)));
+
+  const eyeY = top + Math.round(headH * 0.42);
+  const eyeW = Math.max(2, Math.round(headW * 0.16));
+  const lx = hx + Math.round(headW * 0.2);
+  const rx = hx + headW - Math.round(headW * 0.2) - eyeW;
+  ctx.fillStyle = C.black;
+  ctx.fillRect(lx, eyeY, eyeW, eyeW);
+  ctx.fillRect(rx, eyeY, eyeW, eyeW);
+
+  // Brows carry most of it: down and in for concentrating, high for scared.
+  const browY = mood === "scared" ? eyeY - eyeW * 2 : eyeY - eyeW - 1;
+  const tilt = mood === "concentrating" ? 1 : 0;
+  ctx.fillRect(lx, browY + tilt, eyeW + 1, 1);
+  ctx.fillRect(rx - 1, browY + tilt, eyeW + 1, 1);
+
+  // Mouth
+  const mouthY = top + Math.round(headH * 0.72);
+  const mw = Math.round(headW * 0.4);
+  const mx = Math.round(cx - mw / 2);
+  ctx.fillStyle = mood === "concentrating" ? C.black : "#7A1520";
+  const mh = mood === "celebrating" ? Math.max(3, eyeW * 2) : mood === "happy" ? 2 : mood === "scared" ? Math.max(2, eyeW) : 1;
+  ctx.fillRect(mx, mouthY, mw, mh);
+
+  // A raised bottle when there is something to celebrate.
+  if (mood === "celebrating") {
+    ctx.fillStyle = C.black;
+    ctx.fillRect(left - Math.round(w * 0.18), top - Math.round(h * 0.1), Math.max(3, Math.round(w * 0.16)), Math.round(h * 0.3));
+    ctx.fillStyle = "#C46A18";
+    ctx.fillRect(left - Math.round(w * 0.18) + 1, top - Math.round(h * 0.1) + 1, Math.max(1, Math.round(w * 0.16) - 2), Math.round(h * 0.3) - 2);
+  }
+}
+
 // ─── Pre-scaling ─────────────────────────────────────────────────────────────
 
 const scaled = new Map<string, HTMLCanvasElement>();
