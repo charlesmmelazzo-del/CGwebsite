@@ -138,13 +138,31 @@ a second, unrelated panel.
    show of it only: the deal pays no score and fills none of the order, because
    a stage that could be handed to you before you touched it is not a stage.
 6. Play.
-7. Cleared: the guest, delighted, holding the shot. Round score and running
-   total.
-8. Failed: the guest, furious. *"Where is my shot??"* Three continues; a
-   continue re-deals the same stage rather than handing back the position that
-   just beat them, and drops straight back to the recipe — they have just
-   watched the guest order this, and they are trying again rather than starting
-   over.
+7. Cleared, in three beats, each waiting for its own tap:
+   1. **STAGE CLEARED!** pops up over the finished board, which is dimmed but
+      still there underneath.
+   2. The guest, delighted, holding the shot, with the round score and the
+      running total in the band along the bottom.
+   3. **NEXT ROUND!** pops up over that same screen — over the guest, but
+      *under* the score band, which is drawn last so the payout stays at full
+      strength while everything behind it dims.
+
+   Neither banner gets a screen of its own. The moment each one announces
+   belongs to the picture underneath it, and cutting to black would take that
+   picture away at the instant the player earned the right to look at it. This
+   used to be one screen doing all three jobs, and the score under the guest's
+   face got read as decoration while the fact that another stage was coming was
+   never stated at all. The next stage is not dealt until the last tap, so
+   nothing on screen is swapped out from under the player mid-sentence.
+8. Failed, in two beats: **STAGE FAILED** pops up over the board first, for the
+   same reason the clear does — the position that beat them is what is being
+   talked about, and it is still on screen. Then the guest, furious: *"Where is
+   my shot??"* Three continues; a continue re-deals the same stage rather than
+   handing back the position that just beat them, and drops straight back to the
+   recipe — they have just watched the guest order this, and they are trying
+   again rather than starting over. Which screen follows the banner — one more
+   go, or the end of the run — is decided on the way out of it, so the count of
+   continues is read at the moment it is about to be shown.
 
 Each stage draws a random order and a random guest, avoiding what came up
 recently, so nobody at the bar is reading the same joke as the person next to
@@ -199,7 +217,20 @@ in `public/popup/art/shots/`:
 | --- | --- |
 Everything is in. The ten bottles, twenty-nine guests, the bartender's two
 lettered panels and his four reactions, the bar back's nine-frame run, the
-coffee cup and the marquee.
+coffee cup, the marquee and the three between-stage banners.
+
+The banners are keyed by the FLOOD ONLY — the connected fill in from the border
+— and never by the stray-colour pass every other sprite gets. Both are lettered
+in bright green over a magenta starburst, which is to say they are made almost
+entirely of the two colours that pass every stray test in the importer: run it
+over **STAGE CLEARED!** and the word CLEARED disappears, along with the lime.
+
+One thing the flood cannot save: on the *Stage Cleared* sheet the bright pink
+rays behind the shot glass are drawn in the same magenta as the background and
+touch it, so they key out with it. The purple rays survive and the banner reads
+fine without them — but if they are wanted, they need redrawing in a pink that
+is not the key colour, the way the *Next Round* and *Stage Failed* sheets
+already do it.
 
 Two sheets are cut as FRAMES — the reactions and the bar back — and both are
 cropped with a single shared rectangle covering all of them, so a character
@@ -209,7 +240,10 @@ not divide leaves every cell boundary a fraction of a pixel out and smears a
 sliver of the next frame into this one.
 
 The bar back throws his own bottles — they are drawn into his frames — so the
-game plays the sheet and adds no particles of its own. He crosses the middle of
-the screen in front of the board: in from the right, a turn, then back out to
-the right. His sheet faces LEFT, so he is mirrored on the return leg only, and
+game plays the sheet and adds no particles of its own. He runs along the board's
+TOP EDGE, feet on the rim and body up in the back bar, passing in front of the
+bartender: in from the right, a turn, then back out to the right. He used to
+cross the middle of the screen, which put him over the fourth and fifth rows —
+squarely on top of the bottles being read, at the moment the board is refilling
+and they most need to be seen. His sheet faces LEFT, so he is mirrored on the return leg only, and
 `barBackPass` in constants.ts is the one place that rule lives.

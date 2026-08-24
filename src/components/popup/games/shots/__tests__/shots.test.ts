@@ -10,8 +10,8 @@ import { GUESTS, GUEST_COUNT } from "../guestArt";
 import { BARBACK_FRAMES, MOODS } from "../sprites";
 import { HOWTO_COPY, PARAGRAPH_GAP, lineHeight, wrapLines } from "../text";
 import {
-  COLS, ROWS, W, barBackPass, layoutFor,
-  BARBACK_RUN, EXIT_CLEARANCE_H, HUD_CONTENT, H_MAX, H_MIN,
+  BOARD_H, COLS, ROWS, W, barBackPass, layoutFor,
+  BARBACK_BODY_H, BARBACK_RUN, EXIT_CLEARANCE_H, HUD_CONTENT, H_MAX, H_MIN,
 } from "../constants";
 import {
   COFFEE_SWIPES, MAX_COFFEE_ON_BOARD, SCORE_PER_SWIPE_LEFT,
@@ -680,6 +680,75 @@ check("the coffee cup and the bar back are in the build", () => {
   // which smears a sliver of the next frame into the edge of this one.
   const { w } = pngSize(strip);
   assert.equal(w % BARBACK_FRAMES, 0, `the ${w}px strip does not divide into ${BARBACK_FRAMES} whole frames`);
+});
+
+/**
+ * The story panel's frame, from panelFrame() in LetsDoShots.tsx.
+ *
+ * Restated rather than imported: it lives inside the component module, which
+ * pulls in React and the canvas. Kept in step by the banner check below, which
+ * is the only thing that reads it and would fail loudly if the real frame moved
+ * out from under it.
+ */
+const FRAME_ASPECT = 0.465;
+function panelFrameFor(h: number) {
+  let fw = W - 26;
+  let fh = fw / FRAME_ASPECT;
+  if (fh > h - 44) { fh = h - 44; fw = fh * FRAME_ASPECT; }
+  return { y: Math.round((h - fh) / 2) - 6, h: Math.round(fh) };
+}
+
+check("all three banners are in the build, and each fits what it pops up over", () => {
+  // Each is drawn inset to W-46 and centred on the picture underneath it. The
+  // game letters a stand-in if one is missing, so the existence check is what
+  // catches a run of the importer that quietly skipped it — the source files
+  // are named by hand and it moves on rather than failing when one is not
+  // found.
+  const width = W - 46;
+  const heightOf = (which: string) => {
+    const file = path.join(ART, `banner-${which}.png`);
+    assert.ok(fs.existsSync(file), `missing banner-${which}.png — run scripts/shots-art.mjs`);
+    const { w, h } = pngSize(file);
+    return (h / w) * width;
+  };
+
+  // Over the BOARD: stage cleared and stage failed, centred on the playfield.
+  // Taller than the board and the banner spills onto the recipe strip below and
+  // the bartender above, which is what makes it read as a screen rather than as
+  // something laid on the stage.
+  for (const which of ["stage-cleared", "stage-failed"]) {
+    const bh = heightOf(which);
+    assert.ok(bh <= BOARD_H, `banner-${which}.png is ${Math.round(bh)} tall over a ${BOARD_H} board`);
+  }
+
+  // Over the PANEL: next round, centred on the guest — and it must not reach
+  // the score band along the panel's bottom edge. That band is the whole reason
+  // the banner goes over that screen rather than replacing it.
+  const bh = heightOf("next-round");
+  for (let screen = H_MIN; screen <= H_MAX; screen++) {
+    const frame = panelFrameFor(screen);
+    const footerTop = frame.y + frame.h - (22 + 2 * 12);
+    const bottom = frame.y + frame.h / 2 + bh / 2;
+    assert.ok(bottom <= footerTop,
+      `at ${screen} the next-round banner reaches ${Math.round(bottom)} and covers the score at ${footerTop}`);
+  }
+});
+
+check("the bar back runs along the top of the board, not across it", () => {
+  // He crossed the middle of the screen, which put him over the fourth and
+  // fifth rows — on top of the bottles being read, at the moment the board is
+  // refilling. His feet go on the board's top rim instead, so his whole body is
+  // up in the back bar and no cell is ever covered.
+  for (let h = H_MIN; h <= H_MAX; h++) {
+    const l = layoutFor(h);
+    // His feet are the ground line, so his whole body is above it: he can never
+    // reach down into a cell, whatever the screen height does to the layout.
+    assert.ok(l.boardY <= l.recipeY - BOARD_H,
+      `at ${h} his ground line is inside the board`);
+    // And he has to FIT in the bar above it, or he covers the HUD instead.
+    assert.ok(l.boardY - BARBACK_BODY_H > l.hudY,
+      `at ${h} he stands ${BARBACK_BODY_H} tall on ${l.boardY - l.hudY} of bar and reaches the HUD`);
+  }
 });
 
 check("the how-to copy fits on the shortest screen", () => {

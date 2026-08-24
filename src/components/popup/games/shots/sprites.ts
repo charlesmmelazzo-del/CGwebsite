@@ -127,6 +127,12 @@ export function logoUrl(): string {
   return `${ART_BASE}/logo.png`;
 }
 
+/** The painted banners that pop up over a finished stage. */
+export type Banner = "stage-cleared" | "stage-failed" | "next-round";
+export function bannerUrl(which: Banner): string {
+  return `${ART_BASE}/banner-${which}.png`;
+}
+
 /**
  * The bartender behind the bar, standing on `groundY`, `h` tall.
  *

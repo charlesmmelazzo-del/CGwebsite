@@ -18,8 +18,8 @@ import {
   type StageRules, type StageState, type Step,
 } from "./shotsCore";
 import {
-  bartenderUrl, bottleUrl, coffeeUrl, drawBarBack, drawBottle, drawMood, getImage,
-  guestUrl, logoUrl, MOODS, moodUrl, prefetch, type Mood,
+  bannerUrl, bartenderUrl, bottleUrl, coffeeUrl, drawBarBack, drawBottle, drawMood,
+  getImage, guestUrl, logoUrl, MOODS, moodUrl, prefetch, type Banner, type Mood,
 } from "./sprites";
 
 // ─── Timing ──────────────────────────────────────────────────────────────────
@@ -65,6 +65,9 @@ const DEMO_HOLD = 0.9;
  * something else.
  */
 const TAP_HINT = "TAP TO ADVANCE";
+
+/** How long a banner takes to overshoot and settle. */
+const BANNER_POP = 0.22;
 
 const CONTINUES = 3;
 
@@ -168,7 +171,29 @@ type Phase =
   /** The shot's recipe, full screen, immediately before play. */
   | "recipe"
   | "play"
+  /**
+   * The three beats between a cleared stage and the next order, in order.
+   *
+   * Split out from the single "bottoms up" screen this used to be because it
+   * was doing three jobs at once: announcing the clear, paying out the score,
+   * and pointing at the next round. The player's eye can only be in one of
+   * those places, and it went to the guest's face — so the score underneath got
+   * read as decoration and the fact that another stage was coming was never
+   * stated at all. One beat each, each waiting for its own tap.
+   */
+  | "cleared"
   | "won"
+  | "nextround"
+  /**
+   * The stage was lost. Announced over the board before the guest is, for the
+   * same reason the clear is: the position that beat them is the thing being
+   * talked about, and it is still on screen.
+   *
+   * Which screen comes next — one more go, or the end of the run — is decided
+   * on the way OUT of here rather than on the way in, so the count of continues
+   * is read at the moment it is about to be shown.
+   */
+  | "failed"
   | "lost"
   | "gameover";
 
@@ -599,11 +624,11 @@ function checkOutcome(g: Game) {
   if (g.phase !== "play" || isBusy(g)) return;
   if (g.state.outcome === "won") {
     g.total += g.state.score;
-    g.phase = "won";
+    g.phase = "cleared";
     g.phaseT = 0;
   } else if (g.state.outcome === "lost") {
     // A lost round banks nothing. The order was never poured.
-    g.phase = g.continues > 0 ? "lost" : "gameover";
+    g.phase = "failed";
     g.phaseT = 0;
   }
 }
@@ -793,21 +818,22 @@ function drawBartender(ctx: CanvasRenderingContext2D, g: Game, layout: Layout) {
 /**
  * The bar back, crossing the play field.
  *
- * He used to run along a drawn shelf above the board. That shelf is gone — the
- * bartender fills the space now, and two characters sharing it left neither of
- * them room — so the runner comes through the middle of the screen instead,
- * where there is nothing to crowd and the bottles he throws arc up out of the
- * board toward the bar.
+ * He runs along the board's TOP EDGE — feet on the rim, body up in the back bar
+ * with the bartender, who he passes in front of. He used to cross the middle of
+ * the screen, which put him over the fourth and fifth rows: squarely on top of
+ * the bottles the player is reading, at the exact moment the board is refilling
+ * and they most need to see it. Up here he crosses furniture instead, and the
+ * bottles he throws still arc up out of the board towards him.
  *
  * Cosmetic from top to bottom: nothing waits for him and no bottle on the board
  * is one he threw. He exists because a board that silently refills from nowhere
  * feels like a spreadsheet, and one that gets restocked by somebody running
  * past feels like a bar.
  */
-function drawBarBackRunner(ctx: CanvasRenderingContext2D, g: Game, h: number) {
+function drawBarBackRunner(ctx: CanvasRenderingContext2D, g: Game, layout: Layout) {
   if (!g.barback.running) return;
   const pass = barBackPass(g.barback.t);
-  drawBarBack(ctx, pass.x, Math.round(h * 0.5), BARBACK_BODY_H, Math.floor(g.barback.t * 14), pass.flip);
+  drawBarBack(ctx, pass.x, layout.boardY, BARBACK_BODY_H, Math.floor(g.barback.t * 14), pass.flip);
 }
 
 function drawRecipe(ctx: CanvasRenderingContext2D, g: Game, layout: Layout) {
@@ -1187,6 +1213,72 @@ function drawRecipeScreen(ctx: CanvasRenderingContext2D, g: Game, h: number, t: 
   drawTapHint(ctx, "TAP TO START ROUND", h, t);
 }
 
+/**
+ * One of the two painted banners, centred on `cy` and `width` across.
+ *
+ * It POPS: the graphic overshoots its size on the way in and settles back,
+ * which is what makes a held frame land as an event rather than as the game
+ * having stopped. Driven off `phaseT`, so it happens once on arrival and not
+ * again while the screen waits for its tap.
+ *
+ * Lettered in code until the artwork arrives — same contract as every other
+ * sprite here: a missing png costs the painted version, never the screen.
+ */
+function drawBanner(
+  ctx: CanvasRenderingContext2D,
+  which: Banner,
+  fallback: [string, string],
+  cy: number,
+  width: number,
+  phaseT: number
+) {
+  // Overshoot to 1.12 and settle.
+  const p = Math.min(1, phaseT / BANNER_POP);
+  const pop = 1 + 0.12 * Math.sin(p * Math.PI) * (1 - p * 0.35);
+
+  const img = getImage(bannerUrl(which));
+  if (img && img.naturalWidth) {
+    const bw = width * pop;
+    const bh = (img.naturalHeight / img.naturalWidth) * bw;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(img, Math.round(W / 2 - bw / 2), Math.round(cy - bh / 2), Math.round(bw), Math.round(bh));
+    ctx.imageSmoothingEnabled = false;
+    return;
+  }
+  drawTextMarquee(ctx, fallback[0], W / 2, cy - 20, C.brass, 3, "center", C.black);
+  drawTextMarquee(ctx, fallback[1], W / 2, cy + 8, C.good, 3, "center", C.black);
+}
+
+/**
+ * A banner laid OVER whatever the last screen already drew.
+ *
+ * Both banners work this way, and neither gets a screen of its own. The moment
+ * each one announces belongs to the picture underneath it: STAGE CLEARED over
+ * the board that was just cleared, NEXT ROUND over the guest holding the shot
+ * and the score they just paid out. Cutting to black would take that picture
+ * away at the exact instant the player earned the right to look at it, and
+ * leave the banner announcing something no longer on screen.
+ *
+ * The picture is DIMMED rather than left at full strength — painted bottles or
+ * a lit guest panel behind lettering is unreadable — but it stays visible,
+ * which is the whole point of putting the banner here.
+ */
+function drawBannerPopup(
+  ctx: CanvasRenderingContext2D,
+  which: Banner,
+  fallback: [string, string],
+  cy: number,
+  h: number,
+  phaseT: number
+) {
+  ctx.globalAlpha = 0.62;
+  fillRect(ctx, 0, 0, W, h, C.black);
+  ctx.globalAlpha = 1;
+  // Inset from the screen edge so it reads as something laid ON the picture
+  // rather than as a new screen that has replaced it.
+  drawBanner(ctx, which, fallback, cy, W - 46, phaseT);
+}
+
 function drawTapHint(ctx: CanvasRenderingContext2D, label: string, h: number, t: number) {
   if (Math.sin(t * 4) < -0.4) return;
   drawTextMarquee(ctx, label, W / 2, h - 10, C.bone, 1, "center", C.black);
@@ -1272,6 +1364,7 @@ export default function LetsDoShots({ onGameOver, onShowScores, demo = false }: 
     prefetch([
       logoUrl(), ...HOWTO_ART, ...MOODS_TO_PREFETCH,
       bartenderUrl("ask"), bartenderUrl("go"),
+      bannerUrl("stage-cleared"), bannerUrl("stage-failed"), bannerUrl("next-round"),
     ]);
   }, [newRun]);
 
@@ -1310,12 +1403,30 @@ export default function LetsDoShots({ onGameOver, onShowScores, demo = false }: 
         g.phase = "play";
         g.phaseT = 0;
         break;
-      case "won": {
+      case "cleared":
+        g.phase = "won";
+        g.phaseT = 0;
+        break;
+      case "won":
+        g.phase = "nextround";
+        g.phaseT = 0;
+        break;
+      case "nextround": {
+        // The next stage is not built until here. Everything the three beats
+        // behind us put on screen — the guest's face, the round's score, the
+        // stage number — belongs to the stage just finished, and dealing the
+        // next one any earlier would swap all of it out underneath the player
+        // mid-sentence.
         startStage(g, g.stageNo + 1);
         g.phase = "ask";
         g.phaseT = 0;
         break;
       }
+      case "failed":
+        // Out of continues is the end of the run, not another go at it.
+        g.phase = g.continues > 0 ? "lost" : "gameover";
+        g.phaseT = 0;
+        break;
       case "lost": {
         if (g.continues <= 0) {
           g.phase = "gameover";
@@ -1425,11 +1536,19 @@ export default function LetsDoShots({ onGameOver, onShowScores, demo = false }: 
 
       fillRect(ctx, 0, 0, W, h, C.black);
 
-      if (g.phase === "play") {
+      // "cleared" and "failed" draw the SAME world as "play" and then lay their
+      // banner over it. The board still updates: it is settled by the time a
+      // stage can be won or lost, so nothing moves except the cosmetics that
+      // were mid-flight when it was — the screen shake decaying, the last
+      // shards falling, the bar back finishing his run. Freezing those instead
+      // would leave the shake frozen at a random offset, jittering under the
+      // banner for as long as it is up.
+      const overBoard = g.phase === "cleared" || g.phase === "failed";
+      if (g.phase === "play" || overBoard) {
         updatePlay(g, dt);
-        checkOutcome(g);
+        if (g.phase === "play") checkOutcome(g);
 
-        if (demo && !isBusy(g)) {
+        if (demo && g.phase === "play" && !isBusy(g)) {
           botTimer.current -= dt;
           if (botTimer.current <= 0) {
             botTimer.current = 0.42;
@@ -1452,10 +1571,22 @@ export default function LetsDoShots({ onGameOver, onShowScores, demo = false }: 
         drawBartender(ctx, g, layout);
         drawHud(ctx, g, layout);
         drawBoard(ctx, g, layout, t);
-        // In FRONT of the board: he runs through the play field, not behind it.
-        drawBarBackRunner(ctx, g, h);
+        // In FRONT of the board and of the bartender: he is nearest the glass.
+        drawBarBackRunner(ctx, g, layout);
         drawRecipe(ctx, g, layout);
         ctx.restore();
+
+        // Over the board, and OUTSIDE the shake: the stage is over, so the
+        // cabinet settling down is the board's business and not the banner's.
+        if (overBoard) {
+          const cleared = g.phase === "cleared";
+          drawBannerPopup(ctx,
+            cleared ? "stage-cleared" : "stage-failed",
+            cleared ? ["STAGE", "CLEARED!"] : ["STAGE", "FAILED"],
+            layout.boardY + BOARD_H / 2, h, g.phaseT);
+          drawTapHint(ctx, TAP_HINT, h, t);
+          if (demo && g.phaseT > DEMO_HOLD) advance();
+        }
         return;
       }
 
@@ -1506,11 +1637,24 @@ export default function LetsDoShots({ onGameOver, onShowScores, demo = false }: 
         return;
       }
 
-      if (g.phase === "won") {
+      if (g.phase === "won" || g.phase === "nextround") {
         const panel = drawPanel(ctx, guestUrl(g.guest.slug, "happy"), h);
         drawBubble(ctx, "Bottoms up!", g.guest.happy, panel);
+        // NEXT ROUND lays over the guest — but UNDER the score, which is drawn
+        // after it. The banner is centred on the panel and the band sits along
+        // the panel's bottom edge, so the two never overlap; what the dim would
+        // otherwise do is take the round's payout down to 38% at the exact
+        // moment the screen is there to show it.
+        if (g.phase === "nextround") {
+          drawBannerPopup(ctx, "next-round", ["NEXT", "ROUND!"],
+            panel.frame.y + panel.frame.h / 2, h, g.phaseT);
+        }
+
+        // No "STAGE n CLEARED" line any more — the banner two taps back said
+        // exactly that, in letters four times the size. What is left is the
+        // only thing this screen is for: what the round paid, and what the run
+        // is worth so far.
         drawFooter(ctx, [
-          `STAGE ${g.stageNo} CLEARED`,
           `ROUND ${g.state.score}`,
           `TOTAL ${g.total}`,
         ], panel.frame, C.good);

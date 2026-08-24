@@ -649,7 +649,38 @@ if (!coffeePath) {
   console.log(`  powerup-coffee.png`.padEnd(34) + `${cup.w}x${cup.h} -> ${trimmed.w}x${trimmed.h}${size}`);
 }
 
-// ── 6. The marquee ──
+// ── 6. The between-stage banners ──
+//
+// Two single graphics on flat magenta, shown full screen between rounds.
+//
+// Keyed by the FLOOD ONLY — no killStrays. Both banners are lettered in bright
+// green over a magenta starburst, which is to say they are made almost entirely
+// of the two colours that pass every stray test in this file. Run killStrays
+// over "STAGE CLEARED!" and the word CLEARED disappears, along with the lime and
+// the rays behind the shot glass. The flood is connected, so it takes the
+// surround and stops at the banner's black outline, which is exactly the cut
+// that is wanted here.
+console.log("\nBanners");
+const BANNERS = [
+  [["Stage Cleared.png", "Stage Cleared"], "banner-stage-cleared.png"],
+  [["Stage Failed.png", "stage failed.png", "Stage Failed"], "banner-stage-failed.png"],
+  [["Next Round.png", "Next Round"], "banner-next-round.png"],
+];
+for (const [names, out] of BANNERS) {
+  const src = names.map((n) => path.join(ROOT, n)).find((p) => fs.existsSync(p));
+  if (!src) {
+    console.log(`  skip  ${names[0]} (not found — the game letters it instead)`);
+    continue;
+  }
+  const img = await readRGBA(src);
+  cutMagenta(img);
+  despill(img);
+  const trimmed = trimToContent(img);
+  const size = await write(out, trimmed, 420, 128);
+  console.log(`  ${out.padEnd(32)}${img.w}x${img.h} -> ${trimmed.w}x${trimmed.h}${size}`);
+}
+
+// ── 7. The marquee ──
 console.log("\nLogo");
 const logoPath = [path.join(ROOT, "Logo"), path.join(ROOT, "Logo.png")].find((p) => fs.existsSync(p));
 if (!logoPath) {
@@ -662,7 +693,7 @@ if (!logoPath) {
   console.log(`  logo.png`.padEnd(34) + `${logo.w}x${logo.h}${size}`);
 }
 
-// ── 7. Bartender panels ──
+// ── 8. Bartender panels ──
 console.log("\nBartender");
 const barDir = path.join(ROOT, "Stage Intro Assets", "Bartender");
 const BAR_MAP = { "Bartender 1.png": "bartender-ask.png", "Bartender 2.png": "bartender-go.png" };
@@ -674,7 +705,7 @@ for (const [from, to] of Object.entries(BAR_MAP)) {
   console.log(`  ${to.padEnd(24)}${img.w}x${img.h}${size}`);
 }
 
-// ── 8. The generated bubble table ──
+// ── 9. The generated bubble table ──
 if (guests.length && !dry) {
   const rows = guests.map((g) => {
     const panels = GUEST_PANELS.map((p, i) => {
