@@ -157,12 +157,14 @@ a second, unrelated panel.
 8. Failed, in two beats: **STAGE FAILED** pops up over the board first, for the
    same reason the clear does — the position that beat them is what is being
    talked about, and it is still on screen. Then the guest, furious: *"Where is
-   my shot??"* Three continues; a continue re-deals the same stage rather than
-   handing back the position that just beat them, and drops straight back to the
-   recipe — they have just watched the guest order this, and they are trying
-   again rather than starting over. Which screen follows the banner — one more
-   go, or the end of the run — is decided on the way out of it, so the count of
-   continues is read at the moment it is about to be shown.
+   my shot??"* Three continues; a continue re-deals the stage at the same
+   number rather than handing back the position that just beat them, and runs
+   the intro panels from the top like any other round. It has to: a fresh deal
+   draws a new guest and a new order, so dropping straight to the recipe — which
+   is what it used to do — landed them on a recipe card for a drink nobody on
+   screen had asked for, from a guest they had not met. Which screen follows the
+   banner — one more go, or the end of the run — is decided on the way out of
+   it, so the count of continues is read at the moment it is about to be shown.
 
 Each stage draws a random order and a random guest, avoiding what came up
 recently, so nobody at the bar is reading the same joke as the person next to

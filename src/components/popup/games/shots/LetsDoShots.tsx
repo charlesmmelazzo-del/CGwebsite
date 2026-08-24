@@ -1434,15 +1434,19 @@ export default function LetsDoShots({ onGameOver, onShowScores, demo = false }: 
           break;
         }
         g.continues--;
-        // A continue re-pours the SAME stage, freshly dealt. Handing back the
-        // board they just lost on would be handing back the position that beat
-        // them, which is not another go at anything.
+        // A continue re-pours the stage at the SAME NUMBER, freshly dealt.
+        // Handing back the board they just lost on would be handing back the
+        // position that beat them, which is not another go at anything.
         //
-        // Straight back to the recipe, skipping the three intro panels: they
-        // have just watched the guest order this and they are trying again, not
-        // starting over.
+        // And "freshly dealt" means a new guest with a new order, not the same
+        // one again — buildStage draws both, avoiding what came up recently. So
+        // it runs the intro panels like any other round. It used to drop
+        // straight to the recipe on the theory that they had just watched this
+        // order being placed, which was never true: they arrived at a recipe
+        // card for a drink nobody on screen had asked for, from a guest they
+        // had not met.
         startStage(g, g.stageNo);
-        g.phase = "recipe";
+        g.phase = "ask";
         g.phaseT = 0;
         break;
       }
