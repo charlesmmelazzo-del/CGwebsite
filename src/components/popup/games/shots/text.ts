@@ -40,7 +40,7 @@ export function wrapLines(text: string, maxW: number, scale: number): string[] {
 export const HOWTO_COPY: string[][] = [
   ["Flick a bottle into the one next to it to swap them."],
   [
-    "Match 4 to clear them and earn points.",
+    "Match 4 to break the bottles around them too, and earn bonus points.",
     "Match 4 next to a coffee cup to get more swipes.",
   ],
   [
