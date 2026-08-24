@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef } from "react";
 import type { ArcadeGameProps } from "../registry";
 import { drawText, drawTextMarquee, textWidth } from "../arcade";
 import ShotsCanvas, { type SwipeDir } from "./ShotsCanvas";
+import { HOWTO_COPY, PARAGRAPH_GAP, lineHeight, wrapLines } from "./text";
 import {
   BOARD_H, BOARD_W, BOARD_X, C, CELL, COLS, HUD_CONTENT, RECIPE_H, ROWS, W,
   layoutFor, type Layout,
@@ -42,7 +43,16 @@ const MAX_FALL = 1150;
 /** How much of the impact comes back up. Enough to read as glass, not as rubber. */
 const BOUNCE = 0.18;
 
-const PANEL_HOLD = { ask: 2.4, order: 4.2, go: 2.2, recipe: 3.4 } as const;
+/**
+ * How long the story panels sit before moving themselves on.
+ *
+ * The RECIPE screen is deliberately not in here. Every other panel is something
+ * being said to the player, and holding those hostage to a tap just adds taps —
+ * but the recipe screen is the one they are meant to STUDY, and it is the last
+ * thing between them and a stage they get a limited number of swipes at. That
+ * one waits.
+ */
+const PANEL_HOLD = { ask: 2.4, order: 4.2, go: 2.2 } as const;
 const DEMO_HOLD = 0.9;
 
 const CONTINUES = 3;
@@ -126,16 +136,6 @@ interface FloatText {
   scale: number;
 }
 
-/** A bottle the bar back has thrown up toward the shelf. Pure theatre. */
-interface Toss {
-  /** Absolute, not relative to the runner — a thrown bottle is out of his hands. */
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  kind: CellKind;
-}
-
 type Anim =
   | { kind: "idle" }
   | { kind: "swap"; a: Piece; b: Piece; t: number; dur: number }
@@ -185,7 +185,7 @@ interface Game {
   queue: Step[];
   anim: Anim;
   selected: number | null;
-  barback: { t: number; running: boolean; tosses: Toss[] };
+  barback: { t: number; running: boolean };
   shake: number;
   recentOrders: number[];
   recentGuests: number[];
@@ -426,42 +426,33 @@ function applyFall(g: Game, step: FallStep) {
     p.vy = 0;
   }
   reindex(g);
-  if (step.spawns.length) startBarBack(g, step.spawns.map((s) => s.cell.kind));
+  if (step.spawns.length) startBarBack(g);
 }
 
 // ─── The bar back ────────────────────────────────────────────────────────────
 
 /**
- * Send the bar back across with an armful of stock.
+ * Send the bar back across the bar.
  *
  * Cosmetic from top to bottom: nothing waits for him and no bottle on the board
- * is the bottle he threw. He exists because a board that silently refills from
+ * is a bottle he threw. He exists because a board that silently refills from
  * nowhere feels like a spreadsheet, and one that gets restocked by somebody
  * running past feels like a bar.
+ *
+ * The throwing is drawn INTO his sheet, so there is nothing to spawn here — a
+ * separate particle system on top of it would have him throwing two bottles for
+ * every one he picks up.
  */
-function startBarBack(g: Game, kinds: CellKind[]) {
-  if (!g.barback.running) {
-    g.barback.running = true;
-    g.barback.t = 0;
-  }
-  const from = barBackX(g.barback.t);
-  for (let i = 0; i < Math.min(3, kinds.length); i++) {
-    g.barback.tosses.push({
-      x: from + (Math.random() - 0.5) * 8,
-      y: 0,
-      vx: 30 + Math.random() * 40,
-      // Tuned so the top of the arc lands about where the shelf's own bottles
-      // stand: he is restocking the shelf, not clearing the roof.
-      vy: -(110 + Math.random() * 40),
-      kind: kinds[Math.floor(Math.random() * kinds.length)],
-    });
-  }
+function startBarBack(g: Game) {
+  if (g.barback.running) return;
+  g.barback.running = true;
+  g.barback.t = 0;
 }
 
 /** How far across he is, for a run that lasts BARBACK_RUN seconds. */
-const BARBACK_RUN = 1.15;
+const BARBACK_RUN = 1.6;
 function barBackX(t: number): number {
-  return -20 + (t * (W + 40)) / BARBACK_RUN;
+  return -30 + (t * (W + 60)) / BARBACK_RUN;
 }
 
 // ─── Update ──────────────────────────────────────────────────────────────────
@@ -543,14 +534,6 @@ function updatePlay(g: Game, dt: number) {
       bb.t = 0;
     }
   }
-  for (let i = bb.tosses.length - 1; i >= 0; i--) {
-    const t = bb.tosses[i];
-    t.vy += 240 * dt;
-    t.x += t.vx * dt;
-    t.y += t.vy * dt;
-    if (t.y > 40) bb.tosses.splice(i, 1);
-  }
-
   // ── Step machine ────────────────────────────────────────────────────────
   const a = g.anim;
   if (a.kind === "swap") {
@@ -718,69 +701,79 @@ function drawBoard(ctx: CanvasRenderingContext2D, g: Game, layout: Layout, t: nu
 }
 
 function drawHud(ctx: CanvasRenderingContext2D, g: Game, layout: Layout) {
-  // Opaque, and drawn AFTER the back bar, so a bottle the bar back throws
-  // toward the shelf disappears behind the readouts instead of sailing across
-  // the swipe counter.
-  fillRect(ctx, 0, 0, W, layout.backbarY, C.night);
-
-  // Hung from the BOTTOM of the HUD box, so extra height on a tall phone opens
-  // up above the readouts instead of stranding them at the top of the screen.
+  // No background panel: the bartender stands behind these readouts and would
+  // be erased by one. Everything here is keylined instead, which is how a
+  // cabinet has always put bright type over a busy picture.
   const y = layout.backbarY - HUD_CONTENT;
+  const box = bartenderBox(layout);
+  const label = (text: string, x: number, ly: number, color: string, scale = 1, align: "left" | "right" | "center" = "left") =>
+    drawTextMarquee(ctx, text, x, ly, color, scale, align, C.black);
 
-  // Everything that matters is on the LEFT, and the top-right is deliberately
-  // empty — that corner belongs to the cabinet's EXIT button. See
-  // EXIT_CLEARANCE_W. The score lived up there until it was noticed that on a
-  // short phone it sat directly under a 44px tap target.
-  drawText(ctx, `STAGE ${g.stageNo}`, 16, y, C.dim, 1);
+  label(`STAGE ${g.stageNo}`, 16, y, C.dim);
 
-  // Swipes: the largest number on the screen, because it is the clock. Plain,
-  // not keylined — a three-pixel black outline at this size stops reading as
-  // lettering and starts reading as a box with a number trapped in it.
+  // Swipes: the largest number on the screen, because it is the clock.
   const low = g.state.swipesLeft <= 5;
-  drawText(ctx, String(g.state.swipesLeft), 16, y + 10, low ? C.hot : C.white, 3);
-  drawText(ctx, "SWIPES", 16, y + 34, low ? C.hot : C.dim, 1);
+  label(String(g.state.swipesLeft), 16, y + 10, low ? C.hot : C.white, 3);
+  label("SWIPES", 16, y + 34, low ? C.hot : C.dim);
 
-  // What the guest ordered, one chip per bottle. Low enough on the right to
-  // clear the exit button on the shortest screen the game runs at.
+  // What the guest ordered, one chip per bottle, low enough on the right to
+  // clear the cabinet's exit button on the shortest screen.
   const chipW = 42;
   const chips = g.rules.targets.length;
   const startX = W - 16 - chips * chipW;
-
-  // The score drops to small lettering rather than growing into the order
-  // chips. A long run reaches seven figures, and at the large size that ran
-  // straight under the first chip.
-  const score = String(g.total + g.state.score);
-  drawText(ctx, "SCORE", 16, y + 46, C.dim, 1);
-  const scoreScale = 52 + textWidth(score, 2) < startX - 8 ? 2 : 1;
-  drawText(ctx, score, 52, y + (scoreScale === 2 ? 44 : 46), C.brass, scoreScale);
+  label("CLEAR TO ADVANCE", W - 16, y + 20, C.dim, 1, "right");
   g.rules.targets.forEach((target, i) => {
     const cx = startX + i * chipW + chipW / 2;
     const done = g.state.got[i] >= target.need;
     drawBottle(ctx, target.kind, cx, y + 40, 22, { alpha: done ? 0.4 : 1 });
-    const label = done ? "OK" : `${g.state.got[i]}/${target.need}`;
-    drawText(ctx, label, cx, y + 53, done ? C.good : C.bone, 1, "center");
+    label(done ? "OK" : `${g.state.got[i]}/${target.need}`, cx, y + 53, done ? C.good : C.bone, 1, "center");
   });
 
-  // One bar for the order as a whole. The three counters answer "how am I doing
-  // on Gin"; this answers "am I going to make it", which is the question
-  // actually being asked every few seconds.
+  // The score drops to small lettering rather than running under the bartender.
+  const score = String(g.total + g.state.score);
+  label("SCORE", 16, y + 46, C.dim);
+  const scoreScale = 52 + textWidth(score, 2) < box.left - 6 ? 2 : 1;
+  label(score, 52, y + (scoreScale === 2 ? 44 : 46), C.brass, scoreScale);
+
+  // One bar for the order as a whole. The chips answer "how am I doing on Gin";
+  // this answers "am I going to make it", which is the question actually being
+  // asked every few seconds.
+  //
+  // Pinned to the very top edge. It used to sit at the foot of the HUD, which
+  // is exactly the height the bartender's chest reaches now that he is centred
+  // and full size — so a progress meter ran straight through him, and neither
+  // he nor it read properly. Up here nothing crosses it, and it clears the
+  // cabinet's exit button, which starts a few pixels lower.
   const need = g.rules.targets.reduce((s, t) => s + t.need, 0);
   const got = g.rules.targets.reduce((s, t, i) => s + Math.min(g.state.got[i], t.need), 0);
-  const barY = y + 62;
-  fillRect(ctx, 16, barY, W - 32, 6, C.well);
-  fillRect(ctx, 17, barY + 1, Math.round(((W - 34) * got) / Math.max(1, need)), 4, C.good);
-  fillRect(ctx, 16, barY, W - 32, 1, C.panelLip);
+  fillRect(ctx, 0, 0, W, 4, C.well);
+  fillRect(ctx, 0, 0, Math.round((W * got) / Math.max(1, need)), 4, C.good);
 }
 
 /**
- * The shelf the bar back runs along.
+ * How far above the bar the bartender is allowed to reach.
  *
- * On a tall phone this band is the better part of a centimetre of screen and it
- * is empty most of the time, because he only comes out when stock is needed.
- * Left as flat colour it read as a gap in the layout. A back bar drawn into it
- * — shelf, bottles in silhouette, a strip of light along the front edge — makes
- * the same space read as the room the game is set in.
+ * He stands on the shelf line and CENTRED, so the readouts either side of him
+ * stay where they are while he gets to be nearly twice the height the band
+ * alone would allow. Everything the HUD draws over him is keylined, so he reads
+ * as standing behind the counter rather than in front of the numbers.
  */
+const BARTENDER_BLEED = 44;
+
+function bartenderBox(layout: Layout) {
+  const bandH = layout.boardY - layout.backbarY;
+  const h = bandH + BARTENDER_BLEED;
+  // 0.61 is the moods' own aspect; they are all cut from one frame, so one
+  // number covers all four.
+  const w = h * 0.61;
+  return { cx: W / 2, groundY: layout.boardY - 5, h, left: W / 2 - w / 2, right: W / 2 + w / 2 };
+}
+
+function drawBartender(ctx: CanvasRenderingContext2D, g: Game, layout: Layout) {
+  const box = bartenderBox(layout);
+  drawMood(ctx, g.mood, box.cx, box.groundY, box.h);
+}
+
 function drawBackBar(ctx: CanvasRenderingContext2D, g: Game, layout: Layout) {
   const y = layout.backbarY;
   const bandH = layout.boardY - y;
@@ -800,29 +793,11 @@ function drawBackBar(ctx: CanvasRenderingContext2D, g: Game, layout: Layout) {
   fillRect(ctx, 0, shelfY, W, 1, C.brassDark);
   fillRect(ctx, 0, layout.boardY - 2, W, 2, C.panelLip);
 
-  // The bartender, standing on the shelf line at the left, clipped to his own
-  // band so a raised bottle cannot poke up through the swipe counter.
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, y, W, bandH);
-  ctx.clip();
-  const moodH = bandH - 4;
-  drawMood(ctx, g.mood, 12 + moodH * 0.31, shelfY + 1, moodH);
-  ctx.restore();
-
   const bb = g.barback;
-  if (!bb.running && !bb.tosses.length) return;
-
-  const groundY = shelfY;
-
-  for (const t of bb.tosses) {
-    drawBottle(ctx, t.kind, t.x, groundY - 16 + t.y, 16, {
-      alpha: Math.max(0, 1 - Math.abs(t.y) / 44),
-    });
-  }
-  if (bb.running) {
-    drawBarBack(ctx, barBackX(bb.t), groundY, Math.min(30, bandH - 6), Math.floor(bb.t * 12), 1);
-  }
+  if (!bb.running) return;
+  // Two thirds of the band: his frame is more than twice his own height, and
+  // the bottles he throws use the rest of it, climbing up past the shelf.
+  drawBarBack(ctx, barBackX(bb.t), shelfY, Math.round(bandH * 0.62), Math.floor(bb.t * 14));
 }
 
 function drawRecipe(ctx: CanvasRenderingContext2D, g: Game, layout: Layout) {
@@ -846,7 +821,15 @@ function drawRecipe(ctx: CanvasRenderingContext2D, g: Game, layout: Layout) {
 
 // ─── Story panels ────────────────────────────────────────────────────────────
 
-/** Cover-fit an image over the whole screen. Returns where it landed. */
+/**
+ * Fit a story panel on screen WHOLE, and report where it landed.
+ *
+ * Contain, not cover. Covering filled the screen edge to edge and cropped
+ * whatever did not fit — which on the taller panels was the top of the speech
+ * bubble, so a guest could be halfway through a line the player never got to
+ * read. The letterbox that contain leaves is the lesser problem by a distance:
+ * the whole point of these screens is the dialogue.
+ */
 function drawPanel(ctx: CanvasRenderingContext2D, url: string, h: number) {
   // Not black: on a slow connection this is what the guest looks at for a
   // second or two, and a flat black screen reads as something having gone
@@ -856,7 +839,7 @@ function drawPanel(ctx: CanvasRenderingContext2D, url: string, h: number) {
   fillRect(ctx, 0, Math.round(h * 0.72), W, 2, C.panelLip);
   const img = getImage(url);
   if (!img || !img.naturalWidth) return null;
-  const scale = Math.max(W / img.naturalWidth, h / img.naturalHeight);
+  const scale = Math.min(W / img.naturalWidth, h / img.naturalHeight);
   const dw = img.naturalWidth * scale;
   const dh = img.naturalHeight * scale;
   const dx = (W - dw) / 2;
@@ -866,26 +849,6 @@ function drawPanel(ctx: CanvasRenderingContext2D, url: string, h: number) {
   ctx.imageSmoothingEnabled = false;
   return { dx, dy, dw, dh };
 }
-
-/** Break `text` into lines that fit `maxW` at `scale`. */
-function wrapLines(text: string, maxW: number, scale: number): string[] {
-  const words = text.split(/\s+/);
-  const lines: string[] = [];
-  let line = "";
-  for (const word of words) {
-    const candidate = line ? `${line} ${word}` : word;
-    if (line && textWidth(candidate, scale) > maxW) {
-      lines.push(line);
-      line = word;
-    } else {
-      line = candidate;
-    }
-  }
-  if (line) lines.push(line);
-  return lines;
-}
-
-const LINE_H = (scale: number) => 7 * scale + 3 * scale;
 
 /**
  * Set the guest's line inside the bubble drawn into their artwork.
@@ -919,12 +882,12 @@ function drawBubble(
 
   for (const scale of [2, 1]) {
     const lines = wrapLines(text, box.w, scale);
-    const total = lines.length * LINE_H(scale);
+    const total = lines.length * lineHeight(scale);
     if (total > box.h && scale > 1) continue;
     let ty = box.y + Math.max(0, (box.h - total) / 2);
     for (const line of lines) {
       drawText(ctx, line, box.x + box.w / 2, ty, C.black, scale, "center");
-      ty += LINE_H(scale);
+      ty += lineHeight(scale);
     }
     return;
   }
@@ -1073,30 +1036,36 @@ function drawHowTo(ctx: CanvasRenderingContext2D, page: number, h: number, t: nu
     }
   };
 
+  // The words the owner wrote, verbatim. They are long — longer than a line —
+  // so the block below wraps them rather than the page assuming a line count.
   let copy: string[];
   if (page === 0) {
     const startX = row(["bourbon", "gin", "gin", "malort"], cy - 42);
     swapArrow(startX - 7, startX + cell + 7, cy - 20);
     row(["gin", "gin", "gin", "malort"], cy + 8, 0);
     drawText(ctx, "THREE IN A ROW BREAKS", W / 2, cy + 44, C.good, 1, "center");
-    copy = ["FLICK A BOTTLE INTO THE ONE", "NEXT TO IT TO SWAP THEM."];
+    copy = HOWTO_COPY[0];
   } else if (page === 1) {
-    row(["scotch", "scotch", "scotch", "scotch"], cy - 44);
-    drawText(ctx, "FOUR TAKES THE NEIGHBOURS TOO", W / 2, cy - 22, C.good, 1, "center");
-    row(["coffee"], cy + 10);
-    drawText(ctx, "A COFFEE CUP GIVES SWIPES BACK", W / 2, cy + 44, C.good, 1, "center");
-    copy = ["THE MORE YOU LINE UP,", "THE MORE GOES WITH IT."];
+    row(["scotch", "scotch", "scotch", "scotch"], cy - 36);
+    row(["scotch", "scotch", "scotch", "scotch", "coffee"], cy + 18);
+    copy = HOWTO_COPY[1];
   } else {
-    row(["bourbon", "gin", "tequila", "scotch"], cy - 40);
-    drawTextMarquee(ctx, "X2", W / 2, cy - 12, C.brass, 2, "center", C.black);
-    drawText(ctx, "POUR THE GUEST'S SHOT IN ORDER", W / 2, cy + 20, C.good, 1, "center");
-    drawText(ctx, "IT CLEARS THE BAR AROUND IT", W / 2, cy + 34, C.dim, 1, "center");
-    copy = ["FILL THE GUEST'S ORDER BEFORE", "YOUR SWIPES RUN OUT."];
+    // Centred in the panel: with the captions gone the copy carries the page,
+    // and content pinned to the top left the frame looking half empty.
+    row(["bourbon", "gin", "tequila", "scotch"], cy - 24);
+    drawTextMarquee(ctx, "X2", W / 2, cy + 14, C.brass, 2, "center", C.black);
+    copy = HOWTO_COPY[2];
   }
 
-  copy.forEach((line, i) => {
-    drawText(ctx, line, W / 2, cy + 86 + i * 12, C.bone, 1, "center");
-  });
+  // Wrapped, and each paragraph separated by a blank line.
+  let ty = cy + 84;
+  for (const paragraph of copy) {
+    for (const line of wrapLines(paragraph, W - 44, 1)) {
+      drawText(ctx, line, W / 2, ty, C.bone, 1, "center");
+      ty += lineHeight(1);
+    }
+    ty += PARAGRAPH_GAP;
+  }
 
   drawTapHint(ctx, page === HOWTO_PAGES - 1 ? "TAP TO POUR" : "TAP TO CONTINUE", h, t);
 }
@@ -1125,9 +1094,11 @@ function drawRecipeScreen(ctx: CanvasRenderingContext2D, g: Game, h: number, t: 
   drawText(ctx, "LINE THESE UP IN ORDER", W / 2, Math.round(h * 0.52), C.bone, 1, "center");
   drawText(ctx, "FOR DOUBLE SCORE", W / 2, Math.round(h * 0.52) + 12, C.brass, 1, "center");
 
-  // And what the guest actually ordered, so the goal is on screen too.
+  // And what the guest actually ordered, so the goal is on screen too. Same
+  // words as the HUD uses over the same bottles, so the screen is teaching the
+  // thing the player is about to be looking at all round.
   fillRect(ctx, 20, Math.round(h * 0.63), W - 40, 1, C.panelLip);
-  drawText(ctx, "THE ORDER", W / 2, Math.round(h * 0.66), C.dim, 1, "center");
+  drawText(ctx, "CLEAR TO ADVANCE", W / 2, Math.round(h * 0.66), C.dim, 1, "center");
   const oy = Math.round(h * 0.74);
   const ostep = 54;
   const ox = W / 2 - ((g.rules.targets.length - 1) * ostep) / 2;
@@ -1138,7 +1109,7 @@ function drawRecipeScreen(ctx: CanvasRenderingContext2D, g: Game, h: number, t: 
   });
   drawText(ctx, `${g.state.swipesLeft} SWIPES`, W / 2, Math.round(h * 0.86), C.white, 2, "center");
 
-  drawTapHint(ctx, "TAP TO POUR", h, t);
+  drawTapHint(ctx, "TAP TO START ROUND", h, t);
 }
 
 function drawTapHint(ctx: CanvasRenderingContext2D, label: string, h: number, t: number) {
@@ -1209,7 +1180,7 @@ export default function LetsDoShots({ onGameOver, onShowScores, demo = false }: 
       queue: [],
       anim: { kind: "idle" },
       selected: null,
-      barback: { t: 0, running: false, tosses: [] },
+      barback: { t: 0, running: false },
       shake: 0,
       recentOrders: [],
       recentGuests: [],
@@ -1404,6 +1375,7 @@ export default function LetsDoShots({ onGameOver, onShowScores, demo = false }: 
         }
         fillRect(ctx, 0, 0, W, h, C.night);
         drawBackBar(ctx, g, layout);
+        drawBartender(ctx, g, layout);
         drawHud(ctx, g, layout);
         drawBoard(ctx, g, layout, t);
         drawRecipe(ctx, g, layout);
@@ -1429,7 +1401,9 @@ export default function LetsDoShots({ onGameOver, onShowScores, demo = false }: 
 
       if (g.phase === "recipe") {
         drawRecipeScreen(ctx, g, h, t);
-        if (g.phaseT > (hold ?? PANEL_HOLD.recipe)) advance();
+        // Attract mode still walks itself through; a real player starts when
+        // they have read it.
+        if (demo && g.phaseT > DEMO_HOLD) advance();
         return;
       }
 

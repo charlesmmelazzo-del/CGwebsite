@@ -101,13 +101,24 @@ Only the scores button is a target you have to hit. Anywhere else on the
 marquee starts the game — missing "start" on a front page is a guest deciding
 the game is broken.
 
+## The panels
+
+Story panels are fitted WHOLE, letterboxed if they have to be. Filling the
+screen edge to edge and cropping the overflow cost the top of the speech bubble
+on the taller panels, so a guest could be halfway through a line the player
+never got to read. The dialogue is the entire point of those screens.
+
 ## The stage flow
 
 1. The bartender: *"Someone said you wanted to order a shot?"*
 2. The guest, with their line in the speech bubble, and the recipe underneath.
 3. The bartender: *"Weird… never heard of that one myself but let's do it!"*
 4. The round's shot, full screen: its name, the four bottles in pour order, what
-   the guest actually ordered, and how many swipes there are to do it in.
+   the guest actually ordered and how much of it, and how many swipes there are
+   to do it in. This is the ONE panel that waits for a tap. Everything else is
+   something being said to the player and moves itself on; this is the screen
+   they are meant to study, and it is the last thing between them and a stage
+   they get a limited number of swipes at.
 5. The board pours in. Anything that matches on the way down breaks — for the
    show of it only: the deal pays no score and fills none of the order, because
    a stage that could be handed to you before you touched it is not a stage.
@@ -162,11 +173,16 @@ in `public/popup/art/shots/`:
 
 | File | What it is |
 | --- | --- |
-| `powerup-coffee.png` | The coffee cup, drawn to sit in a grid cell like a bottle. Same magenta background as the bottle sheet. |
-| `barback.png` | The bar back who runs across restocking the shelf. One row of **four** frames, left to right, a walk cycle, facing right. |
+Everything is in. The ten bottles, twenty-nine guests, the bartender's two
+lettered panels and his four reactions, the bar back's nine-frame run, the
+coffee cup and the marquee.
 
-Both are drawn in code until then — the cup as a mug of coffee, the bar back as
-a small figure in an apron.
+Two sheets are cut as FRAMES — the reactions and the bar back — and both are
+cropped with a single shared rectangle covering all of them, so a character
+cannot change size or hop sideways between poses. The bar back's strip is also
+written at a width that divides exactly by its frame count; a width that does
+not divide leaves every cell boundary a fraction of a pixel out and smears a
+sliver of the next frame into this one.
 
-Already delivered and imported: the ten bottles, the guest panels, the
-bartender's two lettered panels, his four reactions, and the marquee.
+The bar back throws his own bottles — they are drawn into his frames — so the
+game plays the sheet and adds no particles of its own.

@@ -3,13 +3,14 @@
 import assert from "node:assert";
 import fs from "node:fs";
 import path from "node:path";
-import { unrenderable } from "../../arcade";
+import { textWidth, unrenderable } from "../../arcade";
 import { BOTTLES, BOTTLE_IDS, type BottleId, type CellKind } from "../bottles";
 import { ORDERS, recipeBottles } from "../orders";
 import { GUESTS, GUEST_COUNT } from "../guestArt";
-import { MOODS } from "../sprites";
+import { BARBACK_FRAMES, MOODS } from "../sprites";
+import { HOWTO_COPY, PARAGRAPH_GAP, lineHeight, wrapLines } from "../text";
 import {
-  COLS, ROWS, layoutFor, EXIT_CLEARANCE_H, HUD_CONTENT, H_MAX, H_MIN,
+  COLS, ROWS, W, layoutFor, EXIT_CLEARANCE_H, HUD_CONTENT, H_MAX, H_MIN,
 } from "../constants";
 import {
   COFFEE_SWIPES, MAX_COFFEE_ON_BOARD, SCORE_PER_SWIPE_LEFT,
@@ -72,13 +73,11 @@ check("every fixed line the game speaks can be drawn too", () => {
     "Bottoms up!", "Where is my shot??", "GAME OVER", "BONUS SHOT", "SWIPES", "SCORE",
     "TAP TO START", "HIGH SCORES", "COMMON GOOD COCKTAIL HOUSE",
     "THE MOVE", "BIGGER BREAKS", "THE BONUS SHOT",
-    "THREE IN A ROW BREAKS", "FOUR TAKES THE NEIGHBOURS TOO",
-    "A COFFEE CUP GIVES SWIPES BACK", "POUR THE GUEST'S SHOT IN ORDER",
-    "FLICK A BOTTLE INTO THE ONE", "NEXT TO IT TO SWAP THEM.",
-    "THE MORE YOU LINE UP,", "THE MORE GOES WITH IT.",
-    "FILL THE GUEST'S ORDER BEFORE", "YOUR SWIPES RUN OUT.",
+    "THREE IN A ROW BREAKS", "CLEAR TO ADVANCE",
+    ...HOWTO_COPY.flat(),
     "LINE THESE UP IN ORDER", "FOR DOUBLE SCORE", "THE ORDER",
-    "TAP TO CONTINUE", "TAP TO POUR", "TAP TO FINISH", "TAP FOR NEXT ROUND",
+    "TAP TO CONTINUE", "TAP TO POUR", "TAP TO START ROUND", "TAP TO FINISH",
+    "TAP FOR NEXT ROUND",
     "STAGE 1 CLEARED", "CONTINUES 3", "TAP TO POUR IT AGAIN", "1 OF 3",
   ]) {
     assert.deepEqual(unrenderable(line), [], `cannot draw "${line}"`);
@@ -637,6 +636,41 @@ check("the bartender has all four reactions, in one shared frame", () => {
   for (const size of sizes) {
     assert.deepEqual(size, sizes[0], `the reactions are not all the same size: ${JSON.stringify(sizes)}`);
   }
+});
+
+check("the coffee cup and the bar back are in the build", () => {
+  assert.ok(fs.existsSync(path.join(ART, "powerup-coffee.png")), "missing powerup-coffee.png");
+  const strip = path.join(ART, "barback.png");
+  assert.ok(fs.existsSync(strip), "missing barback.png");
+  // The game finds a frame by dividing the strip's width by the frame count. A
+  // width that does not divide leaves every cell boundary a fraction of a pixel
+  // out, and each frame is then drawn from a fractional source rectangle —
+  // which smears a sliver of the next frame into the edge of this one.
+  const { w } = pngSize(strip);
+  assert.equal(w % BARBACK_FRAMES, 0, `the ${w}px strip does not divide into ${BARBACK_FRAMES} whole frames`);
+});
+
+check("the how-to copy fits on the shortest screen", () => {
+  // The pages are written as sentences, not as pre-broken lines, so how many
+  // lines they need depends on the font and the wording. This is what catches a
+  // reworded instruction that quietly runs off the bottom of a small phone.
+  const copyWidth = W - 44;
+  // Where the block starts and where the tap hint sits, from drawHowTo.
+  const top = Math.round(H_MIN * 0.44) + 84;
+  const limit = H_MIN - 20;
+  HOWTO_COPY.forEach((page, i) => {
+    let y = top;
+    for (const paragraph of page) {
+      const lines = wrapLines(paragraph, copyWidth, 1);
+      assert.ok(lines.length > 0, `page ${i + 1} has an empty paragraph`);
+      for (const line of lines) {
+        assert.ok(textWidth(line, 1) <= copyWidth, `page ${i + 1}: "${line}" is too wide to wrap`);
+        y += lineHeight(1);
+      }
+      y += PARAGRAPH_GAP;
+    }
+    assert.ok(y <= limit, `page ${i + 1}'s copy runs to ${y}, past the ${limit} a ${H_MIN}px screen has`);
+  });
 });
 
 check("the marquee is in the build", () => {

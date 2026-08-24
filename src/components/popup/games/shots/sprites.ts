@@ -74,11 +74,29 @@ export function coffeeUrl(): string {
   return `${ART_BASE}/powerup-coffee.png`;
 }
 
-/** A four-frame run cycle, laid out left to right. */
+/**
+ * His run cycle, laid out left to right as one strip.
+ *
+ * Nine frames of running AND throwing: the bottles leaving his hand are drawn
+ * into the artwork, so the game plays the sheet and adds nothing of its own.
+ * Must match BARBACK_FRAMES in scripts/shots-art.mjs, which warns if the
+ * delivered sheet cuts into a different number.
+ */
 export function barbackUrl(): string {
   return `${ART_BASE}/barback.png`;
 }
-export const BARBACK_FRAMES = 4;
+export const BARBACK_FRAMES = 9;
+
+/**
+ * How much of a frame he actually is, and where his feet are in it.
+ *
+ * The frame is over twice his height because the bottles he throws climb most
+ * of the way up it. Sizing him by the frame would therefore draw him at half
+ * the height asked for, so the caller passes the height it wants HIM to be and
+ * these two turn that into the frame's box.
+ */
+const BARBACK_BODY = 0.46;
+const BARBACK_FEET = 0.94;
 
 /** One of a guest's three panels. */
 export function guestUrl(slug: string, panel: "order" | "mad" | "happy"): string {
@@ -358,50 +376,51 @@ function drawCoffeeShape(ctx: CanvasRenderingContext2D, cx: number, cy: number, 
  */
 export function drawBarBack(
   ctx: CanvasRenderingContext2D,
-  x: number,
+  cx: number,
   groundY: number,
-  h: number,
-  frame: number,
-  facing: 1 | -1
+  bodyH: number,
+  frame: number
 ): void {
   const sheet = getImage(barbackUrl());
   if (sheet && sheet.naturalWidth) {
     const cw = sheet.naturalWidth / BARBACK_FRAMES;
-    const w = (cw / sheet.naturalHeight) * h;
-    ctx.save();
-    ctx.translate(Math.round(x), Math.round(groundY - h));
-    if (facing < 0) ctx.scale(-1, 1);
+    const frameH = bodyH / BARBACK_BODY;
+    const frameW = (cw / sheet.naturalHeight) * frameH;
+    const top = groundY - BARBACK_FEET * frameH;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(
+      sheet,
+      Math.floor((frame % BARBACK_FRAMES) * cw), 0, Math.floor(cw), sheet.naturalHeight,
+      Math.round(cx - frameW / 2), Math.round(top), Math.round(frameW), Math.round(frameH)
+    );
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(sheet, (frame % BARBACK_FRAMES) * cw, 0, cw, sheet.naturalHeight,
-      facing < 0 ? -Math.round(w / 2) - Math.round(w / 2) : -Math.round(w / 2), 0, Math.round(w), h);
-    ctx.restore();
     return;
   }
 
   const bob = frame % 2 === 0 ? 0 : 1;
-  const w = Math.round(h * 0.42);
-  const left = Math.round(x - w / 2);
-  const top = Math.round(groundY - h + bob);
+  const w = Math.round(bodyH * 0.42);
+  const left = Math.round(cx - w / 2);
+  const top = Math.round(groundY - bodyH + bob);
 
   // Head, apron, arms, and legs that swap on the beat. At this size the walk is
   // carried entirely by the legs and the bob; anything more is invisible.
   ctx.fillStyle = "#F0C89A";
-  ctx.fillRect(left + Math.round(w * 0.25), top, Math.round(w * 0.5), Math.round(h * 0.24));
+  ctx.fillRect(left + Math.round(w * 0.25), top, Math.round(w * 0.5), Math.round(bodyH * 0.24));
   ctx.fillStyle = C.black;
-  ctx.fillRect(left + Math.round(w * 0.25), top, Math.round(w * 0.5), Math.round(h * 0.08));
+  ctx.fillRect(left + Math.round(w * 0.25), top, Math.round(w * 0.5), Math.round(bodyH * 0.08));
   ctx.fillStyle = "#1B2A46";
-  ctx.fillRect(left, top + Math.round(h * 0.24), w, Math.round(h * 0.42));
+  ctx.fillRect(left, top + Math.round(bodyH * 0.24), w, Math.round(bodyH * 0.42));
   // A narrow apron, not a white slab: at thirty pixels tall a wide light panel
   // swallows the whole figure and he stops reading as a person.
   ctx.fillStyle = C.bone;
-  ctx.fillRect(left + Math.round(w * 0.28), top + Math.round(h * 0.38), Math.round(w * 0.44), Math.round(h * 0.26));
+  ctx.fillRect(left + Math.round(w * 0.28), top + Math.round(bodyH * 0.38), Math.round(w * 0.44), Math.round(bodyH * 0.26));
   ctx.fillStyle = "#F0C89A";
-  const armY = top + Math.round(h * 0.24);
-  ctx.fillRect(left - 2, armY - Math.round(h * 0.08) * (bob ? 1 : 0), 3, Math.round(h * 0.3));
-  ctx.fillRect(left + w - 1, armY - Math.round(h * 0.08) * (bob ? 0 : 1), 3, Math.round(h * 0.3));
+  const armY = top + Math.round(bodyH * 0.24);
+  ctx.fillRect(left - 2, armY - Math.round(bodyH * 0.08) * (bob ? 1 : 0), 3, Math.round(bodyH * 0.3));
+  ctx.fillRect(left + w - 1, armY - Math.round(bodyH * 0.08) * (bob ? 0 : 1), 3, Math.round(bodyH * 0.3));
   ctx.fillStyle = "#101828";
-  const legY = top + Math.round(h * 0.66);
-  const legH = h - Math.round(h * 0.66) - bob;
+  const legY = top + Math.round(bodyH * 0.66);
+  const legH = bodyH - Math.round(bodyH * 0.66) - bob;
   ctx.fillRect(left + (bob ? 0 : 2), legY, Math.round(w * 0.34), legH);
   ctx.fillRect(left + w - Math.round(w * 0.34) - (bob ? 2 : 0), legY, Math.round(w * 0.34), legH);
 }

@@ -65,6 +65,16 @@ const GUEST_PANELS = ["order", "mad", "happy"];
 const BARTENDER_MOODS = ["concentrating", "scared", "happy", "celebrating"];
 
 /**
+ * Frames in the bar back's run cycle.
+ *
+ * He runs and throws in one continuous animation — the bottles leaving his hand
+ * are drawn INTO the frames — so the game plays the sheet and adds nothing of
+ * its own. Must match BARBACK_FRAMES in sprites.ts; a mismatch is reported here
+ * rather than showing up as a character who slides.
+ */
+const BARBACK_FRAMES = 9;
+
+/**
  * How far into a cell to step before reading it.
  *
  * The rules are cleanly detected, but they are ANTI-ALIASED: a couple of pixels
@@ -101,6 +111,58 @@ function crop(img, x0, y0, w, h) {
   return { w, h, data: out };
 }
 
+/** Lay equal-sized cells out left to right as one strip. */
+function composeStrip(cells) {
+  const w = cells[0].w, h = cells[0].h;
+  const outW = w * cells.length;
+  const out = Buffer.alloc(outW * h * 4);
+  cells.forEach((cell, i) => {
+    for (let y = 0; y < h; y++) {
+      const src = cell.data.subarray(y * cell.w * 4, (y * cell.w + w) * 4);
+      src.copy(out, (y * outW + i * w) * 4);
+    }
+  });
+  return { w: outW, h, data: out };
+}
+
+/**
+ * Cut a ruled strip into cells, key each one, and crop them all with ONE
+ * rectangle — the union of what they contain, measured about each cell's own
+ * centre.
+ *
+ * The shared rectangle is the whole point. Trimmed to their own content the
+ * frames differ by however much the pose does, so the character grows, shrinks
+ * and hops from frame to frame. What has to be constant is the FRAME, not what
+ * is inside it.
+ */
+function cutFrames(sheet, cols, pad = 4) {
+  const cells = [];
+  for (const [x0, x1] of cols) {
+    const cell = crop(sheet, x0 + RULE_FRINGE, RULE_FRINGE,
+      x1 - x0 + 1 - RULE_FRINGE * 2, sheet.h - RULE_FRINGE * 2);
+    cutMagenta(cell);
+    killStrays(cell);
+    despill(cell);
+    cells.push(cell);
+  }
+  const w = Math.min(...cells.map((c) => c.w));
+  const h = Math.min(...cells.map((c) => c.h));
+  let minx = w, maxx = -1, miny = h, maxy = -1;
+  for (const cell of cells) {
+    const b = contentBounds(cell);
+    if (!b) continue;
+    const cx = cell.w / 2;
+    minx = Math.min(minx, Math.round(w / 2 + (b.minx - cx)));
+    maxx = Math.max(maxx, Math.round(w / 2 + (b.maxx - cx)));
+    miny = Math.min(miny, b.miny);
+    maxy = Math.max(maxy, b.maxy);
+  }
+  const rx = Math.max(0, minx - pad), ry = Math.max(0, miny - pad);
+  const rw = Math.min(w - rx, maxx - minx + 1 + pad * 2);
+  const rh = Math.min(h - ry, maxy - miny + 1 + pad * 2);
+  return cells.map((cell) => crop(cell, rx + Math.round((cell.w - w) / 2), ry, rw, rh));
+}
+
 /**
  * Encode: resize to a height, quantise, write.
  *
@@ -109,11 +171,21 @@ function crop(img, x0, y0, w, h) {
  * on clean blocks. Nearest-neighbour at a non-integer ratio drops rows out of
  * those blocks instead, which is what makes a downscaled pixel sprite shimmer.
  */
-async function encode(file, img, targetH, colors) {
-  return sharp(img.data, { raw: { width: img.w, height: img.h, channels: 4 } })
-    .resize({ height: Math.min(targetH, img.h), kernel: "lanczos3", withoutEnlargement: true })
-    .png({ palette: true, colors, dither: 0.6, effort: 10, compressionLevel: 9 })
-    .toFile(file);
+async function encode(file, img, targetH, colors, frames = 1) {
+  const h = Math.min(targetH, img.h);
+  const pipe = sharp(img.data, { raw: { width: img.w, height: img.h, channels: 4 } });
+  if (frames > 1) {
+    // The width has to land on a WHOLE number of cells. The game finds a frame
+    // by dividing the image width by the column count, so a strip whose width
+    // does not divide leaves every boundary a fraction of a pixel out — and
+    // each frame is then drawn from a fractional source rectangle, which smears
+    // a sliver of the next frame into the edge of this one.
+    const cell = Math.max(1, Math.round((img.w / frames) * (h / img.h)));
+    pipe.resize({ width: cell * frames, height: h, fit: "fill", kernel: "lanczos3" });
+  } else {
+    pipe.resize({ height: h, kernel: "lanczos3", withoutEnlargement: true });
+  }
+  return pipe.png({ palette: true, colors, dither: 0.6, effort: 10, compressionLevel: 9 }).toFile(file);
 }
 
 // ─── Finding the rules ───────────────────────────────────────────────────────
@@ -436,9 +508,9 @@ if (!fs.existsSync(ROOT)) {
 if (!dry) fs.mkdirSync(DEST, { recursive: true });
 
 const KB = (name) => `  ${(fs.statSync(path.join(DEST, name)).size / 1024).toFixed(0)}KB`;
-async function write(name, img, targetH, colors) {
+async function write(name, img, targetH, colors, frames = 1) {
   if (dry) return "";
-  await encode(path.join(DEST, name), img, targetH, colors);
+  await encode(path.join(DEST, name), img, targetH, colors, frames);
   return KB(name);
 }
 
@@ -527,54 +599,57 @@ if (!reactPath) {
   const cols = ruleRuns(sheet, isGreen, "col").length === 3
     ? bandsFor(sheet, isGreen, "col", 4, "Bartender React")
     : bandsFor(sheet, isMagenta, "col", 4, "Bartender React");
-
-  // Cut and key all four FIRST, then crop them all with ONE rectangle.
-  //
-  // Trimming each mood to its own content was wrong in a way that only shows
-  // up in motion: celebrating has both arms over his head and concentrating
-  // has none, so their content boxes differ by a third. Boxed to a common
-  // height afterwards, that made him visibly shrink the moment he cheered and
-  // swell again when he settled. What has to be constant between frames is the
-  // FRAME, not the character inside it.
-  const cells = [];
-  for (let i = 0; i < Math.min(4, cols.length); i++) {
-    const [x0, x1] = cols[i];
-    const cell = crop(sheet, x0 + RULE_FRINGE, RULE_FRINGE,
-      x1 - x0 + 1 - RULE_FRINGE * 2, sheet.h - RULE_FRINGE * 2);
-    cutMagenta(cell);
-    killStrays(cell);
-    despill(cell);
-    cells.push(cell);
-  }
-
-  const w = Math.min(...cells.map((c) => c.w));
-  const h = Math.min(...cells.map((c) => c.h));
-  let minx = w, maxx = -1, miny = h, maxy = -1;
-  for (const cell of cells) {
-    const b = contentBounds(cell);
-    if (!b) continue;
-    // Measured about each cell's own centre, so a mood drawn slightly off to
-    // one side does not drag the whole set sideways.
-    const cx = cell.w / 2;
-    minx = Math.min(minx, Math.round(w / 2 + (b.minx - cx)));
-    maxx = Math.max(maxx, Math.round(w / 2 + (b.maxx - cx)));
-    miny = Math.min(miny, b.miny);
-    maxy = Math.max(maxy, b.maxy);
-  }
-  const pad = 4;
-  const rx = Math.max(0, minx - pad), ry = Math.max(0, miny - pad);
-  const rw = Math.min(w - rx, maxx - minx + 1 + pad * 2);
-  const rh = Math.min(h - ry, maxy - miny + 1 + pad * 2);
-
-  for (let i = 0; i < cells.length; i++) {
-    const framed = crop(cells[i], rx + Math.round((cells[i].w - w) / 2), ry, rw, rh);
-    const size = await write(`bartender-${BARTENDER_MOODS[i]}.png`, framed, 320, 128);
+  const frames = cutFrames(sheet, cols.slice(0, 4));
+  for (let i = 0; i < frames.length; i++) {
+    const size = await write(`bartender-${BARTENDER_MOODS[i]}.png`, frames[i], 320, 128);
     console.log(`  bartender-${BARTENDER_MOODS[i]}.png`.padEnd(34) +
-      `${cells[i].w}x${cells[i].h} -> ${framed.w}x${framed.h}${size}`);
+      `${frames[i].w}x${frames[i].h}${size}`);
   }
 }
 
-// ── 4. The marquee ──
+// ── 4. The bar back ──
+//
+// One sheet, one continuous run-and-throw cycle, written out as a uniform strip
+// the game slices by column. The bottles leaving his hand are drawn INTO the
+// frames, so the game plays the sheet and adds nothing of its own.
+console.log("\nBar back");
+const barbackPath = [
+  path.join(ROOT, "Barback.png"), path.join(ROOT, "BArback.png"),
+  path.join(ROOT, "Bar Back.png"), path.join(ROOT, "Barback"),
+].find((p) => fs.existsSync(p));
+if (!barbackPath) {
+  console.log("  skip  Barback (not found — the game draws a stand-in)");
+} else {
+  const sheet = await readRGBA(barbackPath);
+  const found = ruleRuns(sheet, isGreen, "col").length + 1;
+  if (found !== BARBACK_FRAMES) {
+    console.log(`  WARNING  the sheet cuts into ${found} frames, but the game expects ${BARBACK_FRAMES}.`);
+    console.log("           Update BARBACK_FRAMES here and in sprites.ts, or he will slide.");
+  }
+  const cols = bandsFor(sheet, isGreen, "col", BARBACK_FRAMES, "Barback");
+  const strip = composeStrip(cutFrames(sheet, cols));
+  const size = await write("barback.png", strip, 224, 128, BARBACK_FRAMES);
+  console.log(`  barback.png`.padEnd(34) + `${sheet.w}x${sheet.h} -> ${strip.w}x${strip.h} (${BARBACK_FRAMES} frames)${size}`);
+}
+
+// ── 5. The coffee cup ──
+console.log("\nCoffee");
+const coffeePath = [
+  path.join(ROOT, "Coffee.png"), path.join(ROOT, "Coffee .png"), path.join(ROOT, "Coffee"),
+].find((p) => fs.existsSync(p));
+if (!coffeePath) {
+  console.log("  skip  Coffee (not found — the game draws a stand-in)");
+} else {
+  const cup = await readRGBA(coffeePath);
+  cutMagenta(cup);
+  killStrays(cup);
+  despill(cup);
+  const trimmed = trimToContent(cup);
+  const size = await write("powerup-coffee.png", trimmed, 200, 128);
+  console.log(`  powerup-coffee.png`.padEnd(34) + `${cup.w}x${cup.h} -> ${trimmed.w}x${trimmed.h}${size}`);
+}
+
+// ── 6. The marquee ──
 console.log("\nLogo");
 const logoPath = [path.join(ROOT, "Logo"), path.join(ROOT, "Logo.png")].find((p) => fs.existsSync(p));
 if (!logoPath) {
@@ -587,7 +662,7 @@ if (!logoPath) {
   console.log(`  logo.png`.padEnd(34) + `${logo.w}x${logo.h}${size}`);
 }
 
-// ── 5. Bartender panels ──
+// ── 7. Bartender panels ──
 console.log("\nBartender");
 const barDir = path.join(ROOT, "Stage Intro Assets", "Bartender");
 const BAR_MAP = { "Bartender 1.png": "bartender-ask.png", "Bartender 2.png": "bartender-go.png" };
@@ -599,7 +674,7 @@ for (const [from, to] of Object.entries(BAR_MAP)) {
   console.log(`  ${to.padEnd(24)}${img.w}x${img.h}${size}`);
 }
 
-// ── 6. The generated bubble table ──
+// ── 8. The generated bubble table ──
 if (guests.length && !dry) {
   const rows = guests.map((g) => {
     const panels = GUEST_PANELS.map((p, i) => {
