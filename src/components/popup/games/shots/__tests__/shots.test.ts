@@ -77,9 +77,8 @@ check("every fixed line the game speaks can be drawn too", () => {
     "THREE IN A ROW BREAKS", "CLEAR TO ADVANCE",
     ...HOWTO_COPY.flat(),
     "LINE THESE UP IN ORDER", "FOR DOUBLE SCORE", "THE ORDER",
-    "TAP TO CONTINUE", "TAP TO POUR", "TAP TO START ROUND", "TAP TO FINISH",
-    "TAP FOR NEXT ROUND",
-    "STAGE 1 CLEARED", "CONTINUES 3", "TAP TO POUR IT AGAIN", "1 OF 3",
+    "TAP TO ADVANCE", "TAP TO START ROUND", "TAP TO FINISH",
+    "STAGE 1 CLEARED", "CONTINUES LEFT 3", "TAP TO POUR IT AGAIN", "1 OF 3",
   ]) {
     assert.deepEqual(unrenderable(line), [], `cannot draw "${line}"`);
   }

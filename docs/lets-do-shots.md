@@ -103,6 +103,18 @@ the game is broken.
 
 ## The panels
 
+**Nothing between stages moves itself on.** Every panel waits for a tap, and
+every one carries the same prompt in the same place at the bottom: TAP TO
+ADVANCE, except the three where the tap does something more specific than "go
+on" — starting the round, spending a continue, ending the run.
+
+They used to sit for two to four seconds and then advance themselves. Reading
+speed is not a constant — somebody is holding a drink, somebody else is showing
+the screen to a friend — and a panel that leaves while you are still reading it
+cannot be got back. Waiting costs a tap the player was going to make anyway.
+Attract mode is the exception: with nobody there to tap, it walks itself
+through.
+
 Every story panel is shown through the same fixed FRAME, centred on black, with
 the picture contained inside it — never cropped. Fitting each panel to the
 screen instead meant every one was scaled differently, so the cast turned up at
@@ -121,10 +133,7 @@ a second, unrelated panel.
 3. The bartender: *"Weird… never heard of that one myself but let's do it!"*
 4. The round's shot, full screen: its name, the four bottles in pour order, what
    the guest actually ordered and how much of it, and how many swipes there are
-   to do it in. This is the ONE panel that waits for a tap. Everything else is
-   something being said to the player and moves itself on; this is the screen
-   they are meant to study, and it is the last thing between them and a stage
-   they get a limited number of swipes at.
+   to do it in.
 5. The board pours in. Anything that matches on the way down breaks — for the
    show of it only: the deal pays no score and fills none of the order, because
    a stage that could be handed to you before you touched it is not a stage.

@@ -44,16 +44,27 @@ const MAX_FALL = 1150;
 const BOUNCE = 0.18;
 
 /**
- * How long the story panels sit before moving themselves on.
+ * NOTHING between stages moves itself on. Every panel waits for a tap.
  *
- * The RECIPE screen is deliberately not in here. Every other panel is something
- * being said to the player, and holding those hostage to a tap just adds taps —
- * but the recipe screen is the one they are meant to STUDY, and it is the last
- * thing between them and a stage they get a limited number of swipes at. That
- * one waits.
+ * They used to sit for two to four seconds and then advance. Reading speed is
+ * not a constant — somebody is holding a drink, somebody else is showing the
+ * screen to a friend — and a panel that leaves while you are still reading it
+ * cannot be got back. Waiting costs a tap the player was going to make anyway.
+ *
+ * Attract mode is the exception: with nobody there to tap, it walks itself
+ * through on DEMO_HOLD.
  */
-const PANEL_HOLD = { ask: 2.4, order: 4.2, go: 2.2 } as const;
 const DEMO_HOLD = 0.9;
+
+/**
+ * The prompt under every screen that waits.
+ *
+ * The same words in the same place every time, so it reads as one instruction
+ * the game keeps making rather than as a different button each screen. Only the
+ * three panels where the tap does something more specific than "go on" say
+ * something else.
+ */
+const TAP_HINT = "TAP TO ADVANCE";
 
 const CONTINUES = 3;
 
@@ -882,7 +893,11 @@ function drawPanel(ctx: CanvasRenderingContext2D, url: string, h: number): Panel
   fillRect(ctx, frame.x - FRAME_BORDER, frame.y - FRAME_BORDER,
     frame.w + FRAME_BORDER * 2, frame.h + FRAME_BORDER * 2, C.panelLip);
   fillRect(ctx, frame.x - 1, frame.y - 1, frame.w + 2, frame.h + 2, C.black);
-  fillRect(ctx, frame.x, frame.y, frame.w, frame.h, C.night);
+  // BLACK inside, not the panel colour. The frame's aspect and the artwork's
+  // are close but not identical, so a sliver of the interior shows above and
+  // below every picture — and against these dark, dark panels a lighter fill
+  // read as a band across the top rather than as nothing at all.
+  fillRect(ctx, frame.x, frame.y, frame.w, frame.h, C.black);
 
   const img = getImage(url);
   if (!img || !img.naturalWidth) return { frame, image: null };
@@ -1127,7 +1142,7 @@ function drawHowTo(ctx: CanvasRenderingContext2D, page: number, h: number, t: nu
     ty += PARAGRAPH_GAP;
   }
 
-  drawTapHint(ctx, page === HOWTO_PAGES - 1 ? "TAP TO POUR" : "TAP TO CONTINUE", h, t);
+  drawTapHint(ctx, TAP_HINT, h, t);
 }
 
 /** The round's shot, full screen, immediately before the board comes up. */
@@ -1445,7 +1460,6 @@ export default function LetsDoShots({ onGameOver, onShowScores, demo = false }: 
       }
 
       // ── Story screens ─────────────────────────────────────────────────────
-      const hold = demo ? DEMO_HOLD : undefined;
 
       if (g.phase === "intro") {
         drawIntro(ctx, h, t, Boolean(onShowScores));
@@ -1469,17 +1483,17 @@ export default function LetsDoShots({ onGameOver, onShowScores, demo = false }: 
       }
 
       if (g.phase === "ask") {
-        drawPanel(ctx, bartenderUrl("ask"), h);
         // The bartender's line is lettered into his artwork already.
-        if (g.phaseT > (hold ?? PANEL_HOLD.ask)) advance();
-        else drawTapHint(ctx, "TAP", h, t);
+        drawPanel(ctx, bartenderUrl("ask"), h);
+        drawTapHint(ctx, TAP_HINT, h, t);
+        if (demo && g.phaseT > DEMO_HOLD) advance();
         return;
       }
 
       if (g.phase === "go") {
         drawPanel(ctx, bartenderUrl("go"), h);
-        if (g.phaseT > (hold ?? PANEL_HOLD.go)) advance();
-        else drawTapHint(ctx, "TAP", h, t);
+        drawTapHint(ctx, TAP_HINT, h, t);
+        if (demo && g.phaseT > DEMO_HOLD) advance();
         return;
       }
 
@@ -1487,7 +1501,8 @@ export default function LetsDoShots({ onGameOver, onShowScores, demo = false }: 
         const panel = drawPanel(ctx, guestUrl(g.guest.slug, "order"), h);
         drawBubble(ctx, g.rules.quip, g.guest.order, panel);
         drawRecipeCard(ctx, g, panel.frame);
-        if (g.phaseT > (hold ?? PANEL_HOLD.order)) advance();
+        drawTapHint(ctx, TAP_HINT, h, t);
+        if (demo && g.phaseT > DEMO_HOLD) advance();
         return;
       }
 
@@ -1500,7 +1515,7 @@ export default function LetsDoShots({ onGameOver, onShowScores, demo = false }: 
           `TOTAL ${g.total}`,
         ], panel.frame, C.good);
 
-        drawTapHint(ctx, "TAP FOR NEXT ROUND", h, t);
+        drawTapHint(ctx, TAP_HINT, h, t);
         if (demo && g.phaseT > DEMO_HOLD) advance();
         return;
       }
@@ -1508,10 +1523,8 @@ export default function LetsDoShots({ onGameOver, onShowScores, demo = false }: 
       if (g.phase === "lost") {
         const panel = drawPanel(ctx, guestUrl(g.guest.slug, "mad"), h);
         drawBubble(ctx, "Where is my shot??", g.guest.mad, panel);
-        drawFooter(ctx, [
-          `CONTINUES ${g.continues}`,
-          "TAP TO POUR IT AGAIN",
-        ], panel.frame, C.hot);
+        drawFooter(ctx, [`CONTINUES LEFT ${g.continues}`], panel.frame, C.hot);
+        drawTapHint(ctx, "TAP TO POUR IT AGAIN", h, t);
         if (demo && g.phaseT > DEMO_HOLD) advance();
         return;
       }
@@ -1520,7 +1533,7 @@ export default function LetsDoShots({ onGameOver, onShowScores, demo = false }: 
       const panel = drawPanel(ctx, guestUrl(g.guest.slug, "mad"), h);
       drawBubble(ctx, "Where is my shot??", g.guest.mad, panel);
       drawFooter(ctx, ["GAME OVER", `SCORE ${g.total}`], panel.frame, C.hot);
-      drawTapHint(ctx, demo ? "" : "TAP TO FINISH", h, t);
+      drawTapHint(ctx, "TAP TO FINISH", h, t);
       if (demo && g.phaseT > DEMO_HOLD * 2) advance();
     },
     [advance, demo, onShowScores]
