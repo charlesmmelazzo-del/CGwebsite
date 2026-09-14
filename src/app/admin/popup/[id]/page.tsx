@@ -365,6 +365,11 @@ export default function PopupEditorPage({ params }: { params: { id: string } }) 
       {/* ── Results ──────────────────────────────────────────────────────── */}
       {!isNew && menu.id && <ResultsPanel menuId={menu.id} slug={menu.slug ?? ""} />}
 
+      {/* ── Raffle tickets ───────────────────────────────────────────────── */}
+      {!isNew && menu.id && cocktails.some((c) => c.gameKey) && (
+        <TicketsPanel menuId={menu.id} cocktails={cocktails} />
+      )}
+
       {/* ── Game winners ─────────────────────────────────────────────────── */}
       {!isNew && menu.id && cocktails.some((c) => c.gameKey) && (
         <WinnersPanel menuId={menu.id} slug={menu.slug ?? ""} status={menu.status ?? "draft"} />
@@ -743,6 +748,278 @@ function ResultsPanel({ menuId, slug }: { menuId: string; slug: string }) {
         </>
       )}
     </Section>
+  );
+}
+
+// ─── Raffle tickets ──────────────────────────────────────────────────────────
+
+interface RangeRow {
+  id: string;
+  cocktailId: string;
+  startSerial: number;
+  endSerial: number;
+  active: boolean;
+  used: number;
+}
+
+interface RedemptionRow {
+  id: string;
+  serial: number;
+  cocktailId: string | null;
+  guestName: string;
+  guestEmail: string;
+  redeemedAt: string;
+  completed: boolean;
+  score: number | null;
+}
+
+/**
+ * Which ticket numbers buy a High Score Run on which game.
+ *
+ * Saved the moment they're added — no need to hit the page's Save button — but
+ * only for cocktails that have already been saved, since a range hangs off the
+ * cocktail's id.
+ */
+function TicketsPanel({ menuId, cocktails }: { menuId: string; cocktails: EditableCocktail[] }) {
+  const [ranges, setRanges] = useState<RangeRow[]>([]);
+  const [redemptions, setRedemptions] = useState<RedemptionRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/admin/popup/tickets?menuId=${encodeURIComponent(menuId)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Could not load tickets.");
+      setRanges(data.ranges ?? []);
+      setRedemptions(data.redemptions ?? []);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load tickets.");
+    } finally {
+      setLoading(false);
+    }
+  }, [menuId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function call(method: "POST" | "PATCH" | "DELETE", body: Record<string, unknown>) {
+    setError(null);
+    const res = await fetch(
+      method === "DELETE"
+        ? `/api/admin/popup/tickets?id=${encodeURIComponent(String(body.id))}`
+        : "/api/admin/popup/tickets",
+      {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: method === "DELETE" ? undefined : JSON.stringify({ menuId, ...body }),
+      }
+    );
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error ?? "Could not save.");
+      return false;
+    }
+    await load();
+    return true;
+  }
+
+  const games = cocktails.filter((c) => c.gameKey);
+  const nameById = new Map(cocktails.map((c) => [c.id, c.name || "Untitled cocktail"]));
+
+  return (
+    <Section title="Raffle Tickets — High Score Runs" defaultOpen>
+      <p className="text-[11px] text-gray-400 leading-relaxed mb-4">
+        Each ticket number is good for one High Score Run on one game. Enter the first and last
+        number on each roll of tickets for that cocktail. Only runs played on a ticket go on the
+        high score boards — free play never does.
+      </p>
+
+      {error && (
+        <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-xs text-red-700">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <p className="text-xs text-gray-400 py-6 text-center">Loading…</p>
+      ) : (
+        <div className="space-y-2">
+          {games.map((c) => (
+            <TicketGame
+              key={c.id}
+              cocktail={c}
+              ranges={ranges.filter((r) => r.cocktailId === c.id)}
+              onAdd={(startSerial, endSerial) => call("POST", { cocktailId: c.id, startSerial, endSerial })}
+              onToggle={(r) => call("PATCH", { id: r.id, active: !r.active })}
+              onDelete={(r) => {
+                if (
+                  confirm(
+                    `Remove tickets ${r.startSerial}–${r.endSerial}? Tickets from it that haven't been played will stop working. Scores already set stay on the board.`
+                  )
+                )
+                  call("DELETE", { id: r.id });
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      {redemptions.length > 0 && (
+        <div className="mt-6">
+          <p className="text-[10px] tracking-widest uppercase text-gray-400 mb-2">
+            Recently played tickets
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-[10px] tracking-widest uppercase text-gray-400 border-b border-gray-200">
+                  <th className="text-left font-normal py-2">Ticket</th>
+                  <th className="text-left font-normal py-2">Game</th>
+                  <th className="text-left font-normal py-2">Guest</th>
+                  <th className="text-right font-normal py-2">Score</th>
+                  <th className="text-right font-normal py-2">When</th>
+                </tr>
+              </thead>
+              <tbody>
+                {redemptions.map((r) => (
+                  <tr key={r.id} className="border-b border-gray-100">
+                    <td className="py-2 tabular-nums text-gray-800">{r.serial}</td>
+                    <td className="py-2 text-gray-600">{(r.cocktailId && nameById.get(r.cocktailId)) || "—"}</td>
+                    <td className="py-2 text-gray-600">
+                      {r.guestName}
+                      <span className="block text-[10px] text-gray-400 break-all">{r.guestEmail}</span>
+                    </td>
+                    <td className="py-2 text-right tabular-nums text-gray-800">
+                      {r.score !== null ? r.score.toLocaleString() : (
+                        <span className="text-gray-400">{r.completed ? "—" : "Not finished"}</span>
+                      )}
+                    </td>
+                    <td className="py-2 text-right text-gray-400 whitespace-nowrap">
+                      {new Date(r.redeemedAt).toLocaleString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </Section>
+  );
+}
+
+function TicketGame({
+  cocktail,
+  ranges,
+  onAdd,
+  onToggle,
+  onDelete,
+}: {
+  cocktail: EditableCocktail;
+  ranges: RangeRow[];
+  onAdd: (start: string, end: string) => Promise<boolean>;
+  onToggle: (r: RangeRow) => void;
+  onDelete: (r: RangeRow) => void;
+}) {
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+  const [busy, setBusy] = useState(false);
+  const unsaved = cocktail.id.startsWith("new-");
+  const game = listGames().find((g) => g.key === cocktail.gameKey);
+
+  async function add() {
+    setBusy(true);
+    if (await onAdd(start, end)) {
+      setStart("");
+      setEnd("");
+    }
+    setBusy(false);
+  }
+
+  const input =
+    "w-32 px-2.5 py-1.5 border border-gray-200 text-sm tabular-nums focus:outline-none focus:border-gray-400";
+
+  return (
+    <div className="border border-gray-200 p-3.5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <span className="text-sm text-gray-800">{cocktail.name || "Untitled cocktail"}</span>
+        <span className="text-[10px] tracking-wider uppercase text-gray-400">{game?.title}</span>
+      </div>
+
+      {unsaved ? (
+        <p className="mt-2 text-xs text-gray-400">Save the pop-up first, then add tickets here.</p>
+      ) : (
+        <>
+          {ranges.length === 0 ? (
+            <p className="mt-2 text-xs text-amber-700">
+              No tickets yet — nobody can play a High Score Run on this game.
+            </p>
+          ) : (
+            <ul className="mt-2 space-y-1">
+              {ranges.map((r) => {
+                const total = r.endSerial - r.startSerial + 1;
+                return (
+                  <li key={r.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                    <span className={`tabular-nums ${r.active ? "text-gray-800" : "text-gray-400 line-through"}`}>
+                      {r.startSerial} – {r.endSerial}
+                    </span>
+                    <span className="text-gray-400">
+                      {r.used.toLocaleString()} of {total.toLocaleString()} played
+                    </span>
+                    <button
+                      onClick={() => onToggle(r)}
+                      className="ml-auto text-[10px] tracking-wider uppercase text-gray-400 hover:text-gray-700"
+                    >
+                      {r.active ? "Pause" : "Resume"}
+                    </button>
+                    <button
+                      onClick={() => onDelete(r)}
+                      className="text-gray-300 hover:text-red-500"
+                      aria-label="Remove range"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <input
+              inputMode="numeric"
+              placeholder="First #"
+              value={start}
+              onChange={(e) => setStart(e.target.value)}
+              className={input}
+            />
+            <span className="text-gray-300">–</span>
+            <input
+              inputMode="numeric"
+              placeholder="Last #"
+              value={end}
+              onChange={(e) => setEnd(e.target.value)}
+              className={input}
+            />
+            <button
+              onClick={add}
+              disabled={busy || !start || !end}
+              className="px-3 py-1.5 border border-gray-300 text-[11px] tracking-wider uppercase text-gray-600 hover:border-gray-500 disabled:opacity-40"
+            >
+              {busy ? "Adding…" : "Add range"}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 

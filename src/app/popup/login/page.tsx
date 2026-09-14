@@ -119,7 +119,11 @@ function LoginForm() {
 
       <p className="mt-6 text-center text-xs text-white/40">
         New here?{" "}
-        <Link href="/popup/signup" style={{ color: ACCENT }} className="hover:opacity-80">
+        <Link
+          href={`/popup/signup?from=${encodeURIComponent(from)}`}
+          style={{ color: ACCENT }}
+          className="hover:opacity-80"
+        >
           Create an account
         </Link>
       </p>

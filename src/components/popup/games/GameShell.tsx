@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { getGameMeta } from "@/lib/popup/games";
 import { getGameComponent } from "./registry";
@@ -24,6 +24,22 @@ export interface GameShellProps {
   accent?: string;
   /** Skip the attract screen — used when the player asked for the game itself. */
   autoStart?: boolean;
+  /**
+   * Free play: the game runs exactly as normal but nothing is saved — no score,
+   * no progress file. Anyone can do it, signed in or not.
+   */
+  freePlay?: boolean;
+  /**
+   * The raffle ticket this High Score Run was started on (from
+   * /api/popup/ticket). The score endpoint refuses a run without one, except in
+   * the admin sandbox. A ticket buys ONE run.
+   */
+  runId?: string | null;
+  /**
+   * Ask for another ticket. Called when a guest wants to go again after their
+   * High Score Run has ended, since the ticket it was played on is spent.
+   */
+  onNewRun?: () => void;
   /**
    * Where "quit" goes. Without it the cabinet falls back to its own attract
    * screen; with it, leaving the game closes whatever opened it.
@@ -49,6 +65,9 @@ export default function GameShell({
   isSandbox = false,
   accent = P.yellow,
   autoStart = false,
+  freePlay = false,
+  runId = null,
+  onNewRun,
   onExit,
 }: GameShellProps) {
   const meta = getGameMeta(gameKey);
@@ -61,6 +80,17 @@ export default function GameShell({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedThisRun, setSavedThisRun] = useState(false);
   const [paused, setPaused] = useState(false);
+
+  // A ticketed run is spent once it ends; going again needs a new ticket. The
+  // sandbox has no tickets, so the owner can replay freely there.
+  const needsTicket = !freePlay && !isSandbox;
+  const [runSpent, setRunSpent] = useState(false);
+  const lastRun = useRef<{ score: number; detail: Record<string, unknown> } | null>(null);
+
+  const playAgain = useCallback(() => {
+    if (needsTicket && runSpent && onNewRun) onNewRun();
+    else setPhase("playing");
+  }, [needsTicket, runSpent, onNewRun]);
 
   const loadBoard = useCallback(async () => {
     try {
@@ -131,43 +161,54 @@ export default function GameShell({
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, [phase]);
 
+  const postScore = useCallback(async () => {
+    const run = lastRun.current;
+    if (!run) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const res = await fetch("/api/popup/score", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          menuId,
+          cocktailId,
+          gameKey,
+          score: run.score,
+          detail: run.detail,
+          sandbox: isSandbox,
+          runId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSaveError(data.error ?? "Could not save your score.");
+        return;
+      }
+      setBoard(data.board ?? null);
+      setSavedThisRun(true);
+    } catch {
+      setSaveError("Network error — your score wasn't saved.");
+    } finally {
+      setSaving(false);
+    }
+  }, [menuId, cocktailId, gameKey, isSandbox, runId]);
+
   const handleGameOver = useCallback(
     async (finalScore: number, detail?: Record<string, unknown>) => {
       setScore(finalScore);
       setPhase("over");
       setSavedThisRun(false);
       setSaveError(null);
+      lastRun.current = { score: finalScore, detail: detail ?? {} };
 
+      if (freePlay) return;
+      setRunSpent(true);
       if (!viewerId || !scoringOpen) return;
-
-      setSaving(true);
-      try {
-        const res = await fetch("/api/popup/score", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            menuId,
-            cocktailId,
-            gameKey,
-            score: finalScore,
-            detail: detail ?? {},
-            sandbox: isSandbox,
-          }),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          setSaveError(data.error ?? "Could not save your score.");
-          return;
-        }
-        setBoard(data.board ?? null);
-        setSavedThisRun(true);
-      } catch {
-        setSaveError("Network error — your score wasn't saved.");
-      } finally {
-        setSaving(false);
-      }
+      if (!runId && !isSandbox) return;
+      await postScore();
     },
-    [viewerId, scoringOpen, menuId, cocktailId, gameKey, isSandbox]
+    [freePlay, viewerId, scoringOpen, runId, isSandbox, postScore]
   );
 
   if (!meta || !Game) {
@@ -196,7 +237,9 @@ export default function GameShell({
         <Game
           onGameOver={handleGameOver}
           menuId={menuId}
-          viewerId={viewerId}
+          // Free play keeps no save file, so progress can't be farmed at home
+          // and carried into a ticketed run.
+          viewerId={freePlay ? null : viewerId}
           paused={paused}
           onShowScores={() => setPhase("attract")}
         />
@@ -204,6 +247,7 @@ export default function GameShell({
           <PauseScreen
             title={meta.title}
             accent={accent}
+            ticketRun={needsTicket}
             onResume={() => setPaused(false)}
             onExit={leave}
           />
@@ -234,6 +278,9 @@ export default function GameShell({
             <p style={{ color: accent }} className="text-center text-[11px] tracking-[0.3em] uppercase font-bold">
               {meta.title}
             </p>
+            <p className="mt-1 text-center text-[9px] tracking-[0.3em] uppercase text-white/40">
+              {freePlay ? "Free Play" : "High Score Run"}
+            </p>
             <GameOverScreen
               score={score}
               board={board}
@@ -244,7 +291,10 @@ export default function GameShell({
               scoringOpen={scoringOpen}
               viewerId={viewerId}
               emailVerified={emailVerified}
-              onReplay={() => setPhase("playing")}
+              freePlay={freePlay}
+              needsTicket={needsTicket}
+              onRetrySave={runId ? postScore : undefined}
+              onReplay={playAgain}
               onQuit={leave}
             />
           </div>
@@ -272,7 +322,8 @@ export default function GameShell({
           scoringOpen={scoringOpen}
           viewerId={viewerId}
           emailVerified={emailVerified}
-          onStart={() => setPhase("playing")}
+          freePlay={freePlay}
+          onStart={playAgain}
         />
       </div>
     </div>
@@ -288,11 +339,13 @@ export default function GameShell({
 function PauseScreen({
   title,
   accent,
+  ticketRun,
   onResume,
   onExit,
 }: {
   title: string;
   accent: string;
+  ticketRun: boolean;
   onResume: () => void;
   onExit: () => void;
 }) {
@@ -324,6 +377,11 @@ function PauseScreen({
         >
           Exit
         </button>
+        {ticketRun && (
+          <p className="mt-3 text-[10px] leading-relaxed text-white/45">
+            Exiting ends this High Score Run. Your ticket has been used.
+          </p>
+        )}
       </div>
     </div>
   );
@@ -338,6 +396,7 @@ function AttractScreen({
   scoringOpen,
   viewerId,
   emailVerified,
+  freePlay,
   onStart,
 }: {
   meta: NonNullable<ReturnType<typeof getGameMeta>>;
@@ -346,6 +405,7 @@ function AttractScreen({
   scoringOpen: boolean;
   viewerId: string | null;
   emailVerified: boolean;
+  freePlay: boolean;
   onStart: () => void;
 }) {
   return (
@@ -370,6 +430,7 @@ function AttractScreen({
         scoringOpen={scoringOpen}
         viewerId={viewerId}
         emailVerified={emailVerified}
+        freePlay={freePlay}
       />
 
       <button
@@ -401,6 +462,9 @@ function GameOverScreen({
   scoringOpen,
   viewerId,
   emailVerified,
+  freePlay,
+  needsTicket,
+  onRetrySave,
   onReplay,
   onQuit,
 }: {
@@ -413,6 +477,9 @@ function GameOverScreen({
   scoringOpen: boolean;
   viewerId: string | null;
   emailVerified: boolean;
+  freePlay: boolean;
+  needsTicket: boolean;
+  onRetrySave?: () => void;
   onReplay: () => void;
   onQuit: () => void;
 }) {
@@ -441,15 +508,24 @@ function GameOverScreen({
         </p>
       )}
 
-      {saveError && <p className="mt-2 text-center text-[11px] text-red-300">{saveError}</p>}
+      {saveError && (
+        <p className="mt-2 text-center text-[11px] text-red-300">
+          {saveError}
+          {onRetrySave && !saving && (
+            <>
+              {" "}
+              <button onClick={onRetrySave} className="underline">
+                Try again
+              </button>
+            </>
+          )}
+        </p>
+      )}
 
-      {!viewerId && scoringOpen && (
+      {freePlay && scoringOpen && (
         <p className="mt-3 text-center text-[11px] text-white/50 leading-relaxed">
-          Nice run — but it wasn&apos;t saved.{" "}
-          <Link href="/popup/signup" style={{ color: accent }} className="underline">
-            Make an account
-          </Link>{" "}
-          to get on the board.
+          Free play — this score isn&apos;t recorded. Play a High Score Run with the ticket from
+          your cocktail to get on the board.
         </p>
       )}
 
@@ -474,7 +550,7 @@ function GameOverScreen({
           style={{ background: accent }}
           className="py-3.5 text-black text-[11px] tracking-[0.2em] uppercase font-bold active:opacity-80"
         >
-          Play Again
+          {needsTicket ? "New Run" : "Play Again"}
         </button>
         <button
           onClick={onQuit}
@@ -500,11 +576,13 @@ function PrizeNotice({
   scoringOpen,
   viewerId,
   emailVerified,
+  freePlay,
 }: {
   accent: string;
   scoringOpen: boolean;
   viewerId: string | null;
   emailVerified: boolean;
+  freePlay: boolean;
 }) {
   if (!scoringOpen) {
     return (
@@ -525,7 +603,11 @@ function PrizeNotice({
       <p className="mt-1 text-[10px] text-white/50">
         Top score on this game when the pop-up ends gets emailed a $15 digital gift card.
       </p>
-      {!viewerId ? (
+      {freePlay ? (
+        <p className="mt-1.5 text-[10px] text-white/40">
+          This is free play — scores only count on a High Score Run.
+        </p>
+      ) : !viewerId ? (
         <p className="mt-1.5 text-[10px] text-white/40">
           <Link href="/popup/signup" className="underline">
             Sign up

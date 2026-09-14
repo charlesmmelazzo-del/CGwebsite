@@ -1,65 +1,38 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Image from "next/image";
-import { X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import GameShell from "../games/GameShell";
 import StartScreen from "../StartScreen";
 import CocktailCarousel from "../cabinet/CocktailCarousel";
-import { C } from "../cabinet/theme";
+import CabButton from "../cabinet/CabButton";
+import { C, withAlpha } from "../cabinet/theme";
 import type { PopupCocktail, PopupTemplateProps } from "@/lib/popup/types";
 
 /**
  * HIGH SCORES — a golden-age arcade pop-up.
  *
- * The whole page is dressed as a room full of cabinets: marquee lettering with
- * a heavy keyline and hard offset shadows, a starburst behind the header like
- * a 1981 flyer, and each cocktail presented as an actual cabinet — lit marquee
- * on top, artwork behind glass in a black bezel, control panel underneath.
+ * The whole page is dressed as a room full of cabinets, and each cocktail is a
+ * screen in a carousel: its name, its game playing itself, and two ways in.
+ *
+ *   FREE PLAY       — anyone, any time, nothing recorded.
+ *   HIGH SCORE RUN  — a signed-in guest spends the raffle ticket that came with
+ *                     their cocktail on one run that counts for the prize. That
+ *                     is what stops someone replaying at home all week to win.
  *
  * Built mobile-first throughout, because nearly everyone meets this standing at
  * the bar with a phone in one hand and a drink in the other.
  */
 
-// ─── Marquee lettering ───────────────────────────────────────────────────────
-
-/**
- * Eight-direction text shadow standing in for a stroke.
- *
- * `-webkit-text-stroke` centres the stroke on the glyph edge, which eats into
- * thin letterforms; stacking offset shadows keeps the letter shape intact and
- * works everywhere.
- */
-function keyline(color: string, w: number): string {
-  const offsets = [
-    [-w, -w],
-    [0, -w],
-    [w, -w],
-    [-w, 0],
-    [w, 0],
-    [-w, w],
-    [0, w],
-    [w, w],
-  ];
-  return offsets.map(([x, y]) => `${x}px ${y}px 0 ${color}`).join(", ");
+/** What's running full screen: which game, and whether it counts. */
+interface Play {
+  cocktailId: string;
+  freePlay: boolean;
+  runId: string | null;
 }
 
-function marquee(opts: {
-  fill: string;
-  stroke?: number;
-  shadow1?: string;
-  shadow2?: string;
-}): React.CSSProperties {
-  const w = opts.stroke ?? 2;
-  const parts = [keyline("#100810", w)];
-  // Tight offsets: a marquee shadow sits just behind the letter. Push it much
-  // further and it stops reading as depth and starts reading as a second word.
-  if (opts.shadow1) parts.push(`${w + 1}px ${w + 1}px 0 ${opts.shadow1}`);
-  if (opts.shadow2) parts.push(`${w + 3}px ${w + 3}px 0 ${opts.shadow2}`);
-  return { color: opts.fill, textShadow: parts.join(", ") };
-}
-
-// ─── Template ────────────────────────────────────────────────────────────────
+/** Query param that reopens the ticket prompt after signing in or up. */
+const RUN_PARAM = "run";
 
 export default function HighScoresTemplate({
   menu,
@@ -75,51 +48,56 @@ export default function HighScoresTemplate({
   voteError,
   isSandbox,
 }: PopupTemplateProps) {
-  const [openId, setOpenId] = useState<string | null>(null);
-  const open = cocktails.find((c) => c.id === openId) ?? null;
+  const [play, setPlay] = useState<Play | null>(null);
+  const playing = cocktails.find((c) => c.id === play?.cocktailId) ?? null;
 
-  // Lock the page behind the detail view so a game's controls can't scroll it.
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpenId(null);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
-
-  // Two independent overlays: `openId` is the cocktail's info card, `playingId`
-  // is a game running full screen. "Play game" goes straight to the second
-  // without passing through the first.
-  const [playingId, setPlayingId] = useState<string | null>(null);
-  const playing = cocktails.find((c) => c.id === playingId) ?? null;
+  // The two prompts in front of a High Score Run.
+  const [signInFor, setSignInFor] = useState<PopupCocktail | null>(null);
+  const [ticketFor, setTicketFor] = useState<PopupCocktail | null>(null);
 
   // The attract screen, shown on EVERY load rather than once per session. It
   // carries the logo, what the pop-up is, and the prize, so none of that has to
   // sit permanently above the cocktails taking up the screen.
   const [started, setStarted] = useState(false);
+  const [startIndex, setStartIndex] = useState(0);
 
   const rankByCocktail = new Map(myVotes.map((v) => [v.cocktailId, v.rank]));
   const myTopPick = myVotes.find((v) => v.rank === 1)?.cocktailId;
+
+  const startHighScoreRun = useCallback(
+    (cocktail: PopupCocktail) => {
+      setPlay(null);
+      // The sandbox has no tickets — the owner tests the real flow otherwise.
+      if (isSandbox) setPlay({ cocktailId: cocktail.id, freePlay: false, runId: null });
+      else if (!viewer) setSignInFor(cocktail);
+      else setTicketFor(cocktail);
+    },
+    [isSandbox, viewer]
+  );
+
+  // Back from signing in to play a particular game: skip the attract screen,
+  // land on that game, and ask for the ticket straight away.
+  const handledReturn = useRef(false);
+  useEffect(() => {
+    if (handledReturn.current) return;
+    handledReturn.current = true;
+    const url = new URL(window.location.href);
+    const id = url.searchParams.get(RUN_PARAM);
+    if (!id) return;
+    url.searchParams.delete(RUN_PARAM);
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+
+    const index = cocktails.findIndex((c) => c.id === id);
+    if (index < 0) return;
+    setStarted(true);
+    setStartIndex(index);
+    if (viewer && isLive) setTicketFor(cocktails[index]);
+  }, [cocktails, viewer, isLive]);
 
   return (
     <div className="min-h-screen bg-[#05030F] text-white relative overflow-hidden">
       <ArcadeBackdrop />
 
-      {/*
-        Nothing above the games. The logo and the explanation live on the attract
-        screen, so once it's cleared the screen is the cocktails, their demos and
-        the arrows to move between them — which is the whole point of moving them.
-      */}
       <div className="relative px-1 sm:px-6 py-3 sm:py-6">
         {!isLive && (
           <p
@@ -150,8 +128,13 @@ export default function HighScoresTemplate({
             voteBusy={voteBusy}
             rankByCocktail={rankByCocktail}
             myTopPick={myTopPick}
-            onOpen={(id) => setOpenId(id)}
-            onPlay={(id) => setPlayingId(id)}
+            scoringOpen={isLive}
+            startIndex={startIndex}
+            onFreePlay={(id) => setPlay({ cocktailId: id, freePlay: true, runId: null })}
+            onHighScoreRun={(id) => {
+              const c = cocktails.find((x) => x.id === id);
+              if (c) startHighScoreRun(c);
+            }}
             onVote={(id) => toggleVote(id)}
           />
         )}
@@ -165,10 +148,10 @@ export default function HighScoresTemplate({
         />
       )}
 
-
-      {playing?.gameKey && (
+      {playing?.gameKey && play && (
         <GameShell
-          key={playing.id}
+          // A new ticket is a new cabinet: fresh score, fresh "spent" state.
+          key={`${playing.id}:${play.freePlay ? "free" : play.runId ?? "sandbox"}`}
           menuId={menu.id}
           cocktailId={playing.id}
           cocktailName={playing.name}
@@ -177,14 +160,249 @@ export default function HighScoresTemplate({
           emailVerified={viewer?.emailVerified ?? false}
           scoringOpen={isLive}
           isSandbox={isSandbox}
+          freePlay={play.freePlay}
+          runId={play.runId}
+          onNewRun={() => startHighScoreRun(playing)}
           accent="#FFD500"
           autoStart
-          onExit={() => setPlayingId(null)}
+          onExit={() => setPlay(null)}
         />
       )}
 
-      {open && <CocktailDetail cocktail={open} onClose={() => setOpenId(null)} />}
+      {signInFor && (
+        <SignInPrompt cocktail={signInFor} onCancel={() => setSignInFor(null)} />
+      )}
+
+      {ticketFor && (
+        <TicketPrompt
+          menuId={menu.id}
+          cocktail={ticketFor}
+          onCancel={() => setTicketFor(null)}
+          onRedeemed={(runId) => {
+            setTicketFor(null);
+            setPlay({ cocktailId: ticketFor.id, freePlay: false, runId });
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+// ─── Prompts ─────────────────────────────────────────────────────────────────
+
+/**
+ * A lit cabinet screen floating over everything. Sits above a running game
+ * (z-70) because "New Run" on the score screen opens the ticket prompt, and
+ * below the attract screen (z-80).
+ */
+function PromptFrame({
+  label,
+  title,
+  onCancel,
+  children,
+}: {
+  label: string;
+  title: string;
+  onCancel: () => void;
+  children: React.ReactNode;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onCancel();
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onCancel]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      className="fixed inset-0 z-[75] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto"
+      onClick={onCancel}
+    >
+      <div
+        className="w-full max-w-sm rounded-[28px] p-6 sm:p-7 text-center"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: `radial-gradient(130% 110% at 50% 30%, #1A1030 0%, #0A0618 60%, #05030F 100%)`,
+          boxShadow: [
+            `inset 0 0 0 3px ${withAlpha(C.gold, 0.55)}`,
+            `0 0 50px -8px ${withAlpha(C.magenta, 0.55)}`,
+            `0 12px 0 ${withAlpha("#000000", 0.5)}`,
+          ].join(", "),
+        }}
+      >
+        <p className="text-[9px] tracking-[0.35em] uppercase" style={{ color: C.teal }}>
+          {label}
+        </p>
+        <h2
+          className="mt-2 text-2xl sm:text-3xl font-black uppercase tracking-tight leading-none"
+          style={{
+            fontFamily: "var(--font-display, system-ui)",
+            color: C.gold,
+            textShadow: `0 0 14px ${withAlpha(C.gold, 0.5)}, 3px 4px 0 ${C.ink}`,
+          }}
+        >
+          {title}
+        </h2>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function SignInPrompt({ cocktail, onCancel }: { cocktail: PopupCocktail; onCancel: () => void }) {
+  const router = useRouter();
+  // Come back to this exact game, with the ticket prompt already open.
+  const back = `${typeof window === "undefined" ? "/popup" : window.location.pathname}?${RUN_PARAM}=${cocktail.id}`;
+  const from = encodeURIComponent(back);
+
+  return (
+    <PromptFrame label="High Score Run" title={cocktail.name} onCancel={onCancel}>
+      <p className="mt-5 text-sm leading-relaxed" style={{ color: withAlpha(C.cream, 0.8) }}>
+        High Score Runs need a player account, so we know who to send your prize to.
+      </p>
+      <p className="mt-2 text-xs leading-relaxed" style={{ color: withAlpha(C.cream, 0.5) }}>
+        One account works for this pop-up and every one after it.
+      </p>
+
+      <div className="mt-6 flex flex-col gap-4">
+        <CabButton
+          color={C.magenta}
+          size="md"
+          className="w-full"
+          onClick={() => router.push(`/popup/signup?from=${from}`)}
+        >
+          Create Account
+        </CabButton>
+        <CabButton
+          color={C.teal}
+          size="md"
+          className="w-full"
+          onClick={() => router.push(`/popup/login?from=${from}`)}
+        >
+          Sign In
+        </CabButton>
+      </div>
+
+      <button
+        onClick={onCancel}
+        className="mt-5 text-[10px] tracking-[0.25em] uppercase underline"
+        style={{ color: withAlpha(C.cream, 0.5) }}
+      >
+        Not now
+      </button>
+    </PromptFrame>
+  );
+}
+
+function TicketPrompt({
+  menuId,
+  cocktail,
+  onCancel,
+  onRedeemed,
+}: {
+  menuId: string;
+  cocktail: PopupCocktail;
+  onCancel: () => void;
+  onRedeemed: (runId: string) => void;
+}) {
+  const [serial, setSerial] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!serial.trim() || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/popup/ticket", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ menuId, cocktailId: cocktail.id, serial }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.runId) {
+        setError(data.error ?? "That ticket didn't work. Try again.");
+        return;
+      }
+      onRedeemed(String(data.runId));
+    } catch {
+      setError("Network error — check your connection and try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <PromptFrame label="High Score Run" title={cocktail.name} onCancel={onCancel}>
+      <form onSubmit={submit}>
+        <p className="mt-5 text-sm leading-relaxed" style={{ color: withAlpha(C.cream, 0.85) }}>
+          Enter the code from the ticket included with your cocktail.
+        </p>
+        <p
+          className="mt-2 text-[11px] tracking-[0.25em] uppercase font-bold"
+          style={{ color: C.gold }}
+        >
+          One ticket = 1 play
+        </p>
+
+        <input
+          autoFocus
+          inputMode="numeric"
+          autoComplete="off"
+          aria-label="Ticket number"
+          placeholder="Ticket #"
+          value={serial}
+          onChange={(e) => {
+            setSerial(e.target.value);
+            setError(null);
+          }}
+          className="mt-5 w-full rounded-2xl px-4 py-3.5 text-center text-2xl tracking-[0.2em] tabular-nums font-bold text-white placeholder-white/25 focus:outline-none"
+          style={{
+            background: "#05030F",
+            boxShadow: `inset 0 0 0 2px ${withAlpha(error ? C.magenta : C.teal, 0.7)}, inset 0 0 20px ${withAlpha("#000000", 0.9)}`,
+          }}
+        />
+
+        {error && (
+          <p className="mt-3 text-xs leading-relaxed" role="alert" style={{ color: C.magenta }}>
+            {error}
+          </p>
+        )}
+
+        <p className="mt-3 text-[10px] leading-relaxed" style={{ color: withAlpha(C.cream, 0.45) }}>
+          Your ticket is used as soon as the run starts.
+        </p>
+
+        {/* A real submit button so the phone keyboard's "Go" starts the run. */}
+        <div className="mt-5">
+          <CabButton
+            type="submit"
+            color={C.magenta}
+            size="md"
+            className="w-full"
+            disabled={busy || !serial.trim()}
+          >
+            {busy ? "Checking…" : "Start Run"}
+          </CabButton>
+        </div>
+      </form>
+
+      <button
+        onClick={onCancel}
+        className="mt-5 text-[10px] tracking-[0.25em] uppercase underline"
+        style={{ color: withAlpha(C.cream, 0.5) }}
+      >
+        Cancel
+      </button>
+    </PromptFrame>
   );
 }
 
@@ -226,117 +444,5 @@ function ArcadeBackdrop() {
         }}
       />
     </>
-  );
-}
-
-
-// ─── Cabinet card ────────────────────────────────────────────────────────────
-
-
-
-// ─── Detail overlay ──────────────────────────────────────────────────────────
-
-function CocktailDetail({
-  cocktail,
-  onClose,
-}: {
-  cocktail: PopupCocktail;
-  onClose: () => void;
-}) {
-  return (
-    // Fully opaque, not 97%: at 97% the ranking modal showed through it and the
-    // two overlays read as one broken screen.
-    //
-    // Overlay stack for this template, all of which must clear PopupBar (z-40):
-    //   detail card z-50  <  ranking modal z-60  <  running game z-70
-    <div className="fixed inset-0 z-50 bg-[#05030F] overflow-y-auto overscroll-contain">
-      <div className="min-h-full max-w-lg mx-auto px-4 py-4 pb-20">
-        <div className="sticky top-0 z-10 -mx-4 px-4 py-2.5 bg-[#05030F]/95 backdrop-blur flex justify-between items-center border-b-2 border-[#100810]">
-          <p className="text-[10px] tracking-[0.28em] uppercase text-[#FFD500] truncate font-bold">
-            {cocktail.name}
-          </p>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="p-2 -mr-2 text-white/50 hover:text-white"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Artwork behind glass */}
-        {cocktail.imageUrl && (
-          <div className="mt-3 border-[3px] border-[#100810] bg-[#0A0A12] p-2.5">
-            <div className="relative w-full aspect-[4/3] overflow-hidden">
-              <Image
-                src={cocktail.imageUrl}
-                alt={cocktail.name}
-                fill
-                unoptimized
-                className="object-cover"
-              />
-              <div
-                aria-hidden
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                  backgroundImage:
-                    "repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,0.3) 3px, rgba(0,0,0,0.3) 4px)",
-                }}
-              />
-            </div>
-          </div>
-        )}
-
-        <h2
-          style={{
-            ...marquee({ fill: "#FFD500", stroke: 2, shadow1: "#E42B20" }),
-            fontFamily: "var(--font-display, system-ui)",
-          }}
-          className="mt-6 text-4xl font-black tracking-tight uppercase leading-none"
-        >
-          {cocktail.name}
-        </h2>
-        {cocktail.tagline && (
-          <p className="mt-2.5 text-[10px] tracking-[0.28em] uppercase text-[#3CE0E0]">
-            {cocktail.tagline}
-          </p>
-        )}
-
-        {cocktail.ingredients && (
-          <DetailSection title="Ingredients">
-            <p className="text-sm text-white/85 leading-relaxed">{cocktail.ingredients}</p>
-          </DetailSection>
-        )}
-
-        {cocktail.description && (
-          <DetailSection title="Tasting Notes">
-            <p className="text-sm text-white/70 leading-relaxed">{cocktail.description}</p>
-          </DetailSection>
-        )}
-
-        {cocktail.story && (
-          <DetailSection title="The Story">
-            {cocktail.story.split(/\n\s*\n/).map((para, i) => (
-              <p key={i} className="text-sm text-white/60 leading-relaxed mb-3">
-                {para}
-              </p>
-            ))}
-          </DetailSection>
-        )}
-
-
-      </div>
-    </div>
-  );
-}
-
-function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="mt-6">
-      <h3 className="text-[9px] tracking-[0.32em] uppercase text-[#FF7B00] mb-2 font-bold">
-        {title}
-      </h3>
-      {children}
-    </section>
   );
 }

@@ -32,12 +32,12 @@ export async function GET(req: NextRequest) {
   if (code) {
     const { error } = await sb.auth.exchangeCodeForSession(code);
     if (!error) {
-      return NextResponse.redirect(new URL(`${next}?confirmed=1`, url.origin));
+      return NextResponse.redirect(new URL(`${next}${next.includes("?") ? "&" : "?"}confirmed=1`, url.origin));
     }
   } else if (tokenHash && type) {
     const { error } = await sb.auth.verifyOtp({ type, token_hash: tokenHash });
     if (!error) {
-      return NextResponse.redirect(new URL(`${next}?confirmed=1`, url.origin));
+      return NextResponse.redirect(new URL(`${next}${next.includes("?") ? "&" : "?"}confirmed=1`, url.origin));
     }
   }
 

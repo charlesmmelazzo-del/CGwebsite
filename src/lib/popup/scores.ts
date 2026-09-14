@@ -1,7 +1,7 @@
 // ─── Pop Up Zone — arcade high scores ────────────────────────────────────────
 //
-// Every play-through is stored (see db/popup-high-scores.sql). A leaderboard is
-// each guest's BEST run, computed here rather than stored, so a guest can play
+// Every ticketed play-through is stored (see db/popup-high-scores.sql and
+// db/popup-tickets.sql). A leaderboard is each guest's BEST run, computed here rather than stored, so a guest can play
 // as many times as they like and only their best stands.
 //
 // These boards decide a real $15 gift card, so the read side never exposes a
@@ -61,14 +61,15 @@ export async function getGameBoard(
   let rows: ScoreRow[] = [];
   try {
     const sb = getSupabaseAdmin();
-    const { data } = await sb
+    let query = sb
       .from("popup_game_scores")
       .select("user_id, score, created_at")
       .eq("menu_id", menuId)
       .eq("game_key", gameKey)
-      .eq("is_test", isTest)
-      .order("score", { ascending: false })
-      .limit(2000);
+      .eq("is_test", isTest);
+    // The public board is ticketed runs only. Sandbox runs never have a ticket.
+    if (!isTest) query = query.not("redemption_id", "is", null);
+    const { data } = await query.order("score", { ascending: false }).limit(2000);
     rows = (data ?? []) as ScoreRow[];
   } catch {
     return empty;
@@ -152,6 +153,8 @@ export async function recordScore(args: {
   score: number;
   detail?: Record<string, unknown>;
   isTest?: boolean;
+  /** The raffle ticket this run was played on. */
+  redemptionId?: string | null;
 }): Promise<{ ok: boolean; error?: string }> {
   try {
     const sb = getSupabaseAdmin();
@@ -163,6 +166,7 @@ export async function recordScore(args: {
       score: args.score,
       detail: args.detail ?? {},
       is_test: args.isTest ?? false,
+      redemption_id: args.redemptionId ?? null,
     });
     if (error) throw error;
     return { ok: true };
@@ -220,12 +224,14 @@ export async function getGameWinners(
     let winner: GameWinner["winner"] = null;
     try {
       const sb = getSupabaseAdmin();
-      const { data: top } = await sb
+      let topQuery = sb
         .from("popup_game_scores")
         .select("user_id, score, created_at")
         .eq("menu_id", menuId)
         .eq("game_key", gameKey)
-        .eq("is_test", isTest)
+        .eq("is_test", isTest);
+      if (!isTest) topQuery = topQuery.not("redemption_id", "is", null);
+      const { data: top } = await topQuery
         .order("score", { ascending: false })
         .order("created_at", { ascending: true })
         .limit(1)

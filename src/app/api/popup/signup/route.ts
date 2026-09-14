@@ -46,6 +46,9 @@ export async function POST(req: NextRequest) {
   const firstName = String(body.firstName ?? "").trim();
   const lastName = String(body.lastName ?? "").trim();
   const dateOfBirth = String(body.dateOfBirth ?? "").trim();
+  // Where the confirmation link lands. Same-site paths only.
+  const rawFrom = String(body.from ?? "/popup");
+  const next = rawFrom.startsWith("/") && !rawFrom.startsWith("//") ? rawFrom : "/popup";
 
   if (!email || !email.includes("@")) {
     return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
@@ -81,7 +84,7 @@ export async function POST(req: NextRequest) {
     email,
     password,
     options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || SITE_URL}/api/popup/confirm?next=/popup`,
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || SITE_URL}/api/popup/confirm?next=${encodeURIComponent(next)}`,
     },
   });
 

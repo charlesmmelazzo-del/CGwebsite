@@ -15,6 +15,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
+import Image from "next/image";
 import Link from "next/link";
 import type {
   LeaderboardEntry,
@@ -39,8 +40,10 @@ export default function CocktailCarousel({
   voteBusy,
   rankByCocktail,
   myTopPick,
-  onOpen,
-  onPlay,
+  scoringOpen,
+  startIndex = 0,
+  onFreePlay,
+  onHighScoreRun,
   onVote,
 }: {
   cocktails: PopupCocktail[];
@@ -51,12 +54,17 @@ export default function CocktailCarousel({
   voteBusy: boolean;
   rankByCocktail: Map<string, number>;
   myTopPick?: string;
-  onOpen: (id: string) => void;
-  onPlay: (id: string) => void;
+  /** False once the pop-up has closed — High Score Runs stop with it. */
+  scoringOpen: boolean;
+  /** Slide to open on, e.g. the game a guest just signed in to play. */
+  startIndex?: number;
+  onFreePlay: (id: string) => void;
+  onHighScoreRun: (id: string) => void;
   onVote: (id: string) => void;
 }) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
     align: "center",
+    startIndex,
     // containScroll off is what lets the first and last slides also sit centred
     // with a neighbour showing, instead of being flush to the frame.
     containScroll: false,
@@ -95,8 +103,9 @@ export default function CocktailCarousel({
                 cocktail={c}
                 active={selected === i}
                 rank={rankByCocktail.get(c.id)}
-                onOpen={() => onOpen(c.id)}
-                onPlay={() => onPlay(c.id)}
+                scoringOpen={scoringOpen}
+                onFreePlay={() => onFreePlay(c.id)}
+                onHighScoreRun={() => onHighScoreRun(c.id)}
               />
             </Slide>
           ))}
@@ -175,66 +184,219 @@ function Slide({ children, active }: { children: React.ReactNode; active: boolea
 }
 
 // ─── Cocktail slide ──────────────────────────────────────────────────────────
+//
+// Front: the cocktail's name, its game playing itself, and the two ways to play.
+// Back: everything about the drink. "Cocktail Info" turns the whole screen over
+// rather than opening a separate overlay, so the guest never loses their place.
 
 function CocktailSlide({
   cocktail,
   active,
   rank,
-  onOpen,
-  onPlay,
+  scoringOpen,
+  onFreePlay,
+  onHighScoreRun,
 }: {
   cocktail: PopupCocktail;
   active: boolean;
   rank?: number;
-  onOpen: () => void;
-  onPlay: () => void;
+  scoringOpen: boolean;
+  onFreePlay: () => void;
+  onHighScoreRun: () => void;
 }) {
   const game = getGameMeta(cocktail.gameKey);
+  const [flipped, setFlipped] = useState(false);
+
+  // Swiping away turns the card back to its demo for next time.
+  useEffect(() => {
+    if (!active) setFlipped(false);
+  }, [active]);
+
+  const face: React.CSSProperties = {
+    backfaceVisibility: "hidden",
+    WebkitBackfaceVisibility: "hidden",
+  };
 
   return (
-    <CrtPanel>
-      {/* Name */}
-      <div className="text-center">
-        <h3
-          className="text-2xl sm:text-4xl font-black uppercase tracking-tight leading-none"
-          style={{
-            fontFamily: "var(--font-display, system-ui)",
-            color: C.gold,
-            textShadow: `0 0 14px ${withAlpha(C.gold, 0.5)}, 3px 4px 0 ${C.ink}`,
-          }}
+    <div style={{ perspective: "1600px" }}>
+      <div
+        className="relative transition-transform duration-700"
+        style={{
+          transformStyle: "preserve-3d",
+          transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
+          transitionTimingFunction: "cubic-bezier(0.3, 0.1, 0.2, 1)",
+        }}
+      >
+        {/* ── Front ─────────────────────────────────────────────────────── */}
+        <div style={{ ...face, transform: "rotateY(0deg)" }} aria-hidden={flipped}>
+          <CrtPanel>
+            <div className="text-center">
+              <h3
+                className="text-2xl sm:text-4xl font-black uppercase tracking-tight leading-none"
+                style={{
+                  fontFamily: "var(--font-display, system-ui)",
+                  color: C.gold,
+                  textShadow: `0 0 14px ${withAlpha(C.gold, 0.5)}, 3px 4px 0 ${C.ink}`,
+                }}
+              >
+                {cocktail.name}
+              </h3>
+              {rank !== undefined && (
+                <p className="mt-2 text-[9px] tracking-[0.3em] uppercase" style={{ color: C.teal }}>
+                  {rank === 1 ? "★ Your favorite" : `★ Ranked #${rank}`}
+                </p>
+              )}
+            </div>
+
+            {/* Attract-mode demo of this cocktail's game */}
+            <div className="mt-4">
+              <GameDemo gameKey={cocktail.gameKey} running={active && !flipped} />
+            </div>
+
+            {game ? (
+              <div className="mt-5 flex flex-col items-center">
+                <Caption>Free play to play without high scores</Caption>
+                <div className="mt-3 w-full max-w-[280px] flex flex-col gap-4">
+                  <CabButton color={C.teal} size="md" className="w-full" onClick={onFreePlay}>
+                    Free Play
+                  </CabButton>
+                  <CabButton
+                    color={C.magenta}
+                    size="md"
+                    className="w-full"
+                    onClick={onHighScoreRun}
+                    disabled={!scoringOpen}
+                  >
+                    High Score Run
+                  </CabButton>
+                </div>
+                <Caption className="mt-4">
+                  {scoringOpen ? "High score run to win prizes" : "This pop-up has closed — scores are final"}
+                </Caption>
+              </div>
+            ) : (
+              <p
+                className="mt-5 text-center text-[10px] tracking-[0.3em] uppercase"
+                style={{ color: withAlpha(C.cream, 0.55) }}
+              >
+                Game coming soon
+              </p>
+            )}
+
+            <div className="mt-5 flex justify-center">
+              <CabButton color={C.gold} size="sm" depth={4} onClick={() => setFlipped(true)}>
+                Cocktail Info
+              </CabButton>
+            </div>
+          </CrtPanel>
+        </div>
+
+        {/* ── Back ──────────────────────────────────────────────────────── */}
+        <div
+          className="absolute inset-0"
+          style={{ ...face, transform: "rotateY(180deg)" }}
+          aria-hidden={!flipped}
         >
-          {cocktail.name}
-        </h3>
-        {rank !== undefined && (
-          <p className="mt-2 text-[9px] tracking-[0.3em] uppercase" style={{ color: C.teal }}>
-            {rank === 1 ? "★ Your favorite" : `★ Ranked #${rank}`}
+          <CrtPanel fill accents={false} glow={C.gold}>
+            <CocktailInfo cocktail={cocktail} onClose={() => setFlipped(false)} />
+          </CrtPanel>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Caption({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <p
+      className={`text-center text-[9px] sm:text-[10px] tracking-[0.14em] uppercase leading-relaxed ${className}`}
+      style={{ color: withAlpha(C.cream, 0.65) }}
+    >
+      {children}
+    </p>
+  );
+}
+
+function CocktailInfo({ cocktail, onClose }: { cocktail: PopupCocktail; onClose: () => void }) {
+  return (
+    <div className="h-full flex flex-col">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3
+            className="text-2xl sm:text-3xl font-black uppercase tracking-tight leading-none"
+            style={{
+              fontFamily: "var(--font-display, system-ui)",
+              color: C.gold,
+              textShadow: `0 0 14px ${withAlpha(C.gold, 0.5)}, 3px 4px 0 ${C.ink}`,
+            }}
+          >
+            {cocktail.name}
+          </h3>
+          {cocktail.tagline && (
+            <p className="mt-2 text-[9px] tracking-[0.28em] uppercase" style={{ color: C.teal }}>
+              {cocktail.tagline}
+            </p>
+          )}
+        </div>
+        <CabButton shape="round" size="sm" depth={4} color={C.magenta} ariaLabel="Close cocktail info" onClick={onClose}>
+          <svg width="14" height="14" viewBox="0 0 12 12" aria-hidden>
+            <path d="M2 2 L10 10 M10 2 L2 10" stroke="#12060F" strokeWidth="2.4" strokeLinecap="round" />
+          </svg>
+        </CabButton>
+      </div>
+
+      {/* Long stories scroll inside the card, so it keeps the demo side's size. */}
+      <div className="mt-4 flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1">
+        {cocktail.imageUrl && (
+          <div className="relative w-full aspect-[4/3] overflow-hidden rounded-xl">
+            <Image src={cocktail.imageUrl} alt={cocktail.name} fill unoptimized className="object-cover" />
+          </div>
+        )}
+
+        {cocktail.ingredients && (
+          <InfoSection title="Ingredients">
+            <p className="text-sm leading-relaxed" style={{ color: withAlpha(C.cream, 0.9) }}>
+              {cocktail.ingredients}
+            </p>
+          </InfoSection>
+        )}
+
+        {cocktail.description && (
+          <InfoSection title="Tasting Notes">
+            <p className="text-sm leading-relaxed" style={{ color: withAlpha(C.cream, 0.75) }}>
+              {cocktail.description}
+            </p>
+          </InfoSection>
+        )}
+
+        {cocktail.story && (
+          <InfoSection title="The Story">
+            {cocktail.story.split(/\n\s*\n/).map((para, i) => (
+              <p key={i} className="text-sm leading-relaxed mb-3" style={{ color: withAlpha(C.cream, 0.65) }}>
+                {para}
+              </p>
+            ))}
+          </InfoSection>
+        )}
+
+        {!cocktail.ingredients && !cocktail.description && !cocktail.story && !cocktail.imageUrl && (
+          <p className="mt-6 text-center text-xs" style={{ color: withAlpha(C.cream, 0.5) }}>
+            More about this one soon.
           </p>
         )}
       </div>
+    </div>
+  );
+}
 
-      {/* Attract-mode demo of this cocktail's game */}
-      <div className="mt-4">
-        <GameDemo gameKey={cocktail.gameKey} running={active} />
-      </div>
-
-      {/* Tagline */}
-      <p
-        className="mt-4 text-center text-[11px] sm:text-sm leading-relaxed"
-        style={{ color: withAlpha(C.cream, 0.85) }}
-      >
-        {cocktail.tagline || (game ? game.blurb : "")}
-      </p>
-
-      {/* Controls */}
-      <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-        <CabButton color={C.teal} size="md" onClick={onOpen}>
-          Cocktail Info
-        </CabButton>
-        <CabButton color={C.magenta} size="md" onClick={onPlay} disabled={!game}>
-          {game ? "Play Game" : "Coming Soon"}
-        </CabButton>
-      </div>
-    </CrtPanel>
+function InfoSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="mt-5">
+      <h4 className="text-[9px] tracking-[0.32em] uppercase mb-2 font-bold" style={{ color: C.sunset }}>
+        {title}
+      </h4>
+      {children}
+    </section>
   );
 }
 

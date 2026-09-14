@@ -16,14 +16,20 @@ export default function CrtPanel({
   children,
   glow = C.sky,
   className = "",
+  fill = false,
+  accents = true,
 }: {
   children: ReactNode;
   glow?: string;
   className?: string;
+  /** Stretch to the parent's height, glass and all — for the back of a flip card. */
+  fill?: boolean;
+  /** The little sprites in the top corners. */
+  accents?: boolean;
 }) {
   return (
     <div
-      className={`relative ${className}`}
+      className={`relative ${fill ? "h-full flex flex-col" : ""} ${className}`}
       style={{
         // The moulded plastic surround.
         borderRadius: R.screen,
@@ -38,7 +44,7 @@ export default function CrtPanel({
       }}
     >
       <div
-        className="relative overflow-hidden px-4 py-6 sm:px-7 sm:py-8"
+        className={`relative overflow-hidden px-4 py-6 sm:px-7 sm:py-8 ${fill ? "flex-1 min-h-0" : ""}`}
         style={{
           // The glass. Rounded hard — a CRT's corners are generous.
           borderRadius: "20px",
@@ -52,18 +58,22 @@ export default function CrtPanel({
           illustration does the heavy lifting elsewhere — these are the nod to
           what is actually running on the tube.
         */}
-        <div aria-hidden className="hidden sm:block absolute left-2 top-2 z-20 opacity-80">
-          <BartenderArt px={2} mood="happy" holdingTin={false} />
-        </div>
-        <div
-          aria-hidden
-          className="hidden sm:block absolute right-2 top-2 z-20 opacity-80"
-          style={{ transform: "scaleX(-1)" }}
-        >
-          <SpriteArt sprite={GUEST} colors={GUEST_SWAPS[0]} px={2} />
-        </div>
+        {accents && (
+          <>
+            <div aria-hidden className="hidden sm:block absolute left-2 top-2 z-20 opacity-80">
+              <BartenderArt px={2} mood="happy" holdingTin={false} />
+            </div>
+            <div
+              aria-hidden
+              className="hidden sm:block absolute right-2 top-2 z-20 opacity-80"
+              style={{ transform: "scaleX(-1)" }}
+            >
+              <SpriteArt sprite={GUEST} colors={GUEST_SWAPS[0]} px={2} />
+            </div>
+          </>
+        )}
 
-        <div className="relative z-10">{children}</div>
+        <div className={`relative z-10 ${fill ? "h-full" : ""}`}>{children}</div>
 
         {/* Scanlines, at page scale rather than sprite scale. */}
         <div

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { MailCheck } from "lucide-react";
 
 const ACCENT = "#C97D5A";
@@ -15,7 +15,22 @@ const ACCENT = "#C97D5A";
  * refuses to create an account at all if it's under 21.
  */
 export default function SignupPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignupForm />
+    </Suspense>
+  );
+}
+
+function SignupForm() {
   const router = useRouter();
+  const params = useSearchParams();
+
+  // Where to go once signed up — e.g. back to the game they wanted to play.
+  // Only same-site paths, never an absolute URL from the query string.
+  const rawFrom = params.get("from") ?? "/popup";
+  const from = rawFrom.startsWith("/") && !rawFrom.startsWith("//") ? rawFrom : "/popup";
+
   const [form, setForm] = useState({
     email: "",
     password: "",
@@ -40,7 +55,7 @@ export default function SignupPage() {
       const res = await fetch("/api/popup/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, from }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -50,7 +65,7 @@ export default function SignupPage() {
       if (data.needsConfirmation) {
         setSentTo(data.email ?? form.email);
       } else {
-        router.push("/popup");
+        router.push(from);
         router.refresh();
       }
     } catch {
@@ -75,11 +90,11 @@ export default function SignupPage() {
           <span className="text-white/90 break-all">{sentTo}</span>. Click it and you&apos;re in.
         </p>
         <p className="mt-4 text-xs text-white/40 leading-relaxed">
-          You can look around the pop-up before confirming — you just need a confirmed email to
-          cast your vote.
+          You can look around and use free play before confirming — you just need a confirmed
+          email to cast your vote.
         </p>
         <Link
-          href="/popup"
+          href={from}
           className="inline-block mt-8 text-[10px] tracking-[0.2em] uppercase text-white/50 hover:text-white transition-colors"
         >
           Go to the pop-up →
@@ -97,7 +112,7 @@ export default function SignupPage() {
         Join the Pop Up Zone
       </h1>
       <p className="mt-3 text-center text-xs text-white/45 leading-relaxed">
-        One account lets you vote on every pop-up. Must be 21 or older.
+        One account lets you vote and play High Score Runs on every pop-up. Must be 21 or older.
       </p>
 
       <form onSubmit={submit} className="mt-9 space-y-4">
@@ -164,7 +179,11 @@ export default function SignupPage() {
 
       <p className="mt-6 text-center text-xs text-white/40">
         Already have an account?{" "}
-        <Link href="/popup/login" style={{ color: ACCENT }} className="hover:opacity-80">
+        <Link
+          href={`/popup/login?from=${encodeURIComponent(from)}`}
+          style={{ color: ACCENT }}
+          className="hover:opacity-80"
+        >
           Sign in
         </Link>
       </p>

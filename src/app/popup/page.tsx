@@ -8,14 +8,16 @@ import { loadExperience } from "@/lib/popup/render";
 export const dynamic = "force-dynamic";
 
 /**
- * The front door. A signed-in guest lands straight on whatever pop-up is
- * currently live — no menu of menus in between, which is what the owner asked
- * for. Everyone else gets the welcome/sign-up screen.
+ * The front door. Everyone lands straight on whatever pop-up is currently live
+ * — no menu of menus in between, which is what the owner asked for. Browsing
+ * and free play need no account; voting and High Score Runs ask for one at the
+ * moment they're used. With nothing live, a signed-out visitor gets the
+ * welcome/sign-up screen.
  */
 export default async function PopupHomePage() {
   const [viewer, { live }] = await Promise.all([getViewer(), getPublicMenus()]);
 
-  if (!viewer) return <PopupWelcome menu={live} />;
+  if (!viewer && !live) return <PopupWelcome menu={null} />;
 
   if (!live) {
     return (

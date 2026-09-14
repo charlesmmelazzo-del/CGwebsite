@@ -43,6 +43,7 @@ export default function CabButton({
   ariaLabel,
   className = "",
   depth = 6,
+  type = "button",
 }: {
   children?: ReactNode;
   onClick?: () => void;
@@ -54,6 +55,7 @@ export default function CabButton({
   className?: string;
   /** How far the cap sits above the deck, in px. Also its press travel. */
   depth?: number;
+  type?: "button" | "submit";
 }) {
   const pad =
     shape === "round"
@@ -70,7 +72,7 @@ export default function CabButton({
 
   return (
     <button
-      type="button"
+      type={type}
       onClick={onClick}
       disabled={disabled}
       aria-label={ariaLabel}

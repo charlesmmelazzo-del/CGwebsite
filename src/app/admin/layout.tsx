@@ -23,6 +23,7 @@ import {
   ImageIcon,
   Files,
   Sparkles,
+  UserRound,
 } from "lucide-react";
 
 type NavItem = { href: string; label: string; icon: typeof Home; exact?: boolean };
@@ -55,6 +56,7 @@ const NAV: NavGroup[] = [
     group: "Pop Up Zone",
     items: [
       { href: "/admin/popup", label: "Pop Ups", icon: Sparkles },
+      { href: "/admin/popup/guests", label: "Guest Accounts", icon: UserRound },
     ],
   },
   {
@@ -90,7 +92,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   function isActive(item: NavItem) {
     if (item.exact) return pathname === item.href;
-    return pathname.startsWith(item.href) && item.href !== "/admin";
+    if (!pathname.startsWith(item.href) || item.href === "/admin") return false;
+    // A nested item (Pop Ups → Guest Accounts) lights up instead of its parent.
+    return !NAV.some((g) =>
+      g.items.some((o) => o.href.length > item.href.length && o.href.startsWith(item.href) && pathname.startsWith(o.href))
+    );
   }
 
   const Sidebar = (

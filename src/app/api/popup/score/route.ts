@@ -6,6 +6,7 @@ import { getCocktails, getMenuById, resolveLiveMenu } from "@/lib/popup/menus";
 import { getGameBoard, MAX_SCORE, recordScore } from "@/lib/popup/scores";
 import { isPlayableGame } from "@/lib/popup/games";
 import { checkRateLimit } from "@/lib/popup/access";
+import { completeRedemption, reopenRedemption } from "@/lib/popup/tickets";
 
 /**
  * GET — the public leaderboard for one game on one pop-up.
@@ -35,8 +36,10 @@ export async function GET(req: NextRequest) {
 /**
  * POST — record a play-through.
  *
- * A score is only stored for a signed-in guest: the prize has to reach a real
- * person, and an anonymous board would be trivial to stuff. Confirming their
+ * A score is only stored for a signed-in guest playing a High Score Run — a
+ * run started by spending a raffle ticket (see /api/popup/ticket), whose id
+ * arrives here as `runId`. Free play never posts. The prize has to reach a
+ * real person who bought a drink. Confirming their
  * email isn't required to *play* or to appear on the board — it's required to
  * be paid, which the UI says plainly and the admin winners panel flags.
  *
@@ -103,6 +106,20 @@ export async function POST(req: NextRequest) {
   }
   const score = Math.min(MAX_SCORE, Math.floor(rawScore));
 
+  // Outside the sandbox, a score needs a ticket — and each ticket saves once.
+  const runId = String(body.runId ?? "");
+  if (!isTest) {
+    const claimed = runId
+      ? await completeRedemption({ redemptionId: runId, userId: viewer.userId, menuId: menu.id, gameKey })
+      : { ok: false as const };
+    if (!claimed.ok) {
+      return NextResponse.json(
+        { error: "Only a High Score Run played on a ticket goes on the board.", reason: "no_ticket" },
+        { status: 403 }
+      );
+    }
+  }
+
   // Only accept a cocktail id that actually belongs to this pop-up.
   const cocktails = await getCocktails(menu.id, { includeInactive: true });
   const cocktailId = String(body.cocktailId ?? "");
@@ -121,8 +138,13 @@ export async function POST(req: NextRequest) {
     score,
     detail: safeDetail,
     isTest,
+    redemptionId: isTest ? null : runId,
   });
-  if (!saved.ok) return NextResponse.json({ error: saved.error }, { status: 500 });
+  if (!saved.ok) {
+    // Let the guest retry the save rather than losing the ticket to a blip.
+    if (!isTest) await reopenRedemption(runId);
+    return NextResponse.json({ error: saved.error }, { status: 500 });
+  }
 
   const board = await getGameBoard(menu.id, gameKey, viewer.userId, isTest);
 
