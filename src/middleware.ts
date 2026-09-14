@@ -15,7 +15,8 @@ function pass(res: NextResponse): NextResponse {
 export async function middleware(req: NextRequest) {
   // ── Preview password ───────────────────────────────────────────────────────
   // First, before anything else: on a staging deployment nothing is served —
-  // not even the admin login page — until the site password is supplied.
+  // not even the admin login page — until the site password is supplied. The
+  // Pop Up Zone is the exception, left open so testers only need the link.
   // Production doesn't set PREVIEW_PASSWORD, so this returns immediately.
   const gated = previewGate(req);
   if (gated) return gated;

@@ -27,6 +27,19 @@ function matches(a: string, b: string): boolean {
 }
 
 /**
+ * Paths anyone with the link can open on a preview, no password — so the owner
+ * can hand the Pop Up Zone to testers while the staging copy of the main site
+ * (and its admin panel, which edits LIVE content) stays behind the gate.
+ * The zone's own protections still apply: guest accounts to vote or save a
+ * score, the admin session for the /popup/preview sandbox.
+ */
+const OPEN_SECTIONS = ["/popup", "/api/popup", "/fonts", "/images", "/favicon.ico"];
+
+function isOpenPath(pathname: string): boolean {
+  return OPEN_SECTIONS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
+/**
  * Returns a 401 challenge when the site is in preview mode and the request
  * hasn't supplied the password, or null to let the request through.
  */
@@ -34,6 +47,8 @@ export function previewGate(req: NextRequest): NextResponse | null {
   const expected = process.env.PREVIEW_PASSWORD;
   // Production has no PREVIEW_PASSWORD, so this is a single env read and out.
   if (!expected) return null;
+
+  if (isOpenPath(req.nextUrl.pathname)) return null;
 
   const header = req.headers.get("authorization");
   if (header?.startsWith("Basic ")) {
