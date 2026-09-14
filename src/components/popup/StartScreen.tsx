@@ -2,33 +2,19 @@
 
 // ─── The attract screen ──────────────────────────────────────────────────────
 //
-// What a cabinet showed before anyone put a coin in: the logo, what the machine
-// is, and PRESS START.
-//
-// It exists so the page underneath doesn't have to explain itself. The header,
-// the banner and the prize notice all used to sit permanently above the
-// cocktails, pushing the actual games down the page. Moving them here means
-// everything a first-time visitor needs is said once, up front, and then the
-// screen belongs entirely to the games.
+// What a cabinet showed before anyone put a coin in: the logo and PRESS START,
+// nothing else. The owner asked for the text above and below the button to go.
 //
 // Shown on EVERY load, deliberately — not once per session, not behind a
 // dismissed flag. It's the front of house.
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { C, withAlpha } from "./cabinet/theme";
 import CabButton from "./cabinet/CabButton";
 import { INK } from "./cabinet/art/props";
 
-export default function StartScreen({
-  subtitle,
-  description,
-  onStart,
-}: {
-  subtitle?: string;
-  description?: string;
-  onStart: () => void;
-}) {
+export default function StartScreen({ onStart }: { onStart: () => void }) {
   // Any key starts it, as on a cabinet where every button is the start button.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -40,14 +26,6 @@ export default function StartScreen({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onStart]);
-
-  // The blink is CSS-free and driven by state, because a keyframe animation on
-  // a fixed overlay kept repainting the whole layer on some phones.
-  const [lit, setLit] = useState(true);
-  useEffect(() => {
-    const id = setInterval(() => setLit((v) => !v), 620);
-    return () => clearInterval(id);
-  }, []);
 
   return (
     <div
@@ -92,29 +70,11 @@ export default function StartScreen({
           className="w-full max-w-lg h-auto"
         />
 
-        {subtitle && (
-          <p
-            className="mt-4 text-[10px] sm:text-xs tracking-[0.42em] uppercase"
-            style={{ color: C.teal }}
-          >
-            {subtitle}
-          </p>
-        )}
-
-        {description && (
-          <p
-            className="mt-4 max-w-md text-xs sm:text-sm leading-relaxed"
-            style={{ color: withAlpha(C.cream, 0.8) }}
-          >
-            {description}
-          </p>
-        )}
-
-        {/* ── Press start ──────────────────────────────────────────────── */}
-        <div
-          className="mt-9 w-full max-w-[320px] transition-[filter] duration-300"
-          style={{ filter: `drop-shadow(0 0 ${lit ? 18 : 6}px ${withAlpha(C.gold, lit ? 0.6 : 0.25)})` }}
-        >
+        {/*
+          No pulsing glow: a filter animating over pixel art re-rasterised the
+          button every half second and made it flicker.
+        */}
+        <div className="mt-9 w-full max-w-[320px]">
           <CabButton color={C.gold} size="lg" className="w-full" onClick={onStart}>
             Press Start
           </CabButton>

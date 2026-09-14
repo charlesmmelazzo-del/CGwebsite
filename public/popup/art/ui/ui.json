@@ -1,23 +1,89 @@
 {
   "pill": {
-    "width": 446,
-    "height": 139,
-    "cap": 76
+    "width": 56,
+    "height": 17,
+    "cap": 9
+  },
+  "icons": {
+    "arrow-left": [
+      26,
+      25
+    ],
+    "arrow-left-pressed": [
+      26,
+      25
+    ],
+    "arrow-right": [
+      26,
+      24
+    ],
+    "arrow-right-pressed": [
+      26,
+      24
+    ],
+    "close": [
+      26,
+      24
+    ],
+    "close-pressed": [
+      26,
+      24
+    ],
+    "pause": [
+      26,
+      24
+    ],
+    "pause-pressed": [
+      26,
+      24
+    ],
+    "light-on": [
+      17,
+      17
+    ],
+    "light-off": [
+      17,
+      17
+    ],
+    "star": [
+      21,
+      21
+    ],
+    "ticket-icon": [
+      27,
+      16
+    ],
+    "joystick": [
+      20,
+      28
+    ],
+    "trophy": [
+      26,
+      27
+    ],
+    "coin": [
+      23,
+      25
+    ],
+    "coupe": [
+      25,
+      28
+    ]
   },
   "frame": {
-    "width": 884,
-    "height": 1393,
-    "side": 79,
-    "slice": 135
+    "width": 126,
+    "height": 199,
+    "side": 11,
+    "slice": 20
   },
   "ticket": {
-    "width": 702,
-    "height": 336,
+    "width": 100,
+    "height": 48,
     "box": {
-      "left": 18.9,
-      "top": 30.4,
-      "width": 55.6,
-      "height": 40.2
+      "left": 19,
+      "top": 31.3,
+      "width": 56,
+      "height": 39.6
     }
   }
 }

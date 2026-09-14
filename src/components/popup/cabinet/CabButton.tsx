@@ -41,7 +41,8 @@ const LABEL: Record<PillArt | "disabled", string> = {
   disabled: "#2A2A2A",
 };
 
-const HEIGHT = { sm: 36, md: 50, lg: 62 } as const;
+/** Screen pixels per art pixel. Whole numbers only, so the pixels stay even. */
+const SCALE = { sm: 2, md: 3, lg: 4 } as const;
 const TEXT = { sm: "text-[8px]", md: "text-[10px]", lg: "text-[12px]" } as const;
 
 /**
@@ -87,8 +88,8 @@ export default function CabButton({
 }) {
   const { down, handlers } = usePress();
   const pill = PILL_FOR[color] ?? "gold";
-  const h = HEIGHT[size];
-  const cap = Math.round((h * UI.pill.cap) / UI.pill.height);
+  const h = UI.pill.height * SCALE[size];
+  const cap = UI.pill.cap * SCALE[size];
   const pressed = down && !disabled;
   const shift = ((pressed ? PRESSED_CENTRE : RAISED_CENTRE) - 0.5) * h;
 
@@ -140,25 +141,28 @@ export default function CabButton({
 
 export type IconArt = "arrow-left" | "arrow-right" | "close" | "pause";
 
+const ICON_SIZE: Record<string, number[]> = UI.icons;
+
 /** A round cabinet button with its symbol drawn into the art. */
 export function CabIconButton({
   icon,
   onClick,
-  size = 56,
+  scale = 2,
   disabled = false,
   ariaLabel,
   className = "",
 }: {
   icon: IconArt;
   onClick?: () => void;
-  /** Width in px; height follows the art. */
-  size?: number;
+  /** Screen pixels per art pixel — keep it a whole number. */
+  scale?: number;
   disabled?: boolean;
   ariaLabel: string;
   className?: string;
 }) {
   const { down, handlers } = usePress();
   const pressed = down && !disabled;
+  const [w, h] = ICON_SIZE[icon];
 
   return (
     <button
@@ -167,18 +171,18 @@ export function CabIconButton({
       disabled={disabled}
       aria-label={ariaLabel}
       {...handlers}
-      style={{ width: size, height: size, WebkitTapHighlightColor: "transparent" }}
+      style={{ width: w * scale, height: h * scale, WebkitTapHighlightColor: "transparent" }}
       className={`relative select-none shrink-0 disabled:opacity-35 disabled:cursor-not-allowed ${className}`}
     >
       <span
         aria-hidden
         className="pointer-events-none absolute inset-0"
-        style={{ ...artLayer(icon, "contain"), opacity: pressed ? 0 : 1 }}
+        style={{ ...artLayer(icon), opacity: pressed ? 0 : 1 }}
       />
       <span
         aria-hidden
         className="pointer-events-none absolute inset-0"
-        style={{ ...artLayer(`${icon}-pressed`, "contain"), opacity: pressed ? 1 : 0 }}
+        style={{ ...artLayer(`${icon}-pressed`), opacity: pressed ? 1 : 0 }}
       />
     </button>
   );
@@ -197,7 +201,7 @@ export function CabArrow({
   return (
     <CabIconButton
       icon={direction === "left" ? "arrow-left" : "arrow-right"}
-      size={60}
+      scale={2}
       onClick={onClick}
       disabled={disabled}
       ariaLabel={direction === "left" ? "Previous cocktail" : "Next cocktail"}

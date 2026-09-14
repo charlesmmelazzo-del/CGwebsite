@@ -119,11 +119,7 @@ export default function HighScoresTemplate({
       </div>
 
       {!started && (
-        <StartScreen
-          subtitle={menu.subtitle}
-          description={menu.description}
-          onStart={() => setStarted(true)}
-        />
+        <StartScreen onStart={() => setStarted(true)} />
       )}
 
       {playing?.gameKey && play && (
@@ -327,7 +323,9 @@ function TicketPrompt({
 
         {/* The ticket itself, with the number typed into its dark box. */}
         <div
-          className={`relative mt-5 w-full ${torn ? "animate-[ticket-tear_0.35s_steps(3)]" : ""}`}
+          // Two screen pixels per art pixel on a phone, three from `sm` up —
+          // whole numbers, so the ticket's pixels stay even.
+          className={`relative mx-auto mt-5 w-[200px] sm:w-[300px] ${torn ? "animate-[ticket-tear_0.35s_steps(3)]" : ""}`}
           style={{
             aspectRatio: `${UI.ticket.width} / ${UI.ticket.height}`,
             ...artLayer(torn ? "ticket-torn" : "ticket"),
@@ -353,7 +351,7 @@ function TicketPrompt({
                 width: `${box.width}%`,
                 height: `${box.height}%`,
                 color: error ? "#FF6B6B" : C.gold,
-                fontSize: serial.length > 8 ? 11 : 16,
+                fontSize: serial.length > 8 ? 8 : 12,
                 caretColor: C.gold,
               }}
             />

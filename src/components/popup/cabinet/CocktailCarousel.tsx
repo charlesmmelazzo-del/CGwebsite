@@ -15,7 +15,7 @@ import Image from "next/image";
 import type { PopupCocktail } from "@/lib/popup/types";
 import { getGameMeta } from "@/lib/popup/games";
 import CabButton, { CabArrow, CabIconButton } from "./CabButton";
-import { artLayer } from "./pixelArt";
+import { artLayer, UI } from "./pixelArt";
 import CrtPanel from "./CrtPanel";
 import GameDemo from "./GameDemo";
 import { withAlpha, C } from "./theme";
@@ -96,8 +96,11 @@ export default function CocktailCarousel({
               onClick={() => emblaApi?.scrollTo(i)}
               aria-label={`Go to slide ${i + 1}`}
               aria-current={i === selected}
-              className="w-4 h-4"
-              style={artLayer(i === selected ? "light-on" : "light-off", "contain")}
+              style={{
+                width: UI.icons["light-on"][0],
+                height: UI.icons["light-on"][1],
+                ...artLayer(i === selected ? "light-on" : "light-off"),
+              }}
             />
           ))}
         </div>
@@ -284,7 +287,7 @@ function CocktailInfo({ cocktail, onClose }: { cocktail: PopupCocktail; onClose:
             </p>
           )}
         </div>
-        <CabIconButton icon="close" size={44} ariaLabel="Close cocktail info" onClick={onClose} />
+        <CabIconButton icon="close" scale={2} ariaLabel="Close cocktail info" onClick={onClose} />
       </div>
 
       {/* Long stories scroll inside the card, so it keeps the demo side's size. */}

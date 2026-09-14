@@ -193,10 +193,70 @@ function cropShared(list) {
   return list.map((c) => crop(c, x0, y0, x1 - x0 + 1, y1 - y0 + 1));
 }
 
+// ─── Pixel grid ──────────────────────────────────────────────────────────────
+//
+// The generator draws "pixel art" at roughly 10 image pixels to an art pixel,
+// but not exactly, and not the same on every sheet. Scaled down in the browser
+// that uneven grid turns into lopsided, jagged edges. So every piece is
+// resampled to ONE image pixel per art pixel here, and the site enlarges it by
+// whole numbers — every art pixel then lands the same size on screen.
+
+/** The most common short run of one colour: the size of one art pixel. */
+function estimateBlock(cells) {
+  const counts = new Map();
+  const key = (d, p) => (d[p + 3] < 128 ? -1 : ((d[p] >> 4) << 8) | ((d[p + 1] >> 4) << 4) | (d[p + 2] >> 4));
+  for (const c of cells) {
+    for (const horizontal of [true, false]) {
+      const outer = horizontal ? c.h : c.w, inner = horizontal ? c.w : c.h;
+      for (let o = 0; o < outer; o += 3) {
+        let prev = null, run = 0;
+        for (let i = 0; i <= inner; i++) {
+          const k = i === inner ? null : key(c.data, ((horizontal ? o : i) * c.w + (horizontal ? i : o)) * 4);
+          if (k === prev) { run++; continue; }
+          if (prev !== null && prev !== -1 && run >= 6 && run <= 16) counts.set(run, (counts.get(run) ?? 0) + 1);
+          prev = k; run = 1;
+        }
+      }
+    }
+  }
+  // Runs split between two neighbouring lengths (9 and 10, say) — pool each
+  // length with its neighbours before picking the peak.
+  let best = 10, bestScore = -1;
+  for (let b = 6; b <= 16; b++) {
+    const score = (counts.get(b - 1) ?? 0) * 0.5 + (counts.get(b) ?? 0) + (counts.get(b + 1) ?? 0) * 0.5;
+    if (score > bestScore) { best = b; bestScore = score; }
+  }
+  return best;
+}
+
+/** Nearest-neighbour resample to a W × H grid, sampling each block's centre. */
+function toGrid(cell, W, H) {
+  const out = Buffer.alloc(W * H * 4);
+  for (let j = 0; j < H; j++) {
+    for (let i = 0; i < W; i++) {
+      const sx = Math.min(cell.w - 1, Math.floor(((i + 0.5) * cell.w) / W));
+      const sy = Math.min(cell.h - 1, Math.floor(((j + 0.5) * cell.h) / H));
+      const si = (sy * cell.w + sx) * 4, di = (j * W + i) * 4;
+      cell.data.copy(out, di, si, si + 4);
+      out[di + 3] = out[di + 3] > 128 ? 255 : 0;
+    }
+  }
+  return { w: W, h: H, data: out };
+}
+
+/** Resample cells that share a box onto one shared grid. */
+function gridShared(list, block) {
+  const W = Math.max(1, Math.round(list[0].w / block));
+  const H = Math.max(1, Math.round(list[0].h / block));
+  return list.map((c) => toGrid(c, W, H));
+}
+
 async function write(cell, name) {
   const file = path.join(DEST, `${name}.png`);
+  // Plain PNG: at one pixel per art pixel these are already a few hundred
+  // bytes, and palette quantising mangles the one-pixel-wide middle slices.
   await sharp(cell.data, { raw: { width: cell.w, height: cell.h, channels: 4 } })
-    .png({ palette: true, colours: 64, effort: 8 })
+    .png({ compressionLevel: 9 })
     .toFile(file);
   console.log(`  ${name}.png  ${cell.w}x${cell.h}  ${(fs.statSync(file).size / 1024).toFixed(0)}KB`);
 }
@@ -225,17 +285,17 @@ function capWidth(cell) {
   let left = 0;
   while (left < cell.w / 2) {
     const s = columnSpan(cell, left);
-    if (Math.abs(s.top - centre.top) <= 2 && Math.abs(s.bottom - centre.bottom) <= 2) break;
+    if (s.top === centre.top && s.bottom === centre.bottom) break;
     left++;
   }
   let right = 0;
   while (right < cell.w / 2) {
     const s = columnSpan(cell, cell.w - 1 - right);
-    if (Math.abs(s.top - centre.top) <= 2 && Math.abs(s.bottom - centre.bottom) <= 2) break;
+    if (s.top === centre.top && s.bottom === centre.bottom) break;
     right++;
   }
   // The shaded side block runs past where the outline straightens.
-  const pad = Math.round(cell.w * 0.07);
+  const pad = Math.max(1, Math.round(cell.w * 0.05));
   return Math.min(Math.round(cell.w * 0.3), Math.max(left, right) + pad);
 }
 
@@ -256,7 +316,7 @@ function frameMetrics(cell) {
   for (let yy = 0; yy < cell.h / 2; yy++) {
     let xx = outer;
     while (xx < cell.w / 2 && alphaAt(cell, xx, yy) > 8) xx++;
-    if (xx - outer <= side + 1 && xx - outer >= side - 1) { corner = yy; break; }
+    if (xx - outer === side) { corner = yy; break; }
   }
   return { side, corner };
 }
@@ -281,17 +341,19 @@ function darkBox(cell) {
 // ─── Run ─────────────────────────────────────────────────────────────────────
 
 fs.mkdirSync(DEST, { recursive: true });
-const meta = { pill: {}, frame: {}, ticket: {} };
+const meta = { pill: {}, icons: {}, frame: {}, ticket: {} };
 
 {
   console.log(`\n${FILES.buttons}`);
   const img = await readRGBA(path.join(SRC, FILES.buttons));
   const list = cells(img, 3, PILL_COLORS.length).map(keyOut);
+  const block = estimateBlock(list.slice(0, 3));
+  console.log(`  art pixel ≈ ${block}px`);
   for (let r = 0; r < PILL_COLORS.length; r++) {
-    const [normal, pressed, disabled] = cropShared(list.slice(r * 3, r * 3 + 3));
+    const [normal, pressed, disabled] = gridShared(cropShared(list.slice(r * 3, r * 3 + 3)), block);
     const cap = capWidth(normal);
-    const midW = 8;
-    const midX = Math.floor(normal.w / 2) - midW / 2;
+    const midW = 1;
+    const midX = Math.floor(normal.w / 2);
     const states = { "": normal, "-pressed": pressed };
     // Every row's disabled column is the same grey; keep only one.
     if (r === 0) states["-disabled"] = disabled;
@@ -310,20 +372,25 @@ const meta = { pill: {}, frame: {}, ticket: {} };
   const img = await readRGBA(path.join(SRC, FILES.controls));
   const list = cells(img, 4, 4).map(keyOut);
   const at = (r, c) => list[r * 4 + c];
+  const block = estimateBlock([at(0, 0), at(1, 0), at(3, 1)]);
+  console.log(`  art pixel ≈ ${block}px`);
   // Pressed pairs share a box so they swap without jumping.
   const pairs = [[0, 0, 0, 1], [0, 2, 0, 3], [1, 0, 1, 1], [1, 2, 1, 3], [2, 0, 2, 1]];
   const done = new Set();
   for (const [r1, c1, r2, c2] of pairs) {
-    const [a, b] = cropShared([at(r1, c1), at(r2, c2)]);
+    const [a, b] = gridShared(cropShared([at(r1, c1), at(r2, c2)]), block);
     await write(a, CONTROLS[r1][c1]);
     await write(b, CONTROLS[r2][c2]);
+    meta.icons[CONTROLS[r1][c1]] = [a.w, a.h];
+    meta.icons[CONTROLS[r2][c2]] = [b.w, b.h];
     done.add(`${r1}:${c1}`).add(`${r2}:${c2}`);
   }
   for (let r = 0; r < 4; r++) {
     for (let c = 0; c < 4; c++) {
       if (done.has(`${r}:${c}`)) continue;
-      const [cell] = cropShared([at(r, c)]);
+      const [cell] = gridShared(cropShared([at(r, c)]), block);
       await write(cell, CONTROLS[r][c]);
+      meta.icons[CONTROLS[r][c]] = [cell.w, cell.h];
     }
   }
 }
@@ -331,16 +398,22 @@ const meta = { pill: {}, frame: {}, ticket: {} };
 {
   console.log(`\n${FILES.bezel}`);
   const img = await readRGBA(path.join(SRC, FILES.bezel));
-  const [frame] = cropShared([keyOut(crop(img, 0, 0, img.w, img.h))]);
+  const [trimmed] = cropShared([keyOut(crop(img, 0, 0, img.w, img.h))]);
+  const block = estimateBlock([trimmed]);
+  console.log(`  art pixel ≈ ${block}px`);
+  const [frame] = gridShared([trimmed], block);
   await write(frame, "bezel");
   const { side, corner } = frameMetrics(frame);
-  meta.frame = { width: frame.w, height: frame.h, side, slice: Math.max(side, corner) + 4 };
+  meta.frame = { width: frame.w, height: frame.h, side, slice: Math.max(side, corner) + 1 };
 }
 
 {
   console.log(`\n${FILES.tickets}`);
   const img = await readRGBA(path.join(SRC, FILES.tickets));
-  const [whole, torn] = cropShared(cells(img, 2, 1).map(keyOut));
+  const keyed = cropShared(cells(img, 2, 1).map(keyOut));
+  const block = estimateBlock([keyed[0]]);
+  console.log(`  art pixel ≈ ${block}px`);
+  const [whole, torn] = gridShared(keyed, block);
   await write(whole, "ticket");
   await write(torn, "ticket-torn");
   meta.ticket = { width: whole.w, height: whole.h, box: darkBox(whole) };

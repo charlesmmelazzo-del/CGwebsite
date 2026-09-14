@@ -5,8 +5,10 @@
 // public/popup/art/ui. ui.json is written by the same script and carries the
 // measurements needed to stretch them without distorting the pixels.
 //
-// Everything here is drawn with `image-rendering: pixelated`, so the art stays
-// hard-edged at whatever size the phone scales it to.
+// The files hold ONE image pixel per art pixel. Everything is enlarged by a
+// WHOLE number with `image-rendering: pixelated`, so every art pixel lands the
+// same size on screen. Shrinking the original big sheets instead is what made
+// the buttons' ends look lopsided and jagged.
 
 import { Press_Start_2P } from "next/font/google";
 import type { CSSProperties } from "react";
@@ -32,11 +34,8 @@ export function artLayer(name: string, size = "100% 100%"): CSSProperties {
   };
 }
 
-/**
- * Screen pixels per art pixel for the bezel. The sheet was drawn at 8 image
- * pixels to an art pixel, so 0.25 shows each one as a 2px block.
- */
-const BEZEL_SCALE = 0.25;
+/** Screen pixels per art pixel for the bezel. */
+const BEZEL_SCALE = 2;
 
 /** How far inside the bezel content has to sit to clear its sides. */
 export const BEZEL_INSET = Math.round(UI.frame.side * BEZEL_SCALE);
