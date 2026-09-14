@@ -43,6 +43,14 @@ export interface ArcadeGameProps {
   demo?: boolean;
 
   /**
+   * The guest opened the pause screen. The shell draws the overlay and the
+   * buttons; the game's only job is to STOP — pass it on as its canvas's
+   * `running={!paused}` so the frame loop halts where it is, and let go of any
+   * held input, since the release lands on the overlay rather than the game.
+   */
+  paused?: boolean;
+
+  /**
    * Hand the guest back to the cabinet's own attract screen, which is where
    * the high score board lives.
    *

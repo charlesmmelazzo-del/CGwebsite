@@ -749,7 +749,7 @@ function drawHud(ctx: CanvasRenderingContext2D, g: Game, layout: Layout) {
   label("SWIPES", 16, y + 34, low ? C.hot : C.dim);
 
   // What the guest ordered, one chip per bottle, low enough on the right to
-  // clear the cabinet's exit button on the shortest screen.
+  // clear the shell's pause button on the shortest screen.
   const chipW = 42;
   const chips = g.rules.targets.length;
   const startX = W - 16 - chips * chipW;
@@ -775,7 +775,7 @@ function drawHud(ctx: CanvasRenderingContext2D, g: Game, layout: Layout) {
   // is exactly the height the bartender's chest reaches now that he is centred
   // and full size — so a progress meter ran straight through him, and neither
   // he nor it read properly. Up here nothing crosses it, and it clears the
-  // cabinet's exit button, which starts a few pixels lower.
+  // shell's pause button, which starts a few pixels lower.
   const need = g.rules.targets.reduce((s, t) => s + t.need, 0);
   const got = g.rules.targets.reduce((s, t, i) => s + Math.min(g.state.got[i], t.need), 0);
   fillRect(ctx, 0, 0, W, 4, C.well);
@@ -1318,7 +1318,7 @@ function botMove(g: Game): [number, number] | null {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function LetsDoShots({ onGameOver, onShowScores, demo = false }: ArcadeGameProps) {
+export default function LetsDoShots({ onGameOver, onShowScores, demo = false, paused = false }: ArcadeGameProps) {
   const gameRef = useRef<Game | null>(null);
   const overRef = useRef(onGameOver);
   overRef.current = onGameOver;
@@ -1687,5 +1687,5 @@ export default function LetsDoShots({ onGameOver, onShowScores, demo = false }: 
     [advance, demo, onShowScores]
   );
 
-  return <ShotsCanvas onFrame={onFrame} running onSwipe={onSwipe} onTap={onTap} />;
+  return <ShotsCanvas onFrame={onFrame} running={!paused} onSwipe={onSwipe} onTap={onTap} />;
 }

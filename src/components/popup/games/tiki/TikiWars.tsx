@@ -90,7 +90,7 @@ const ENDING: Beat[] = [
   { art: "ending-blimp", caption: null },
 ];
 
-export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeGameProps) {
+export default function TikiWars({ onGameOver, demo, menuId, viewerId, paused = false }: ArcadeGameProps) {
   // Opens ON the story, not on gameplay.
   //
   // Starting in "play" and switching once the save file came back meant a frame
@@ -440,7 +440,7 @@ export default function TikiWars({ onGameOver, demo, menuId, viewerId }: ArcadeG
     <div className="absolute inset-0 bg-black">
       <TikiCanvas
         onFrame={onFrame}
-        running
+        running={!paused}
         onDragStart={onDragStart}
         onDrag={onDrag}
         onDragEnd={onDragEnd}
@@ -464,7 +464,7 @@ type Hits = Record<string, [number, number, number, number]>;
 const TOP_INSET = 12;
 
 /**
- * Room reserved at the top RIGHT for the shell's EXIT button.
+ * Room reserved at the top RIGHT for the shell's pause button.
  *
  * That button is DOM, drawn over the canvas, so nothing in here knows it is
  * there — whatever shares its row has to be told to get out from under it.
@@ -987,7 +987,7 @@ function drawHud(ctx: CanvasRenderingContext2D, s: State) {
   // into empty sky instead of pushing anything else around.
   // Zero-padded, matching the score screen and every cabinet ever built.
   //
-  // It stops short of the right edge by the width of the EXIT button, which is
+  // It stops short of the right edge by the width of the pause button, which is
   // its neighbour on this row rather than something in another corner.
   const score = pad(Math.min(MAX_SCORE, Math.floor(s.score)));
   const sx = W - EXIT_CLEARANCE - 6;
@@ -1230,7 +1230,7 @@ function drawStory(
   // they have already seen, least of all someone standing at a bar. Hidden in
   // demo mode, where there is nobody to press it.
   if (!demo) {
-    // Bottom right, NOT top right: the shell's Exit button sits over the top
+    // Bottom right, NOT top right: the shell's pause button sits over the top
     // right corner, and the two were landing on top of each other.
     const sw = 54, sh = 24;
     hits.skip = [W - sw - 6, h - BOTTOM_INSET - sh - 2, sw, sh];

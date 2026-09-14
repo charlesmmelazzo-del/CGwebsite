@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import ArcadeCanvas from "./ArcadeCanvas";
 import CRTScreen from "./CRTScreen";
 import { ArcadeButton, useArcadeKeys } from "./controls";
@@ -12,6 +12,7 @@ import {
   drawTextMarquee,
   GAME_H,
   GAME_W,
+  SCREEN_FIT,
   P,
   pad,
   rect,
@@ -311,7 +312,7 @@ function runDemoBot(st: State, dt: number, memo: { jumpFor: number; dither: numb
   else if (targetX - st.px < -3) inp.left = true;
 }
 
-export default function TopShelf({ onGameOver, demo = false }: ArcadeGameProps) {
+export default function TopShelf({ onGameOver, demo = false, paused = false }: ArcadeGameProps) {
   const s = useRef<State>(freshState());
   const endedRef = useRef(false);
 
@@ -325,8 +326,16 @@ export default function TopShelf({ onGameOver, demo = false }: ArcadeGameProps) 
     if (v && s.current.phase === "intro") s.current.introSkipped = true;
   }, [demo]);
 
+  // Let go of everything on pause. A held arrow's release lands on the pause
+  // screen, not here, and he would otherwise walk off the moment play resumed.
+  useEffect(() => {
+    if (!paused) return;
+    const inp = s.current.input;
+    inp.left = inp.right = inp.up = inp.down = inp.jump = false;
+  }, [paused]);
+
   useArcadeKeys(
-    true,
+    !paused,
     (key) => {
       if (key === "ArrowLeft") setInput("left", true);
       else if (key === "ArrowRight") setInput("right", true);
@@ -401,12 +410,18 @@ export default function TopShelf({ onGameOver, demo = false }: ArcadeGameProps) 
   );
 
   return (
-    <div>
-      <CRTScreen glow="#3CE0E0">
-          <ArcadeCanvas onFrame={onFrame} running />
-        </CRTScreen>
+    // The whole of whatever it is given — the full screen in play, the slide's
+    // box in a demo — with the picture as large as fits and the buttons under it.
+    <div className="flex flex-col h-full w-full bg-black" style={{ minHeight: 0 }}>
+      <div className="flex-1 min-h-0 flex items-center justify-center" style={{ containerType: "size" }}>
+        <div style={SCREEN_FIT}>
+          <CRTScreen glow="#3CE0E0" fill bezel={false}>
+            <ArcadeCanvas onFrame={onFrame} running={!paused} fit="contain" />
+          </CRTScreen>
+        </div>
+      </div>
 
-      <div className={`p-2 bg-black grid-cols-4 gap-1.5 ${demo ? "hidden" : "grid"}`}>
+      <div className={`shrink-0 p-2 bg-black grid-cols-4 gap-1.5 ${demo ? "hidden" : "grid"}`}>
         <ArcadeButton
           label="◀"
           ariaLabel="Move left"
@@ -441,7 +456,7 @@ export default function TopShelf({ onGameOver, demo = false }: ArcadeGameProps) 
           className="h-16"
         />
       </div>
-      <p className="pb-2 text-center text-[7px] tracking-[0.2em] uppercase text-white/25">
+      <p className={`shrink-0 pb-2 text-center text-[7px] tracking-[0.2em] uppercase text-white/25 ${demo ? "hidden" : ""}`}>
         Desktop: arrow keys + space
       </p>
     </div>

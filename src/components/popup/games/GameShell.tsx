@@ -60,6 +60,7 @@ export default function GameShell({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedThisRun, setSavedThisRun] = useState(false);
+  const [paused, setPaused] = useState(false);
 
   const loadBoard = useCallback(async () => {
     try {
@@ -100,14 +101,35 @@ export default function GameShell({
     else setPhase("attract");
   }, [onExit]);
 
+  // A pause never outlives the run it paused.
+  useEffect(() => {
+    if (phase !== "playing") setPaused(false);
+  }, [phase]);
+
+  // Escape pauses a run rather than abandoning it — one stray key should not
+  // throw away a high score. On the score screen it still closes.
   useEffect(() => {
     if (!fullscreen) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") leave();
+      if (e.key !== "Escape") return;
+      if (phase === "playing") setPaused((p) => !p);
+      else leave();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [fullscreen, leave]);
+  }, [fullscreen, phase, leave]);
+
+  // A phone that locks, or a guest who switches to their messages, comes back
+  // to a pause screen rather than to a run that carried on — or died — without
+  // them.
+  useEffect(() => {
+    if (phase !== "playing") return;
+    function onVisibility() {
+      if (document.hidden) setPaused(true);
+    }
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [phase]);
 
   const handleGameOver = useCallback(
     async (finalScore: number, detail?: Record<string, unknown>) => {
@@ -159,52 +181,81 @@ export default function GameShell({
     );
   }
 
-  // ── Full-bleed games ──────────────────────────────────────────────────────
-  // Tiki Wars flexes its height to the device and draws its own controls into
-  // the canvas, so a bezel and marquee around it would waste exactly the screen
-  // its art is drawn for. Only while PLAYING: the attract and score screens are
-  // the cabinet's own furniture and stay in the frame.
-  const bleed = Boolean(meta.fullBleed) && phase === "playing";
-
-  if (bleed) {
+  // ── Playing: the whole screen ─────────────────────────────────────────────
+  // Every game gets the viewport while it is being played — no marquee, no
+  // border, no bezel. The frame was spending a phone's screen on decoration
+  // around the one thing the guest is looking at.
+  //
+  // The only chrome is a small pause button in the top-right corner. The
+  // full-bleed games keep that corner clear of their HUD (EXIT_CLEARANCE in
+  // TikiWars.tsx, the same idea in the others), and a pause is one tap away
+  // from the way out without a stray tap ever ending a run.
+  if (phase === "playing") {
     return (
       <div className="fixed inset-0 z-[70] bg-black">
         <Game
           onGameOver={handleGameOver}
           menuId={menuId}
           viewerId={viewerId}
+          paused={paused}
           onShowScores={() => setPhase("attract")}
         />
-        {/*
-          The way out, and it has to be findable.
-
-          Top RIGHT, at the end of the game's own HUD row, immediately after the
-          score. On the left it had the top of the screen to itself and the
-          health bar was pushed down below it, so a whole row of a full-bleed
-          game was spent on one button. The canvas keeps this corner clear —
-          see EXIT_CLEARANCE in TikiWars.tsx — and the only other in-canvas
-          control, a cutscene's SKIP, is at the BOTTOM right, well clear of it.
-
-          Given a panel and a border rather than bare text, since it lands on
-          bright sky, dark sea and painted art by turns, and 40%-opacity type
-          over a beach is not a button anyone can see. Still 44px tall: it is
-          the one control a guest must always be able to hit.
-        */}
-        <button
-          onClick={leave}
-          aria-label="Exit to game select"
-          className="absolute top-2 right-2 z-10 flex min-h-[44px] min-w-[60px] items-center justify-center gap-1 rounded-sm border border-white/30 bg-black/55 px-3 text-[10px] font-bold tracking-[0.2em] uppercase text-white/85 backdrop-blur-sm active:bg-black/80 hover:border-white/60 hover:text-white transition-colors"
-          style={{ WebkitTapHighlightColor: "transparent" }}
-        >
-          <span aria-hidden>&lt;</span> Exit
-        </button>
+        {paused ? (
+          <PauseScreen
+            title={meta.title}
+            accent={accent}
+            onResume={() => setPaused(false)}
+            onExit={leave}
+          />
+        ) : (
+          <button
+            onClick={() => setPaused(true)}
+            aria-label="Pause"
+            // 44px to hit, a smaller mark to see — it sits over the game's art.
+            className="absolute top-1 right-1 z-10 flex h-11 w-11 items-center justify-center"
+            style={{ WebkitTapHighlightColor: "transparent" }}
+          >
+            <span className="flex h-8 w-8 items-center justify-center gap-[3px] rounded-full border border-white/35 bg-black/55 backdrop-blur-sm active:bg-black/80">
+              <span className="block h-3 w-[3px] rounded-sm bg-white/90" />
+              <span className="block h-3 w-[3px] rounded-sm bg-white/90" />
+            </span>
+          </button>
+        )}
       </div>
     );
   }
 
-  const cabinet = (
-    <div className={`w-full mx-auto ${fullscreen ? "max-w-[560px] flex-1 min-h-0 flex flex-col" : "max-w-[420px]"}`}>
-      {/* ── Marquee ──────────────────────────────────────────────────────── */}
+  // ── Game over: the whole screen too, and the way out ──────────────────────
+  if (phase === "over") {
+    return (
+      <div className="fixed inset-0 z-[70] bg-black overflow-y-auto overscroll-contain">
+        <div className="min-h-full flex flex-col items-center justify-center p-4">
+          <div className="w-full max-w-[420px]">
+            <p style={{ color: accent }} className="text-center text-[11px] tracking-[0.3em] uppercase font-bold">
+              {meta.title}
+            </p>
+            <GameOverScreen
+              score={score}
+              board={board}
+              accent={accent}
+              saving={saving}
+              saved={savedThisRun}
+              saveError={saveError}
+              scoringOpen={scoringOpen}
+              viewerId={viewerId}
+              emailVerified={emailVerified}
+              onReplay={() => setPhase("playing")}
+              onQuit={leave}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Attract: the cabinet, in the page ─────────────────────────────────────
+  return (
+    <div className="w-full mx-auto max-w-[420px]">
       <div
         style={{ borderColor: accent }}
         className="border-2 border-b-0 bg-black px-3 py-2 text-center"
@@ -213,64 +264,66 @@ export default function GameShell({
           {meta.title}
         </p>
       </div>
-
-      {/* ── Screen ───────────────────────────────────────────────────────── */}
-      <div
-        style={{ borderColor: accent }}
-        className={`border-2 bg-black ${fullscreen ? "flex-1 min-h-0" : ""}`}
-      >
-        {phase === "playing" ? (
-          <Game onGameOver={handleGameOver} menuId={menuId} viewerId={viewerId} />
-        ) : phase === "attract" ? (
-          <AttractScreen
-            meta={meta}
-            board={board}
-            accent={accent}
-            scoringOpen={scoringOpen}
-            viewerId={viewerId}
-            emailVerified={emailVerified}
-            onStart={() => setPhase("playing")}
-          />
-        ) : (
-          <GameOverScreen
-            score={score}
-            board={board}
-            accent={accent}
-            saving={saving}
-            saved={savedThisRun}
-            saveError={saveError}
-            scoringOpen={scoringOpen}
-            viewerId={viewerId}
-            emailVerified={emailVerified}
-            onReplay={() => setPhase("playing")}
-            onQuit={leave}
-          />
-        )}
+      <div style={{ borderColor: accent }} className="border-2 bg-black">
+        <AttractScreen
+          meta={meta}
+          board={board}
+          accent={accent}
+          scoringOpen={scoringOpen}
+          viewerId={viewerId}
+          emailVerified={emailVerified}
+          onStart={() => setPhase("playing")}
+        />
       </div>
     </div>
   );
+}
 
-  if (!fullscreen) return cabinet;
+// ─── Pause ───────────────────────────────────────────────────────────────────
 
+/**
+ * Over the frozen game, so the guest can see where they left it. Resume is the
+ * big button — it is what nearly everyone opened this for.
+ */
+function PauseScreen({
+  title,
+  accent,
+  onResume,
+  onExit,
+}: {
+  title: string;
+  accent: string;
+  onResume: () => void;
+  onExit: () => void;
+}) {
   return (
-    <div className="fixed inset-0 z-[70] bg-black overflow-y-auto overscroll-contain">
-      {/* Centred when it fits, scrollable when the score board makes it tall. */}
-      {/*
-        h-full, not min-h-full: the game inside sizes itself from its parent's
-        height, and a min-height leaves that percentage with nothing definite to
-        resolve against — which is how the screen ended up rendering at its
-        intrinsic 224px in the middle of an empty page.
-      */}
-      <div className="h-full min-h-full flex flex-col items-center justify-center p-2 sm:p-4">
-        <div className="w-full max-w-[560px] mb-2 flex justify-end">
-          <button
-            onClick={leave}
-            className="px-3 py-1.5 text-[10px] tracking-[0.25em] uppercase text-white/45 hover:text-white/90 transition-colors"
-          >
-            {phase === "playing" ? "Quit" : "Close"}
-          </button>
-        </div>
-        {cabinet}
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Paused"
+      className="absolute inset-0 z-20 flex items-center justify-center bg-black/75 backdrop-blur-[2px] p-6"
+      // Swallow every touch, so nothing reaches the game underneath.
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <div className="w-full max-w-[300px] text-center">
+        <p className="text-[10px] tracking-[0.3em] uppercase text-white/50">{title}</p>
+        <p style={{ color: accent }} className="mt-2 text-3xl font-bold tracking-[0.2em] uppercase">
+          Paused
+        </p>
+        <button
+          onClick={onResume}
+          autoFocus
+          style={{ background: accent }}
+          className="mt-8 w-full py-4 text-black text-xs tracking-[0.3em] uppercase font-bold active:opacity-80"
+        >
+          Resume
+        </button>
+        <button
+          onClick={onExit}
+          className="mt-3 w-full py-3.5 border-2 border-white/25 text-white/75 text-[11px] tracking-[0.25em] uppercase active:bg-white/10"
+        >
+          Exit
+        </button>
       </div>
     </div>
   );
@@ -427,7 +480,7 @@ function GameOverScreen({
           onClick={onQuit}
           className="py-3.5 border-2 border-white/25 text-white/70 text-[11px] tracking-[0.2em] uppercase active:bg-white/10"
         >
-          Back
+          Exit
         </button>
       </div>
 

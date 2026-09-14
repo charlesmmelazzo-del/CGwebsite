@@ -20,6 +20,7 @@ export default function CRTScreen({
   className = "",
   fill = false,
   scanlines = true,
+  bezel = true,
 }: {
   children: ReactNode;
   /** Colour of the ambient light the tube throws onto its bezel. */
@@ -40,22 +41,32 @@ export default function CRTScreen({
    * the bezel, glow and vignette still make it a screen.
    */
   scanlines?: boolean;
+  /**
+   * The plastic surround: padding, rounded corners and the coloured glow. Off
+   * when the game is played full screen, where a frame is just a border eating
+   * the edge of a phone.
+   */
+  bezel?: boolean;
 }) {
   return (
     <div
       className={`relative overflow-hidden ${fill ? "w-full h-full" : ""} ${className}`}
-      style={{
-        // The plastic surround, and the tube's own light spilling onto it.
-        background: "#05050A",
-        padding: "10px",
-        boxSizing: "border-box",
-        boxShadow: `inset 0 0 22px rgba(0,0,0,0.95), 0 0 26px -6px ${glow}55`,
-        borderRadius: "14px",
-      }}
+      style={
+        bezel
+          ? {
+              // The plastic surround, and the tube's own light spilling onto it.
+              background: "#05050A",
+              padding: "10px",
+              boxSizing: "border-box",
+              boxShadow: `inset 0 0 22px rgba(0,0,0,0.95), 0 0 26px -6px ${glow}55`,
+              borderRadius: "14px",
+            }
+          : { background: "#000" }
+      }
     >
       <div
         className={fill ? "relative w-full h-full" : "relative"}
-        style={{ borderRadius: "8px", overflow: "hidden" }}
+        style={{ borderRadius: bezel ? "8px" : 0, overflow: "hidden" }}
       >
         {/*
           Bloom: a slightly blurred, brightened copy of the picture bleeding out

@@ -14,6 +14,7 @@ import {
   GAME_H,
   GAME_W,
   PIXEL_SCALE,
+  SCREEN_FIT,
   meter,
   outline,
   P,
@@ -1247,7 +1248,8 @@ function runDemoBot(
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function BehindTheStick({ onGameOver, demo = false }: ArcadeGameProps) {
+
+export default function BehindTheStick({ onGameOver, demo = false, paused = false }: ArcadeGameProps) {
   const s = useRef<State>(freshState(colorFor));
   // Bubble Buster has its own simulation, rebuilt at the start of each gather
   // phase from the round's own recipe.
@@ -1274,11 +1276,19 @@ export default function BehindTheStick({ onGameOver, demo = false }: ArcadeGameP
   const [uiPhase, setUiPhase] = useState<Phase>("boot");
   const uiPhaseRef = useRef<Phase>("boot");
 
+  // Read by the input handlers, which are made once. A stir drag holds pointer
+  // capture, so its moves keep arriving under the pause screen; counting them
+  // would bank a burst of laps the moment the game resumed.
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
+
   const press = useCallback((key: string) => {
+    if (pausedRef.current) return;
     if (s.current.phase === "pour") s.current.presses.push(key);
   }, []);
 
   const tapShake = useCallback(() => {
+    if (pausedRef.current) return;
     if (s.current.phase === "shake") s.current.shakeTaps++;
   }, []);
 
@@ -1292,7 +1302,7 @@ export default function BehindTheStick({ onGameOver, demo = false }: ArcadeGameP
    */
   const onTankTap = useCallback((e: React.PointerEvent) => {
     const st = s.current;
-    if (st.phase !== "gather" || !g.current) return;
+    if (pausedRef.current || st.phase !== "gather" || !g.current) return;
     const canvas = (e.currentTarget as HTMLElement).querySelector("canvas");
     if (!canvas) return;
     const r = canvas.getBoundingClientRect();
@@ -1309,7 +1319,7 @@ export default function BehindTheStick({ onGameOver, demo = false }: ArcadeGameP
   }, []);
 
   useArcadeKeys(
-    true,
+    !paused,
     (key) => {
       const st = s.current;
 
@@ -1585,11 +1595,12 @@ export default function BehindTheStick({ onGameOver, demo = false }: ArcadeGameP
     // had an opinion, and the loser was the picture.
     <div className="flex flex-col h-full w-full" style={{ minHeight: 0 }}>
       <div
-        className={`min-h-0 flex items-center justify-center bg-black px-2 pt-2 ${
+        className={`min-h-0 flex items-center justify-center bg-black ${
           fullScreenPhase || demo ? "flex-1" : "flex-[4]"
         }`}
         onPointerDown={onTankTap}
         onContextMenu={(e) => e.preventDefault()}
+        style={{ containerType: "size" }}
       >
         {/*
           The aspect box lives HERE, not on the canvas. Sized by height first so
@@ -1597,12 +1608,9 @@ export default function BehindTheStick({ onGameOver, demo = false }: ArcadeGameP
           it back on a narrow phone — aspect-ratio then shrinks the height to
           match, so the picture always fits both ways round without distorting.
         */}
-        <div
-          className="h-full max-h-full max-w-full"
-          style={{ aspectRatio: `${GAME_W} / ${GAME_H}` }}
-        >
-          <CRTScreen glow="#FFA000" fill scanlines={false}>
-            <ArcadeCanvas onFrame={onFrame} running fit="contain" />
+        <div style={SCREEN_FIT}>
+          <CRTScreen glow="#FFA000" fill scanlines={false} bezel={false}>
+            <ArcadeCanvas onFrame={onFrame} running={!paused} fit="contain" />
           </CRTScreen>
         </div>
       </div>
@@ -1641,7 +1649,9 @@ export default function BehindTheStick({ onGameOver, demo = false }: ArcadeGameP
         ) : uiPhase === "stir" ? (
           <StirDial
             wrapRef={wrapRef}
-            onAngle={(a) => applyStirAngle(s.current, a)}
+            onAngle={(a) => {
+              if (!pausedRef.current) applyStirAngle(s.current, a);
+            }}
             onRelease={endStir}
           />
         ) : (

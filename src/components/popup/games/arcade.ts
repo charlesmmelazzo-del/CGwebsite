@@ -36,6 +36,20 @@ export const GAME_H = 288;
 export const PIXEL_SCALE = 2;
 
 /**
+ * CSS for a screen as large as its box allows at exactly 224:288, either way
+ * round. The box needs `container-type: size`.
+ *
+ * Container units rather than `height: 100%` plus an aspect-ratio: that pair
+ * distorts once the box is much taller than it is wide, because max-width pulls
+ * the width in but leaves the height where it was — full screen on a phone
+ * stretched the picture a third taller than it is.
+ */
+export const SCREEN_FIT = {
+  width: `min(100cqw, calc(100cqh * ${GAME_W} / ${GAME_H}))`,
+  height: `min(100cqh, calc(100cqw * ${GAME_H} / ${GAME_W}))`,
+} as const;
+
+/**
  * Saturated primaries pulled from the era's hardware palettes — Midway and
  * Atari boards had a small fixed set of colors and it's a big part of why
  * those games look the way they do. Resist adding tasteful modern shades.
