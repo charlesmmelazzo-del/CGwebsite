@@ -16,7 +16,8 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { C, R, lamp, shade, withAlpha } from "./cabinet/theme";
+import { C, R, withAlpha } from "./cabinet/theme";
+import CabButton from "./cabinet/CabButton";
 import { INK } from "./cabinet/art/props";
 
 export default function StartScreen({
@@ -110,24 +111,14 @@ export default function StartScreen({
         )}
 
         {/* ── Press start ──────────────────────────────────────────────── */}
-        <button
-          type="button"
-          onClick={onStart}
-          className="mt-9 px-8 py-5 sm:px-12 sm:py-6 font-black uppercase text-[13px] sm:text-base tracking-[0.2em] active:translate-y-[5px] transition-transform"
-          style={{
-            borderRadius: R.chip,
-            background: lamp(C.gold),
-            color: INK.black,
-            boxShadow: [
-              `inset 0 0 0 3px ${shade(C.gold, 0.5)}`,
-              `0 7px 0 ${shade(C.gold, 0.6)}`,
-              `0 0 34px ${withAlpha(C.gold, lit ? 0.6 : 0.25)}`,
-            ].join(", "),
-            WebkitTapHighlightColor: "transparent",
-          }}
+        <div
+          className="mt-9 w-full max-w-[320px] transition-[filter] duration-300"
+          style={{ filter: `drop-shadow(0 0 ${lit ? 18 : 6}px ${withAlpha(C.gold, lit ? 0.6 : 0.25)})` }}
         >
-          Press Start
-        </button>
+          <CabButton color={C.gold} size="lg" className="w-full" onClick={onStart}>
+            Press Start
+          </CabButton>
+        </div>
 
         <p
           className="mt-5 text-[10px] sm:text-[11px] tracking-[0.18em] uppercase"

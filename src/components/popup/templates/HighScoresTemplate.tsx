@@ -6,6 +6,8 @@ import GameShell from "../games/GameShell";
 import StartScreen from "../StartScreen";
 import CocktailCarousel from "../cabinet/CocktailCarousel";
 import CabButton from "../cabinet/CabButton";
+import CrtPanel from "../cabinet/CrtPanel";
+import { artLayer, pixelFont, UI } from "../cabinet/pixelArt";
 import { C, withAlpha } from "../cabinet/theme";
 import type { PopupCocktail, PopupTemplateProps } from "@/lib/popup/types";
 
@@ -225,32 +227,23 @@ function PromptFrame({
       className="fixed inset-0 z-[75] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto"
       onClick={onCancel}
     >
-      <div
-        className="w-full max-w-sm rounded-[28px] p-6 sm:p-7 text-center"
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: `radial-gradient(130% 110% at 50% 30%, #1A1030 0%, #0A0618 60%, #05030F 100%)`,
-          boxShadow: [
-            `inset 0 0 0 3px ${withAlpha(C.gold, 0.55)}`,
-            `0 0 50px -8px ${withAlpha(C.magenta, 0.55)}`,
-            `0 12px 0 ${withAlpha("#000000", 0.5)}`,
-          ].join(", "),
-        }}
-      >
-        <p className="text-[9px] tracking-[0.35em] uppercase" style={{ color: C.teal }}>
-          {label}
-        </p>
-        <h2
-          className="mt-2 text-2xl sm:text-3xl font-black uppercase tracking-tight leading-none"
-          style={{
-            fontFamily: "var(--font-display, system-ui)",
-            color: C.gold,
-            textShadow: `0 0 14px ${withAlpha(C.gold, 0.5)}, 3px 4px 0 ${C.ink}`,
-          }}
-        >
-          {title}
-        </h2>
-        {children}
+      <div className="w-full max-w-sm text-center" onClick={(e) => e.stopPropagation()}>
+        <CrtPanel accents={false} glow={C.gold}>
+          <p className={`${pixelFont.className} text-[8px] tracking-[0.2em] uppercase`} style={{ color: C.teal }}>
+            {label}
+          </p>
+          <h2
+            className="mt-2 text-2xl sm:text-3xl font-black uppercase tracking-tight leading-none"
+            style={{
+              fontFamily: "var(--font-display, system-ui)",
+              color: C.gold,
+              textShadow: `0 0 14px ${withAlpha(C.gold, 0.5)}, 3px 4px 0 ${C.ink}`,
+            }}
+          >
+            {title}
+          </h2>
+          {children}
+        </CrtPanel>
       </div>
     </div>
   );
@@ -290,13 +283,11 @@ function SignInPrompt({ cocktail, onCancel }: { cocktail: PopupCocktail; onCance
         </CabButton>
       </div>
 
-      <button
-        onClick={onCancel}
-        className="mt-5 text-[10px] tracking-[0.25em] uppercase underline"
-        style={{ color: withAlpha(C.cream, 0.5) }}
-      >
-        Not now
-      </button>
+      <div className="mt-4">
+        <CabButton color={C.plum} size="sm" onClick={onCancel}>
+          Not now
+        </CabButton>
+      </div>
     </PromptFrame>
   );
 }
@@ -315,10 +306,12 @@ function TicketPrompt({
   const [serial, setSerial] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Set once the ticket is accepted: it tears, then the run starts. */
+  const [torn, setTorn] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!serial.trim() || busy) return;
+    if (!serial.trim() || busy || torn) return;
     setBusy(true);
     setError(null);
     try {
@@ -332,13 +325,16 @@ function TicketPrompt({
         setError(data.error ?? "That ticket didn't work. Try again.");
         return;
       }
-      onRedeemed(String(data.runId));
+      setTorn(true);
+      window.setTimeout(() => onRedeemed(String(data.runId)), 750);
     } catch {
       setError("Network error — check your connection and try again.");
     } finally {
       setBusy(false);
     }
   }
+
+  const box = UI.ticket.box;
 
   return (
     <PromptFrame label="High Score Run" title={cocktail.name} onCancel={onCancel}>
@@ -347,61 +343,74 @@ function TicketPrompt({
           Enter the code from the ticket included with your cocktail.
         </p>
         <p
-          className="mt-2 text-[11px] tracking-[0.25em] uppercase font-bold"
+          className={`${pixelFont.className} mt-3 text-[9px] uppercase leading-relaxed`}
           style={{ color: C.gold }}
         >
           One ticket = 1 play
         </p>
 
-        <input
-          autoFocus
-          inputMode="numeric"
-          autoComplete="off"
-          aria-label="Ticket number"
-          placeholder="Ticket #"
-          value={serial}
-          onChange={(e) => {
-            setSerial(e.target.value);
-            setError(null);
-          }}
-          className="mt-5 w-full rounded-2xl px-4 py-3.5 text-center text-2xl tracking-[0.2em] tabular-nums font-bold text-white placeholder-white/25 focus:outline-none"
+        {/* The ticket itself, with the number typed into its dark box. */}
+        <div
+          className={`relative mt-5 w-full ${torn ? "animate-[ticket-tear_0.35s_steps(3)]" : ""}`}
           style={{
-            background: "#05030F",
-            boxShadow: `inset 0 0 0 2px ${withAlpha(error ? C.magenta : C.teal, 0.7)}, inset 0 0 20px ${withAlpha("#000000", 0.9)}`,
+            aspectRatio: `${UI.ticket.width} / ${UI.ticket.height}`,
+            ...artLayer(torn ? "ticket-torn" : "ticket"),
           }}
-        />
+        >
+          {!torn && (
+            <input
+              autoFocus
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={16}
+              aria-label="Ticket number"
+              placeholder="# # # #"
+              value={serial}
+              onChange={(e) => {
+                setSerial(e.target.value);
+                setError(null);
+              }}
+              className={`${pixelFont.className} absolute bg-transparent text-center tabular-nums focus:outline-none placeholder:text-white/25`}
+              style={{
+                left: `${box.left}%`,
+                top: `${box.top}%`,
+                width: `${box.width}%`,
+                height: `${box.height}%`,
+                color: error ? "#FF6B6B" : C.gold,
+                fontSize: serial.length > 8 ? 11 : 16,
+                caretColor: C.gold,
+              }}
+            />
+          )}
+        </div>
+        <style>{`@keyframes ticket-tear { 0% { transform: translateX(-3px) } 50% { transform: translateX(3px) } 100% { transform: none } }`}</style>
 
         {error && (
-          <p className="mt-3 text-xs leading-relaxed" role="alert" style={{ color: C.magenta }}>
+          <p className="mt-3 text-xs leading-relaxed" role="alert" style={{ color: "#FF6B6B" }}>
             {error}
           </p>
         )}
 
         <p className="mt-3 text-[10px] leading-relaxed" style={{ color: withAlpha(C.cream, 0.45) }}>
-          Your ticket is used as soon as the run starts.
+          {torn ? "Ticket accepted — get ready!" : "Your ticket is used as soon as the run starts."}
         </p>
 
         {/* A real submit button so the phone keyboard's "Go" starts the run. */}
-        <div className="mt-5">
+        <div className="mt-5 flex flex-col items-center gap-3">
           <CabButton
             type="submit"
             color={C.magenta}
             size="md"
             className="w-full"
-            disabled={busy || !serial.trim()}
+            disabled={busy || torn || !serial.trim()}
           >
             {busy ? "Checking…" : "Start Run"}
           </CabButton>
+          <CabButton color={C.plum} size="sm" onClick={onCancel} disabled={torn}>
+            Cancel
+          </CabButton>
         </div>
       </form>
-
-      <button
-        onClick={onCancel}
-        className="mt-5 text-[10px] tracking-[0.25em] uppercase underline"
-        style={{ color: withAlpha(C.cream, 0.5) }}
-      >
-        Cancel
-      </button>
     </PromptFrame>
   );
 }

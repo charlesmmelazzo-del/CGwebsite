@@ -1,14 +1,15 @@
 // ─── CRT panel ───────────────────────────────────────────────────────────────
 //
-// The page's screen: a tube behind rounded glass, not a card.
+// The page's screen: the owner's pixel cabinet bezel around dark glass.
 //
 // Distinct from games/CRTScreen.tsx, which wraps the game canvas itself at
 // pixel scale. This is the larger monitor the whole slide sits inside, so its
-// corner radius, bezel depth and scanline pitch are all bigger — a scanline
-// gap tuned for a 224px canvas is invisible at page scale.
+// scanline pitch is bigger — a gap tuned for a 224px canvas is invisible at
+// page scale.
 
 import type { ReactNode } from "react";
-import { withAlpha, C, R } from "./theme";
+import { withAlpha, C } from "./theme";
+import { BEZEL_INSET, BezelFrame } from "./pixelArt";
 import { BartenderArt, GUEST_SWAPS, SpriteArt } from "../CabinetArt";
 import { GUEST } from "../CabinetArt";
 
@@ -30,42 +31,30 @@ export default function CrtPanel({
   return (
     <div
       className={`relative ${fill ? "h-full flex flex-col" : ""} ${className}`}
-      style={{
-        // The moulded plastic surround.
-        borderRadius: R.screen,
-        padding: "14px",
-        background: `radial-gradient(120% 120% at 50% 0%, #2A2A36 0%, #14141C 55%, #0A0A10 100%)`,
-        boxShadow: [
-          `inset 0 2px 0 ${withAlpha("#FFFFFF", 0.09)}`,
-          `inset 0 0 26px ${withAlpha("#000000", 0.9)}`,
-          `0 0 40px -10px ${withAlpha(glow, 0.45)}`,
-          `0 10px 0 ${withAlpha("#000000", 0.45)}`,
-        ].join(", "),
-      }}
+      style={{ padding: BEZEL_INSET }}
     >
+      <BezelFrame glow={glow} />
+
       <div
-        className={`relative overflow-hidden px-4 py-6 sm:px-7 sm:py-8 ${fill ? "flex-1 min-h-0" : ""}`}
+        className={`relative overflow-hidden px-3 py-5 sm:px-7 sm:py-8 ${fill ? "flex-1 min-h-0" : ""}`}
         style={{
-          // The glass. Rounded hard — a CRT's corners are generous.
-          borderRadius: "20px",
+          // The glass, square-cornered to sit flush in the pixel bezel.
           background: `radial-gradient(130% 110% at 50% 40%, #0E0A1C 0%, #070510 62%, #030208 100%)`,
-          boxShadow: `inset 0 0 60px ${withAlpha("#000000", 0.95)}`,
+          boxShadow: `inset 0 0 40px ${withAlpha("#000000", 0.95)}`,
         }}
       >
         {/*
-          Pixel accents in the bezel corners, as on the reference artwork: the
-          game's own sprites, small, framing the screen the game plays in. The
-          illustration does the heavy lifting elsewhere — these are the nod to
-          what is actually running on the tube.
+          Pixel accents in the corners of the glass: the game's own sprites,
+          small, framing the screen the game plays in.
         */}
         {accents && (
           <>
-            <div aria-hidden className="hidden sm:block absolute left-2 top-2 z-20 opacity-80">
+            <div aria-hidden className="hidden sm:block absolute left-3 top-3 z-[5] opacity-80">
               <BartenderArt px={2} mood="happy" holdingTin={false} />
             </div>
             <div
               aria-hidden
-              className="hidden sm:block absolute right-2 top-2 z-20 opacity-80"
+              className="hidden sm:block absolute right-3 top-3 z-[5] opacity-80"
               style={{ transform: "scaleX(-1)" }}
             >
               <SpriteArt sprite={GUEST} colors={GUEST_SWAPS[0]} px={2} />
@@ -73,37 +62,19 @@ export default function CrtPanel({
           </>
         )}
 
-        <div className={`relative z-10 ${fill ? "h-full" : ""}`}>{children}</div>
-
-        {/* Scanlines, at page scale rather than sprite scale. */}
+        {/*
+          The tube effects sit BEHIND the content. Laid over it, the scanlines
+          striped every button and shimmered as the carousel slid; the demo
+          canvas carries its own scanlines, so the glass loses nothing.
+        */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 z-20 opacity-[0.35]"
+          className="pointer-events-none absolute inset-0 z-0 opacity-[0.35]"
           style={{
             backgroundImage:
               "repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,0.5) 3px, rgba(0,0,0,0.5) 4px)",
           }}
         />
-
-        {/* Vignette: the glass falls off toward the corners. */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 z-20"
-          style={{
-            background: `radial-gradient(115% 115% at 50% 50%, transparent 48%, ${withAlpha("#000000", 0.72)} 100%)`,
-          }}
-        />
-
-        {/* The bulge: light catching the top of a curved tube. */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-2/5 z-20"
-          style={{
-            background: `radial-gradient(90% 100% at 50% 0%, ${withAlpha("#FFFFFF", 0.09)} 0%, transparent 70%)`,
-          }}
-        />
-
-        {/* Ambient phosphor wash, so the black isn't dead flat. */}
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 z-0"
@@ -111,6 +82,8 @@ export default function CrtPanel({
             background: `radial-gradient(80% 70% at 50% 45%, ${withAlpha(glow, 0.07)} 0%, transparent 70%)`,
           }}
         />
+
+        <div className={`relative z-10 ${fill ? "h-full" : ""}`}>{children}</div>
       </div>
     </div>
   );

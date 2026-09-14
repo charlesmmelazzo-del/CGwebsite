@@ -5,6 +5,8 @@ import Link from "next/link";
 import { getGameMeta } from "@/lib/popup/games";
 import { getGameComponent } from "./registry";
 import { P, pad } from "./arcade";
+import CabButton, { CabIconButton } from "../cabinet/CabButton";
+import { C } from "../cabinet/theme";
 import type { GameBoard } from "@/lib/popup/types";
 
 type Phase = "attract" | "playing" | "over";
@@ -252,18 +254,15 @@ export default function GameShell({
             onExit={leave}
           />
         ) : (
-          <button
+          <CabIconButton
+            icon="pause"
+            size={40}
+            ariaLabel="Pause"
             onClick={() => setPaused(true)}
-            aria-label="Pause"
-            // 44px to hit, a smaller mark to see — it sits over the game's art.
-            className="absolute top-1 right-1 z-10 flex h-11 w-11 items-center justify-center"
-            style={{ WebkitTapHighlightColor: "transparent" }}
-          >
-            <span className="flex h-8 w-8 items-center justify-center gap-[3px] rounded-full border border-white/35 bg-black/55 backdrop-blur-sm active:bg-black/80">
-              <span className="block h-3 w-[3px] rounded-sm bg-white/90" />
-              <span className="block h-3 w-[3px] rounded-sm bg-white/90" />
-            </span>
-          </button>
+            // Small, since it sits over the game's art; the full-bleed games keep
+            // this corner clear of their HUD.
+            className="absolute top-1.5 right-1.5 z-10"
+          />
         )}
       </div>
     );
@@ -363,20 +362,14 @@ function PauseScreen({
         <p style={{ color: accent }} className="mt-2 text-3xl font-bold tracking-[0.2em] uppercase">
           Paused
         </p>
-        <button
-          onClick={onResume}
-          autoFocus
-          style={{ background: accent }}
-          className="mt-8 w-full py-4 text-black text-xs tracking-[0.3em] uppercase font-bold active:opacity-80"
-        >
-          Resume
-        </button>
-        <button
-          onClick={onExit}
-          className="mt-3 w-full py-3.5 border-2 border-white/25 text-white/75 text-[11px] tracking-[0.25em] uppercase active:bg-white/10"
-        >
-          Exit
-        </button>
+        <div className="mt-8 flex flex-col gap-3">
+          <CabButton color={C.gold} size="lg" className="w-full" onClick={onResume}>
+            Resume
+          </CabButton>
+          <CabButton color={C.plum} size="md" className="w-full" onClick={onExit}>
+            Exit
+          </CabButton>
+        </div>
         {ticketRun && (
           <p className="mt-3 text-[10px] leading-relaxed text-white/45">
             Exiting ends this High Score Run. Your ticket has been used.
@@ -433,13 +426,9 @@ function AttractScreen({
         freePlay={freePlay}
       />
 
-      <button
-        onClick={onStart}
-        style={{ background: accent }}
-        className="mt-4 w-full py-4 text-black text-xs tracking-[0.3em] uppercase font-bold active:opacity-80 transition-opacity"
-      >
+      <CabButton color={C.gold} size="lg" className="mt-4 w-full" onClick={onStart}>
         Press Start
-      </button>
+      </CabButton>
 
       {board && board.entries.length > 0 && (
         <div className="mt-5">
@@ -545,19 +534,12 @@ function GameOverScreen({
       )}
 
       <div className="mt-4 grid grid-cols-2 gap-2">
-        <button
-          onClick={onReplay}
-          style={{ background: accent }}
-          className="py-3.5 text-black text-[11px] tracking-[0.2em] uppercase font-bold active:opacity-80"
-        >
+        <CabButton color={needsTicket ? C.magenta : C.gold} size="md" className="w-full" onClick={onReplay}>
           {needsTicket ? "New Run" : "Play Again"}
-        </button>
-        <button
-          onClick={onQuit}
-          className="py-3.5 border-2 border-white/25 text-white/70 text-[11px] tracking-[0.2em] uppercase active:bg-white/10"
-        >
+        </CabButton>
+        <CabButton color={C.plum} size="md" className="w-full" onClick={onQuit}>
           Exit
-        </button>
+        </CabButton>
       </div>
 
       {board && board.entries.length > 0 && (

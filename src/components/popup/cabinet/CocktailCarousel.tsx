@@ -26,10 +26,11 @@ import type {
 import { VOTE_BLOCK_MESSAGE } from "@/lib/popup/access";
 import { getGameMeta } from "@/lib/popup/games";
 import Leaderboard from "../Leaderboard";
-import CabButton, { CabArrow } from "./CabButton";
+import CabButton, { CabArrow, CabIconButton } from "./CabButton";
+import { artLayer } from "./pixelArt";
 import CrtPanel from "./CrtPanel";
 import GameDemo from "./GameDemo";
-import { lamp, shade, withAlpha, C } from "./theme";
+import { withAlpha, C } from "./theme";
 
 export default function CocktailCarousel({
   cocktails,
@@ -136,15 +137,9 @@ export default function CocktailCarousel({
               key={i}
               onClick={() => emblaApi?.scrollTo(i)}
               aria-label={`Go to slide ${i + 1}`}
-              className="w-3.5 h-3.5 rounded-full transition-transform"
-              style={{
-                background: i === selected ? lamp(C.gold) : withAlpha(C.cream, 0.22),
-                boxShadow:
-                  i === selected
-                    ? `0 0 10px ${withAlpha(C.gold, 0.8)}, inset 0 0 0 1px ${shade(C.gold, 0.5)}`
-                    : `inset 0 0 0 1px ${withAlpha(C.cream, 0.3)}`,
-                transform: i === selected ? "scale(1.25)" : undefined,
-              }}
+              aria-current={i === selected}
+              className="w-4 h-4"
+              style={artLayer(i === selected ? "light-on" : "light-off", "contain")}
             />
           ))}
         </div>
@@ -284,7 +279,7 @@ function CocktailSlide({
             )}
 
             <div className="mt-5 flex justify-center">
-              <CabButton color={C.gold} size="sm" depth={4} onClick={() => setFlipped(true)}>
+              <CabButton color={C.gold} size="sm" onClick={() => setFlipped(true)}>
                 Cocktail Info
               </CabButton>
             </div>
@@ -309,7 +304,7 @@ function CocktailSlide({
 function Caption({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
     <p
-      className={`text-center text-[9px] sm:text-[10px] tracking-[0.14em] uppercase leading-relaxed ${className}`}
+      className={`text-center text-[9px] sm:text-[10px] tracking-[0.06em] uppercase leading-relaxed ${className}`}
       style={{ color: withAlpha(C.cream, 0.65) }}
     >
       {children}
@@ -338,11 +333,7 @@ function CocktailInfo({ cocktail, onClose }: { cocktail: PopupCocktail; onClose:
             </p>
           )}
         </div>
-        <CabButton shape="round" size="sm" depth={4} color={C.magenta} ariaLabel="Close cocktail info" onClick={onClose}>
-          <svg width="14" height="14" viewBox="0 0 12 12" aria-hidden>
-            <path d="M2 2 L10 10 M10 2 L2 10" stroke="#12060F" strokeWidth="2.4" strokeLinecap="round" />
-          </svg>
-        </CabButton>
+        <CabIconButton icon="close" size={44} ariaLabel="Close cocktail info" onClick={onClose} />
       </div>
 
       {/* Long stories scroll inside the card, so it keeps the demo side's size. */}
@@ -472,11 +463,9 @@ function StandingsSlide({
                   <CabButton
                     key={c.id}
                     size="sm"
-                    depth={4}
                     color={rank !== undefined ? C.gold : C.plum}
                     disabled={voteBusy || !votingOpen}
                     onClick={() => onVote(c.id)}
-                    className={rank !== undefined ? "" : "!text-[#FFE9C4]"}
                   >
                     {rank !== undefined ? `#${rank} ${c.name}` : c.name}
                   </CabButton>
