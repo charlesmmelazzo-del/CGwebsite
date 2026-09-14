@@ -17,6 +17,8 @@ import {
   SHAKE_SECONDS,
   beginBuild,
   cardRemaining,
+  chartFor,
+  MIN_NOTE_GAP,
   update,
   WINDOW_X,
   type State,
@@ -406,6 +408,61 @@ check("score never goes negative in the reported result", () => {
   const st = start();
   st.score = -500;
   assert.ok(Math.max(0, Math.round(st.score)) === 0);
+});
+
+console.log("\nRhythm:");
+
+/** A seeded stand-in for Math.random, so a chart can be pinned down. */
+function seeded(seed: number) {
+  let x = seed;
+  return () => ((x = (x * 16807) % 2147483647) / 2147483647);
+}
+
+check("a round's notes come in phrases, not on a metronome", () => {
+  for (let seed = 1; seed <= 20; seed++) {
+    const chart = chartFor(3, 1, 62, seeded(seed));
+    assert.strictEqual(chart.length, NOTES_PER_ROUND);
+    const distinct = new Set(chart.map((g) => g.toFixed(3)));
+    assert.ok(distinct.size >= 2, `seed ${seed} was all one gap: ${chart.join(", ")}`);
+  }
+});
+
+check("every chart opens on the steady beat", () => {
+  const chart = chartFor(5, 0.8, 100, seeded(7));
+  assert.deepStrictEqual(chart.slice(0, 2), [0.8, 0.8]);
+});
+
+check("no two notes ever come closer than a playable gap, or overlap on the rail", () => {
+  for (let round = 1; round <= 12; round++) {
+    const speed = Math.min(150, 62 + 9 * (round - 1));
+    const beat = Math.max(0.55, 1.15 - 0.06 * (round - 1));
+    for (let seed = 1; seed <= 30; seed++) {
+      for (const g of chartFor(round, beat, speed, seeded(seed))) {
+        assert.ok(g >= MIN_NOTE_GAP - 1e-9, `round ${round}: ${g}s is too quick`);
+        assert.ok(g * speed >= 30 - 1e-6, `round ${round}: bottles ${g * speed}px apart`);
+      }
+    }
+  }
+});
+
+check("round one has no triplets or runs in it", () => {
+  for (let seed = 1; seed <= 40; seed++) {
+    const quick = chartFor(1, 1.15, 62, seeded(seed)).filter((g) => g < 1.15 * 0.5 - 1e-9);
+    assert.deepStrictEqual(quick, [], `seed ${seed}`);
+  }
+});
+
+check("the pour actually follows the chart", () => {
+  const st = start();
+  st.chart = [0.4, 1.6, 0.4, 1.6, 0.4, 1.6, 0.4, 1.6, 0.4, 1.6];
+  const spawnedAt: number[] = [];
+  let seen = 0;
+  for (let i = 0; i < 60 * 12 && st.spawned < 4; i++) {
+    update(st, DT, always("whiskey"));
+    if (st.spawned > seen) { spawnedAt.push(st.phaseT); seen = st.spawned; }
+  }
+  const gaps = spawnedAt.slice(1).map((t, i) => t - spawnedAt[i]);
+  assert.ok(Math.abs(gaps[0] - 0.4) < 0.05 && Math.abs(gaps[1] - 1.6) < 0.05, `gaps were ${gaps.join(", ")}`);
 });
 
 check("every sprite the game asks for is in public/popup/art/stick", () => {

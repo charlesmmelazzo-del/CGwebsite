@@ -19,6 +19,7 @@ export default function CRTScreen({
   glow = "#57C7FF",
   className = "",
   fill = false,
+  scanlines = true,
 }: {
   children: ReactNode;
   /** Colour of the ambient light the tube throws onto its bezel. */
@@ -33,6 +34,12 @@ export default function CRTScreen({
    * middle of the screen no matter how much room the layout gave it.
    */
   fill?: boolean;
+  /**
+   * The scanlines and aperture grille. Off for a game whose painted art and
+   * small type read worse through a stripe pattern than they gain from it —
+   * the bezel, glow and vignette still make it a screen.
+   */
+  scanlines?: boolean;
 }) {
   return (
     <div
@@ -62,26 +69,30 @@ export default function CRTScreen({
           {children}
         </div>
 
-        {/* Scanlines — one dark row between every pixel row. */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,0.34) 3px, rgba(0,0,0,0.34) 4px)",
-            mixBlendMode: "multiply",
-          }}
-        />
+        {scanlines && (
+          <>
+            {/* Scanlines — one dark row between every pixel row. */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0"
+              style={{
+                backgroundImage:
+                  "repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,0.34) 3px, rgba(0,0,0,0.34) 4px)",
+                mixBlendMode: "multiply",
+              }}
+            />
 
-        {/* Aperture grille — the faint vertical RGB stripe of a real tube. */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-[0.13]"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(to right, rgba(255,0,0,0.7) 0px, rgba(0,255,0,0.7) 1px, rgba(0,0,255,0.7) 2px, rgba(0,0,0,0) 3px)",
-          }}
-        />
+            {/* Aperture grille — the faint vertical RGB stripe of a real tube. */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 opacity-[0.13]"
+              style={{
+                backgroundImage:
+                  "repeating-linear-gradient(to right, rgba(255,0,0,0.7) 0px, rgba(0,255,0,0.7) 1px, rgba(0,0,255,0.7) 2px, rgba(0,0,0,0) 3px)",
+              }}
+            />
+          </>
+        )}
 
         {/* Vignette: the glass falls off toward the corners. */}
         <div

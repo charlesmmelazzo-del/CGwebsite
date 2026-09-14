@@ -918,12 +918,14 @@ function ring(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, 
 // ─── The pour deck ───────────────────────────────────────────────────────────
 
 /**
- * The round's four ingredients as round cabinet buttons, two down each side.
+ * The round's four ingredients, two down each side, sized to the deck.
  *
- * Offset diagonally rather than stacked square: on a phone both thumbs come in
- * from the bottom corners, and a straight column means the lower button is
- * under the hand that's reaching for the upper one. The gap in the middle is
- * where the screen shows through above.
+ * A 2x2 grid in columns — recipe 1 and 2 on the left, 3 and 4 on the right,
+ * matching the number keys — hugging the sides so each thumb has its own pair
+ * and the middle stays clear. Each bottle is as tall as its half of the deck
+ * allows rather than a fixed 70px: the deck is a different height on every
+ * phone, and a fixed icon was a small bottle floating in a big black strip on
+ * a tall one and cropped on a short one.
  */
 function PourDeck({
   recipe,
@@ -936,17 +938,12 @@ function PourDeck({
   disabled: boolean;
   onPress: (key: string) => void;
 }) {
-  const left = recipe.slice(0, 2);
-  const right = recipe.slice(2, 4);
-
-  const column = (keys: readonly string[], side: "left" | "right") => (
-    <div className="flex flex-col gap-3">
-      {keys.map((key, i) => {
+  return (
+    <div className="w-full h-full max-w-[420px] mx-auto grid grid-cols-2 grid-rows-2 grid-flow-col gap-x-10 gap-y-2 px-2">
+      {recipe.slice(0, 4).map((key) => {
         const ing = ING_BY_KEY.get(key);
         if (!ing) return null;
-        // Second one steps inward, so the pair sits on a diagonal and a thumb
-        // reaching for the upper never covers the lower.
-        const indent = i === 1 ? (side === "left" ? "ml-9" : "mr-9") : "";
+        const src = artworkUrl(key) ?? iconUrls[key];
         return (
           <button
             key={key}
@@ -958,40 +955,43 @@ function PourDeck({
               onPress(key);
             }}
             onContextMenu={(e) => e.preventDefault()}
-            className={`${indent} select-none flex flex-col items-center justify-end gap-1 px-1 disabled:opacity-30 active:translate-y-[3px] transition-transform`}
+            className="min-h-0 min-w-0 select-none flex flex-col items-center justify-center gap-1 rounded-xl bg-white/[0.04] disabled:opacity-30 active:translate-y-[3px] active:bg-white/[0.1] transition-transform"
             style={{
               touchAction: "none",
               WebkitTouchCallout: "none",
               WebkitTapHighlightColor: "transparent",
             }}
           >
-            {/* The sprite IS the control. A drawn button around a drawn bottle
-                was two frames around one picture; the bottle is what the player
-                is matching against the rail, so show that and nothing else.
-                Fixed box either way, so the icon appearing after mount doesn't
-                shift the target under a thumb. */}
-            <span style={{ width: 70, height: 94 }} className="flex items-end justify-center">
-              {/* The owner's artwork where it exists; the generated icon
-                  otherwise, so an ingredient without a file still has a face. */}
-              {(artworkUrl(key) ?? iconUrls[key]) && (
+            {/* The sprite IS the control — the bottle is what the player is
+                matching against the rail. The box takes whatever height the
+                cell has, so the icon appearing after mount never shifts the
+                target under a thumb. */}
+            <span className="relative flex-1 min-h-0 w-full">
+              {src && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={artworkUrl(key) ?? iconUrls[key]}
+                  src={src}
                   alt=""
+                  draggable={false}
+                  className="absolute inset-0 m-auto h-full max-h-[120px] w-auto max-w-full"
                   style={{
-                    imageRendering: artworkUrl(key) ? "auto" : "pixelated",
-                    width: 70,
-                    height: 94,
+                    // The artwork is square with the bottle centred in it, so
+                    // it is sized by height and its empty sides may overhang.
+                    aspectRatio: "1 / 1",
                     objectFit: "contain",
-                    filter: `drop-shadow(0 3px 0 rgba(0,0,0,0.6))`,
+                    imageRendering: artworkUrl(key) ? "auto" : "pixelated",
+                    filter: "drop-shadow(0 3px 0 rgba(0,0,0,0.6))",
                   }}
                 />
               )}
             </span>
             <span
-              className="text-[11px] font-black uppercase leading-none tracking-tight"
+              className="shrink-0 text-[13px] font-black uppercase leading-none tracking-tight"
               style={{
-                color: ing.color,
+                // Cream, not the ingredient's colour: rum and vermouth are
+                // dark browns and reds that vanish against the black deck,
+                // and the bottle above already carries the colour.
+                color: "#F3E6C8",
                 fontFamily: "var(--font-pixel, ui-monospace, monospace)",
                 textShadow: "2px 2px 0 #000",
               }}
@@ -1003,15 +1003,7 @@ function PourDeck({
       })}
     </div>
   );
-
-  return (
-    <div className="w-full flex items-center justify-between px-1 sm:px-4">
-      {column(left, "left")}
-      {column(right, "right")}
-    </div>
-  );
 }
-
 
 // ─── The shake button ────────────────────────────────────────────────────────
 
@@ -1609,7 +1601,7 @@ export default function BehindTheStick({ onGameOver, demo = false }: ArcadeGameP
           className="h-full max-h-full max-w-full"
           style={{ aspectRatio: `${GAME_W} / ${GAME_H}` }}
         >
-          <CRTScreen glow="#FFA000" fill>
+          <CRTScreen glow="#FFA000" fill scanlines={false}>
             <ArcadeCanvas onFrame={onFrame} running fit="contain" />
           </CRTScreen>
         </div>

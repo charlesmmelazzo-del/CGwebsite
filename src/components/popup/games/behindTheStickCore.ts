@@ -47,6 +47,65 @@ export const CARD_SECONDS = 4;
 export const SERVE_SECONDS = 2.2;
 export const OVER_SECONDS = 2.6;
 
+/**
+ * The shortest time between two notes, however hard the phrase. Below this a
+ * quick pair stops reading as two taps and starts reading as a flam.
+ */
+export const MIN_NOTE_GAP = 0.3;
+/** And the closest two bottles may sit on the rail, so they never overlap. */
+export const MIN_NOTE_SPACING_PX = 30;
+
+/**
+ * The rhythm of a round, as phrases rather than a metronome.
+ *
+ * Each phrase is the gaps AFTER each of its notes, in beats, where a beat is
+ * the round's `gap`. A steady run of equal gaps is what the rail used to do
+ * and it stopped being a rhythm game about four notes in: the thumb found the
+ * pulse and the eyes stopped reading. Mixing quick pairs, pushes and rests is
+ * what a note chart in a guitar game does — the player has to read what is
+ * coming, not just keep time.
+ *
+ * `from` is the round a phrase first appears in, so round one stays mostly
+ * even and the syncopation arrives as the drinks get harder.
+ */
+export const PHRASES: { beats: number[]; from: number }[] = [
+  { beats: [1, 1], from: 1 }, // steady
+  { beats: [2], from: 1 }, // a rest after the note
+  { beats: [0.5, 1.5], from: 1 }, // a quick pair, then room to breathe
+  { beats: [1.5, 0.5], from: 2 }, // a push onto the off-beat
+  { beats: [0.5, 0.5, 1], from: 2 }, // three in a row
+  { beats: [0.75, 0.75, 0.5], from: 3 }, // syncopated
+  { beats: [0.5, 0.5, 0.5, 1.5], from: 3 }, // a run
+  { beats: [1 / 3, 1 / 3, 4 / 3], from: 4 }, // a triplet burst
+];
+
+/**
+ * The gap after each of a round's notes, in seconds.
+ *
+ * Always opens on a steady pair so the first thing the player hears — sees —
+ * is the pulse; the phrases are variations against it. `rand` is injectable so
+ * a test can pin the chart down.
+ */
+export function chartFor(
+  round: number,
+  beat: number,
+  speed: number,
+  rand: () => number = Math.random
+): number[] {
+  const floor = Math.max(MIN_NOTE_GAP, MIN_NOTE_SPACING_PX / speed);
+  const pool = PHRASES.filter((p) => p.from <= round);
+  const beats: number[] = [1, 1];
+  let last = -1;
+  while (beats.length < NOTES_PER_ROUND) {
+    // Never the same phrase twice running, or a repeat reads as a loop.
+    let i = Math.floor(rand() * pool.length);
+    if (i === last && pool.length > 1) i = (i + 1) % pool.length;
+    last = i;
+    beats.push(...pool[i].beats);
+  }
+  return beats.slice(0, NOTES_PER_ROUND).map((b) => Math.max(floor, b * beat));
+}
+
 export const INGREDIENT_KEYS = [
   "whiskey",
   "gin",
@@ -117,7 +176,10 @@ export interface State {
   nextId: number;
   spawnTimer: number;
   speed: number;
+  /** The length of a beat this round, in seconds. */
   gap: number;
+  /** The gap after each note this round — see chartFor. */
+  chart: number[];
   mood: Mood;
   moodTimer: number;
   splashes: Splash[];
@@ -170,6 +232,7 @@ export function freshState(
     spawnTimer: 0.6,
     speed: 62,
     gap: 1.15,
+    chart: [],
     mood: "ok",
     moodTimer: 0,
     splashes: [],
@@ -305,6 +368,7 @@ export function update(
   } else if (st.phase === "build") {
     if (st.phaseT > CARD_SECONDS) {
       setPhase(st, "pour");
+      st.chart = chartFor(st.round, st.gap, st.speed);
       st.banner = `ROUND ${st.round}`;
       st.bannerTimer = 1.2;
     }
@@ -314,8 +378,10 @@ export function update(
     st.spawnTimer -= dt;
     if (st.spawnTimer <= 0 && st.spawned < NOTES_PER_ROUND) {
       st.notes.push({ id: st.nextId++, ing: pickIngredient(), x: -14, judged: false });
+      // The chart decides when the next one comes; a state built without one
+      // (a test that starts mid-round) falls back to the steady beat.
+      st.spawnTimer = st.chart[st.spawned] ?? st.gap;
       st.spawned++;
-      st.spawnTimer = st.gap;
     }
 
     for (const n of st.notes) {
