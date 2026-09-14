@@ -21,8 +21,11 @@ import {
   WINDOW_X,
   type State,
 } from "../behindTheStickCore";
-import { getCocktail } from "../cocktails";
+import { COCKTAILS, getCocktail } from "../cocktails";
 import { colorFor } from "../ingredients";
+import { DECK_ART, drinkArt, STICK_ART } from "../stickArt";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 
 let passed = 0;
 function check(name: string, fn: () => void) {
@@ -403,6 +406,20 @@ check("score never goes negative in the reported result", () => {
   const st = start();
   st.score = -500;
   assert.ok(Math.max(0, Math.round(st.score)) === 0);
+});
+
+check("every sprite the game asks for is in public/popup/art/stick", () => {
+  const dir = join(__dirname, "../../../../../public/popup/art/stick");
+  const missing = [
+    ...STICK_ART.map((n) => `${n}.png`),
+    ...Object.values(DECK_ART).map((u) => u.split("/").pop()!),
+  ].filter((f) => !existsSync(join(dir, f)));
+  assert.deepStrictEqual(missing, []);
+});
+
+check("every cocktail has a painted glass", () => {
+  const without = COCKTAILS.filter((c) => drinkArt(c.key) === null).map((c) => c.key);
+  assert.deepStrictEqual(without, []);
 });
 
 console.log(`\n${passed} checks passed.\n`);

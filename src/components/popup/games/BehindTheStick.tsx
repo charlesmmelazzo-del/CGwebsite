@@ -58,7 +58,18 @@ import {
 import type { ArcadeGameProps } from "./registry";
 import { INGREDIENTS, ING_BY_KEY, colorFor } from "./ingredients";
 import { artworkUrl, ingredientArt, warmIngredientArt } from "./ingredientImages";
-import { drawCharacter, warmCharacterArt, type Mood as ArtMood } from "./characterArt";
+import {
+  DECK_ART,
+  drawArt,
+  drawArtCentred,
+  drawArtFrame,
+  drawArtStanding,
+  drawArtStrip,
+  artGameHeight,
+  drinkArt,
+  warmStickArt,
+  type StickArtName,
+} from "./stickArt";
 import {
   BUBBLE_R,
   live as liveBubbles,
@@ -82,7 +93,27 @@ import {
 
 // ─── Scene ───────────────────────────────────────────────────────────────────
 
+/**
+ * Where the painted back bar's counter starts, in game pixels. The bartender
+ * stands behind it: he is drawn after the background and then the counter and
+ * everything below it is drawn again over his waist.
+ */
+const COUNTER_Y = 152;
+
+/** A black wash over the scene, for the close-ups that sit on top of it. */
+function dim(ctx: CanvasRenderingContext2D, amount: number) {
+  ctx.fillStyle = `rgba(0,0,0,${amount})`;
+  ctx.fillRect(0, 0, GAME_W, GAME_H);
+}
+
+/** The painted back bar, or the drawn one until it loads. */
 function drawBackbar(ctx: CanvasRenderingContext2D, t: number) {
+  if (drawArt(ctx, "bg-backbar", 0, 0, GAME_W, GAME_H)) {
+    // The sign buzzes: mostly lit, with the odd flicker off.
+    const flicker = Math.floor(t * 9) % 23 === 0 || Math.floor(t * 9) % 31 === 0;
+    drawArt(ctx, flicker ? "neon-off" : "neon-on", 7, 84, 40, 24.4);
+    return;
+  }
   clear(ctx, "#0C0818");
 
   // Back wall, with a warm pool of light behind the bartender
@@ -141,6 +172,33 @@ function drawBackbar(ctx: CanvasRenderingContext2D, t: number) {
   if (blink(t, 0.7)) {
     drawTextMarquee(ctx, "OPEN", 14, 20, P.magenta, 1, "left", "#3A0030");
   }
+}
+
+/**
+ * The counter and the bar front, redrawn over the bartender's waist. A slice
+ * of the same background image, so it lines up with what is behind him.
+ */
+function drawCounterOver(ctx: CanvasRenderingContext2D): boolean {
+  return drawArtSlice(ctx, "bg-backbar", COUNTER_Y);
+}
+
+/** Redraw the background from `fromY` down. */
+function drawArtSlice(ctx: CanvasRenderingContext2D, name: StickArtName, fromY: number): boolean {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, fromY, GAME_W, GAME_H - fromY);
+  ctx.clip();
+  const ok = drawArt(ctx, name, 0, 0, GAME_W, GAME_H);
+  ctx.restore();
+  return ok;
+}
+
+/** The painted bartender, in the pose and mood asked for. */
+function bartenderArt(mood: Mood | "over"): StickArtName {
+  if (mood === "over") return "bartender-over";
+  if (mood === "panic") return "bartender-panic";
+  if (mood === "worried") return "bartender-worried";
+  return "bartender-happy";
 }
 
 /** The public side of the bar: rail, panelled front, brass foot rail. */
@@ -268,14 +326,23 @@ function drawGuest(
 }
 
 function drawRail(ctx: CanvasRenderingContext2D, st: State, t: number) {
-  rect(ctx, 0, RAIL_Y, GAME_W, RAIL_H, "#101020");
-  rect(ctx, 0, RAIL_Y, GAME_W, 1, P.slate);
-  rect(ctx, 0, RAIL_Y + RAIL_H - 1, GAME_W, 1, P.slate);
-
   const wx = WINDOW_X - GOOD_HALF - 2;
   const ww = (GOOD_HALF + 2) * 2;
-  rect(ctx, wx, RAIL_Y + 1, ww, RAIL_H - 2, "#182848");
-  outline(ctx, wx, RAIL_Y + 1, ww, RAIL_H - 2, blink(t, 3) ? P.cyan : P.teal);
+
+  if (drawArtStrip(ctx, "rail-strip", -2, RAIL_Y, GAME_W + 4, RAIL_H, 0.42)) {
+    // The window pulses so the eye finds it without reading anything.
+    if (blink(t, 3)) {
+      ctx.fillStyle = "rgba(255,213,0,0.16)";
+      ctx.fillRect(wx, RAIL_Y + 3, ww, RAIL_H - 6);
+    }
+    drawArtFrame(ctx, "pour-window", wx - 2, RAIL_Y - 1, ww + 4, RAIL_H + 2, 0.24, 7);
+  } else {
+    rect(ctx, 0, RAIL_Y, GAME_W, RAIL_H, "#101020");
+    rect(ctx, 0, RAIL_Y, GAME_W, 1, P.slate);
+    rect(ctx, 0, RAIL_Y + RAIL_H - 1, GAME_W, 1, P.slate);
+    rect(ctx, wx, RAIL_Y + 1, ww, RAIL_H - 2, "#182848");
+    outline(ctx, wx, RAIL_Y + 1, ww, RAIL_H - 2, blink(t, 3) ? P.cyan : P.teal);
+  }
 
   for (const n of st.notes) {
     if (n.judged) continue;
@@ -283,14 +350,31 @@ function drawRail(ctx: CanvasRenderingContext2D, st: State, t: number) {
   }
 }
 
-function drawShake(ctx: CanvasRenderingContext2D, st: State) {
+function drawShake(ctx: CanvasRenderingContext2D, st: State, t: number) {
   const ok = currentBpm(st) >= st.target;
   const settling = st.phaseT <= GRACE_SECONDS;
+
+  // A close-up: the bar pushed back into the dark and the tin in two hands.
+  // The frame flips once per tap, so it moves exactly as fast as the player.
+  drawBackbar(ctx, t);
+  dim(ctx, 0.62);
+  const resting = st.phaseT - st.lastTapT > 0.5;
+  const up = !resting && st.shakeCount % 2 === 1;
+  const drewTin = drawArtCentred(
+    ctx,
+    up ? "shaker-2" : "shaker-1",
+    112,
+    146 + (resting ? 0 : up ? -4 : 4),
+    176
+  );
+  if (!drewTin) clear(ctx, P.black);
 
   // One word for what to do. Deliberately no rate meter and no BPM readout:
   // the only thing a player can act on is "keep going" or "speed up", so a
   // number they have to interpret mid-shake is noise.
-  drawTextMarquee(ctx, "SHAKE", 112, 236, P.yellow, 3, "center", P.black, "#8A6A00");
+  if (!drawArtCentred(ctx, "banner-shake-it", 112, 238, 164)) {
+    drawTextMarquee(ctx, "SHAKE", 112, 236, P.yellow, 3, "center", P.black, "#8A6A00");
+  }
 
   // One word for how it is going, held back through the grace period so the
   // first thing a player sees is not a scolding.
@@ -299,7 +383,7 @@ function drawShake(ctx: CanvasRenderingContext2D, st: State) {
       ctx,
       ok ? "GOOD!" : "GO FASTER!",
       112,
-      96,
+      22,
       ok ? P.lime : P.red,
       2,
       "center",
@@ -313,38 +397,57 @@ function drawShake(ctx: CanvasRenderingContext2D, st: State) {
   meter(ctx, 52, 268, 120, 5, clamp((total - st.phaseT) / total, 0, 1), P.cyan);
 }
 
-function drawStir(ctx: CanvasRenderingContext2D, st: State) {
+function drawStir(ctx: CanvasRenderingContext2D, st: State, t: number) {
   const rpm = currentRpm(st);
   const ok = rpm >= st.target;
 
   const cx = 112;
   const cy = 116;
+  const lead = st.lastAngle ?? -Math.PI / 2;
 
   // The drink only. The dial that turns it is on the deck below, so drawing a
   // track and a dot up here too would be two controls for one action.
-  rect(ctx, cx - 22, cy - 26, 44, 52, "#100810");
-  rect(ctx, cx - 19, cy - 23, 38, 46, "#7FA8C0");
-  rect(ctx, cx - 16, cy - 4, 32, 24, P.amber);
+  drawBackbar(ctx, t);
+  dim(ctx, 0.62);
 
-  // Surface, tilted by the swirl the player is actually managing.
-  const swirl = Math.sin(st.revs * Math.PI * 2) * 4;
-  rect(ctx, cx - 16, cy - 6 + swirl, 32, 3, ok ? P.lime : P.tan);
-  rect(ctx, cx - 16, cy - 2 - swirl, 32, 2, "#B07830");
+  // Glass, then the swirl on its surface, then the spoon down into it. The
+  // spoon follows the dial round, and the swirl turns once per third of a lap
+  // the player actually makes — a stalled hand stalls the drink.
+  const glassW = 110;
+  const glassH = glassW * (238 / 177);
+  const glassTop = 206 - glassH;
+  const drewGlass = drawArtStanding(ctx, "mixing-glass", cx, 206, glassH);
+  if (drewGlass) {
+    const frame = (["swirl-1", "swirl-2", "swirl-3"] as const)[Math.floor(st.revs * 3) % 3];
+    drawArtCentred(ctx, frame, cx, glassTop + glassH * 0.39, glassW * 0.74, 0.9);
+    const spoonX = cx + Math.cos(lead) * glassW * 0.24;
+    drawArtStanding(ctx, "bar-spoon", spoonX, glassTop + glassH * 0.62, 115);
+  } else {
+    clear(ctx, P.black);
+    rect(ctx, cx - 22, cy - 26, 44, 52, "#100810");
+    rect(ctx, cx - 19, cy - 23, 38, 46, "#7FA8C0");
+    rect(ctx, cx - 16, cy - 4, 32, 24, P.amber);
 
-  // The spoon, following the dial round.
-  const lead = st.lastAngle ?? -Math.PI / 2;
-  rect(ctx, cx + Math.round(Math.cos(lead) * 11) - 1, cy - 34, 3, 36, "#C8C8D0");
-  rect(ctx, cx + Math.round(Math.cos(lead) * 11) - 2, cy - 36, 5, 4, P.white);
+    // Surface, tilted by the swirl the player is actually managing.
+    const swirl = Math.sin(st.revs * Math.PI * 2) * 4;
+    rect(ctx, cx - 16, cy - 6 + swirl, 32, 3, ok ? P.lime : P.tan);
+    rect(ctx, cx - 16, cy - 2 - swirl, 32, 2, "#B07830");
+
+    rect(ctx, cx + Math.round(Math.cos(lead) * 11) - 1, cy - 34, 3, 36, "#C8C8D0");
+    rect(ctx, cx + Math.round(Math.cos(lead) * 11) - 2, cy - 36, 5, 4, P.white);
+  }
 
   // Same treatment as the shake: one instruction, one verdict, no readout.
-  drawTextMarquee(ctx, "STIR", 112, 250, P.yellow, 3, "center", P.black, "#8A6A00");
+  if (!drawArtCentred(ctx, "banner-stir-it", 112, 238, 164)) {
+    drawTextMarquee(ctx, "STIR", 112, 250, P.yellow, 3, "center", P.black, "#8A6A00");
+  }
 
   if (st.phaseT > GRACE_SECONDS) {
     drawTextMarquee(
       ctx,
       ok ? "GOOD!" : "GO FASTER!",
       112,
-      60,
+      22,
       ok ? P.lime : P.red,
       2,
       "center",
@@ -389,53 +492,129 @@ function drawCocktail(ctx: CanvasRenderingContext2D, cx: number, cy: number, s =
  * to be there. Two figures and a handover is the same beat, legibly.
  */
 function drawServe(ctx: CanvasRenderingContext2D, st: State, t: number) {
-  clear(ctx, P.black);
-
-  const bartenderX = 62;
-  const guestX = 166;
-  const baseY = 250;
-
-  const drewPair =
-    drawCharacter(ctx, "bartender", bartenderX, baseY, 150, { mood: "happy", pose: "serve" }) &&
-    drawCharacter(ctx, "guest", guestX, baseY, 140, { mood: "happy", facing: -1 });
-
-  if (!drewPair) {
-    drawBartender(ctx, bartenderX, baseY, "happy", "serve", t);
-    drawGuest(ctx, guestX, baseY, "happy", t, P.teal, "#005058");
-  }
+  const bartenderX = 60;
+  const guestX = 178;
+  /** Top of the painted bar front both of them lean on. */
+  const barY = 214;
 
   // ── The handover ────────────────────────────────────────────────────────
   // Eased so it leaves slowly, crosses quickly and settles — a linear slide
   // looks like a prop on a rail.
   const p = clamp(st.phaseT / 1.5, 0, 1);
   const ease = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
-  const x = bartenderX + 22 + ease * (guestX - bartenderX - 44);
-  // A shallow arc, so it is carried rather than dragged.
-  const y = 176 - Math.sin(ease * Math.PI) * 12;
+  const arrived = p >= 1;
 
-  drawCocktail(ctx, x, y, 1.3);
+  drawBackbar(ctx, t);
+  dim(ctx, 0.55);
 
-  if (p >= 1 && blink(t, 3)) {
-    drawTextMarquee(ctx, "NICE ONE!", 112, 60, P.lime, 2, "center", P.black, "#00551C");
+  // Hands on the bar while the drink crosses, then a toast once it lands. The
+  // guest waits, and has it in hand the moment it arrives.
+  const drewPair =
+    drawArtStanding(ctx, arrived ? "bartender-serve" : "bartender-happy", bartenderX, barY + 12, 156) &&
+    drawArtStanding(ctx, arrived ? "guest-happy" : "guest-wait", guestX, barY + 8, 100);
+
+  if (!drewPair) {
+    clear(ctx, P.black);
+    drawBartender(ctx, bartenderX, 250, "happy", "serve", t);
+    drawGuest(ctx, guestX, 250, "happy", t, P.teal, "#005058");
+  } else {
+    drawArtStrip(ctx, "bar-front", -4, barY, GAME_W + 8, GAME_H - barY + 6, 0.3);
+  }
+
+  // The drink itself, along the bar top in a shallow arc so it is carried
+  // rather than dragged. Gone once the guest is holding it.
+  const x = bartenderX + 30 + ease * (guestX - bartenderX - 58);
+  const lift = Math.sin(ease * Math.PI) * 12;
+  const art = drinkArt(st.cocktail.key);
+  if (!arrived || !drewPair) {
+    if (!(drewPair && art && drawArtStanding(ctx, art, x, barY + 4 - lift, drinkHeight(art, 44)))) {
+      drawCocktail(ctx, x, barY - lift, 1.3);
+    }
+  }
+
+  if (arrived && blink(t, 3)) {
+    if (!drawArtCentred(ctx, "banner-nice-one", 112, 44, 176)) {
+      drawTextMarquee(ctx, "NICE ONE!", 112, 60, P.lime, 2, "center", P.black, "#00551C");
+    }
   }
 }
 
-function drawOver(ctx: CanvasRenderingContext2D, t: number) {
+function drawOver(ctx: CanvasRenderingContext2D, t: number, tooSlow: boolean): boolean {
+  // The guest who didn't get a drink, leaning in from the right.
+  const drewGuest = drawArtStanding(ctx, "guest-angry", 190, GAME_H + 4, 96);
+  const banner = tooSlow ? "banner-too-slow" : "banner-game-over";
+  if (drewGuest && drawArtCentred(ctx, banner, 78, 196, 140)) {
+    if (blink(t, 2)) {
+      drawTextMarquee(ctx, "WHERE IS MY DRINK!?", 76, 236, P.yellow, 1, "center");
+    }
+    return true;
+  }
   rect(ctx, 0, RAIL_Y - 6, GAME_W, RAIL_H + 12, "#101020");
   drawTextMarquee(ctx, "GAME OVER", 112, RAIL_Y + 4, P.red, 2, "center", P.black, "#3A0000");
   if (blink(t, 2)) {
     drawTextMarquee(ctx, "WHERE IS MY DRINK!?", 112, RAIL_Y + 24, P.yellow, 1, "center");
   }
+  return false;
 }
 
 function drawHud(ctx: CanvasRenderingContext2D, st: State) {
   rect(ctx, 0, 0, GAME_W, 13, P.black);
   drawText(ctx, `SCORE ${pad(Math.max(0, st.score))}`, 4, 3, P.white, 1);
   drawText(ctx, `ROUND ${st.round}`, 148, 3, P.cyan, 1);
+  // Lives as glasses: standing until a spill knocks one over.
   for (let i = 0; i < MAX_STRIKES; i++) {
-    drawText(ctx, i < st.strikes ? "X" : "-", 108 + i * 8, 3, i < st.strikes ? P.red : P.slate, 1);
+    const lost = i < st.strikes;
+    const cx = 114 + i * 12;
+    if (!drawArtStanding(ctx, lost ? "life-lost" : "life", cx, 12, 11)) {
+      drawText(ctx, lost ? "X" : "-", cx - 6, 3, lost ? P.red : P.slate, 1);
+    }
   }
 }
+
+/**
+ * A banner for one of the game's shouted words, with the drawn lettering as
+ * the fallback. ROUND gets its number written into the blank on its right.
+ */
+function drawBanner(ctx: CanvasRenderingContext2D, text: string, cx: number, cy: number) {
+  const W = 172;
+  const round = /^ROUND (\d+)$/.exec(text);
+  const name: StickArtName | null = round
+    ? "banner-round"
+    : text === "SHAKE IT!"
+      ? "banner-shake-it"
+      : text === "STIR IT!"
+        ? "banner-stir-it"
+        : text === "TOO SLOW!"
+          ? "banner-too-slow"
+          : text === "ORDER UP!"
+            ? "banner-order-up"
+            : null;
+  if (name && drawArtCentred(ctx, name, cx, cy, W)) {
+    if (round) {
+      drawTextMarquee(ctx, round[1], cx + W * 0.3, cy - 7, "#FFE9B0", 2, "center", P.black);
+    }
+    return;
+  }
+  drawTextMarquee(ctx, text, cx, cy, P.yellow, 2, "center", P.black, P.crimson);
+}
+
+/**
+ * A glass's height when the tallest glass is drawn at `tallest`. The sprites
+ * were cut at one shared scale, so this keeps a rocks glass shorter than a
+ * coupe instead of stretching every drink to the same height.
+ */
+function drinkHeight(art: StickArtName, tallest: number): number {
+  const TALLEST_SOURCE = 85; // the tallest glass, in game pixels at 1:1
+  return ((artGameHeight(art) ?? TALLEST_SOURCE) / TALLEST_SOURCE) * tallest;
+}
+
+/** The score words that float off the rail, as painted plaques. */
+const POP_ART: Record<string, StickArtName> = {
+  PERFECT: "pop-perfect",
+  GOOD: "pop-good",
+  MISS: "pop-miss",
+  OOPS: "pop-oops",
+};
 
 /**
  * Every screen that explains something, drawn the same way.
@@ -464,9 +643,22 @@ function drawCard(
   // A flashing card alternates its ground, which is what "full screen flashing"
   // looked like on hardware that had no alpha to fade with.
   const lit = opts.flash ? blink(t, 3) : false;
-  clear(ctx, lit ? "#2A1040" : "#12081F");
+  const framed = drawArt(ctx, "bg-card", 0, 0, GAME_W, GAME_H);
+  if (framed) {
+    // The painted chalkboard, warmed a touch on the flash beat.
+    if (lit) {
+      ctx.fillStyle = "rgba(255,190,110,0.07)";
+      ctx.fillRect(0, 0, GAME_W, GAME_H);
+    }
+  } else {
+    clear(ctx, lit ? "#2A1040" : "#12081F");
+  }
 
-  drawTextMarquee(ctx, heading, 112, 34, headingColor, 2, "center", P.black, P.crimson);
+  if (heading === "ORDER UP!") {
+    drawBanner(ctx, heading, 112, 38);
+  } else {
+    drawTextMarquee(ctx, heading, 112, 34, headingColor, 2, "center", P.black, P.crimson);
+  }
 
   if (sub) {
     drawTextMarquee(ctx, sub, 112, 66, P.cyan, 2, "center", P.black, "#0A4A6A");
@@ -482,9 +674,11 @@ function drawCard(
   }
 
   // ── Countdown ────────────────────────────────────────────────────────────
+  // Raised clear of the painted frame's bottom rail when there is one.
+  const lift = framed ? 12 : 0;
   const secs = Math.ceil(remaining);
-  drawText(ctx, `${secs}`, 112, GAME_H - 26, P.yellow, 1, "center");
-  meter(ctx, 52, GAME_H - 14, 120, 5, clamp(remaining / total, 0, 1), P.yellow);
+  drawText(ctx, `${secs}`, 112, GAME_H - 26 - lift, P.yellow, 1, "center");
+  meter(ctx, 52, GAME_H - 14 - lift, 120, 5, clamp(remaining / total, 0, 1), P.yellow);
 }
 
 /** Greedy wrap at whole words, for the 5x7 font's ~30 characters a line. */
@@ -515,6 +709,8 @@ function drawBoot(
   logo: HTMLImageElement | null
 ) {
   clear(ctx, P.black);
+  // The bar the player is about to work, in the dark behind the title.
+  if (drawArt(ctx, "bg-backbar", 0, 0, GAME_W, GAME_H)) dim(ctx, 0.7);
 
   if (logo && logo.complete && logo.naturalWidth > 0) {
     const maxW = GAME_W - 16;
@@ -541,6 +737,11 @@ function drawBoot(
 /** The order card: the drink, and the four bottles to go and find. */
 function drawOrderCard(ctx: CanvasRenderingContext2D, st: State, t: number) {
   const name = st.cocktail.name.toUpperCase();
+  const art = drinkArt(st.cocktail.key);
+  if (art && drawArt(ctx, "bg-card", 0, 0, GAME_W, GAME_H)) {
+    drawOrderCardArt(ctx, st, t, name, art);
+    return;
+  }
   drawCard(ctx, {
     heading: "ORDER UP!",
     sub: name.length > 13 ? undefined : name,
@@ -565,17 +766,72 @@ function drawOrderCard(ctx: CanvasRenderingContext2D, st: State, t: number) {
   });
 }
 
+/**
+ * The order card with the drink painted on it: what they asked for, what it
+ * looks like, and the four bottles it takes, top to bottom.
+ */
+function drawOrderCardArt(
+  ctx: CanvasRenderingContext2D,
+  st: State,
+  t: number,
+  name: string,
+  art: StickArtName
+) {
+  if (blink(t, 3)) {
+    ctx.fillStyle = "rgba(255,190,110,0.07)";
+    ctx.fillRect(0, 0, GAME_W, GAME_H);
+  }
+  drawBanner(ctx, "ORDER UP!", 112, 38);
+
+  // Every glass at one scale, so a rocks glass sits shorter than a coupe.
+  drawArtStanding(ctx, art, 112, 122, drinkHeight(art, 62));
+
+  if (name.length <= 13) {
+    drawTextMarquee(ctx, name, 112, 129, P.cyan, 2, "center", P.black, "#0A4A6A");
+  } else {
+    drawTextMarquee(ctx, name, 112, 132, P.cyan, 1, "center", P.black);
+  }
+
+  st.cocktail.recipe.forEach((key, i) => {
+    const ing = ING_BY_KEY.get(key);
+    if (!ing) return;
+    const x = 39 + i * 49;
+    drawIngredient(ctx, key, x, 164, 28);
+    drawText(ctx, ing.label.toUpperCase().slice(0, 7), x, 182, ing.color, 1, "center");
+  });
+
+  let y = 201;
+  for (const line of [
+    "Tap the right ingredients to select them!",
+    "Avoid wrong ingredients or you lose points!",
+  ]) {
+    for (const wrapped of wrapText(line, 30)) {
+      drawText(ctx, wrapped, 112, y, P.white, 1, "center");
+      y += 10;
+    }
+    y += 4;
+  }
+
+  const remaining = cardRemaining(st);
+  drawText(ctx, `${Math.ceil(remaining)}`, 112, GAME_H - 38, P.yellow, 1, "center");
+  meter(ctx, 52, GAME_H - 26, 120, 5, clamp(remaining / CARD_SECONDS, 0, 1), P.yellow);
+}
+
 
 /**
  * Bubble Buster. The bar's stock drifting in a tank, the recipe underneath.
  */
 function drawBubbles(ctx: CanvasRenderingContext2D, bs: BubbleState, t: number) {
-  clear(ctx, "#0A0820");
-
-  // Tank glass, so the play area has an edge the bounces make sense against.
-  outline(ctx, 0, TANK_TOP, GAME_W, TANK_BOTTOM - TANK_TOP, "#2A2258");
-  for (let i = 0; i < 6; i++) {
-    rect(ctx, 0, TANK_TOP + 10 + i * 30, GAME_W, 1, "#150F33");
+  // The painted tank, squeezed to the play area so its sand floor sits on the
+  // recipe panel rather than behind it.
+  const painted = drawArt(ctx, "bg-tank", 0, 0, GAME_W, TANK_BOTTOM + 4);
+  if (!painted) {
+    clear(ctx, "#0A0820");
+    // Tank glass, so the play area has an edge the bounces make sense against.
+    outline(ctx, 0, TANK_TOP, GAME_W, TANK_BOTTOM - TANK_TOP, "#2A2258");
+    for (let i = 0; i < 6; i++) {
+      rect(ctx, 0, TANK_TOP + 10 + i * 30, GAME_W, 1, "#150F33");
+    }
   }
 
   for (const b of bs.bubbles) {
@@ -585,25 +841,35 @@ function drawBubbles(ctx: CanvasRenderingContext2D, bs: BubbleState, t: number) 
     const x = Math.round(b.x);
     const y = Math.round(b.y);
     const needed = bs.needed.includes(b.key) && !bs.collected.includes(b.key);
+    const size = BUBBLE_R * 2 + 4;
 
     // ── Popping ────────────────────────────────────────────────────────────
-    // A ring that expands and thins, which reads as a burst without needing
-    // any extra sprites.
+    // Three painted frames of the burst, falling back to a ring that expands
+    // and thins.
     if (b.popping > 0) {
       const k = 1 - b.popping / 0.35;
-      const r = Math.round(BUBBLE_R + k * 9);
-      ring(ctx, x, y, r, k < 0.5 ? P.white : P.slate);
+      const frame = (["bubble-pop-1", "bubble-pop-2", "bubble-pop-3"] as const)[
+        Math.min(2, Math.floor(k * 3))
+      ];
+      if (!drawArtCentred(ctx, frame, x, y, size + 8)) {
+        const r = Math.round(BUBBLE_R + k * 9);
+        ring(ctx, x, y, r, k < 0.5 ? P.white : P.slate);
+      }
       continue;
     }
-
-    // The bubble itself: a ring with a highlight, so it reads as glass rather
-    // than as a disc the ingredient is stuck to.
-    ring(ctx, x, y, BUBBLE_R, needed && blink(t, 2.5) ? P.lime : "#5A6A9A");
-    rect(ctx, x - 5, y - BUBBLE_R + 2, 3, 2, P.white);
 
     // Slightly taller than the bubble, so the bottle fills it rather than
     // floating in the middle of a ring.
     drawIngredient(ctx, b.key, x, y, BUBBLE_R * 2 - 2);
+
+    // The glass goes OVER the bottle, so its shine reads as the bottle being
+    // inside a bubble rather than stuck to a disc.
+    if (drawArtCentred(ctx, "bubble", x, y, size)) {
+      if (needed && blink(t, 2.5)) ring(ctx, x, y, BUBBLE_R + 2, P.lime);
+    } else {
+      ring(ctx, x, y, BUBBLE_R, needed && blink(t, 2.5) ? P.lime : "#5A6A9A");
+      rect(ctx, x - 5, y - BUBBLE_R + 2, 3, 2, P.white);
+    }
   }
 
   // ── Feedback ─────────────────────────────────────────────────────────────
@@ -747,6 +1013,45 @@ function PourDeck({
 }
 
 
+// ─── The shake button ────────────────────────────────────────────────────────
+
+/**
+ * The big red arcade button. Two painted states, swapped on contact rather
+ * than on click — a rapid tap must register the moment it lands, and the
+ * pressed art has to show for exactly as long as the thumb is down.
+ */
+function ShakeButton({ onTap }: { onTap: () => void }) {
+  const [pressed, setPressed] = useState(false);
+  const release = () => setPressed(false);
+  return (
+    <button
+      type="button"
+      aria-label="Shake"
+      onPointerDown={(e) => {
+        e.preventDefault();
+        setPressed(true);
+        onTap();
+      }}
+      onPointerUp={release}
+      onPointerLeave={release}
+      onPointerCancel={release}
+      onContextMenu={(e) => e.preventDefault()}
+      style={{
+        touchAction: "none",
+        WebkitTouchCallout: "none",
+        WebkitTapHighlightColor: "transparent",
+      }}
+      className="select-none w-[168px] bg-transparent p-0 border-0"
+    >
+      {/* Both states are in the DOM so the swap never waits on a decode. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={DECK_ART.shake} alt="" draggable={false} className="w-full h-auto" hidden={pressed} />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={DECK_ART.shakePressed} alt="" draggable={false} className="w-full h-auto" hidden={!pressed} />
+    </button>
+  );
+}
+
 // ─── The stir dial ───────────────────────────────────────────────────────────
 
 /**
@@ -815,24 +1120,31 @@ function StirDial({
       onContextMenu={(e) => e.preventDefault()}
       style={{ WebkitTouchCallout: "none", WebkitTapHighlightColor: "transparent" }}
     >
-      {/* The track */}
-      <div
+      {/* The track: the painted brass ring */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={DECK_ART.dialTrack}
+        alt=""
         aria-hidden
-        className="absolute inset-0 rounded-full border-[3px] border-dashed border-white/30"
+        draggable={false}
+        className="absolute inset-0 w-full h-full pointer-events-none select-none"
       />
       <p className="absolute inset-0 flex items-center justify-center text-center text-[8px] tracking-[0.2em] uppercase text-white/40 leading-tight pointer-events-none">
         stir
       </p>
-      {/* The dot */}
-      <div
+      {/* The knob that rides it */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={DECK_ART.dialKnob}
+        alt=""
         aria-hidden
-        className="absolute w-[34px] h-[34px] rounded-full border-[3px] border-black"
+        draggable={false}
+        className="absolute w-[40px] h-auto pointer-events-none select-none"
         style={{
           left: "50%",
           top: "50%",
           transform: `translate(-50%,-50%) translate(${dotX}px, ${dotY}px) scale(${down ? 1.12 : 1})`,
-          background: `radial-gradient(circle at 36% 30%, #FFFFFF 0%, ${P.lime} 55%, ${P.green} 100%)`,
-          boxShadow: "0 3px 0 rgba(0,0,0,0.5)",
+          filter: "drop-shadow(0 3px 0 rgba(0,0,0,0.5))",
           transition: "transform 40ms linear",
         }}
       />
@@ -956,7 +1268,7 @@ export default function BehindTheStick({ onGameOver, demo = false }: ArcadeGameP
   const logoRef = useRef<HTMLImageElement | null>(null);
   useEffect(() => {
     warmIngredientArt();
-    warmCharacterArt();
+    warmStickArt();
     const img = new window.Image();
     img.src = "/popup/art/logo-behind-the-stick.png";
     img.onload = () => {
@@ -1156,6 +1468,14 @@ export default function BehindTheStick({ onGameOver, demo = false }: ArcadeGameP
           flash: true,
           t,
         });
+        // What's coming, in the gap under the words: the tin going, or the
+        // bartender at the mixing glass.
+        if (st.cocktail.finish === "shake") {
+          const frame = Math.floor(t * 5) % 2 === 0 ? "shaker-1" : "shaker-2";
+          drawArtCentred(ctx, frame, 112, 206, 92);
+        } else {
+          drawArtStanding(ctx, "bartender-stir", 112, 244, 96);
+        }
         return;
       }
       if (st.phase === "gather" && g.current) {
@@ -1163,40 +1483,36 @@ export default function BehindTheStick({ onGameOver, demo = false }: ArcadeGameP
         return;
       }
 
+      // ── Shake, stir and serve are close-ups ───────────────────────────
+      // The bar pushed back into the dark behind them. The bartender was
+      // competing with the one object the player is acting on.
+      if (st.phase === "shake" || st.phase === "stir" || st.phase === "serve") {
+        if (st.phase === "shake") drawShake(ctx, st, t);
+        else if (st.phase === "stir") drawStir(ctx, st, t);
+        else drawServe(ctx, st, t);
+        drawHud(ctx, st);
+        // SHAKE IT! and STIR IT! already sit at the bottom of their screens.
+        const repeated = st.banner === "SHAKE IT!" || st.banner === "STIR IT!";
+        if (st.bannerTimer > 0 && st.banner && !repeated) drawBanner(ctx, st.banner, 112, 96);
+        return;
+      }
+
       drawBackbar(ctx, t);
 
-      const pose =
-        st.phase === "shake"
-          ? "shake"
-          : st.phase === "stir"
-            ? "stir"
-            : st.phase === "serve"
-              ? "serve"
-              : "idle";
-      // Drawn at 2x now the crowd is gone. He is the only thing to watch during
-      // a round, and at 1x he was a 20-pixel figure lost in the middle of the
-      // screen. An INTEGER scale on purpose — 1.5 or 1.7 lands sprite pixels on
-      // fractional device pixels and opens hairline seams through the art.
       const mood = st.phase === "over" ? "panic" : st.mood;
-      // The four game moods collapse onto the three heads that were drawn.
-      const artMood: ArtMood =
-        mood === "panic" ? "sad" : mood === "worried" ? "worried" : "happy";
 
-      // The tin alternates on each tap, so the drawn bartender shakes at
-      // exactly the rate the player is tapping — same rule the pixel one used.
-      const tapping = st.phase === "shake" && st.phaseT - st.lastTapT < 0.5;
-      const shakeLift = tapping && st.shakeCount % 2 === 1 ? 1 : 0;
+      // Behind the counter, hands on the bar: the painted counter is drawn
+      // again over his waist so he stands behind it rather than on top of it.
+      const drewArt = drawArtStanding(
+        ctx,
+        bartenderArt(st.phase === "over" ? "over" : mood),
+        112,
+        COUNTER_Y + 4,
+        124
+      );
+      if (drewArt) drawCounterOver(ctx);
 
-      // Feet well below the bar line and a tall figure, so the bar front crops
-      // him at the waist. Half a character drawn twice the size reads far
-      // better than a whole one shrunk to fit above the rail.
-      const drewArt = drawCharacter(ctx, "bartender", 112, 296, 196, {
-        mood: artMood,
-        pose: pose === "stir" ? "idle" : (pose as "idle" | "shake" | "serve"),
-        shakeLift,
-      });
-
-      // Until the parts load, the pixel bartender stands in. Drawn at 2x, an
+      // Until the art loads, the pixel bartender stands in. Drawn at 3x, an
       // INTEGER scale — 1.5 lands sprite pixels on fractional device pixels and
       // opens hairline seams through the art.
       if (!drewArt) {
@@ -1204,61 +1520,46 @@ export default function BehindTheStick({ onGameOver, demo = false }: ArcadeGameP
         ctx.translate(112, 232);
         ctx.scale(3, 3);
         ctx.imageSmoothingEnabled = false;
-        drawBartender(
-          ctx,
-          0,
-          0,
-          mood,
-          pose,
-          t,
-          st.phase === "shake"
-            ? { count: st.shakeCount, since: st.phaseT - st.lastTapT }
-            : undefined,
-          st.phase === "stir" ? st.revs : undefined
-        );
+        drawBartender(ctx, 0, 0, mood, "idle", t);
         ctx.restore();
-      }
-      // The tin stays outside the transform so it keeps its place on the bar
-      // rather than floating up with him.
-      if (pose === "idle") drawTin(ctx, 172, 140, st.tinFill);
-
-      // ── Shake and stir stand alone ────────────────────────────────────
-      // Nothing behind them. The bar and the bartender were competing with the
-      // one object the player is acting on, and a shake is a close-up.
-      if (st.phase === "shake" || st.phase === "stir" || st.phase === "serve") {
-        clear(ctx, P.black);
-        if (st.phase === "shake") drawShake(ctx, st);
-        else if (st.phase === "stir") drawStir(ctx, st);
-        else drawServe(ctx, st, t);
-        drawHud(ctx, st);
-        if (st.bannerTimer > 0 && st.banner) {
-          drawTextMarquee(ctx, st.banner, 112, 96, P.yellow, 2, "center", P.black, P.crimson);
-        }
-        return;
+        drawTin(ctx, 172, 140, st.tinFill);
+        // No guests behind the bar at all. The guest gets his own scene at the
+        // serve, where the handover actually happens.
+        drawBarFront(ctx);
       }
 
-      // No guests behind the bar at all now. A wall of them during the rhythm
-      // phase competed with the only thing worth watching, and it kept the
-      // bartender too small to read. The guest gets his own scene at the serve,
-      // full size on black, where the handover actually happens.
-      drawBarFront(ctx);
-
-      // shake and stir returned earlier — they draw on black, with no bar.
-      // shake, stir and serve returned earlier — they draw on black.
+      let overArt = false;
       if (st.phase === "pour") drawRail(ctx, st, t);
-      else if (st.phase === "over") drawOver(ctx, t);
+      else if (st.phase === "over") overArt = drawOver(ctx, t, st.banner === "TOO SLOW!");
 
       for (const sp of st.splashes) {
-        rect(ctx, sp.x - 3, sp.y, 6, 2, sp.color);
-        rect(ctx, sp.x - 5, sp.y + 2, 2, 2, sp.color);
-        rect(ctx, sp.x + 4, sp.y + 2, 2, 2, sp.color);
+        // Three painted frames across the splash's short life.
+        const frame = (["splash-1", "splash-2", "splash-3"] as const)[
+          Math.min(2, Math.floor((1 - sp.life / 0.7) * 3))
+        ];
+        if (!drawArtStanding(ctx, frame, sp.x, RAIL_Y + 30, 16)) {
+          rect(ctx, sp.x - 3, sp.y, 6, 2, sp.color);
+          rect(ctx, sp.x - 5, sp.y + 2, 2, 2, sp.color);
+          rect(ctx, sp.x + 4, sp.y + 2, 2, 2, sp.color);
+        }
       }
-      for (const p of st.pops) drawText(ctx, p.text, p.x, p.y, p.color, 1, "center");
+      for (const p of st.pops) {
+        const art = POP_ART[p.text];
+        // Kept on screen: a pop at the rail's end would otherwise hang off it.
+        const px = clamp(p.x, 30, GAME_W - 30);
+        if (p.text === "PERFECT") {
+          const k = clamp(p.life / 0.8, 0, 1);
+          drawArtCentred(ctx, "sparkle", WINDOW_X, RAIL_Y + 19, 14 + (1 - k) * 18, k);
+        }
+        if (!art || !drawArtCentred(ctx, art, px, p.y - 6, 56)) {
+          drawText(ctx, p.text, p.x, p.y, p.color, 1, "center");
+        }
+      }
 
       drawHud(ctx, st);
 
-      if (st.bannerTimer > 0 && st.banner) {
-        drawTextMarquee(ctx, st.banner, 112, 96, P.yellow, 2, "center", P.black, P.crimson);
+      if (st.bannerTimer > 0 && st.banner && !overArt) {
+        drawBanner(ctx, st.banner, 112, 96);
       }
     },
     [onGameOver, demo]
@@ -1343,25 +1644,7 @@ export default function BehindTheStick({ onGameOver, demo = false }: ArcadeGameP
           </p>
         ) : uiPhase === "shake" ? (
           <div className="flex items-center justify-center">
-            <button
-              type="button"
-              aria-label="Shake"
-              // pointerdown, not click — a rapid tap must register on contact.
-              onPointerDown={(e) => {
-                e.preventDefault();
-                tapShake();
-              }}
-              onContextMenu={(e) => e.preventDefault()}
-              style={{
-                background: P.lime,
-                touchAction: "none",
-                WebkitTouchCallout: "none",
-                WebkitTapHighlightColor: "transparent",
-              }}
-              className="select-none w-[112px] h-[112px] rounded-full border-[4px] border-black text-black text-[15px] font-black tracking-[0.12em] uppercase shadow-[0_6px_0_#00551C] active:translate-y-[5px] active:shadow-[0_1px_0_#00551C] transition-transform"
-            >
-              Shake
-            </button>
+            <ShakeButton onTap={tapShake} />
           </div>
         ) : uiPhase === "stir" ? (
           <StirDial
