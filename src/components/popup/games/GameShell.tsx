@@ -256,9 +256,10 @@ export default function GameShell({
         ) : (
           <CabIconButton
             icon="pause"
-            // 1.5, not 2: the full-bleed games keep only about 38px of this
-            // corner clear of their HUD (EXIT_CLEARANCE_H in Tater Tales).
-            scale={1.5}
+            // The full-bleed games keep only about 38px of this corner clear of
+            // their HUD (EXIT_CLEARANCE_H in Tater Tales).
+            color={C.plum}
+            size={34}
             ariaLabel="Pause"
             onClick={() => setPaused(true)}
             className="absolute top-1 right-1 z-10"

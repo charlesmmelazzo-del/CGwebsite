@@ -2,56 +2,39 @@
 
 // ─── Cabinet controls ────────────────────────────────────────────────────────
 //
-// Every control on the pop-up is a piece of the owner's pixel art rather than
-// a CSS button, so the page matches the games it leads into.
+// Plain arcade-menu blocks: one flat colour, a thick dark outline, a hard
+// shadow underneath, and a pixel-font label. Drawn in CSS rather than from
+// the pixel-art sheets — the stretched art looked odd at phone sizes, and a
+// block stays crisp at any size.
 //
-//   CabButton     — a pill with a text label. Three slices (two rounded ends
-//                   and a middle that stretches), so one piece of art fits any
-//                   label without squashing its pixels.
-//   CabIconButton — a round control with its symbol drawn in: arrows, close,
-//                   pause.
+//   CabButton     — a text button.
+//   CabIconButton — a square button with a drawn symbol: arrows, close, pause.
 //
-// A press swaps to the art's pressed frame, where the cap is drawn pushed down
-// into its base. Both frames are always mounted so the first press never waits
-// on an image download.
+// A press drops the button onto its shadow, so it reads as pushed in.
 //
 // Not to be confused with games/controls.tsx ArcadeButton, which is the
 // in-canvas control for playing a game and is tuned for rapid tapping.
 
-import { useState, type ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { C } from "./theme";
-import { artLayer, pixelFont, UI } from "./pixelArt";
+import { pixelFont } from "./pixelArt";
 
-type PillArt = "teal" | "red" | "gold" | "purple";
+const INK = "#12060F";
+const DISABLED = "#77727E";
 
-/** The page palette's button colours, mapped onto the four pills drawn. */
-const PILL_FOR: Record<string, PillArt> = {
-  [C.teal]: "teal",
-  [C.magenta]: "red",
-  [C.gold]: "gold",
-  [C.plum]: "purple",
+/** Dark text on the light colours, cream on the dark ones. */
+const LABEL: Record<string, string> = {
+  [C.teal]: INK,
+  [C.gold]: INK,
+  [C.magenta]: "#FFF3DC",
+  [C.plum]: "#FFF3DC",
 };
 
-/** Dark ink on the light pills, cream on the dark ones. */
-const LABEL: Record<PillArt | "disabled", string> = {
-  teal: "#0B1A1A",
-  gold: "#1A1204",
-  red: "#FFF3DC",
-  purple: "#FFF3DC",
-  disabled: "#2A2A2A",
-};
-
-/** Screen pixels per art pixel. Whole numbers only, so the pixels stay even. */
-const SCALE = { sm: 2, md: 3, lg: 4 } as const;
+const HEIGHT = { sm: 32, md: 40, lg: 52 } as const;
 const TEXT = { sm: "text-[8px]", md: "text-[10px]", lg: "text-[12px]" } as const;
 
-/**
- * Where the label sits. Measured off the art: the face of a raised pill is
- * centred 40% of the way down (the base takes the rest), and the pressed face
- * 50%, so the label drops with the cap.
- */
-const RAISED_CENTRE = 0.4;
-const PRESSED_CENTRE = 0.5;
+/** How far the button sits above its shadow, and so how far a press travels. */
+const LIFT = 4;
 
 function usePress() {
   const [down, setDown] = useState(false);
@@ -65,6 +48,21 @@ function usePress() {
     onBlur: () => setDown(false),
   };
   return { down, handlers };
+}
+
+function blockStyle(color: string, pressed: boolean, disabled: boolean): CSSProperties {
+  const lift = pressed ? 0 : LIFT;
+  return {
+    background: disabled ? DISABLED : color,
+    border: `3px solid ${INK}`,
+    boxShadow: [
+      `inset 0 3px 0 rgba(255,255,255,${disabled ? 0.12 : 0.35})`,
+      `inset 0 -4px 0 rgba(0,0,0,0.22)`,
+      `0 ${lift}px 0 ${INK}`,
+    ].join(", "),
+    transform: `translateY(${LIFT - lift}px)`,
+    WebkitTapHighlightColor: "transparent",
+  };
 }
 
 export default function CabButton({
@@ -87,18 +85,7 @@ export default function CabButton({
   type?: "button" | "submit";
 }) {
   const { down, handlers } = usePress();
-  const pill = PILL_FOR[color] ?? "gold";
-  const h = UI.pill.height * SCALE[size];
-  const cap = UI.pill.cap * SCALE[size];
   const pressed = down && !disabled;
-  const shift = ((pressed ? PRESSED_CENTRE : RAISED_CENTRE) - 0.5) * h;
-
-  const frames = disabled
-    ? [{ name: "pill-disabled", visible: true }]
-    : [
-        { name: `pill-${pill}`, visible: !pressed },
-        { name: `pill-${pill}-pressed`, visible: pressed },
-      ];
 
   return (
     <button
@@ -108,61 +95,48 @@ export default function CabButton({
       aria-label={ariaLabel}
       {...handlers}
       style={{
-        height: h,
-        minWidth: cap * 3,
-        paddingLeft: Math.round(cap * 1.1),
-        paddingRight: Math.round(cap * 1.1),
-        color: LABEL[disabled ? "disabled" : pill],
-        WebkitTapHighlightColor: "transparent",
+        ...blockStyle(color, pressed, disabled),
+        height: HEIGHT[size],
+        color: disabled ? "#2A2A2A" : (LABEL[color] ?? INK),
       }}
-      className={`${pixelFont.className} relative select-none inline-flex items-center justify-center uppercase leading-none disabled:cursor-not-allowed ${TEXT[size]} ${className}`}
+      className={`${pixelFont.className} select-none inline-flex items-center justify-center px-4 uppercase leading-none whitespace-nowrap disabled:cursor-not-allowed ${TEXT[size]} ${className}`}
     >
-      {frames.map((f) => (
-        <span
-          key={f.name}
-          aria-hidden
-          className="pointer-events-none absolute inset-0 flex"
-          style={{ opacity: f.visible ? 1 : 0 }}
-        >
-          <span className="h-full shrink-0" style={{ width: cap, ...artLayer(`${f.name}-l`) }} />
-          <span className="h-full flex-1" style={artLayer(`${f.name}-m`)} />
-          <span className="h-full shrink-0" style={{ width: cap, ...artLayer(`${f.name}-r`) }} />
-        </span>
-      ))}
-      <span
-        className="relative whitespace-nowrap"
-        style={{ transform: `translateY(${shift}px)` }}
-      >
-        {children}
-      </span>
+      {children}
     </button>
   );
 }
 
 export type IconArt = "arrow-left" | "arrow-right" | "close" | "pause";
 
-const ICON_SIZE: Record<string, number[]> = UI.icons;
+/** Symbols on a 7×7 pixel grid, so they share the labels' blocky look. */
+const ICON_PATH: Record<IconArt, string> = {
+  "arrow-left": "M4 0h1v7H4zM3 1h1v5H3zM2 2h1v3H2zM1 3h1v1H1z",
+  "arrow-right": "M2 0h1v7H2zM3 1h1v5H3zM4 2h1v3H4zM5 3h1v1H5z",
+  close: "M0 0h2v1H0zM1 1h2v1H1zM2 2h3v3H2zM4 1h2v1H4zM5 0h2v1H5zM1 5h2v1H1zM0 6h2v1H0zM4 5h2v1H4zM5 6h2v1H5z",
+  pause: "M1 0h2v7H1zM4 0h2v7H4z",
+};
 
-/** A round cabinet button with its symbol drawn into the art. */
+/** A square button with a pixel symbol. */
 export function CabIconButton({
   icon,
   onClick,
-  scale = 2,
+  color = C.gold,
+  size = 44,
   disabled = false,
   ariaLabel,
   className = "",
 }: {
   icon: IconArt;
   onClick?: () => void;
-  /** Screen pixels per art pixel — keep it a whole number. */
-  scale?: number;
+  color?: string;
+  size?: number;
   disabled?: boolean;
   ariaLabel: string;
   className?: string;
 }) {
   const { down, handlers } = usePress();
   const pressed = down && !disabled;
-  const [w, h] = ICON_SIZE[icon];
+  const ink = LABEL[color] ?? INK;
 
   return (
     <button
@@ -171,24 +145,23 @@ export function CabIconButton({
       disabled={disabled}
       aria-label={ariaLabel}
       {...handlers}
-      style={{ width: w * scale, height: h * scale, WebkitTapHighlightColor: "transparent" }}
-      className={`relative select-none shrink-0 disabled:opacity-35 disabled:cursor-not-allowed ${className}`}
+      style={{ ...blockStyle(color, pressed, disabled), width: size, height: size }}
+      className={`select-none shrink-0 inline-flex items-center justify-center disabled:cursor-not-allowed ${className}`}
     >
-      <span
+      <svg
         aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{ ...artLayer(icon), opacity: pressed ? 0 : 1 }}
-      />
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{ ...artLayer(`${icon}-pressed`), opacity: pressed ? 1 : 0 }}
-      />
+        width={Math.round(size * 0.36)}
+        height={Math.round(size * 0.36)}
+        viewBox="0 0 7 7"
+        shapeRendering="crispEdges"
+      >
+        <path d={ICON_PATH[icon]} fill={disabled ? "#2A2A2A" : ink} />
+      </svg>
     </button>
   );
 }
 
-/** The carousel's left/right nudge — big enough to hit with a thumb. */
+/** The carousel's left/right nudge. */
 export function CabArrow({
   direction,
   onClick,
@@ -201,7 +174,7 @@ export function CabArrow({
   return (
     <CabIconButton
       icon={direction === "left" ? "arrow-left" : "arrow-right"}
-      scale={2}
+      size={40}
       onClick={onClick}
       disabled={disabled}
       ariaLabel={direction === "left" ? "Previous cocktail" : "Next cocktail"}

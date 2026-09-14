@@ -87,7 +87,9 @@ export default function HighScoresTemplate({
   }, [cocktails, viewer, isLive]);
 
   return (
-    <div className="min-h-screen bg-[#05030F] text-white relative overflow-hidden">
+    // Fills the screen under the zone bar (48px plus its 1px rule) and no more,
+    // so the page never scrolls.
+    <div className="min-h-[calc(100dvh-49px)] bg-[#05030F] text-white relative overflow-hidden">
       <ArcadeBackdrop />
 
       <div className="relative px-1 sm:px-6 py-3 sm:py-6">
