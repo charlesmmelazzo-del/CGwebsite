@@ -3,7 +3,7 @@
 // Which pop-up is live is RESOLVED AT READ TIME rather than flipped by a
 // scheduled job. A pop-up set to `scheduled` with a future go_live_at simply
 // becomes the live one on the first page load after that moment passes, and
-// the previous pop-up becomes archived with voting closed.
+// the previous pop-up becomes archived.
 //
 // That matters because the site runs on Railway with no cron scheduler — the
 // owner can set a launch date and it works, with nothing to keep running.
@@ -12,10 +12,7 @@ import { unstable_noStore as noStore } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import type { PopupCocktail, PopupMenu, PopupStatus } from "./types";
 
-const DEFAULT_WEIGHTS = [3, 2, 1];
-
 function mapMenu(r: Record<string, unknown>): PopupMenu {
-  const weights = Array.isArray(r.vote_weights) ? (r.vote_weights as number[]) : DEFAULT_WEIGHTS;
   return {
     id: String(r.id),
     slug: String(r.slug),
@@ -27,9 +24,6 @@ function mapMenu(r: Record<string, unknown>): PopupMenu {
     status: (r.status as PopupStatus) ?? "draft",
     goLiveAt: (r.go_live_at as string) ?? undefined,
     archivedAt: (r.archived_at as string) ?? undefined,
-    voteRankDepth: Number(r.vote_rank_depth ?? 3),
-    voteWeights: weights.length ? weights : DEFAULT_WEIGHTS,
-    votingEnabled: r.voting_enabled !== false,
     bgColor: (r.bg_color as string) ?? undefined,
     textColor: (r.text_color as string) ?? undefined,
     accentColor: (r.accent_color as string) ?? undefined,
@@ -137,7 +131,7 @@ async function persistResolvedStatuses(menus: PopupMenu[], live: PopupMenu | nul
 
 /**
  * The single source of truth for "which pop-up is showing right now".
- * Everything public — the landing page, the vote endpoint, the archive —
+ * Everything public — the landing page, the score endpoint, the archive —
  * goes through this.
  */
 export async function resolveLiveMenu(): Promise<PopupMenu | null> {
@@ -204,18 +198,6 @@ export async function getCocktails(
   } catch {
     return [];
   }
-}
-
-/**
- * Whether a guest may cast a vote on this pop-up.
- *
- * Voting is open ONLY on the currently resolved live pop-up. This is checked
- * again inside the vote API route — the UI hiding a button is a convenience,
- * not the enforcement.
- */
-export async function isVotingOpen(menuId: string): Promise<boolean> {
-  const live = await resolveLiveMenu();
-  return Boolean(live && live.id === menuId && live.votingEnabled);
 }
 
 export { mapMenu, mapCocktail };

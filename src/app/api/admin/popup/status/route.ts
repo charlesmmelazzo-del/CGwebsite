@@ -9,7 +9,7 @@ import { getAllMenus, getMenuById } from "@/lib/popup/menus";
  *   draft     — pull it back out of public view entirely
  *   schedule  — set a future launch time; it goes live on its own
  *   golive    — publish right now
- *   archive   — close it and its voting
+ *   archive   — close it and freeze its boards
  *
  * Going live also archives whatever was live before, so "only one pop-up is
  * live at a time" is guaranteed here rather than depending on the read-time

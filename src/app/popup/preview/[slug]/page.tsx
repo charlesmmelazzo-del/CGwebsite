@@ -20,9 +20,9 @@ const STATUS_LABEL: Record<string, string> = {
  * The sandbox: render any pop-up at any status, before the public can see it.
  *
  * Gated on the existing admin session cookie — the same one that protects
- * /admin. Votes cast here are written with is_test = true and are excluded
- * from every public tally, so the owner can walk the whole voting flow on an
- * unpublished pop-up without polluting real results.
+ * /admin. Scores set here are written with is_test = true and are excluded
+ * from every public board, and no ticket is needed, so the owner can play
+ * every game on an unpublished pop-up without polluting real results.
  */
 export default async function SandboxPage({ params }: { params: { slug: string } }) {
   const isAdmin = await verifySessionToken(cookies().get(SESSION_COOKIE)?.value);
@@ -32,11 +32,7 @@ export default async function SandboxPage({ params }: { params: { slug: string }
   if (!menu) notFound();
 
   const viewer = await getViewer();
-  const { cocktails, votingOpen, isLive, voteBlockReason, ballot, results } = await loadExperience(
-    menu,
-    viewer,
-    { isSandbox: true }
-  );
+  const { cocktails, isLive } = await loadExperience(menu, { isSandbox: true });
 
   return (
     <>
@@ -49,7 +45,7 @@ export default async function SandboxPage({ params }: { params: { slug: string }
           <div className="flex items-center gap-4">
             {!viewer && (
               <Link href="/popup/login" className="text-[10px] tracking-[0.15em] uppercase underline">
-                Sign in as a guest to test voting
+                Sign in as a guest to save test scores
               </Link>
             )}
             <Link
@@ -66,12 +62,8 @@ export default async function SandboxPage({ params }: { params: { slug: string }
         menu={menu}
         cocktails={cocktails}
         viewer={viewer}
-        votingOpen={votingOpen}
-        isLive={isLive}
-        voteBlockReason={voteBlockReason}
-        initialBallot={ballot}
-        initialResults={results}
-        isSandbox
+          isLive={isLive}
+              isSandbox
       />
     </>
   );

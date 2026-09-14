@@ -9,9 +9,9 @@ export const dynamic = "force-dynamic";
 /**
  * A single pop-up by slug — the archive detail view.
  *
- * Voting here is closed by construction: loadExperience asks the same
+ * Scoring here is closed by construction: loadExperience asks the same
  * resolver the live page uses, and this pop-up isn't the live one, so
- * voteBlockReason comes back "voting_closed". Guests see the final standings.
+ * isLive comes back false. Guests see the final high score boards.
  *
  * Drafts and future-scheduled pop-ups 404 rather than leaking early — they're
  * reachable only through the admin sandbox.
@@ -27,21 +27,14 @@ export default async function ArchivedPopupPage({ params }: { params: { slug: st
 
   if (menu.status === "draft" || menu.status === "scheduled") notFound();
 
-  const { cocktails, votingOpen, isLive, voteBlockReason, ballot, results } = await loadExperience(
-    menu,
-    viewer
-  );
+  const { cocktails, isLive } = await loadExperience(menu);
 
   return (
     <PopupExperience
       menu={menu}
       cocktails={cocktails}
       viewer={viewer}
-      votingOpen={votingOpen}
       isLive={isLive}
-      voteBlockReason={voteBlockReason}
-      initialBallot={ballot}
-      initialResults={results}
     />
   );
 }

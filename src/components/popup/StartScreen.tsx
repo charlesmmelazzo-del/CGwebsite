@@ -16,7 +16,7 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { C, R, withAlpha } from "./cabinet/theme";
+import { C, withAlpha } from "./cabinet/theme";
 import CabButton from "./cabinet/CabButton";
 import { INK } from "./cabinet/art/props";
 
@@ -118,37 +118,6 @@ export default function StartScreen({
           <CabButton color={C.gold} size="lg" className="w-full" onClick={onStart}>
             Press Start
           </CabButton>
-        </div>
-
-        <p
-          className="mt-5 text-[10px] sm:text-[11px] tracking-[0.18em] uppercase"
-          style={{ color: lit ? C.cream : withAlpha(C.cream, 0.45) }}
-        >
-          Press start to see the cocktails and games
-        </p>
-
-        {/* ── How it works, said once, here ───────────────────────────── */}
-        <div
-          className="mt-8 px-5 py-4 max-w-md"
-          style={{
-            borderRadius: R.panel,
-            background: withAlpha(INK.black, 0.5),
-            boxShadow: `inset 0 0 0 2px ${withAlpha(C.gold, 0.3)}`,
-          }}
-        >
-          <p
-            className="text-[10px] sm:text-[11px] leading-relaxed tracking-[0.06em] uppercase font-bold"
-            style={{ color: withAlpha(C.cream, 0.85) }}
-          >
-            Explore the cocktails. Order one to receive tickets to play its
-            corresponding game. Vote for your favorites.
-          </p>
-          <p
-            className="mt-3 text-[10px] sm:text-[11px] leading-relaxed tracking-[0.06em] uppercase font-black"
-            style={{ color: C.gold }}
-          >
-            High score in each game at the end of the pop up wins a $15 gift card
-          </p>
         </div>
       </div>
     </div>

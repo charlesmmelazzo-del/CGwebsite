@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 5 signups per IP per hour — enough for a couple at the same table,
-  // not enough to farm ballot-stuffing accounts.
+  // not enough to farm accounts.
   const rl = checkRateLimit(`signup:${getIp(req)}`, 5, 60 * 60 * 1000);
   if (rl.blocked) {
     return NextResponse.json(

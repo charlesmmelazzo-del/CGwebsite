@@ -1,13 +1,9 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CheckCircle2, AlertCircle } from "lucide-react";
 import AccountActions from "./AccountActions";
 import { getViewer } from "@/lib/popup/auth";
-import { getBallotHistory } from "@/lib/popup/voting";
 
 export const dynamic = "force-dynamic";
-
-const ACCENT = "#C97D5A";
 
 export default async function AccountPage({
   searchParams,
@@ -17,7 +13,6 @@ export default async function AccountPage({
   const viewer = await getViewer();
   if (!viewer) redirect("/popup/login?from=/popup/account");
 
-  const history = await getBallotHistory(viewer.userId);
   const name = [viewer.profile?.firstName, viewer.profile?.lastName].filter(Boolean).join(" ");
 
   return (
@@ -32,7 +27,7 @@ export default async function AccountPage({
 
       {searchParams.confirmed === "1" && viewer.emailVerified && (
         <p className="mt-6 text-center text-xs text-green-300">
-          Email confirmed — you&apos;re all set to vote.
+          Email confirmed — you&apos;re eligible for prizes.
         </p>
       )}
 
@@ -41,7 +36,7 @@ export default async function AccountPage({
         <StatusRow
           ok={viewer.emailVerified}
           okText="Email confirmed"
-          pendingText="Email not confirmed yet — required to vote"
+          pendingText="Email not confirmed yet — required to be sent a prize"
         />
         <StatusRow
           ok={viewer.ageVerified}
@@ -51,42 +46,6 @@ export default async function AccountPage({
       </div>
 
       <AccountActions emailVerified={viewer.emailVerified} />
-
-      {/* ── Their votes ────────────────────────────────────────────────────── */}
-      <section className="mt-12">
-        <h2 className="text-[10px] tracking-[0.25em] uppercase text-white/40 mb-4">Your picks</h2>
-        {history.length === 0 ? (
-          <p className="text-sm text-white/35 leading-relaxed">
-            You haven&apos;t voted yet.{" "}
-            <Link href="/popup" style={{ color: ACCENT }} className="hover:opacity-80">
-              See what&apos;s pouring →
-            </Link>
-          </p>
-        ) : (
-          <ul className="space-y-4">
-            {history.map((h) => (
-              <li key={h.menuId} className="border border-white/10 rounded-lg p-4 bg-white/[0.03]">
-                <Link
-                  href={`/popup/m/${h.menuSlug}`}
-                  className="text-sm text-white/90 hover:opacity-80"
-                >
-                  {h.menuTitle}
-                </Link>
-                <ol className="mt-2.5 space-y-1">
-                  {h.picks.map((p) => (
-                    <li key={p.rank} className="flex gap-2.5 text-xs text-white/55">
-                      <span style={{ color: ACCENT }} className="tabular-nums w-3">
-                        {p.rank}
-                      </span>
-                      <span>{p.name}</span>
-                    </li>
-                  ))}
-                </ol>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
     </div>
   );
 }

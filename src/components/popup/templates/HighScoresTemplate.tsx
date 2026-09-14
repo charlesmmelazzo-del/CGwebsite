@@ -40,14 +40,7 @@ export default function HighScoresTemplate({
   menu,
   cocktails,
   viewer,
-  votingOpen,
   isLive,
-  voteBlockReason,
-  myVotes,
-  results,
-  toggleVote,
-  voteBusy,
-  voteError,
   isSandbox,
 }: PopupTemplateProps) {
   const [play, setPlay] = useState<Play | null>(null);
@@ -62,9 +55,6 @@ export default function HighScoresTemplate({
   // sit permanently above the cocktails taking up the screen.
   const [started, setStarted] = useState(false);
   const [startIndex, setStartIndex] = useState(0);
-
-  const rankByCocktail = new Map(myVotes.map((v) => [v.cocktailId, v.rank]));
-  const myTopPick = myVotes.find((v) => v.rank === 1)?.cocktailId;
 
   const startHighScoreRun = useCallback(
     (cocktail: PopupCocktail) => {
@@ -110,12 +100,6 @@ export default function HighScoresTemplate({
           </p>
         )}
 
-        {voteError && (
-          <p className="mb-3 text-center text-xs" style={{ color: C.magenta }}>
-            {voteError}
-          </p>
-        )}
-
         {cocktails.length === 0 ? (
           <p className="text-center text-sm text-white/40 py-16">
             No cocktails on this pop-up yet.
@@ -123,13 +107,6 @@ export default function HighScoresTemplate({
         ) : (
           <CocktailCarousel
             cocktails={cocktails}
-            results={results}
-            viewer={viewer}
-            votingOpen={votingOpen}
-            voteBlockReason={voteBlockReason}
-            voteBusy={voteBusy}
-            rankByCocktail={rankByCocktail}
-            myTopPick={myTopPick}
             scoringOpen={isLive}
             startIndex={startIndex}
             onFreePlay={(id) => setPlay({ cocktailId: id, freePlay: true, runId: null })}
@@ -137,7 +114,6 @@ export default function HighScoresTemplate({
               const c = cocktails.find((x) => x.id === id);
               if (c) startHighScoreRun(c);
             }}
-            onVote={(id) => toggleVote(id)}
           />
         )}
       </div>

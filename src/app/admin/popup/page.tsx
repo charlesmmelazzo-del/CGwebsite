@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, ExternalLink, Loader2, Users, GlassWater } from "lucide-react";
+import { Plus, ExternalLink, Loader2, GlassWater } from "lucide-react";
 import type { PopupMenu, PopupStatus } from "@/lib/popup/types";
 
-type MenuRow = PopupMenu & { cocktailCount: number; voterCount: number };
+type MenuRow = PopupMenu & { cocktailCount: number };
 
 const STATUS_STYLE: Record<PopupStatus, { label: string; className: string }> = {
   live: { label: "Live", className: "bg-green-100 text-green-700" },
@@ -62,8 +62,8 @@ export default function AdminPopupListPage() {
           <h1 className="text-lg text-gray-800">Pop Up Zone</h1>
           <p className="mt-1 text-xs text-gray-400 leading-relaxed max-w-lg">
             Build a pop-up menu, test it in the sandbox, then publish it or schedule it to launch
-            on its own. Only one pop-up is live at a time — publishing a new one closes voting on
-            the last.
+            on its own. Only one pop-up is live at a time — publishing a new one closes the last
+            and freezes its high score boards.
           </p>
         </div>
         <Link
@@ -146,10 +146,6 @@ export default function AdminPopupListPage() {
                   <span className="flex items-center gap-1.5">
                     <GlassWater size={12} />
                     {m.cocktailCount}
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <Users size={12} />
-                    {m.voterCount}
                   </span>
                 </div>
 

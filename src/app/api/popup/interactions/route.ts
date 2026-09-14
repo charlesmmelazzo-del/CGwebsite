@@ -13,9 +13,8 @@ import { checkRateLimit, getIp } from "@/lib/popup/access";
  * a mini game posts `kind: "game_score"` — each with whatever payload it needs.
  * New interactive formats never require a schema change or a new endpoint.
  *
- * Unlike voting, this does NOT require a confirmed email: a guest who just
- * signed up can play with the pop-up straight away. Only their ballot waits on
- * confirmation.
+ * This does NOT require a confirmed email: a guest who just signed up can play
+ * with the pop-up straight away.
  */
 export async function POST(req: NextRequest) {
   const viewer = await getViewer();

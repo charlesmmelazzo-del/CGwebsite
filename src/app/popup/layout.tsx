@@ -5,7 +5,7 @@ import { getViewer } from "@/lib/popup/auth";
 export const metadata: Metadata = {
   title: "Pop Up Zone",
   description:
-    "Common Good's Pop Up Zone — see the current pop-up cocktail menu and vote for your favorites.",
+    "Common Good's Pop Up Zone — see the current pop-up cocktail menu and play its games.",
   // A members' corner reached from the footer, not something to surface in
   // search results. Flip to `index: true` if that changes.
   robots: { index: false, follow: false },

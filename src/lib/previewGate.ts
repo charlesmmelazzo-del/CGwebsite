@@ -30,8 +30,8 @@ function matches(a: string, b: string): boolean {
  * Paths anyone with the link can open on a preview, no password — so the owner
  * can hand the Pop Up Zone to testers while the staging copy of the main site
  * (and its admin panel, which edits LIVE content) stays behind the gate.
- * The zone's own protections still apply: guest accounts to vote or save a
- * score, the admin session for the /popup/preview sandbox.
+ * The zone's own protections still apply: guest accounts to save a score,
+ * the admin session for the /popup/preview sandbox.
  */
 const OPEN_SECTIONS = ["/popup", "/api/popup", "/fonts", "/images", "/favicon.ico"];
 

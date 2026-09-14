@@ -7,25 +7,13 @@
 // point of the layout — a slide that fills the frame edge to edge gives a
 // first-time visitor no reason to think anything else exists.
 //
-// The standings ride in the same carousel as the last slide rather than sitting
-// below it, so voting is somewhere you arrive by swiping rather than by
-// scrolling past the games.
-//
 // Built on embla, already a dependency here (see components/home/HomeCarousel).
 
 import { useCallback, useEffect, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import Image from "next/image";
-import Link from "next/link";
-import type {
-  LeaderboardEntry,
-  PopupCocktail,
-  PopupViewer,
-  VoteBlockReason,
-} from "@/lib/popup/types";
-import { VOTE_BLOCK_MESSAGE } from "@/lib/popup/access";
+import type { PopupCocktail } from "@/lib/popup/types";
 import { getGameMeta } from "@/lib/popup/games";
-import Leaderboard from "../Leaderboard";
 import CabButton, { CabArrow, CabIconButton } from "./CabButton";
 import { artLayer } from "./pixelArt";
 import CrtPanel from "./CrtPanel";
@@ -34,34 +22,18 @@ import { withAlpha, C } from "./theme";
 
 export default function CocktailCarousel({
   cocktails,
-  results,
-  viewer,
-  votingOpen,
-  voteBlockReason,
-  voteBusy,
-  rankByCocktail,
-  myTopPick,
   scoringOpen,
   startIndex = 0,
   onFreePlay,
   onHighScoreRun,
-  onVote,
 }: {
   cocktails: PopupCocktail[];
-  results: LeaderboardEntry[];
-  viewer: PopupViewer | null;
-  votingOpen: boolean;
-  voteBlockReason: VoteBlockReason | null;
-  voteBusy: boolean;
-  rankByCocktail: Map<string, number>;
-  myTopPick?: string;
   /** False once the pop-up has closed — High Score Runs stop with it. */
   scoringOpen: boolean;
   /** Slide to open on, e.g. the game a guest just signed in to play. */
   startIndex?: number;
   onFreePlay: (id: string) => void;
   onHighScoreRun: (id: string) => void;
-  onVote: (id: string) => void;
 }) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
     align: "center",
@@ -92,7 +64,7 @@ export default function CocktailCarousel({
     };
   }, [emblaApi, onSelect]);
 
-  const slideCount = cocktails.length + 1; // + standings
+  const slideCount = cocktails.length;
 
   return (
     <div className="relative">
@@ -103,7 +75,6 @@ export default function CocktailCarousel({
               <CocktailSlide
                 cocktail={c}
                 active={selected === i}
-                rank={rankByCocktail.get(c.id)}
                 scoringOpen={scoringOpen}
                 onFreePlay={() => onFreePlay(c.id)}
                 onHighScoreRun={() => onHighScoreRun(c.id)}
@@ -111,19 +82,6 @@ export default function CocktailCarousel({
             </Slide>
           ))}
 
-          <Slide active={selected === cocktails.length}>
-            <StandingsSlide
-              cocktails={cocktails}
-              results={results}
-              viewer={viewer}
-              votingOpen={votingOpen}
-              voteBlockReason={voteBlockReason}
-              voteBusy={voteBusy}
-              rankByCocktail={rankByCocktail}
-              myTopPick={myTopPick}
-              onVote={onVote}
-            />
-          </Slide>
         </div>
       </div>
 
@@ -187,14 +145,12 @@ function Slide({ children, active }: { children: React.ReactNode; active: boolea
 function CocktailSlide({
   cocktail,
   active,
-  rank,
   scoringOpen,
   onFreePlay,
   onHighScoreRun,
 }: {
   cocktail: PopupCocktail;
   active: boolean;
-  rank?: number;
   scoringOpen: boolean;
   onFreePlay: () => void;
   onHighScoreRun: () => void;
@@ -236,11 +192,6 @@ function CocktailSlide({
               >
                 {cocktail.name}
               </h3>
-              {rank !== undefined && (
-                <p className="mt-2 text-[9px] tracking-[0.3em] uppercase" style={{ color: C.teal }}>
-                  {rank === 1 ? "★ Your favorite" : `★ Ranked #${rank}`}
-                </p>
-              )}
             </div>
 
             {/* Attract-mode demo of this cocktail's game */}
@@ -388,105 +339,5 @@ function InfoSection({ title, children }: { title: string; children: React.React
       </h4>
       {children}
     </section>
-  );
-}
-
-// ─── Standings slide ─────────────────────────────────────────────────────────
-
-function StandingsSlide({
-  cocktails,
-  results,
-  viewer,
-  votingOpen,
-  voteBlockReason,
-  voteBusy,
-  rankByCocktail,
-  myTopPick,
-  onVote,
-}: {
-  cocktails: PopupCocktail[];
-  results: LeaderboardEntry[];
-  viewer: PopupViewer | null;
-  votingOpen: boolean;
-  voteBlockReason: VoteBlockReason | null;
-  voteBusy: boolean;
-  rankByCocktail: Map<string, number>;
-  myTopPick?: string;
-  onVote: (id: string) => void;
-}) {
-  return (
-    <CrtPanel>
-      <div className="text-center">
-        <h3
-          className="text-2xl sm:text-4xl font-black uppercase tracking-tight leading-none"
-          style={{
-            fontFamily: "var(--font-display, system-ui)",
-            color: C.teal,
-            textShadow: `0 0 14px ${withAlpha(C.teal, 0.5)}, 3px 4px 0 ${C.ink}`,
-          }}
-        >
-          Standings
-        </h3>
-        <p
-          className="mt-2 text-[9px] tracking-[0.3em] uppercase"
-          style={{ color: withAlpha(C.cream, 0.55) }}
-        >
-          {votingOpen ? "Vote for your favorites" : "Voting closed"}
-        </p>
-      </div>
-
-      <div className="mt-4">
-        <Leaderboard results={results} accent={C.gold} myTopPick={myTopPick} />
-      </div>
-
-      {/* Voting happens here, on the same screen as the standings. */}
-      <div className="mt-5">
-        {voteBlockReason && !votingOpen ? (
-          <p
-            className="text-center text-[11px] leading-relaxed"
-            style={{ color: withAlpha(C.cream, 0.6) }}
-          >
-            {VOTE_BLOCK_MESSAGE[voteBlockReason]}
-          </p>
-        ) : (
-          <>
-            <p
-              className="text-center text-[9px] tracking-[0.28em] uppercase mb-3"
-              style={{ color: withAlpha(C.cream, 0.5) }}
-            >
-              Tap a cocktail to rank it
-            </p>
-            <div className="flex flex-wrap justify-center gap-2.5">
-              {cocktails.map((c) => {
-                const rank = rankByCocktail.get(c.id);
-                return (
-                  <CabButton
-                    key={c.id}
-                    size="sm"
-                    color={rank !== undefined ? C.gold : C.plum}
-                    disabled={voteBusy || !votingOpen}
-                    onClick={() => onVote(c.id)}
-                  >
-                    {rank !== undefined ? `#${rank} ${c.name}` : c.name}
-                  </CabButton>
-                );
-              })}
-            </div>
-          </>
-        )}
-      </div>
-
-      {!viewer && (
-        <p
-          className="mt-5 text-center text-[11px]"
-          style={{ color: withAlpha(C.cream, 0.55) }}
-        >
-          <Link href="/popup/signup" className="underline" style={{ color: C.gold }}>
-            Create an account
-          </Link>{" "}
-          to vote and get on the high score boards.
-        </p>
-      )}
-    </CrtPanel>
   );
 }

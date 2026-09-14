@@ -33,7 +33,7 @@ import ColorPicker from "@/components/ui/ColorPicker";
 import ImagePicker from "@/components/ui/ImagePicker";
 import { listTemplates } from "@/components/popup/templates/registry";
 import { listGames } from "@/lib/popup/games";
-import type { LeaderboardEntry, PopupCocktail, PopupMenu, PopupStatus } from "@/lib/popup/types";
+import type { PopupCocktail, PopupMenu, PopupStatus } from "@/lib/popup/types";
 
 type EditableCocktail = Partial<PopupCocktail> & { id: string };
 
@@ -45,9 +45,6 @@ const BLANK_MENU: Partial<PopupMenu> = {
   templateKey: "classic",
   config: {},
   status: "draft",
-  voteRankDepth: 3,
-  voteWeights: [3, 2, 1],
-  votingEnabled: true,
 };
 
 export default function PopupEditorPage({ params }: { params: { id: string } }) {
@@ -130,11 +127,11 @@ export default function PopupEditorPage({ params }: { params: { id: string } }) 
       setMenu(data.menu ?? menu);
       setNotice(
         action === "golive"
-          ? "This pop-up is live. Voting on the previous one is now closed."
+          ? "This pop-up is live. The previous one is now closed."
           : action === "schedule"
             ? "Scheduled. It will go live on its own at that time."
             : action === "archive"
-              ? "Archived — voting is closed."
+              ? "Archived — its high score boards are final."
               : "Moved back to draft."
       );
     } catch (e) {
@@ -148,7 +145,7 @@ export default function PopupEditorPage({ params }: { params: { id: string } }) 
     if (!menu.id) return;
     if (
       !confirm(
-        `Delete "${menu.title}" permanently? This removes its cocktails and every vote cast on it. This cannot be undone.`
+        `Delete "${menu.title}" permanently? This removes its cocktails, ticket ranges and every high score set on it. This cannot be undone.`
       )
     )
       return;
@@ -279,75 +276,6 @@ export default function PopupEditorPage({ params }: { params: { id: string } }) 
         </div>
       </Section>
 
-      {/* ── Voting ───────────────────────────────────────────────────────── */}
-      <Section title="Voting">
-        <label className="flex items-center gap-2.5 mb-4">
-          <input
-            type="checkbox"
-            checked={menu.votingEnabled !== false}
-            onChange={(e) => set("votingEnabled", e.target.checked)}
-            className="accent-[#C97D5A]"
-          />
-          <span className="text-xs text-gray-600">Let guests vote on this pop-up</span>
-        </label>
-
-        <label className="block mb-4">
-          <span className="block text-[10px] tracking-widest uppercase text-gray-400 mb-1.5">
-            How many cocktails a guest can rank
-          </span>
-          <input
-            type="number"
-            min={1}
-            max={10}
-            value={menu.voteRankDepth ?? 3}
-            onChange={(e) => {
-              const depth = Math.min(10, Math.max(1, Number(e.target.value) || 1));
-              // Keep whatever the owner already set, and extend by stepping down
-              // from the last weight — so a longer ballot never accidentally makes
-              // a lower rank worth MORE than the rank above it. New ranks floor at
-              // 1 rather than 0: if you let guests rank six, all six should count.
-              // The owner can still zero one out by hand.
-              const weights: number[] = [];
-              for (let i = 0; i < depth; i++) {
-                const existing = menu.voteWeights?.[i];
-                if (existing !== undefined) weights.push(existing);
-                else weights.push(Math.max(1, (weights[i - 1] ?? depth) - 1));
-              }
-              setMenu((m) => ({ ...m, voteRankDepth: depth, voteWeights: weights }));
-            }}
-            className="w-24 px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
-          />
-        </label>
-
-        <div>
-          <span className="block text-[10px] tracking-widest uppercase text-gray-400 mb-1.5">
-            Points per rank
-          </span>
-          <p className="text-[11px] text-gray-400 leading-relaxed mb-2.5">
-            A guest&apos;s first choice is worth the most; lower picks still count toward the
-            leader, for fewer points.
-          </p>
-          <div className="flex flex-wrap gap-3">
-            {Array.from({ length: menu.voteRankDepth ?? 3 }, (_, i) => (
-              <label key={i} className="flex items-center gap-2">
-                <span className="text-[11px] text-gray-500 whitespace-nowrap">#{i + 1}</span>
-                <input
-                  type="number"
-                  min={0}
-                  value={menu.voteWeights?.[i] ?? 0}
-                  onChange={(e) => {
-                    const next = [...(menu.voteWeights ?? [])];
-                    next[i] = Math.max(0, Number(e.target.value) || 0);
-                    set("voteWeights", next);
-                  }}
-                  className="w-16 px-2 py-1.5 border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
-                />
-              </label>
-            ))}
-          </div>
-        </div>
-      </Section>
-
       {/* ── Colors ───────────────────────────────────────────────────────── */}
       <Section title="Colors">
         <div className="flex flex-wrap gap-5">
@@ -361,9 +289,6 @@ export default function PopupEditorPage({ params }: { params: { id: string } }) 
       <Section title={`Cocktails (${cocktails.length})`} defaultOpen>
         <CocktailList cocktails={cocktails} onChange={setCocktails} />
       </Section>
-
-      {/* ── Results ──────────────────────────────────────────────────────── */}
-      {!isNew && menu.id && <ResultsPanel menuId={menu.id} slug={menu.slug ?? ""} />}
 
       {/* ── Raffle tickets ───────────────────────────────────────────────── */}
       {!isNew && menu.id && cocktails.some((c) => c.gameKey) && (
@@ -406,7 +331,7 @@ function StatusPanel({
     live: "Live — guests are seeing this now",
     scheduled: "Scheduled",
     draft: "Draft — only visible in the sandbox",
-    archived: "Archived — voting is closed",
+    archived: "Archived — high score boards are final",
   };
 
   return (
@@ -481,7 +406,7 @@ function StatusPanel({
         </button>
         <p className="w-full text-[11px] text-gray-400 leading-relaxed">
           It goes live on its own at that time — nothing left running, nothing to remember. The
-          pop-up that was live becomes archived and its voting closes.
+          pop-up that was live becomes archived and its boards freeze.
         </p>
       </div>
     </div>
@@ -663,91 +588,6 @@ function CocktailCard({
         </div>
       )}
     </div>
-  );
-}
-
-// ─── Results ─────────────────────────────────────────────────────────────────
-
-function ResultsPanel({ menuId, slug }: { menuId: string; slug: string }) {
-  const [results, setResults] = useState<LeaderboardEntry[]>([]);
-  const [voterCount, setVoterCount] = useState(0);
-  const [sandbox, setSandbox] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    setLoading(true);
-    fetch(`/api/admin/popup/results?menuId=${encodeURIComponent(menuId)}${sandbox ? "&sandbox=1" : ""}`)
-      .then((r) => r.json())
-      .then((d) => {
-        setResults(d.results ?? []);
-        setVoterCount(d.voterCount ?? 0);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [menuId, sandbox]);
-
-  return (
-    <Section title="Results" defaultOpen>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <label className="flex items-center gap-2.5">
-          <input
-            type="checkbox"
-            checked={sandbox}
-            onChange={(e) => setSandbox(e.target.checked)}
-            className="accent-[#C97D5A]"
-          />
-          <span className="text-xs text-gray-600">Show sandbox test votes instead</span>
-        </label>
-        <a
-          href={`/api/admin/popup/results?menuId=${encodeURIComponent(menuId)}&format=csv${sandbox ? "&sandbox=1" : ""}`}
-          download={`${slug}-votes.csv`}
-          className="flex items-center gap-1.5 text-[11px] tracking-wider uppercase text-gray-400 hover:text-[#C97D5A] transition-colors"
-        >
-          <Download size={12} /> Export CSV
-        </a>
-      </div>
-
-      {loading ? (
-        <p className="text-xs text-gray-400 py-6 text-center">Loading…</p>
-      ) : results.every((r) => r.totalVotes === 0) ? (
-        <p className="text-xs text-gray-400 py-6 text-center border border-dashed border-gray-200">
-          No {sandbox ? "sandbox " : ""}votes yet.
-        </p>
-      ) : (
-        <>
-          <p className="text-[11px] text-gray-400 mb-2">
-            {voterCount} {voterCount === 1 ? "guest has" : "guests have"} voted
-          </p>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-[10px] tracking-widest uppercase text-gray-400 border-b border-gray-200">
-                <th className="text-left font-normal py-2 w-8">#</th>
-                <th className="text-left font-normal py-2">Cocktail</th>
-                <th className="text-right font-normal py-2">Points</th>
-                <th className="text-right font-normal py-2">#1 votes</th>
-                <th className="text-right font-normal py-2">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {results.map((r) => (
-                <tr key={r.cocktailId} className="border-b border-gray-100">
-                  <td className="py-2.5 text-gray-400 tabular-nums">{r.position}</td>
-                  <td className="py-2.5 text-gray-800">{r.name}</td>
-                  <td className="py-2.5 text-right tabular-nums text-gray-800">{r.points}</td>
-                  <td className="py-2.5 text-right tabular-nums text-gray-500">
-                    {r.firstPlaceVotes}
-                  </td>
-                  <td className="py-2.5 text-right tabular-nums text-gray-400">{r.totalVotes}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <p className="mt-3 text-[11px] text-gray-400 leading-relaxed">
-            The CSV lists every individual ballot — who voted, what they picked and at which rank.
-          </p>
-        </>
-      )}
-    </Section>
   );
 }
 

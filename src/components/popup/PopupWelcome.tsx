@@ -5,9 +5,9 @@ import type { PopupMenu } from "@/lib/popup/types";
 /**
  * The door into the Pop Up Zone for someone who isn't signed in.
  *
- * The zone requires an account — that's how votes stay tied to real people and
- * how one guest can't vote a hundred times. But we show them what they're
- * joining rather than a bare login box, so the ask makes sense.
+ * Shown only when nothing is live. An account is what High Score Runs are
+ * played on, so we show them what they're joining rather than a bare login
+ * box, so the ask makes sense.
  */
 export default function PopupWelcome({ menu }: { menu: PopupMenu | null }) {
   const accent = menu?.accentColor ?? "#C97D5A";
@@ -34,7 +34,7 @@ export default function PopupWelcome({ menu }: { menu: PopupMenu | null }) {
 
       <p className="mt-5 text-sm text-white/60 leading-relaxed">
         {menu
-          ? "Create a free account to see the full pop-up menu, vote for your favorite cocktail, and help decide what comes back."
+          ? "Create a free account to play High Score Runs and win prizes."
           : "There's no pop-up running right now. Create an account and you'll be ready the moment the next one goes live."}
       </p>
 

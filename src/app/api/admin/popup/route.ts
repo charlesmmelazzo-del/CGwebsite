@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getAllMenus, getCocktails, getMenuById, mapMenu } from "@/lib/popup/menus";
-import { getVoterCount } from "@/lib/popup/voting";
 import { isPlayableGame } from "@/lib/popup/games";
 import type { PopupCocktail } from "@/lib/popup/types";
 
@@ -17,7 +16,7 @@ function slugify(input: string): string {
     .slice(0, 60);
 }
 
-/** GET — every pop-up, with cocktail and voter counts for the list view. */
+/** GET — every pop-up, with cocktail counts for the list view. */
 export async function GET(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("id");
 
@@ -35,7 +34,6 @@ export async function GET(req: NextRequest) {
     menus.map(async (m) => ({
       id: m.id,
       cocktails: (await getCocktails(m.id, { includeInactive: true })).length,
-      voters: await getVoterCount(m.id),
     }))
   );
   const countById = new Map(counts.map((c) => [c.id, c]));
@@ -44,7 +42,6 @@ export async function GET(req: NextRequest) {
     menus: menus.map((m) => ({
       ...m,
       cocktailCount: countById.get(m.id)?.cocktails ?? 0,
-      voterCount: countById.get(m.id)?.voters ?? 0,
     })),
   });
 }
@@ -78,10 +75,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const weights = Array.isArray(menu.voteWeights)
-    ? (menu.voteWeights as unknown[]).map((w) => Math.max(0, Math.round(Number(w) || 0)))
-    : [3, 2, 1];
-  const rankDepth = Math.min(10, Math.max(1, Math.round(Number(menu.voteRankDepth ?? 3)) || 3));
 
   const row = {
     slug,
@@ -90,10 +83,6 @@ export async function POST(req: NextRequest) {
     description: (menu.description as string) || null,
     template_key: (menu.templateKey as string) || "classic",
     config: (menu.config as Record<string, unknown>) ?? {},
-    vote_rank_depth: rankDepth,
-    // Always as many weights as ranks, so no rank silently scores nothing.
-    vote_weights: Array.from({ length: rankDepth }, (_, i) => weights[i] ?? 0),
-    voting_enabled: menu.votingEnabled !== false,
     bg_color: (menu.bgColor as string) || null,
     text_color: (menu.textColor as string) || null,
     accent_color: (menu.accentColor as string) || null,
@@ -165,7 +154,7 @@ export async function POST(req: NextRequest) {
       .map((r) => String(r.id))
       .filter((id) => !keepIds.includes(id));
     if (toDelete.length) {
-      // Votes cascade with the cocktail (FK on delete cascade).
+      // Scores and ticket ranges go with the cocktail (FK on delete).
       await sb.from("popup_cocktails").delete().in("id", toDelete);
     }
 
@@ -187,7 +176,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/** DELETE — remove a pop-up entirely, along with its cocktails and votes. */
+/** DELETE — remove a pop-up entirely, along with its cocktails and scores. */
 export async function DELETE(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Missing id." }, { status: 400 });

@@ -56,7 +56,7 @@ export default function AdminGuestsPage() {
         <h1 className="text-lg text-gray-800">Guest Accounts</h1>
         <p className="mt-1 text-xs text-gray-400 leading-relaxed max-w-lg">
           Everyone who has signed up for the Pop Up Zone. One account works for every pop-up —
-          it&apos;s what guests use to vote and to play High Score Runs.
+          it&apos;s what guests use to play High Score Runs.
         </p>
       </header>
 
@@ -194,7 +194,7 @@ function GuestEditor({
   function remove() {
     if (
       !confirm(
-        `Delete ${guest.email}? Their votes, high scores and ticket history are removed too. This cannot be undone.`
+        `Delete ${guest.email}? Their high scores and ticket history are removed too. This cannot be undone.`
       )
     )
       return;

@@ -101,7 +101,7 @@ export async function updateGuest(
 }
 
 /**
- * Delete a guest outright. Their votes, scores and ticket runs go with them
+ * Delete a guest outright. Their scores and ticket runs go with them
  * (every popup_* table cascades on auth.users), so a deleted winner is gone
  * from the boards too.
  */

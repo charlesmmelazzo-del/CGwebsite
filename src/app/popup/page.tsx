@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 /**
  * The front door. Everyone lands straight on whatever pop-up is currently live
  * — no menu of menus in between, which is what the owner asked for. Browsing
- * and free play need no account; voting and High Score Runs ask for one at the
+ * and free play need no account; High Score Runs ask for one at the
  * moment they're used. With nothing live, a signed-out visitor gets the
  * welcome/sign-up screen.
  */
@@ -42,21 +42,14 @@ export default async function PopupHomePage() {
     );
   }
 
-  const { cocktails, votingOpen, isLive, voteBlockReason, ballot, results } = await loadExperience(
-    live,
-    viewer
-  );
+  const { cocktails, isLive } = await loadExperience(live);
 
   return (
     <PopupExperience
       menu={live}
       cocktails={cocktails}
       viewer={viewer}
-      votingOpen={votingOpen}
       isLive={isLive}
-      voteBlockReason={voteBlockReason}
-      initialBallot={ballot}
-      initialResults={results}
     />
   );
 }

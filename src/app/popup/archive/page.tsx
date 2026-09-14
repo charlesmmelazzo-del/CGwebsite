@@ -26,8 +26,8 @@ export default async function ArchivePage() {
         Pop Ups
       </h1>
       <p className="mt-3 text-center text-xs text-white/45 leading-relaxed max-w-md mx-auto">
-        Look back at what we&apos;ve poured. Voting closes when a pop-up ends, but the results
-        stay up.
+        Look back at what we&apos;ve poured. The high score boards freeze when a pop-up ends,
+        but they stay up.
       </p>
 
       <div className="mt-12 space-y-4">
@@ -87,7 +87,7 @@ function MenuCard({
           </span>
         ) : (
           <span className="text-[9px] tracking-[0.25em] uppercase text-white/30">
-            Voting closed
+            Closed
           </span>
         )}
         <h2

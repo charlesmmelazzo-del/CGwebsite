@@ -2,7 +2,7 @@
 //
 // Every pop-up menu names a template here. The template owns the entire visual
 // treatment and any interactive gimmick — a trivia board, a mini game per
-// cocktail, a scratch-off card. Accounts, voting, scheduling and the archive
+// cocktail, a scratch-off card. Accounts, scheduling and the archive
 // are handled by the platform underneath and don't change.
 //
 // TO ADD A NEW POP-UP EXPERIENCE:
@@ -30,9 +30,9 @@ export const TEMPLATES: Record<string, PopupTemplate> = {
     key: "classic",
     label: "Classic Gallery",
     description:
-      "A clean card grid — image, name, tagline and ingredients — with voting and the live leaderboard. The neutral baseline.",
+      "A clean card grid — image, name, tagline and ingredients. The neutral baseline.",
     component: ClassicTemplate,
-    defaultConfig: { showIngredients: true, showLeaderboard: true },
+    defaultConfig: { showIngredients: true },
   },
   "high-scores": {
     key: "high-scores",

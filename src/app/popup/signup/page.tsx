@@ -90,8 +90,8 @@ function SignupForm() {
           <span className="text-white/90 break-all">{sentTo}</span>. Click it and you&apos;re in.
         </p>
         <p className="mt-4 text-xs text-white/40 leading-relaxed">
-          You can look around and use free play before confirming — you just need a confirmed
-          email to cast your vote.
+          You can look around and play before confirming — you just need a confirmed email to
+          be sent a prize.
         </p>
         <Link
           href={from}
@@ -112,7 +112,7 @@ function SignupForm() {
         Join the Pop Up Zone
       </h1>
       <p className="mt-3 text-center text-xs text-white/45 leading-relaxed">
-        One account lets you vote and play High Score Runs on every pop-up. Must be 21 or older.
+        One account lets you play High Score Runs on every pop-up. Must be 21 or older.
       </p>
 
       <form onSubmit={submit} className="mt-9 space-y-4">
