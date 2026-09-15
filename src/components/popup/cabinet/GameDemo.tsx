@@ -38,12 +38,25 @@ import { withAlpha, C } from "./theme";
 const DEMO_ASPECT: Record<string, number> = {
   "tiki-wars": TIKI.W / TIKI.H_REF,
   "lets-do-shots": SHOTS.W / SHOTS.H_REF,
-  // Played sideways, so its demo is a letterbox.
   "behind-the-stick": STICK.W_REF / STICK.H,
 };
 
+/**
+ * Sideways games show several demos stacked, so the slide is about as tall
+ * as the portrait games' instead of a thin letterbox. Each copy plays its own
+ * run, started at a different point, so the stack shows different parts of
+ * the game at once.
+ */
+const DEMO_STACK: Record<string, number> = {
+  "behind-the-stick": 3,
+};
+
+function stackOf(gameKey: string | undefined): number {
+  return (gameKey && DEMO_STACK[gameKey]) || 1;
+}
+
 export function demoAspect(gameKey: string | undefined): number {
-  return (gameKey && DEMO_ASPECT[gameKey]) || GAME_W / GAME_H;
+  return ((gameKey && DEMO_ASPECT[gameKey]) || GAME_W / GAME_H) / stackOf(gameKey);
 }
 
 export default function GameDemo({
@@ -94,8 +107,15 @@ export default function GameDemo({
         // The aspect box gives the game a definite height to fill. Without one,
         // its percentage heights resolve to auto and the screen collapses to
         // its intrinsic 224px.
-        <div className="pointer-events-none w-full" style={{ aspectRatio }}>
-          <Game onGameOver={() => {}} demo />
+        <div
+          className="pointer-events-none w-full grid gap-[3px] bg-black"
+          style={{ aspectRatio, gridTemplateRows: `repeat(${stackOf(gameKey)}, minmax(0, 1fr))` }}
+        >
+          {Array.from({ length: stackOf(gameKey) }, (_, i) => (
+            <div key={i} className="relative min-h-0">
+              <Game onGameOver={() => {}} demo />
+            </div>
+          ))}
         </div>
       ) : (
         // A still frame, so a slide never flashes empty as it scrolls in.

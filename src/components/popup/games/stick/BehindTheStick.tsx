@@ -149,7 +149,18 @@ export default function BehindTheStick({ onGameOver, demo = false, paused = fals
   }, []);
 
   useEffect(() => {
-    if (demo) stRef.current = freshState({ demo: true });
+    if (demo) {
+      // Start somewhere random in a run, so stacked demos aren't all on the
+      // same opening card.
+      const st = freshState({ demo: true });
+      const bot = botRef.current;
+      const skip = Math.random() * 25;
+      for (let i = 0; i < skip * 30 && st.stage !== "over"; i++) {
+        botStep(bot, st, 1 / 30);
+        update(st, 1 / 30);
+      }
+      stRef.current = st.stage === "over" ? freshState({ demo: true }) : st;
+    }
     return () => {
       if (locked.current) releaseLandscape();
     };
