@@ -214,8 +214,17 @@ export const FIZZ_PER_MIXER = 3;
 
 /** Per row of the shaft, counted at the highest row ever reached. */
 export const SCORE_PER_ROW = 100;
-/** First time a zone's floor is crossed — the shelf, the sky, the moon, and so on. */
-export const SCORE_NEW_ZONE = 500;
+/** First time a zone's floor is crossed — the sky, the moon, and so on. A big moment. */
+export const SCORE_NEW_ZONE = 2000;
+/** And a refill to go with it. */
+export const FIZZ_PER_ZONE = 5;
+
+// ─── Holding ─────────────────────────────────────────────────────────────────
+
+/** Full fills of the gauge a hold survives. Past this, the can explodes. */
+export const OVERSHAKE_CYCLES = 3;
+/** How many rows an explosion knocks Elmer down. */
+export const KNOCKDOWN_ROWS = 3;
 /** Handing a mixer to a dusty bottle so it can finally be a drink. */
 export const SCORE_MATCH = 1000;
 /** Picking a mixer up. */

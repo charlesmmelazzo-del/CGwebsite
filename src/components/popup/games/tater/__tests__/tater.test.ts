@@ -15,7 +15,8 @@ import {
   summitBottleFor,
 } from "../cast";
 import {
-  AIM_MAX, ELMER_W, FIZZ_MAX, FIZZ_START, GRAVITY, H_MAX, H_MIN, PIXEL_SCALE, PLATFORM_W,
+  AIM_MAX, ELMER_W, FIZZ_MAX, FIZZ_START, GRAVITY, H_MAX, H_MIN, KNOCKDOWN_ROWS, OVERSHAKE_CYCLES,
+  PIXEL_SCALE, PLATFORM_W, powerPeriodFor as periodFor,
   ROW_GAP, SCORE_PER_ROW, SCORE_RESCUE, V_MAX, V_MIN, W, WALL_MARGIN, aimPeriodFor, heightFor,
   powerPeriodFor,
 } from "../constants";
@@ -24,8 +25,8 @@ import { SLIDES } from "../story";
 import { HOWTO_COPY } from "../text";
 import {
   ALLIE_ROWS, CHARGE_TIME, REACH_X, aimAt, bestShot, build, createGame,
-  drainEvents, endScene, heightRows, nextLap, powerAt, score, simulateBlast, speedFor,
-  makeRng, step, tap, velocityFor, type Phase, type TaterState,
+  cancelHold, drainEvents, endScene, heightRows, nextLap, platformX, powerAt, press, release,
+  score, simulateBlast, speedFor, makeRng, step, velocityFor, type Phase, type TaterState,
 } from "../taterCore";
 
 /** Assign a phase without TypeScript narrowing every later read to that literal. */
@@ -96,12 +97,12 @@ function playRun(seed: number, opts: { maxSeconds?: number; noise?: number } = {
           power: aim.power + (jitter() - 0.5) * noise,
         };
       }
-      if (Math.abs(g.angle - want.angle) < 0.05) tap(g);
+      if (Math.abs(g.angle - want.angle) < 0.05) press(g);
       // An arrow that never quite passes the target must not hang the run.
-      else if (g.t > 6) tap(g);
+      else if (g.t > 6) press(g);
     } else if (g.phase === "power") {
-      if (Math.abs(g.power - (want?.power ?? 0.9)) < 0.03) tap(g);
-      else if (g.t > 6) tap(g);
+      if (Math.abs(g.power - (want?.power ?? 0.9)) < 0.03) release(g);
+      else if (g.t > 2) release(g);
     } else {
       want = null;
     }
@@ -116,6 +117,7 @@ check("every line in the game can be drawn by the 5x7 font", () => {
   const strings = [
     ...THANK_YOU, GUILLERMO_LINE, ALLIE_LINE, TATER_LINE, FLAT_LINE,
     TATER_TAUNT, TATER_TAUNT_AGAIN, TATER_SOAKED, ALLIE_KEEP_GOING, ALLIE_AGAIN,
+    ...ZONES.map((z) => `${z.title}!!!`), "YOU REACHED", "KA-BLOOEY!", "LET GO!",
     ...HOWTO_COPY.flat(),
     ...LONELY_BOTTLES.map((b) => b.label),
     ...MIXERS.map((m) => m.label),
@@ -198,12 +200,9 @@ check("the bottom shelf is one unbroken floor with Guillermo on it", () => {
 
 check("Allie appears on the far right of her rows and nowhere else", () => {
   const g = createGame(3);
-  build(g, 120);
+  build(g, SUMMIT_ROW);
   const found = g.platforms.filter((p) => p.item?.kind === "allie");
-  assert.deepEqual(
-    found.map((p) => p.row).sort((a, b) => a - b),
-    ALLIE_ROWS.filter((r) => r <= 120)
-  );
+  assert.deepEqual(found.map((p) => p.row).sort((a, b) => a - b), ALLIE_ROWS);
   for (const p of found) {
     const row = g.platforms.filter((q) => q.row === p.row);
     const rightmost = row.reduce((a, b) => (b.x + b.w > a.x + a.w ? b : a));
@@ -327,16 +326,15 @@ check("a run ends, and it ends because the can went flat", () => {
 /** Rows climbed across every lap of a run. */
 const climbed = (g: TaterState) => g.banked / SCORE_PER_ROW + g.maxRow;
 
-check("a good player reaches the summit, and the laps after it are harder", () => {
-  // The whole fizz economy in one assertion. The top has to be reachable by a
-  // steady player — the finale and the laps are the point of the design — but
-  // not by everybody, and the laps must eventually stop them.
+check("a good player climbs through several worlds, and the top stays a real achievement", () => {
+  // The whole fizz economy in one assertion. Worlds are long on purpose — a new
+  // one should feel like an event — so a good run sees a few of them, and the
+  // summit is for the very best.
   const runs = [1, 2, 3, 4, 5, 6, 7, 8].map((s) => playRun(s, { noise: 0.08 }));
   const avg = runs.reduce((a, r) => a + climbed(r.g), 0) / runs.length;
   const topped = runs.filter((r) => r.summits > 0).length;
-  console.log(`       good player: ${avg.toFixed(0)} rows a run, ${topped}/8 reached the summit, laps ${runs.map((r) => r.g.lap).join(",")}`);
-  assert.ok(avg > 25, `a good player averaged only ${avg.toFixed(1)} rows`);
-  assert.ok(topped >= 2, `only ${topped} of 8 good runs reached the summit`);
+  console.log(`       good player: ${avg.toFixed(0)} rows a run, ${topped}/8 reached the summit, rows ${runs.map((r) => climbed(r.g)).join(",")}`);
+  assert.ok(avg > ROWS_PER_ZONE * 2, `a good player averaged only ${avg.toFixed(1)} rows — under two worlds`);
 });
 
 check("a shakier thumb still gets a real run", () => {
@@ -367,6 +365,7 @@ check("height is only ever paid for once", () => {
   // through rows already banked.
   const g = createGame(9);
   build(g, 60);
+  for (const p of g.platforms) if (p.item?.kind !== "guillermo") p.item = null;
   g.maxRow = 20;
   const before = score(g);
   g.elmer = { x: W / 2, y: -ROW_GAP * 10, vx: 0, vy: 0, facing: 1, standing: null };
@@ -425,14 +424,87 @@ check("landing on Allie pauses the game for her scene", () => {
   assert.equal(g.phase, "aim");
 });
 
-check("taps outside the two sweep phases do nothing", () => {
+check("input outside aiming and holding does nothing", () => {
   const g = createGame(6);
-  setPhase(g, "flight");
-  assert.equal(tap(g), false);
-  setPhase(g, "charge");
-  assert.equal(tap(g), false);
-  setPhase(g, "over");
-  assert.equal(tap(g), false);
+  for (const ph of ["flight", "charge", "over", "settle"] as Phase[]) {
+    setPhase(g, ph);
+    assert.equal(press(g), false, `press did something in ${ph}`);
+    assert.equal(release(g), false, `release did something in ${ph}`);
+  }
+});
+
+check("one gesture: press locks the aim and fills, release blasts at that level", () => {
+  const g = createGame(6);
+  step(g, 0.3);
+  const angle = g.angle;
+  assert.ok(press(g));
+  assert.equal(g.phase, "power");
+  assert.equal(g.lockedAngle, angle, "pressing did not lock the arrow where it was");
+  for (let i = 0; i < 20; i++) step(g, 1 / 60);
+  const level = g.power;
+  assert.ok(level > 0, "holding did not fill the gauge");
+  assert.ok(release(g));
+  assert.equal(g.phase, "charge");
+  assert.equal(g.lockedPower, level);
+});
+
+check("a hold interrupted by a pause does not fire", () => {
+  const g = createGame(6);
+  press(g);
+  step(g, 0.3);
+  cancelHold(g);
+  assert.equal(g.phase, "aim");
+});
+
+check("holding past three full fills explodes and knocks Elmer down", () => {
+  const g = createGame(21);
+  build(g, 20);
+  const shelf = g.byRow.get(10)![0];
+  shelf.move = undefined;
+  g.elmer = { x: shelf.x + shelf.w / 2, y: shelf.y, vx: 0, vy: 0, facing: 1, standing: shelf.id };
+  g.maxRow = 10;
+  setPhase(g, "aim");
+  press(g);
+  const period = periodFor(g.lap);
+  let exploded = false;
+  for (let i = 0; i < (OVERSHAKE_CYCLES * period + 0.2) * 60; i++) {
+    step(g, 1 / 60);
+    if (drainEvents(g).some((e) => e.kind === "explode")) { exploded = true; break; }
+  }
+  assert.ok(exploded, "the can never blew");
+  for (let i = 0; i < 1200 && g.phase !== "settle" && g.phase !== "aim"; i++) step(g, 1 / 60);
+  const landed = g.byId.get(g.elmer.standing!)!;
+  assert.ok(landed.row <= 10 - KNOCKDOWN_ROWS, `only knocked down to row ${landed.row}`);
+});
+
+check("moving shelves stay in the shaft and never overlap, at any moment", () => {
+  const g = createGame(17);
+  build(g, SUMMIT_ROW);
+  const moving = g.platforms.filter((p) => p.move);
+  assert.ok(moving.length > 30, `only ${moving.length} moving shelves`);
+  for (const t of [0, 0.7, 1.9, 3.3, 10, 57.1]) {
+    for (const [row, list] of Array.from(g.byRow.entries())) {
+      const at = list.map((p) => ({ x: platformX(p, t), w: p.w })).sort((a, b) => a.x - b.x);
+      for (let i = 0; i < at.length; i++) {
+        assert.ok(at[i].x >= 0 && at[i].x + at[i].w <= W, `row ${row} leaves the shaft at t=${t}`);
+        if (i) assert.ok(at[i].x >= at[i - 1].x + at[i - 1].w, `row ${row} overlaps at t=${t}`);
+      }
+    }
+  }
+  assert.ok(!g.platforms.some((p) => p.move && p.item?.kind === "allie"), "Allie's shelf moves");
+});
+
+check("a moving shelf carries Elmer with it", () => {
+  const g = createGame(17);
+  build(g, 60);
+  const shelf = g.platforms.find((p) => p.move)!;
+  g.elapsed = 0;
+  shelf.x = platformX(shelf, 0);
+  g.elmer = { x: shelf.x + shelf.w / 2, y: shelf.y, vx: 0, vy: 0, facing: 1, standing: shelf.id };
+  const offset = g.elmer.x - shelf.x;
+  setPhase(g, "aim");
+  for (let i = 0; i < 90; i++) step(g, 1 / 60);
+  assert.ok(Math.abs(g.elmer.x - shelf.x - offset) < 1e-6, "he slid off his spot on the shelf");
 });
 
 check("simulateBlast never marks a shelf spent or moves the real Elmer", () => {

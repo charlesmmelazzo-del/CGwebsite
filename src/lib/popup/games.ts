@@ -70,8 +70,8 @@ export const GAMES: Record<string, GameMeta> = {
     title: "Tater Tales",
     blurb: "Blast up Mr. Tater's shelves. How high can you go?",
     howToPlay: [
-      "Tap once to stop the arrow where you want to go.",
-      "Tap again to stop the carbonation gauge.",
+      "When the arrow points where you want to go, press and hold.",
+      "Let go when the fizz is where you want it. Hold too long and it explodes.",
       "Fuller means faster and further. Bank off the walls.",
       "Grab mixers and hand them to the dusty bottles up there.",
       "Knock Tater off his top shelf, then do it again. Every lap is harder.",

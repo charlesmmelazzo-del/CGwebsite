@@ -25,7 +25,7 @@ import {
   LAND_SPEED, MAX_FALL,
   PLATFORM_BOUNCE, PLATFORM_W, POWER_PERIOD, REST_SPEED, ROW_GAP,
   SCORE_ALLIE, SCORE_MATCH, SCORE_MIXER, SCORE_NEW_ZONE, SCORE_PER_ROW,
-  SCORE_RESCUE, SCORE_SUMMIT_PER_LAP,
+  SCORE_RESCUE, SCORE_SUMMIT_PER_LAP, FIZZ_PER_ZONE, KNOCKDOWN_ROWS, OVERSHAKE_CYCLES,
   SLIDE_FRICTION, V_MAX, V_MIN, W, WALL_BOUNCE, WALL_MARGIN,
   aimPeriodFor, lapDifficulty, powerPeriodFor,
   type PlatformSize,
@@ -76,6 +76,17 @@ export interface Platform {
   item: Item | null;
   /** Set once the item has been dealt with, so a shelf pays out only once. */
   spent: boolean;
+  /**
+   * A shelf that slides from side to side. `x` is kept current by `step`;
+   * `baseX` is where it was generated, and it swings `amp` either side of that.
+   */
+  move?: { baseX: number; amp: number; speed: number; phase: number };
+}
+
+/** Where a shelf is at a given moment. */
+export function platformX(p: Platform, time: number): number {
+  if (!p.move) return p.x;
+  return p.move.baseX + p.move.amp * Math.sin(p.move.phase + time * p.move.speed);
 }
 
 /**
@@ -93,6 +104,9 @@ export interface Platform {
  */
 export const REACH_X = 150;
 
+/** First row that can have a moving shelf. */
+const MOVING_FROM_ROW = 8;
+
 /** Rows apart, roughly, that mixers turn up. Stretches by up to two rows on later laps. */
 const MIXER_EVERY: [number, number] = [3, 5];
 /** Rows apart, roughly, that a dusty bottle is waiting. Closer together on later laps. */
@@ -105,7 +119,7 @@ const BOTTLE_EVERY: [number, number] = [6, 9];
  * story beat that might not happen is not one. Spaced far enough apart that
  * seeing her again is an event and not a checkpoint.
  */
-export const ALLIE_ROWS = [14, 34, 54];
+export const ALLIE_ROWS = [35, 95, 155, 215];
 
 function spanFor(rng: Rng, [lo, hi]: [number, number]): number {
   return lo + Math.floor(rng() * (hi - lo + 1));
@@ -212,6 +226,34 @@ function placeRow(rng: Rng, row: number, below: Platform[], ctx: RowContext): Pl
     }
   }
 
+  // ── Moving shelves ───────────────────────────────────────────────────────
+  // None on the first few rows, then more of them the higher the climb and the
+  // later the lap. At most one per row, and it swings only through the gap its
+  // neighbours leave, so shelves never overlap and never leave the shaft.
+  // Never Allie's: her scene is staged against a shelf that stays put.
+  if (row >= MOVING_FROM_ROW) {
+    const odds = Math.min(0.7, 0.22 + (row / SUMMIT_ROW) * 0.3 + hard * 0.25);
+    if (rng() < odds) {
+      const candidates = out.filter((p) => p.item?.kind !== "allie");
+      if (candidates.length) {
+        const p = pick(rng, candidates);
+        const sorted = [...out].sort((a, b) => a.x - b.x);
+        const i = sorted.indexOf(p);
+        const leftBound = i > 0 ? sorted[i - 1].x + sorted[i - 1].w + 10 : WALL_MARGIN;
+        const rightBound = i < sorted.length - 1 ? sorted[i + 1].x - 10 : W - WALL_MARGIN;
+        const amp = Math.min(p.x - leftBound, rightBound - (p.x + p.w), 64);
+        if (amp >= 14) {
+          p.move = {
+            baseX: p.x,
+            amp,
+            speed: 0.7 + rng() * 0.6 + hard * 0.5,
+            phase: rng() * Math.PI * 2,
+          };
+        }
+      }
+    }
+  }
+
   return out;
 }
 
@@ -245,14 +287,16 @@ export type TaterEvent =
   | { kind: "allie"; platformId: number; x: number; y: number }
   /** Standing on Tater's top shelf. The renderer plays the finale, then calls nextLap. */
   | { kind: "summit"; lap: number; bottle: BottleId | null; bonus: number; y: number }
+  /** Held the gauge too long: Mixey blew. Elmer is knocked down `rows` rows. */
+  | { kind: "explode"; x: number; y: number; rows: number }
   | { kind: "flat" };
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
 export type Phase =
-  /** The arrow sweeps. A tap locks the direction. */
+  /** The arrow sweeps. Pressing down locks the direction and starts the fill. */
   | "aim"
-  /** The carbonation gauge fills and empties. A tap locks the strength. */
+  /** Held down: the carbonation gauge fills and empties. Letting go fires. */
   | "power"
   /** He stops shaking, points Mixey down and cracks the tab. Fixed length. */
   | "charge"
@@ -312,6 +356,13 @@ export interface TaterState {
   maxRow: number;
   maxZone: number;
   blasts: number;
+  /** Times the can blew up from holding too long. */
+  explosions: number;
+  /**
+   * Knocked down: shelves above this row do not catch him until he lands on
+   * one at or below it.
+   */
+  dropTo: number | null;
 
   platforms: Platform[];
   /**
@@ -367,8 +418,11 @@ export function createGame(seed: number, opts: { startRow?: number } = {}): Tate
     },
     angle: 0, power: 0, lockedAngle: 0, lockedPower: 0,
     fizz: FIZZ_START, mixers: 0, bonus: 0, lap: 1, banked: 0, maxRow: 0, maxZone: 0, blasts: 0,
+    explosions: 0, dropTo: null,
     platforms,
-    byRow: new Map([[0, platforms]]),
+    // A COPY for row 0: `platforms` itself grows with every row built, and the
+    // bucket must not.
+    byRow: new Map([[0, [...platforms]]]),
     byId: new Map(platforms.map((p) => [p.id, p])),
     builtTo: 0,
     events: [], over: false,
@@ -410,13 +464,14 @@ export function nextLap(g: TaterState): void {
   const platforms = groundRow(g.ctx);
   const ground = platforms[0];
   g.platforms = platforms;
-  g.byRow = new Map([[0, platforms]]);
+  g.byRow = new Map([[0, [...platforms]]]);
   g.byId = new Map(platforms.map((p) => [p.id, p]));
   g.builtTo = 0;
   g.elmer = { x: ground.x + ground.w * 0.28, y: 0, vx: 0, vy: 0, facing: 1, standing: ground.id };
   g.maxRow = 0;
   g.maxZone = 0;
   g.fizz = FIZZ_MAX;
+  g.dropTo = null;
   g.phase = "aim";
   g.t = 0;
   g.angle = 0;
@@ -498,28 +553,45 @@ export function velocityFor(angle: number, power: number): { vx: number; vy: num
 // ─── Input ───────────────────────────────────────────────────────────────────
 
 /**
- * The single control. One tap locks the angle, the next locks the strength.
+ * The control, one gesture: PRESS when the arrow points where you want to go —
+ * that locks it and starts the fizz filling — HOLD while the gauge rises and
+ * falls, and LET GO at the strength you want. Hold through OVERSHAKE_CYCLES
+ * full fills and the can blows, knocking Elmer down.
  *
- * Deliberately the only input the game has: the whole thing is playable with a
- * drink in the other hand, which is the actual constraint a bar game is under.
- * Taps in any other phase are IGNORED rather than queued — a queued tap fires a
- * blast the player made while watching a cutscene and had forgotten about.
+ * Input in any other phase is IGNORED rather than queued — a queued press fires
+ * a blast the player made while watching a cutscene and had forgotten about.
  */
-export function tap(g: TaterState): boolean {
-  if (g.phase === "aim") {
-    g.lockedAngle = g.angle;
-    g.elmer.facing = g.angle >= 0 ? 1 : -1;
-    g.phase = "power";
-    g.t = 0;
-    return true;
-  }
+export function press(g: TaterState): boolean {
+  if (g.phase !== "aim") return false;
+  g.lockedAngle = g.angle;
+  g.elmer.facing = g.angle >= 0 ? 1 : -1;
+  g.phase = "power";
+  g.t = 0;
+  g.power = 0;
+  return true;
+}
+
+/** Finger up while filling: blast at whatever the gauge reads. */
+export function release(g: TaterState): boolean {
+  if (g.phase !== "power") return false;
+  g.lockedPower = g.power;
+  g.phase = "charge";
+  g.t = 0;
+  return true;
+}
+
+/** The hold was interrupted (the game was paused): back to aiming, no blast. */
+export function cancelHold(g: TaterState): void {
   if (g.phase === "power") {
-    g.lockedPower = g.power;
-    g.phase = "charge";
+    g.phase = "aim";
     g.t = 0;
-    return true;
+    g.power = 0;
   }
-  return false;
+}
+
+/** How many full fills the current hold has been through, fractional. */
+export function holdCycles(g: TaterState): number {
+  return g.phase === "power" ? g.t / powerPeriodFor(g.lap) : 0;
 }
 
 /** End a cutscene the renderer was playing, and hand the simulation back. */
@@ -552,15 +624,19 @@ export function step(g: TaterState, dt: number): void {
   const d = Math.min(0.05, Math.max(0, dt));
   g.t += d;
   g.elapsed += d;
+  movePlatforms(g);
 
   switch (g.phase) {
     case "aim":
       g.angle = aimAt(g.t, aimPeriodFor(g.lap));
       break;
 
-    case "power":
-      g.power = powerAt(g.t, powerPeriodFor(g.lap));
+    case "power": {
+      const period = powerPeriodFor(g.lap);
+      g.power = powerAt(g.t, period);
+      if (g.t >= OVERSHAKE_CYCLES * period) explode(g);
       break;
+    }
 
     case "charge":
       if (g.t >= CHARGE_TIME) launch(g);
@@ -586,6 +662,53 @@ export function step(g: TaterState, dt: number): void {
       }
       break;
   }
+}
+
+/** Rows either side of Elmer whose moving shelves are kept up to date. */
+const MOVE_WINDOW = 24;
+
+/**
+ * Slide the moving shelves to where they are now, and carry Elmer along if he
+ * is standing on one. Positions are a pure function of `elapsed`, so a replay
+ * is exact and nothing accumulates drift.
+ */
+function movePlatforms(g: TaterState): void {
+  const row = Math.round(heightRows(g));
+  const standing = g.elmer.standing;
+  for (let r = Math.max(1, row - MOVE_WINDOW); r <= row + MOVE_WINDOW; r++) {
+    const list = g.byRow.get(r);
+    if (!list) continue;
+    for (const p of list) {
+      if (!p.move) continue;
+      const nx = platformX(p, g.elapsed);
+      if (standing === p.id) g.elmer.x += nx - p.x;
+      p.x = nx;
+    }
+  }
+}
+
+/**
+ * Held too long. Mixey blows his top, Elmer is thrown off the shelf and falls
+ * past the next KNOCKDOWN_ROWS rows before anything can catch him.
+ */
+function explode(g: TaterState): void {
+  const e = g.elmer;
+  const p = e.standing != null ? platformById(g, e.standing) : undefined;
+  const from = p ? p.row : Math.max(0, Math.round(heightRows(g)));
+  const to = Math.max(0, from - KNOCKDOWN_ROWS);
+  g.fizz -= FIZZ_PER_BLAST;
+  g.explosions++;
+  g.dropTo = to;
+  g.events.push({ kind: "explode", x: e.x, y: e.y, rows: from - to });
+  // Popped up and away from the middle, so he clears the shelf he was on.
+  const away = e.x < W / 2 ? 1 : -1;
+  e.vx = away * 110;
+  e.vy = -240;
+  e.standing = null;
+  e.y -= 1;
+  g.power = 0;
+  g.phase = "flight";
+  g.t = 0;
 }
 
 function launch(g: TaterState): void {
@@ -666,6 +789,8 @@ function collide(g: TaterState, px: number, py: number): void {
   for (let r = rLo; r <= rHi; r++) {
     const list = g.byRow.get(r);
     if (!list) continue;
+    // Knocked down: shelves above the target row let him fall straight past.
+    if (g.dropTo !== null && r > g.dropTo) continue;
     for (const p of list) {
       if (!(e.x + half > p.x && e.x - half < p.x + p.w)) continue;
       // His feet were above this surface a substep ago and are through it now.
@@ -687,6 +812,7 @@ function collide(g: TaterState, px: number, py: number): void {
 
 function land(g: TaterState, p: Platform): void {
   const e = g.elmer;
+  g.dropTo = null;
   e.vy = 0;
   e.standing = p.id;
   g.phase = "slide";
@@ -753,6 +879,7 @@ function rest(g: TaterState, p: Platform): void {
     if (zone > g.maxZone) {
       g.maxZone = zone;
       g.bonus += SCORE_NEW_ZONE;
+      g.fizz = Math.min(FIZZ_MAX, g.fizz + FIZZ_PER_ZONE);
       g.events.push({ kind: "zone", index: zone });
     }
     build(g, g.maxRow + BUILD_AHEAD);

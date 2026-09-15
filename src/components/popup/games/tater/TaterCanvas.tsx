@@ -14,7 +14,8 @@ import { PIXEL_SCALE, VIEW_W, heightFor } from "./constants";
  * its side — the picture is LETTERBOXED rather than stretched: pixel art
  * squashed to fit is the one thing it cannot survive.
  *
- * ONE INPUT, and it fires on POINTER DOWN.
+ * TWO EVENTS: the press fires on POINTER DOWN and the blast on POINTER UP —
+ * press when the arrow is right, hold while the fizz fills, let go.
  *
  * The whole game is "stop the sweeping thing at the right moment", so the lag
  * between the thumb touching the glass and the value being read is the game's
@@ -26,10 +27,12 @@ import { PIXEL_SCALE, VIEW_W, heightFor } from "./constants";
 export default function TaterCanvas({
   onFrame,
   onTap,
+  onRelease,
   running,
 }: {
   onFrame: (ctx: CanvasRenderingContext2D, dt: number, t: number, h: number) => void;
   onTap: (x: number, y: number, h: number) => void;
+  onRelease: () => void;
   running: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -39,6 +42,8 @@ export default function TaterCanvas({
   frameRef.current = onFrame;
   const tapRef = useRef(onTap);
   tapRef.current = onTap;
+  const releaseRef = useRef(onRelease);
+  releaseRef.current = onRelease;
 
   const logicalH = useRef(600);
 
@@ -62,6 +67,28 @@ export default function TaterCanvas({
     if (ch > r.height) { ch = r.height; cw = r.height * aspect; }
     canvas.style.width = `${Math.floor(cw)}px`;
     canvas.style.height = `${Math.floor(ch)}px`;
+  }, []);
+
+  // A press-and-hold game on a phone: stop the browser treating a long touch
+  // as a request for the copy / paste / look-up callout, the text magnifier,
+  // or a drag. CSS alone does not stop iOS; a non-passive touchstart that
+  // prevents the default does, and pointer events still arrive.
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const block = (e: Event) => { if (e.cancelable) e.preventDefault(); };
+    wrap.addEventListener("touchstart", block, { passive: false });
+    wrap.addEventListener("touchmove", block, { passive: false });
+    wrap.addEventListener("touchend", block, { passive: false });
+    wrap.addEventListener("selectstart", block);
+    wrap.addEventListener("dragstart", block);
+    return () => {
+      wrap.removeEventListener("touchstart", block);
+      wrap.removeEventListener("touchmove", block);
+      wrap.removeEventListener("touchend", block);
+      wrap.removeEventListener("selectstart", block);
+      wrap.removeEventListener("dragstart", block);
+    };
   }, []);
 
   useEffect(() => {
@@ -107,6 +134,12 @@ export default function TaterCanvas({
 
   function down(e: React.PointerEvent) {
     if (!running) return;
+    // Keep receiving this finger's release even if it slides off the canvas.
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    } catch {
+      // A pointer the browser no longer tracks; the release still bubbles here.
+    }
     const r = canvasRef.current?.getBoundingClientRect();
     if (!r || r.width <= 0) return;
     tapRef.current(
@@ -120,6 +153,8 @@ export default function TaterCanvas({
     <div
       ref={wrapRef}
       onPointerDown={down}
+      onPointerUp={() => releaseRef.current()}
+      onPointerCancel={() => releaseRef.current()}
       onContextMenu={(e) => e.preventDefault()}
       className="relative w-full h-full bg-black flex items-center justify-center"
       style={{
@@ -138,7 +173,10 @@ export default function TaterCanvas({
       <canvas
         ref={canvasRef}
         className="block"
-        style={{ imageRendering: "pixelated", touchAction: "none", display: "block" }}
+        style={{
+          imageRendering: "pixelated", touchAction: "none", display: "block",
+          userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none",
+        }}
       />
     </div>
   );

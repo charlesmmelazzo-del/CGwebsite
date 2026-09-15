@@ -41,12 +41,10 @@ export interface Zone {
 /**
  * Rows per band.
  *
- * Six, which puts the summit at row 72. A steady player gains roughly a row a
- * blast and the fizz economy pays back for new height, so the top is reachable
- * in a good run — it has to be, because the finale and the laps are the point —
- * and each lap after that is harder.
+ * Twenty, which takes a few minutes of climbing, so a new world arriving is an
+ * event. The summit is at row 240.
  */
-export const ROWS_PER_ZONE = 6;
+export const ROWS_PER_ZONE = 20;
 
 const BG: Record<ZoneArt, string> = {
   shelf: "#120A06",
@@ -63,15 +61,15 @@ const BG: Record<ZoneArt, string> = {
 /** The order Mr. Tater's shelf passes through, bottom to top. */
 const LADDER: Array<{ art: ZoneArt; title: string }> = [
   { art: "shelf",  title: "THE BOTTOM SHELF" },
-  { art: "sky",    title: "OUT THE SUNROOF" },
+  { art: "sky",    title: "THE SKY" },
   { art: "space",  title: "OUTER SPACE" },
   { art: "moon",   title: "THE MOON" },
   { art: "space",  title: "DEEPER SPACE" },
   { art: "mars",   title: "MARS" },
-  { art: "space",  title: "DEEPER STILL" },
+  { art: "space",  title: "DEEP SPACE" },
   { art: "pluto",  title: "PLUTO" },
   { art: "space",  title: "THE LONG DARK" },
-  { art: "ship",   title: "SOMEBODY'S SHIP" },
+  { art: "ship",   title: "THE ALIEN SHIP" },
   { art: "space",  title: "THE FAR SIDE" },
   { art: "heaven", title: "HEAVEN" },
 ];

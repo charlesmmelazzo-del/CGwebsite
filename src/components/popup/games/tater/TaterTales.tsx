@@ -10,8 +10,8 @@ import {
   TATER_SOAKED, TATER_TAUNT, TATER_TAUNT_AGAIN, THANK_YOU, summitBottleFor, type BottleId,
 } from "./cast";
 import {
-  CAMERA_ANCHOR, CAMERA_LERP, ELMER_H, FIZZ_MAX, HUD_H, PIXEL_SCALE, ROW_GAP, T, VIEW_W, W,
-  WALL_W,
+  CAMERA_ANCHOR, CAMERA_LERP, ELMER_H, FIZZ_MAX, FIZZ_PER_ZONE, HUD_H, OVERSHAKE_CYCLES,
+  PIXEL_SCALE, ROW_GAP, SCORE_NEW_ZONE, T, VIEW_W, W, WALL_W,
 } from "./constants";
 import {
   BLOCK_H, WALL_TILE_H, drawArrow, drawArt, drawGauge, drawPlatformTiles, drawWallTile,
@@ -19,8 +19,8 @@ import {
 } from "./sprites";
 import { DEMO_SLIDE_HOLD, SLIDES } from "./story";
 import {
-  bestShot, createGame, drainEvents, endScene, heightRows, nextLap, platformById, rowsFor,
-  score, step, tap, type Item, type TaterEvent, type TaterState,
+  bestShot, cancelHold, createGame, drainEvents, endScene, heightRows, holdCycles, nextLap,
+  platformById, press, release, rowsFor, score, step, type Item, type TaterEvent, type TaterState,
 } from "./taterCore";
 import { HOWTO_COPY, PARAGRAPH_GAP, lineHeight, wrapLines } from "./text";
 import { SUMMIT_ROW, SUMMIT_ZONE, ZONES, zoneForRow, type ZoneArt } from "./zones";
@@ -29,10 +29,12 @@ import { SUMMIT_ROW, SUMMIT_ZONE, ZONES, zoneForRow, type ZoneArt } from "./zone
 
 const FLOAT_LIFE = 1.3;
 const BANNER_LIFE = 2.4;
+/** The "YOU REACHED MARS!!!" banner stays up longer: it is the big moment. */
+const ZONE_BANNER_LIFE = 4;
 const HOWTO_PAGES = HOWTO_COPY.length;
 
 /** Row numbers painted on the wall signs, every this many rows. */
-const SIGN_EVERY = 3;
+const SIGN_EVERY = 5;
 
 /** Where Elmer and Tater stand on the summit, as fractions of the shaft. */
 const SUMMIT_ELMER_X = W * 0.22;
@@ -119,7 +121,11 @@ interface View {
   thanks: Array<{ id: BottleId; x: number; y: number; t: number }>;
   floats: Float[];
   bubble: Bubble | null;
-  banner: { text: string; sub: string; t: number } | null;
+  banner: { text: string; sub: string; t: number; big?: boolean } | null;
+  /** Soda and bubbles flying out of an exploded can. */
+  bursts: Array<{ x: number; y: number; vx: number; vy: number; t: number; color: string }>;
+  /** Seconds of screen shake left. */
+  shake: number;
 
   demo: boolean;
   demoHold: number;
@@ -142,7 +148,7 @@ function makeView(demo: boolean, practice = false): View {
     cam: 0, camReady: false,
     anim: "shake", animT: 0,
     scene: null, thanks: [],
-    floats: [], bubble: null, banner: null,
+    floats: [], bubble: null, banner: null, bursts: [], shake: 0,
     demo, demoHold: 0, demoWant: null,
     practice, logoTaps: [],
     finished: false,
@@ -166,6 +172,12 @@ export default function TaterTales({ onGameOver, demo = false, paused = false, o
   useEffect(() => {
     view.current = makeView(demo);
   }, [demo]);
+
+  // A pause lands the finger's release on the overlay, not the game: drop the
+  // hold rather than firing a blast nobody meant when play resumes.
+  useEffect(() => {
+    if (paused) cancelHold(view.current.g);
+  }, [paused]);
 
   useEffect(() => {
     prefetch([
@@ -212,13 +224,20 @@ export default function TaterTales({ onGameOver, demo = false, paused = false, o
         return;
       case "play":
         if (v.scene) { skipBeat(v); return; }
-        tap(v.g);
+        // One gesture: pressing locks the arrow and starts the fizz filling.
+        press(v.g);
         return;
       case "flat":
         finish(v, overRef.current);
         return;
     }
   }, [onShowScores]);
+
+  const onRelease = useCallback(() => {
+    const v = view.current;
+    if (v.demo || v.screen !== "play" || v.scene) return;
+    release(v.g);
+  }, []);
 
   const onFrame = useCallback((ctx: CanvasRenderingContext2D, dt: number, t: number, h: number) => {
     const v = view.current;
@@ -239,7 +258,7 @@ export default function TaterTales({ onGameOver, demo = false, paused = false, o
     }
   }, [onShowScores]);
 
-  return <TaterCanvas onFrame={onFrame} onTap={onTap} running={!paused} />;
+  return <TaterCanvas onFrame={onFrame} onTap={onTap} onRelease={onRelease} running={!paused} />;
 }
 
 function inside(x: number, y: number, r: { x: number; y: number; w: number; h: number }) {
@@ -303,9 +322,9 @@ function driveDemo(v: View, dt: number) {
   const g = v.g;
   if (g.phase === "aim") {
     if (!v.demoWant) v.demoWant = bestShot(g) ?? { angle: 0, power: 0.85 };
-    if (Math.abs(g.angle - v.demoWant.angle) < 0.05 || g.t > 5) tap(g);
+    if (Math.abs(g.angle - v.demoWant.angle) < 0.05 || g.t > 5) press(g);
   } else if (g.phase === "power") {
-    if (Math.abs(g.power - (v.demoWant?.power ?? 0.85)) < 0.03 || g.t > 5) tap(g);
+    if (Math.abs(g.power - (v.demoWant?.power ?? 0.85)) < 0.03 || g.t > 2) release(g);
   } else {
     v.demoWant = null;
   }
@@ -355,7 +374,13 @@ function update(v: View, dt: number, h: number) {
   for (const th of v.thanks) th.t += dt;
   v.thanks = v.thanks.filter((th) => th.t < 0.9);
   if (v.bubble) { v.bubble.t += dt; if (v.bubble.t > v.bubble.life) v.bubble = null; }
-  if (v.banner) { v.banner.t += dt; if (v.banner.t > BANNER_LIFE) v.banner = null; }
+  if (v.banner) {
+    v.banner.t += dt;
+    if (v.banner.t > (v.banner.big ? ZONE_BANNER_LIFE : BANNER_LIFE)) v.banner = null;
+  }
+  for (const b of v.bursts) { b.t += dt; b.vy += 500 * dt; b.x += b.vx * dt; b.y += b.vy * dt; }
+  v.bursts = v.bursts.filter((b) => b.t < 1.2);
+  v.shake = Math.max(0, v.shake - dt);
 
   if (g.over && v.screen === "play" && !v.scene) { v.screen = "flat"; v.demoHold = 0; }
 }
@@ -368,7 +393,7 @@ function animFor(g: TaterState, v: View): ElmerAnim {
     case "aim":
     case "power": return thudding ? "thud" : "shake";
     case "charge": return "blast";
-    case "flight": return g.elmer.vy < 140 ? "fly" : "fall";
+    case "flight": return g.dropTo !== null || g.elmer.vy >= 140 ? "fall" : "fly";
     case "slide": return "land";
     case "settle":
       if (v.anim === "fall" || v.anim === "thud") return "thud";
@@ -394,7 +419,22 @@ function handle(v: View, e: TaterEvent, h: number) {
     }
     case "zone": {
       const z = e.index < ZONES.length ? ZONES[e.index] : SUMMIT_ZONE;
-      v.banner = { text: z.title, sub: "+500", t: 0 };
+      v.banner = { text: `${z.title}!!!`, sub: `+${SCORE_NEW_ZONE} BONUS   +${FIZZ_PER_ZONE} FIZZ`, t: 0, big: true };
+      break;
+    }
+    case "explode": {
+      // Soda everywhere.
+      for (let i = 0; i < 48; i++) {
+        const a = (i / 48) * Math.PI * 2 + hash(i, g.explosions) * 0.4;
+        const sp = 60 + hash(g.explosions, i) * 140;
+        v.bursts.push({
+          x: e.x, y: e.y - 18, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 80, t: 0,
+          color: i % 3 === 0 ? T.white : i % 3 === 1 ? "#6E3A08" : "#C07A32",
+        });
+      }
+      v.shake = 0.45;
+      v.floats.push({ text: "KA-BLOOEY!", x: e.x, y: e.y - 44, t: 0, color: T.hot });
+      v.floats.push({ text: `DOWN ${e.rows}`, x: e.x, y: e.y - 32, t: 0, color: T.white });
       break;
     }
     case "allie": {
@@ -512,6 +552,11 @@ function drawPlay(ctx: CanvasRenderingContext2D, v: View, h: number, t: number) 
   // Camera on the device grid, so tiles and sprites never shimmer against it.
   const cam = Math.round(v.cam * PIXEL_SCALE) / PIXEL_SCALE;
 
+  ctx.save();
+  if (v.shake > 0) {
+    const k = v.shake * 8;
+    ctx.translate(Math.round(Math.sin(t * 90) * k), Math.round(Math.cos(t * 70) * k * 0.6));
+  }
   drawStage(ctx, v, cam, h);
 
   ctx.save();
@@ -541,15 +586,30 @@ function drawPlay(ctx: CanvasRenderingContext2D, v: View, h: number, t: number) 
   // ── The two controls ─────────────────────────────────────────────────────
   if (!v.scene && g.phase === "aim") {
     drawArrow(ctx, ex, ey - ELMER_H - 2, g.angle);
-    hint(ctx, h, "TAP TO AIM");
+    hint(ctx, h, "PRESS AND HOLD TO SHAKE");
   } else if (!v.scene && g.phase === "power") {
     drawArrow(ctx, ex, ey - ELMER_H - 2, g.lockedAngle, 0.45);
     const gs = gaugeSize();
-    const gx = ex > W / 2 ? ex - 26 - gs.w : ex + 22;
+    // On the last fill before it blows: the gauge rattles and flashes.
+    const danger = holdCycles(g) >= OVERSHAKE_CYCLES - 1;
+    const jitter = danger ? Math.round(Math.sin(t * 60) * 1.5) : 0;
+    const gx = (ex > W / 2 ? ex - 26 - gs.w : ex + 22) + jitter;
     const gy = Math.max(HUD_H + 4, ey - gs.h - 6);
-    drawGauge(ctx, Math.max(2, Math.min(W - gs.w - 2, gx)), gy, g.power, t);
-    hint(ctx, h, "TAP TO BLAST");
+    const x = Math.max(2, Math.min(W - gs.w - 2, gx));
+    drawGauge(ctx, x, gy, g.power, t);
+    if (danger && Math.floor(t * 8) % 2 === 0) {
+      fill(ctx, x - 1, gy - 1, gs.w + 2, gs.h + 2, "rgba(240,58,46,0.35)");
+    }
+    if (danger) {
+      ctx.save();
+      ctx.globalAlpha = Math.floor(t * 6) % 2 === 0 ? 1 : 0.4;
+      drawTextMarquee(ctx, "LET GO!", x + gs.w / 2, gy - 12, T.hot, 1, "center");
+      ctx.restore();
+    }
+    hint(ctx, h, "LET GO TO BLAST");
   }
+
+  for (const b of v.bursts) fill(ctx, b.x - 1, b.y - cam - 1, 3, 3, b.color);
 
   if (v.scene) drawScene(ctx, v, cam, h, t);
 
@@ -566,8 +626,11 @@ function drawPlay(ctx: CanvasRenderingContext2D, v: View, h: number, t: number) 
   if (v.bubble) drawBubble(ctx, v.bubble.text, v.bubble.x, v.bubble.y - cam, h);
   ctx.restore();
 
+  ctx.restore();
+
   drawHud(ctx, v);
-  if (v.banner) drawBanner(ctx, v.banner.text, v.banner.sub, h, v.banner.t);
+  if (v.banner?.big) drawZoneBanner(ctx, v.banner.text, v.banner.sub, h, v.banner.t);
+  else if (v.banner) drawBanner(ctx, v.banner.text, v.banner.sub, h, v.banner.t);
 }
 
 /**
@@ -858,6 +921,34 @@ function drawBubble(ctx: CanvasRenderingContext2D, text: string, x: number, y: n
     fill(ctx, tx + 1, by + boxH + 2, 2, 2, T.bone);
   }
   lines.forEach((line, i) => drawText(ctx, line, bx + boxW / 2, by + 3 + i * lh, T.ink, 1, "center"));
+}
+
+/**
+ * YOU REACHED MARS!!! — big, flashing, and up for a while. Reaching a new world
+ * takes minutes of climbing, so it gets a proper fanfare.
+ */
+function drawZoneBanner(ctx: CanvasRenderingContext2D, place: string, sub: string, h: number, t: number) {
+  const life = ZONE_BANNER_LIFE;
+  const alpha = t < 0.15 ? t / 0.15 : t > life - 0.5 ? (life - t) / 0.5 : 1;
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+  // The place as big as the screen allows: triple size, double if it will not fit.
+  const pop = textWidth(place, 3) <= VIEW_W - 12 ? 3 : 2;
+  const words = wrapLines(place, VIEW_W - 12, pop);
+  const lh = lineHeight(pop);
+  const top = Math.round(h * 0.24);
+  const head = lineHeight(2);
+  const boxH = head + words.length * lh + 22;
+  fill(ctx, 0, top - 8, VIEW_W, boxH, "rgba(0,0,0,0.78)");
+  fill(ctx, 0, top - 8, VIEW_W, 2, T.brass);
+  fill(ctx, 0, top - 8 + boxH - 2, VIEW_W, 2, T.brass);
+  const flash = Math.floor(t * 6) % 2 === 0;
+  drawTextMarquee(ctx, "YOU REACHED", VIEW_W / 2, top, T.white, 2, "center");
+  words.forEach((line, i) => {
+    drawTextMarquee(ctx, line, VIEW_W / 2, top + head + i * lh, flash ? T.brass : T.hot, pop, "center");
+  });
+  drawTextMarquee(ctx, sub, VIEW_W / 2, top + head + words.length * lh + 2, T.good, 1, "center");
+  ctx.restore();
 }
 
 function drawBanner(ctx: CanvasRenderingContext2D, text: string, sub: string, h: number, t: number) {
