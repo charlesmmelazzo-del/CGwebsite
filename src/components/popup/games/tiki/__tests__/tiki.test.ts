@@ -9,7 +9,7 @@ import {
   damage, enemySpeed, freshState, gateGoodChance, GRUNTS, GUNS, isGrunt,
   MAX_ARMOR, MAX_HEALTH, MAX_HELPERS, PTS_BLOCKER, PTS_BOSS, PTS_GRUNT,
   PTS_MISS_BLOCKER, PTS_MISS_GRUNT, spawnInterval, update, detonateBomb,
-  enemyWalk, waveSize, worldSpeed, gruntHp, blockerHp, FOLLOW_RATE,
+  enemyWalk, waveSize, worldSpeed, gruntHp, blockerHp, STEER_FREQ, STEER_DAMPING,
   BLOCKERS, BOSSES, bossFor, ELITE_BLOCKER, BOSS_ATTACK_Z,
   pickStageBlockers, BLOCKERS_PER_STAGE,
   MAX_TRAVERSE, GATE_REACH, GATE_CURE_HITS, cureGateOption, LADDERS,
@@ -681,15 +681,51 @@ check("a neutral gate reports neutral, so nothing is said", () => {
 
 // ── Steering ────────────────────────────────────────────────────────────────
 
-check("the character is pinned to the thumb, not towed behind it", () => {
+check("the character follows the thumb quickly, not towed behind it", () => {
   const st = fresh();
   st.playerNx = 0;
   st.targetNx = 0.8;
-  // One tenth of a second is about as long as a guest will tolerate.
-  run(st, 0.1);
-  assert.ok(st.playerNx > 0.7,
-    `after 100ms the character was still at ${st.playerNx.toFixed(2)} of a 0.8 target — too drifty`);
-  assert.ok(FOLLOW_RATE > 20, "follow rate dropped back into towed territory");
+  run(st, 0.2);
+  assert.ok(st.playerNx > 0.72,
+    `after 200ms the character was still at ${st.playerNx.toFixed(2)} of a 0.8 target — too drifty`);
+  assert.ok(STEER_FREQ >= 14, "the steering spring has gone soft enough to feel towed");
+});
+
+check("but he has weight: he accelerates into a move instead of snapping", () => {
+  // The complaint this answers: a one-frame follow jumped most of the way to
+  // the thumb on the first frame, which read as jerky rather than quick.
+  const st = fresh();
+  st.playerNx = 0;
+  st.targetNx = 0.8;
+  update(st, DT);
+  const first = st.playerNx;
+  update(st, DT);
+  const second = st.playerNx - first;
+  assert.ok(first < 0.1, `first frame covered ${first.toFixed(2)} — that is a snap, not a move`);
+  assert.ok(second > first, "he did not pick up speed into the move");
+});
+
+check("he settles on the spot without a visible wobble", () => {
+  const st = fresh();
+  st.playerNx = 0;
+  st.targetNx = 0.5;
+  let peak = 0;
+  for (let i = 0; i < 90; i++) { update(st, DT); peak = Math.max(peak, st.playerNx); }
+  assert.ok(peak - 0.5 < 0.03, `overshot by ${(peak - 0.5).toFixed(3)}`);
+  assert.ok(Math.abs(st.playerNx - 0.5) < 0.005, "he never settled on the target");
+  assert.ok(STEER_DAMPING >= 0.7, "damping low enough to wobble");
+});
+
+check("finger jitter is smoothed out of the sprite", () => {
+  const st = fresh();
+  let worst = 0;
+  for (let i = 0; i < 240; i++) {
+    // A thumb held still, wobbling a couple of hundredths at 12Hz.
+    st.targetNx = 0.02 * Math.sin(2 * Math.PI * 12 * i * DT);
+    update(st, DT);
+    if (i > 120) worst = Math.max(worst, Math.abs(st.playerNx));
+  }
+  assert.ok(worst < 0.005, `jitter came through at ${(worst / 0.02 * 100).toFixed(0)}%`);
 });
 
 check("a full road crossing is quick", () => {
@@ -708,20 +744,23 @@ check("but a violent flick cannot teleport across the road", () => {
   update(st, DT);
   assert.ok(st.playerNx < 0.2,
     "one frame crossed most of the road — a flick teleports the character");
-  // ...and the cap must stay generous, or it becomes the towed feel again.
   assert.ok(MAX_TRAVERSE > 5, "the traverse cap is tight enough to feel like lag");
 });
 
-check("releasing the thumb stops the character dead", () => {
+check("releasing the thumb brakes to a stop rather than coasting", () => {
   const st = fresh();
   st.playerNx = 0;
   st.targetNx = 1;
-  run(st, 0.2);
+  run(st, 0.1);                           // released mid-move, at speed
   const held = st.playerNx;
   st.targetNx = null;
   st.drag = 0;
   run(st, 0.5);
-  assert.ok(Math.abs(st.playerNx - held) < 1e-6, "the character coasted after release");
+  const slid = Math.abs(st.playerNx - held);
+  assert.ok(slid < 0.2, `the character coasted ${slid.toFixed(2)} after release`);
+  const parked = st.playerNx;
+  run(st, 0.5);
+  assert.ok(Math.abs(st.playerNx - parked) < 1e-4, "the character kept drifting once stopped");
 });
 
 check("keyboard steering still works when no thumb is down", () => {

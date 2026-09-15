@@ -313,13 +313,39 @@ export const PLAYER_NX_LIMIT = 0.75;
 export const PLAYER_SPEED = 2.6;          // keyboard only: nx per second
 
 /**
- * How hard the character is pinned to the thumb, per second.
+ * How the hero chases the thumb: a spring, not a leash.
  *
- * High on purpose. This is effectively direct tracking with one frame of
- * smoothing — anything gentler reintroduces the towed, drifty feel that made
- * dodging unreliable.
+ * He used to be pinned to the thumb with a single frame of smoothing, which was
+ * quick but read as jerky — every wobble of a finger and every uneven touch
+ * event went straight into the sprite, and he started and stopped with no
+ * acceleration at all, like a cursor rather than a body.
+ *
+ * A spring gives him mass. He accelerates into a move, decelerates into the
+ * spot, and settles with a hair of overshoot, while finger jitter is filtered
+ * out almost entirely. Measured at these values: 90% of a typical move in about
+ * 155ms, a full kerb-to-kerb crossing in about 270ms, overshoot around 1%.
+ *
+ * `STEER_FREQ` is the stiffness (higher is snappier, and lets more jitter
+ * through); `STEER_DAMPING` below 1 is what allows the slight settle that reads
+ * as weight. Much under 0.7 and he visibly wobbles.
+ *
+ * The towed feel this game once had came from integrating the drag as a
+ * VELOCITY, which is not this: the thumb still sets where he is going, the
+ * spring only shapes how he gets there.
  */
-export const FOLLOW_RATE = 34;
+export const STEER_FREQ = 20;
+export const STEER_DAMPING = 0.8;
+
+/**
+ * How hard he brakes when the thumb lifts, per second.
+ *
+ * A released hero slides velocity / STEER_BRAKE further: nothing at all if the
+ * thumb had already stopped, a short skid off the back of a flick.
+ */
+export const STEER_BRAKE = 45;
+
+/** Integration step for the spring, so a slow frame cannot make it unstable. */
+const STEER_SUBSTEP = 1 / 240;
 
 /**
  * How much road one full thumb travel covers, in nx.
@@ -327,7 +353,7 @@ export const FOLLOW_RATE = 34;
  * This is the GAIN, and it is what makes the character feel fast or slow across
  * the road — not the follow rate. Lowering it means the same thumb movement
  * covers less ground, which reads as more controlled without introducing any
- * lag at all. Lowering FOLLOW_RATE instead would just bring back the drift.
+ * lag at all. Softening the spring (STEER_FREQ) instead would add drift.
  */
 export const DRAG_RANGE = 0.88;
 
@@ -893,6 +919,12 @@ export interface State {
    * which is unusable in a game where a lane choice is worth health.
    */
   targetNx: number | null;
+  /**
+   * The hero's own velocity across the road, in nx per second.
+   *
+   * What gives him weight, and what the renderer leans him by.
+   */
+  playerVx: number;
 
   health: number;
   armor: number;
@@ -1002,6 +1034,7 @@ export function freshState(opts: StartOpts = {}): State {
     playerNx: 0,
     drag: 0,
     targetNx: null,
+    playerVx: 0,
     health: MAX_HEALTH,
     armor: Math.min(MAX_ARMOR, opts.armor ?? 0),
     money: opts.money ?? 0,
@@ -1717,18 +1750,28 @@ export function update(st: State, dt: number): void {
 
   // ── Player ──
   const heroWas = st.playerNx;
-  if (st.targetNx !== null) {
-    // Fast enough to feel like the character is pinned to the thumb, smoothed
-    // just enough that a jittery touch doesn't judder the sprite.
-    const k = Math.min(1, FOLLOW_RATE * dt);
-    const want = (st.targetNx - st.playerNx) * k;
-    const cap = MAX_TRAVERSE * dt;
-    st.playerNx += Math.abs(want) > cap ? Math.sign(want) * cap : want;
+  if (st.targetNx !== null || st.drag === 0) {
+    // With the thumb down he springs toward it. With nothing held, only the
+    // damping acts: he brakes to a stop over a few frames rather than stopping
+    // dead, which is exactly as jerky as starting dead was.
+    const w = STEER_FREQ;
+    const n = Math.max(1, Math.ceil(dt / STEER_SUBSTEP));
+    const h = dt / n;
+    for (let i = 0; i < n; i++) {
+      const acc = st.targetNx !== null
+        ? w * w * (st.targetNx - st.playerNx) - 2 * STEER_DAMPING * w * st.playerVx
+        : -STEER_BRAKE * st.playerVx;
+      st.playerVx += acc * h;
+      if (Math.abs(st.playerVx) > MAX_TRAVERSE) st.playerVx = Math.sign(st.playerVx) * MAX_TRAVERSE;
+      st.playerNx += st.playerVx * h;
+    }
   } else {
-    st.playerNx += st.drag * PLAYER_SPEED * dt;
+    // Keyboard: a key has no position, so it stays a velocity.
+    st.playerVx = st.drag * PLAYER_SPEED;
+    st.playerNx += st.playerVx * dt;
   }
-  if (st.playerNx < -PLAYER_NX_LIMIT) st.playerNx = -PLAYER_NX_LIMIT;
-  if (st.playerNx > PLAYER_NX_LIMIT) st.playerNx = PLAYER_NX_LIMIT;
+  if (st.playerNx < -PLAYER_NX_LIMIT) { st.playerNx = -PLAYER_NX_LIMIT; if (st.playerVx < 0) st.playerVx = 0; }
+  if (st.playerNx > PLAYER_NX_LIMIT) { st.playerNx = PLAYER_NX_LIMIT; if (st.playerVx > 0) st.playerVx = 0; }
 
   // ── The squad ──
   // After the hero has moved, so his step this frame is what shoves them.

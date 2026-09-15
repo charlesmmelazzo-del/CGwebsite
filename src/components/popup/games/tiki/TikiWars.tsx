@@ -495,6 +495,16 @@ const GUN_SHEET: Record<GunKind, GunArt> = {
 const MUZZLE_FLASH_H = 26;
 
 /**
+ * How far the hero leans into a move: shear per unit of velocity, and its cap.
+ *
+ * At the cap his head sits about 7 logical px ahead of his feet — enough to
+ * read as momentum at a glance, not so much that the gun visibly leaves the
+ * muzzle flash behind.
+ */
+const HERO_LEAN = 0.013;
+const HERO_LEAN_MAX = 0.06;
+
+/**
  * The helper's own muzzle, as a fraction of ITS height.
  *
  * Same measurement as the hero's, off the helper sheet: it carries two pistols
@@ -871,9 +881,18 @@ function drawField(
     // The boss kill keeps its own turn-to-camera pose with the sunglasses.
     drawSprite(ctx, "player-turn-shades", 0, px, py, { h: PLAYER_H, pixelScale: PIXEL_SCALE });
   } else {
-    drawSprite(ctx, pose, struck ? Math.floor(t * 12) : walk, px, py, {
+    // Lean into the move. A shear rather than a rotation, so the pixel rows
+    // stay level and the art does not crawl, and anchored at his feet so they
+    // stay planted while his shoulders go with the motion. This is most of what
+    // makes the steering spring read as a body with weight.
+    const lean = Math.max(-HERO_LEAN_MAX, Math.min(HERO_LEAN_MAX, s.playerVx * HERO_LEAN));
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.transform(1, 0, -lean, 1, 0, 0);
+    drawSprite(ctx, pose, struck ? Math.floor(t * 12) : walk, 0, 0, {
       h: PLAYER_H, pixelScale: PIXEL_SCALE,
     });
+    ctx.restore();
   }
 
   // ── Bullets ────────────────────────────────────────────────────────────

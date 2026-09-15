@@ -390,12 +390,24 @@ Feeding the drag into a velocity integrator, which is what the first build did,
 made the character feel towed: you moved your thumb and it caught up a moment
 later. In a game where picking a lane is worth health, that lag is unusable.
 
-Two separate knobs control how this feels, and they are easy to confuse:
+The hero then chases that position on a **spring** (`STEER_FREQ` 20,
+`STEER_DAMPING` 0.8). He used to be pinned to it with one frame of smoothing,
+which was quick but jerky: every finger wobble and uneven touch event went
+straight into the sprite, and he started and stopped like a cursor. The spring
+gives him mass — he accelerates into a move, decelerates onto the spot with
+about 1% overshoot, and filters out nearly all jitter — while still reaching 90%
+of a typical move in ~155ms and crossing the road in ~270ms. Lifting the thumb
+brakes him (`STEER_BRAKE`) instead of stopping him dead. The renderer leans him
+into the move with a small shear anchored at his feet.
+
+Knobs, which are easy to confuse:
 
 * **`DRAG_RANGE` is the gain** — how much road one thumb travel covers. This is
   what makes the character feel fast or slow, and lowering it costs nothing.
-* **`FOLLOW_RATE` is the responsiveness.** Lowering this to slow the character
-  down just brings back the drift.
+* **`STEER_FREQ` is the snap.** Higher is tighter and lets more jitter through;
+  much lower starts to feel towed.
+* **`STEER_DAMPING` is the settle.** Below ~0.7 he visibly wobbles; 1.0 removes
+  the overshoot entirely and feels a little dead.
 
 There is also a **traverse cap** so a violent flick cannot teleport the
 character edge to edge in one frame. It must stay generous — set too low it
