@@ -51,9 +51,9 @@ export const GAMES: Record<string, GameMeta> = {
     blurb: "It's a rush. Two thumbs, no mercy.",
     howToPlay: [
       "Hold your phone sideways, a thumb on each side.",
-      "Tap the order's bottles as they fall. Dodge the junk, the vodka and the bombs.",
-      "Play the build down the highway: two buttons per thumb.",
-      "Shake or stir with your right thumb while the next order falls on the left.",
+      "Tap the bottles in color as they're tossed up. Leave everything grey alone.",
+      "Tap the bottles as they slide down the bar to toss them in the shaker.",
+      "Shake or stir with your right thumb, then grab the next order with your left.",
       "Micro games cut in. Win them for big points.",
       "Party Mode: up to 10 friends pass the phone. Mess up and you're out.",
     ],

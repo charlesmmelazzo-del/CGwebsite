@@ -7,13 +7,18 @@
 //
 // THE LOOP
 //
-//   GRAB (both thumbs)      tap the order's bottles as they fall, dodge junk
-//     ↓
-//   BUILD                   Guitar Hero highway, two lanes per thumb
-//     ↓  (micro games cut in and hand back)
-//   FINISH                  right thumb shakes or stirs that drink while the
-//     ↓                     left thumb GRABS the next order at the same time
-//   BUILD → FINISH → BUILD → ... forever, faster every drink.
+//   GRAB (both thumbs)   card: "grab the colour bottles!", then bottles and
+//     ↓                  junk are tossed up; only the wanted ones are in colour
+//   BUILD                card: "let's build the drink!", then bottles slide
+//     ↓                  down the bar into the tap zones, bartender reacting
+//     ↓                  (micro games cut in and hand back)
+//   FINISH               card: "shake it!", the right thumb shakes alone for a
+//     ↓                  beat, then card: "order up! grab with your left
+//     ↓                  thumb!" and both run at once until the shake's clock
+//     ↓                  runs out and the guest gets the drink
+//   BUILD → FINISH → BUILD → ... forever, a little faster every drink.
+//
+// Every new task gets a card, and nothing moves while it's up.
 //
 // SOLO has three lives. PARTY is a last-one-standing relay: every served
 // drink hands the phone to a random teammate who's still in, any strike
@@ -48,11 +53,11 @@ export interface Player {
 // ─── Grab ────────────────────────────────────────────────────────────────────
 
 export type JunkKind = "can" | "glass" | "napkin" | "phone";
-export type ItemKind = "bottle" | JunkKind | "vodka" | "jug" | "bomb" | "tips" | "cherry" | "ice" | "watch";
+export type ItemKind = "bottle" | JunkKind | "vodka" | "jug" | "bomb";
 
 export const JUNK: JunkKind[] = ["can", "glass", "napkin", "phone"];
 
-export interface Falling {
+export interface Flying {
   id: number;
   side: 0 | 1;
   kind: ItemKind;
@@ -60,6 +65,8 @@ export interface Falling {
   ing: string | null;
   /** Across the panel, 0..1, so a resize doesn't move anything out of its panel. */
   x: number;
+  /** Panel widths a second. */
+  vx: number;
   y: number;
   vy: number;
   /** Radians, for a tumble. */
@@ -67,18 +74,27 @@ export interface Falling {
   spinV: number;
 }
 
+/** Which words the card at the top of a grab says. */
+export type GrabCard = "fresh" | "left" | "retry" | "turn";
+
 export interface Grab {
-  /** Which panels are raining. Both on a fresh order, the left while finishing. */
+  /**
+   * Not started yet: the order is picked but the left thumb hasn't been
+   * brought in. Only while a finish is in its solo lead.
+   */
+  pending: boolean;
+  /** Seconds of instruction card left. Nothing is tossed and no clock runs while it's up. */
+  cardT: number;
+  card: GrabCard;
+  /** Which panels are in play. Both on a fresh order, the left while finishing. */
   sides: [boolean, boolean];
-  items: Falling[];
+  items: Flying[];
   spawnT: [number, number];
   sinceNeeded: number;
   got: string[];
   timeLeft: number;
   timeMax: number;
   done: boolean;
-  /** The ice cube's slow-motion. */
-  iceT: number;
   /** A vodka cloud over a panel. */
   stinkT: [number, number];
 }
@@ -86,25 +102,34 @@ export interface Grab {
 // ─── Build ───────────────────────────────────────────────────────────────────
 
 export type Judgement = "perfect" | "good" | "miss";
+export type BartenderMood = "happy" | "worried" | "panic";
 
 export interface Note {
   lane: number;
-  /** Build-clock time it reaches the line. */
+  /** Build-clock time it reaches the tap zone. */
   t: number;
   judged: Judgement | null;
 }
 
 export interface Build {
+  /** Seconds of "let's build the drink!" left. The clock waits for it. */
+  cardT: number;
   clock: number;
   travel: number;
   notes: Note[];
   hits: number;
+  misses: number;
   combo: number;
   bestCombo: number;
   /** Build-clock times micro games cut in, soonest first. */
   microAt: number[];
   /** Last press per lane, in build-clock time, for the button flash. */
   pressedAt: number[];
+  /** The bartender in the middle, reacting. */
+  mood: BartenderMood;
+  moodT: number;
+  /** Bottles tossed into the tin; drives a little bounce on it. */
+  tossed: number;
 }
 
 // ─── Micro ───────────────────────────────────────────────────────────────────
@@ -121,12 +146,19 @@ export interface Micro {
 
 export interface Finish {
   cocktail: Cocktail;
+  /** Seconds of "shake it!" card left. Input doesn't count while it's up. */
+  cardT: number;
+  /** Seconds of play since the card. Keeps running after the result, to time the next grab. */
+  clock: number;
   meter: number;
-  timeLeft: number;
+  /** Seconds spent under the line. */
+  slowFor: number;
   /** null while working, then how it went. */
   result: "served" | "ruined" | null;
   /** Seconds since `result` was set. */
   resultT: number;
+  /** Party: this served drink has already passed the phone. */
+  passed: boolean;
   pointer: number | null;
   // Shake
   strokes: number;
@@ -151,17 +183,20 @@ export interface Handoff {
   to: number;
   t: number;
   /** Where play picks up. */
-  resume: Stage;
+  resume: "grab" | "finish";
 }
 
 // ─── Effects the view animates ───────────────────────────────────────────────
 
-export type FxKind = "grab" | "boom" | "shatter" | "stink" | "splash" | "sparkle" | "word" | "serve";
+export type FxKind = "grab" | "boom" | "shatter" | "stink" | "splash" | "sparkle" | "word" | "toss";
 
 export interface Fx {
   kind: FxKind;
   x: number;
   y: number;
+  /** Where a toss lands. */
+  tx?: number;
+  ty?: number;
   t: number;
   dur: number;
   text?: string;
@@ -228,6 +263,11 @@ export function wants(st: State, ing: string): boolean {
   return (st.order.recipe as readonly string[]).includes(ing);
 }
 
+/** Whether a flying thing is one the player should tap — the only ones drawn in colour. */
+export function isWanted(st: State, it: Flying): boolean {
+  return it.kind === "bottle" && !!it.ing && wants(st, it.ing) && !st.grab.got.includes(it.ing);
+}
+
 export function level(st: State): number {
   return st.served + 1;
 }
@@ -251,7 +291,7 @@ export function freshState(opts: Options = {}): State {
     current: 0,
     served: 0,
     order,
-    grab: newGrab(1, true),
+    grab: newGrab(1, true, "fresh"),
     build: null,
     micro: null,
     lastMicro: null,
@@ -273,8 +313,6 @@ export function freshState(opts: Options = {}): State {
     st.current = first;
     st.handoff = { reason: "start", from: null, to: first, t: 0, resume: "grab" };
     st.stage = "handoff";
-  } else {
-    showBanner(st, "GRAB!", "#FFD500", 1.1);
   }
   return st;
 }
@@ -284,18 +322,27 @@ export function setWidth(st: State, w: number): void {
   if (w !== st.layout.w) st.layout = K.layoutFor(w);
 }
 
-function newGrab(lvl: number, both: boolean): Grab {
+const CARD_SECONDS: Record<GrabCard, number> = {
+  fresh: K.GRAB_CARD,
+  left: K.GRAB_CARD_LEFT,
+  retry: K.GRAB_CARD_SHORT,
+  turn: K.GRAB_CARD_SHORT,
+};
+
+function newGrab(lvl: number, both: boolean, card: GrabCard, pending = false): Grab {
   const time = K.grabTime(lvl, both);
   return {
+    pending,
+    cardT: CARD_SECONDS[card],
+    card,
     sides: [true, both],
     items: [],
-    spawnT: [0.5, 0.75],
-    sinceNeeded: 0,
+    spawnT: [0.15, 0.5],
+    sinceNeeded: K.NEEDED_DROUGHT,
     got: [],
     timeLeft: time,
     timeMax: time,
     done: false,
-    iceT: 0,
     stinkT: [0, 0],
   };
 }
@@ -372,7 +419,7 @@ function strike(st: State, reason: string): boolean {
   // A knockout scraps whatever was in progress: the next bartender starts
   // clean on a fresh order with both thumbs.
   st.order = pickCocktail(st.order.key, st.rand);
-  st.grab = newGrab(level(st), true);
+  st.grab = newGrab(level(st), true, "fresh");
   st.build = null;
   st.micro = null;
   st.finish = null;
@@ -422,7 +469,7 @@ export function update(st: State, dt: number): UpdateResult {
       break;
     case "grab":
       updateGrab(st, dt);
-      if (st.stage === "grab" && st.grab.done && st.stageT > 0) toBuild(st);
+      if (st.stage === "grab" && st.grab.done) toBuild(st);
       break;
     case "build":
       updateBuild(st, dt);
@@ -453,11 +500,14 @@ function beginTurn(st: State) {
   if (!h) return;
   st.current = h.to;
   st.handoff = null;
-  const lastOne = aliveIndexes(st).length === 1 && st.players.length > 1;
   setStage(st, h.resume);
+  const lastOne = aliveIndexes(st).length === 1 && st.players.length > 1;
   if (lastOne && h.reason === "out") showBanner(st, "LAST ONE STANDING!", "#FFD500", 1.6);
-  else if (h.resume === "grab" || h.resume === "finish") showBanner(st, "GRAB!", "#FFD500", 1);
-  else if (h.resume === "build") showBanner(st, "BUILD IT!", "#FF9A2A", 1);
+  // Someone picking up a grab halfway gets their own beat to see what's wanted.
+  if (h.resume === "finish" && !st.grab.pending && !st.grab.done) {
+    st.grab.cardT = K.GRAB_CARD_SHORT;
+    st.grab.card = "turn";
+  }
 }
 
 // ── Grab ──
@@ -473,17 +523,13 @@ function pickSpawn(st: State): { kind: ItemKind; ing: string | null } {
   if (need.length && g.sinceNeeded >= K.NEEDED_DROUGHT) {
     return { kind: "bottle", ing: need[Math.floor(st.rand() * need.length)] };
   }
-  const bomb = Math.min(0.12, 0.03 + 0.012 * lvl);
+  const bomb = Math.min(0.12, 0.03 + 0.01 * lvl);
   const table: [number, () => { kind: ItemKind; ing: string | null }][] = [
-    [need.length ? 0.34 : 0, () => ({ kind: "bottle", ing: need[Math.floor(st.rand() * need.length)] })],
-    [0.2, () => ({ kind: "bottle", ing: decoy(st) })],
-    [0.22, () => ({ kind: JUNK[Math.floor(st.rand() * JUNK.length)], ing: null })],
-    [0.1, () => ({ kind: st.rand() < 0.6 ? "vodka" : "jug", ing: null })],
+    [need.length ? 0.36 : 0, () => ({ kind: "bottle", ing: need[Math.floor(st.rand() * need.length)] })],
+    [0.24, () => ({ kind: "bottle", ing: decoy(st) })],
+    [0.24, () => ({ kind: JUNK[Math.floor(st.rand() * JUNK.length)], ing: null })],
+    [0.12, () => ({ kind: st.rand() < 0.6 ? "vodka" : "jug", ing: null })],
     [bomb, () => ({ kind: "bomb", ing: null })],
-    [0.03, () => ({ kind: "tips", ing: null })],
-    [0.012, () => ({ kind: "cherry", ing: null })],
-    [0.014, () => ({ kind: "ice", ing: null })],
-    [0.014, () => ({ kind: "watch", ing: null })],
   ];
   const total = table.reduce((a, [w]) => a + w, 0);
   let r = st.rand() * total;
@@ -502,72 +548,83 @@ function decoy(st: State): string {
   return pool[Math.floor(st.rand() * pool.length)] ?? "ice";
 }
 
+/** Toss something up from below the panel. It peaks somewhere in the top half and falls back. */
 function spawn(st: State, side: 0 | 1) {
   const { kind, ing } = pickSpawn(st);
   const g = st.grab;
   if (kind === "bottle" && ing && wants(st, ing) && !g.got.includes(ing)) g.sinceNeeded = 0;
-  const base = K.fallSpeed(level(st));
+  const grav = K.gravity(level(st));
+  const startY = K.H + K.ITEM_H / 2;
+  const apex = 50 + st.rand() * 110;
+  const x = 0.2 + st.rand() * 0.6;
+  // Drift toward the middle of the panel so nothing sails off its edge.
+  const vx = (0.5 - x) * (0.12 + st.rand() * 0.12);
   g.items.push({
     id: st.nextId++,
     side,
     kind,
     ing,
-    x: 0.18 + st.rand() * 0.64,
-    y: -K.ITEM_H / 2,
-    vy: base * (0.8 + st.rand() * 0.4),
+    x,
+    vx,
+    y: startY,
+    vy: -Math.sqrt(2 * grav * (startY - apex)),
     spin: 0,
-    spinV: kind === "bottle" ? 0 : (st.rand() - 0.5) * 3,
+    spinV: kind === "bottle" ? (st.rand() - 0.5) * 1.2 : (st.rand() - 0.5) * 5,
   });
 }
 
 function updateGrab(st: State, dt: number) {
   const g = st.grab;
-  if (g.done) return;
-  const slow = g.iceT > 0 ? 0.5 : 1;
-  g.iceT = Math.max(0, g.iceT - dt);
+  if (g.done || g.pending) return;
+  if (g.cardT > 0) {
+    g.cardT = Math.max(0, g.cardT - dt);
+    return;
+  }
   g.stinkT = [Math.max(0, g.stinkT[0] - dt), Math.max(0, g.stinkT[1] - dt)];
   g.sinceNeeded += dt;
 
   for (const side of [0, 1] as const) {
     if (!g.sides[side]) continue;
-    g.spawnT[side] -= dt * slow;
+    g.spawnT[side] -= dt;
     if (g.spawnT[side] <= 0) {
       spawn(st, side);
       g.spawnT[side] = K.spawnGap(level(st)) * (0.75 + st.rand() * 0.5);
     }
   }
+  const grav = K.gravity(level(st));
   for (const it of g.items) {
-    it.y += it.vy * dt * slow;
+    it.vy += grav * dt;
+    it.y += it.vy * dt;
+    it.x = Math.max(0.1, Math.min(0.9, it.x + it.vx * dt));
     it.spin += it.spinV * dt;
   }
-  g.items = g.items.filter((it) => it.y < K.H + K.ITEM_H);
+  g.items = g.items.filter((it) => it.vy < 0 || it.y < K.H + K.ITEM_H);
 
-  // The clock doesn't start until the first thing has had time to fall into reach.
-  if (st.stageT > 0.6 || st.stage === "finish") g.timeLeft -= dt;
+  g.timeLeft -= dt;
   if (g.timeLeft <= 0) {
     if (strike(st, "TOO SLOW!")) {
       st.order = pickCocktail(st.order.key, st.rand);
-      const both = g.sides[1];
-      st.grab = newGrab(level(st), both);
-      showBanner(st, "NEW ORDER!", "#FFD500", 1);
+      st.grab = newGrab(level(st), g.sides[1], "retry");
     }
   }
 }
 
-/** A tap on a thumb panel while it's raining. */
+/** A tap on a thumb panel while things are flying. */
 function tapGrab(st: State, side: 0 | 1, x: number, y: number) {
   const g = st.grab;
-  if (g.done || !g.sides[side]) return;
+  if (g.done || g.pending || g.cardT > 0 || !g.sides[side]) return;
   const l = st.layout;
   const px = K.panelX(l, side);
-  let best: Falling | null = null;
+  let best: Flying | null = null;
   let bestD = K.TAP_RADIUS;
   for (const it of g.items) {
-    if (it.side !== side) continue;
+    if (it.side !== side || it.y > K.H) continue;
     const d = Math.hypot(px + it.x * l.side - x, it.y - y);
-    if (d <= bestD) {
+    // A wanted bottle wins a close call: a thumb on the colour one means it.
+    const bias = isWanted(st, it) ? 8 : 0;
+    if (d - bias <= bestD) {
       best = it;
-      bestD = d;
+      bestD = d - bias;
     }
   }
   if (!best) return;
@@ -614,26 +671,6 @@ function tapGrab(st: State, side: 0 | 1, x: number, y: number) {
       g.items = g.items.filter((o) => o.side !== side);
       strike(st, "BOOM!");
       break;
-    case "tips":
-      addScore(st, K.PTS_TIPS);
-      addFx(st, { kind: "sparkle", x: ix, y: it.y, dur: 0.6 });
-      word(st, ix, it.y - 26, `+${K.PTS_TIPS}`, "#FFD500");
-      break;
-    case "cherry":
-      addScore(st, K.PTS_CHERRY);
-      addFx(st, { kind: "sparkle", x: ix, y: it.y, dur: 0.6 });
-      word(st, ix, it.y - 26, `+${K.PTS_CHERRY}`, "#FFD500");
-      break;
-    case "ice":
-      g.iceT = K.ICE_SECONDS;
-      addFx(st, { kind: "sparkle", x: ix, y: it.y, dur: 0.6 });
-      word(st, ix, it.y - 26, "CHILL", "#9CE8FF");
-      break;
-    case "watch":
-      g.timeLeft = Math.min(g.timeMax, g.timeLeft + K.WATCH_TIME);
-      addFx(st, { kind: "sparkle", x: ix, y: it.y, dur: 0.6 });
-      word(st, ix, it.y - 26, "+TIME", "#9CE8FF");
-      break;
   }
 }
 
@@ -646,7 +683,6 @@ function grabComplete(st: State) {
   g.items = [];
   // A clean order is worth something, and faster is worth more.
   addScore(st, Math.round(20 * Math.max(0, g.timeLeft)));
-  if (st.stage === "grab") showBanner(st, "BUILD IT!", "#FF9A2A", 1);
 }
 
 // ── Build ──
@@ -655,12 +691,12 @@ function grabComplete(st: State) {
 export const PHRASES: { beats: number[]; from: number }[] = [
   { beats: [1, 1], from: 1 },
   { beats: [2], from: 1 },
-  { beats: [0.5, 1.5], from: 1 },
-  { beats: [1.5, 0.5], from: 2 },
-  { beats: [0.5, 0.5, 1], from: 2 },
-  { beats: [0.75, 0.75, 0.5], from: 3 },
-  { beats: [0.5, 0.5, 0.5, 1.5], from: 4 },
-  { beats: [1 / 3, 1 / 3, 4 / 3], from: 5 },
+  { beats: [0.5, 1.5], from: 2 },
+  { beats: [1.5, 0.5], from: 3 },
+  { beats: [0.5, 0.5, 1], from: 3 },
+  { beats: [0.75, 0.75, 0.5], from: 4 },
+  { beats: [0.5, 0.5, 0.5, 1.5], from: 5 },
+  { beats: [1 / 3, 1 / 3, 4 / 3], from: 7 },
 ];
 
 export function chartFor(lvl: number, rand: () => number): Note[] {
@@ -691,7 +727,7 @@ export function chartFor(lvl: number, rand: () => number): Note[] {
     }
     prev2 = prev;
     prev = lane;
-    t += Math.max(0.28, gaps[n] * beat);
+    t += Math.max(0.3, gaps[n] * beat);
   }
   return notes;
 }
@@ -709,15 +745,43 @@ function toBuild(st: State) {
     const frac = count === 1 ? 0.35 + st.rand() * 0.3 : i === 0 ? 0.3 : 0.7;
     microAt.push(lead + (end - lead) * frac);
   }
-  st.build = { clock: 0, travel, notes, hits: 0, combo: 0, bestCombo: 0, microAt, pressedAt: [-9, -9, -9, -9] };
-  st.finish = st.finish?.result ? null : st.finish;
+  st.build = {
+    cardT: K.BUILD_CARD,
+    clock: 0,
+    travel,
+    notes,
+    hits: 0,
+    misses: 0,
+    combo: 0,
+    bestCombo: 0,
+    microAt,
+    pressedAt: [-9, -9, -9, -9],
+    mood: "happy",
+    moodT: 0,
+    tossed: 0,
+  };
+  st.finish = null;
+  st.banner = null;
   setStage(st, "build");
+}
+
+function setMood(b: Build, mood: BartenderMood, hold: number) {
+  b.mood = mood;
+  b.moodT = hold;
 }
 
 function updateBuild(st: State, dt: number) {
   const b = st.build;
   if (!b) return;
+  if (b.cardT > 0) {
+    b.cardT = Math.max(0, b.cardT - dt);
+    return;
+  }
   b.clock += dt;
+  if (b.moodT > 0) {
+    b.moodT -= dt;
+    if (b.moodT <= 0) b.mood = b.misses >= 3 && b.combo < 3 ? "worried" : "happy";
+  }
 
   if (b.microAt.length && b.clock >= b.microAt[0]) {
     b.microAt.shift();
@@ -728,11 +792,13 @@ function updateBuild(st: State, dt: number) {
   for (const n of b.notes) {
     if (!n.judged && b.clock > n.t + K.GOOD_WINDOW) {
       n.judged = "miss";
+      b.misses++;
       b.combo = 0;
+      setMood(b, b.misses >= 3 ? "panic" : "worried", 0.9);
     }
   }
 
-  const end = b.notes[b.notes.length - 1].t + 0.45;
+  const end = b.notes[b.notes.length - 1].t + 0.5;
   if (b.clock < end) return;
 
   const acc = b.hits / b.notes.length;
@@ -740,19 +806,23 @@ function updateBuild(st: State, dt: number) {
     st.build = null;
     if (strike(st, "SENT BACK!")) {
       st.order = pickCocktail(st.order.key, st.rand);
-      st.grab = newGrab(level(st), true);
+      st.grab = newGrab(level(st), true, "fresh");
       setStage(st, "grab");
     }
     return;
   }
   addScore(st, Math.round(K.PTS_BUILD_BONUS * acc));
-  showBanner(st, st.order.finish === "shake" ? "SHAKE IT!" : "STIR IT!", "#FF6A3A", 1.1);
   startFinish(st);
+}
+
+/** Where the tin (or mixing glass) sits on the bar, in front of the bartender. */
+export function vesselPos(l: Layout): { x: number; y: number } {
+  return { x: l.w / 2 + 64, y: K.H - 54 };
 }
 
 function pressLane(st: State, lane: number) {
   const b = st.build;
-  if (!b) return;
+  if (!b || b.cardT > 0) return;
   b.pressedAt[lane] = b.clock;
   let best: Note | null = null;
   for (const n of b.notes) {
@@ -770,13 +840,16 @@ function pressLane(st: State, lane: number) {
   best.judged = perfect ? "perfect" : "good";
   b.hits++;
   b.combo++;
+  b.tossed++;
   b.bestCombo = Math.max(b.bestCombo, b.combo);
+  setMood(b, "happy", 0.6);
   addScore(st, (perfect ? K.PTS_PERFECT : K.PTS_GOOD) + Math.min(b.combo, K.COMBO_CAP) * K.COMBO_BONUS);
-  addFx(st, { kind: "grab", x: bx, y: LANE_BUTTON_Y, dur: 0.35, ing: st.order.recipe[lane] });
+  const v = vesselPos(st.layout);
+  addFx(st, { kind: "toss", x: bx, y: LANE_BUTTON_Y, tx: v.x, ty: v.y - 30, dur: 0.45, ing: st.order.recipe[lane] });
   word(st, bx, LANE_BUTTON_Y - 50, perfect ? "PERFECT" : "GOOD", perfect ? "#FFD500" : "#9CE800");
 }
 
-/** Where each lane's button sits: two per thumb panel, side by side. */
+/** Where each lane's tap zone sits: two per thumb panel, side by side. */
 export const LANE_BUTTON_Y = K.H - 62;
 
 export function laneButtonX(l: Layout, lane: number): number {
@@ -846,10 +919,13 @@ function startFinish(st: State) {
   const lvl = level(st);
   st.finish = {
     cocktail: st.order,
-    meter: 0,
-    timeLeft: K.FINISH_SECONDS,
+    cardT: K.FINISH_CARD,
+    clock: 0,
+    meter: K.FINISH_START,
+    slowFor: 0,
     result: null,
     resultT: 0,
+    passed: false,
     pointer: null,
     strokes: 0,
     dir: 0,
@@ -860,22 +936,37 @@ function startFinish(st: State) {
     stirBest: 0,
   };
   st.build = null;
-  // And straight away, the next order starts falling down the left.
+  // The next order is picked now, but the left thumb isn't brought in until
+  // the right one has had a beat on its own.
   st.order = pickCocktail(st.order.key, st.rand);
-  st.grab = newGrab(lvl, false);
+  st.grab = newGrab(lvl, false, "left", true);
   setStage(st, "finish");
 }
 
 function updateFinishStage(st: State, dt: number) {
   const f = st.finish;
+  if (!f) return;
+
+  if (f.cardT > 0) {
+    f.cardT = Math.max(0, f.cardT - dt);
+    return;
+  }
+  f.clock += dt;
+  if (st.grab.pending && f.clock >= K.FINISH_LEAD) st.grab.pending = false;
   updateGrab(st, dt);
-  if (st.stage !== "finish" || !f) return;
+  if (st.stage !== "finish") return;
 
   if (!f.result) {
-    f.timeLeft -= dt;
-    // Judged before it drains, or a meter topped out this frame would read 0.999.
-    if (f.meter < 1) f.meter = Math.max(0, f.meter - K.FINISH_DECAY * dt);
-    if (f.meter >= 1) {
+    f.meter = Math.max(0, f.meter - K.finishDrain(level(st)) * dt);
+    if (f.clock > K.FINISH_GRACE && f.meter < K.FINISH_LINE) f.slowFor += dt;
+    else f.slowFor = 0;
+
+    if (f.slowFor > K.FINISH_SLOW_TOLERANCE) {
+      f.result = "ruined";
+      f.resultT = 0;
+      f.pointer = null;
+      if (!strike(st, f.cocktail.finish === "shake" ? "WATERY!" : "TOO WARM!")) return;
+    } else if (f.clock >= K.FINISH_PLAY) {
       f.result = "served";
       f.resultT = 0;
       f.pointer = null;
@@ -884,33 +975,26 @@ function updateFinishStage(st: State, dt: number) {
       st.served++;
       const p = st.players[st.current];
       if (p) p.drinks++;
-      addFx(st, { kind: "serve", x: st.layout.rightX + st.layout.side / 2, y: K.H * 0.45, dur: K.SERVE_HOLD });
-    } else if (f.timeLeft <= 0) {
-      f.result = "ruined";
-      f.resultT = 0;
-      f.pointer = null;
-      if (!strike(st, f.cocktail.finish === "shake" ? "WATERY!" : "TOO WARM!")) return;
+      addFx(st, { kind: "sparkle", x: st.layout.rightX + st.layout.side / 2, y: K.H * 0.45, dur: 0.8 });
     }
   } else {
     f.resultT += dt;
   }
 
-  if (f.result === "served" && st.mode === "party" && f.resultT >= K.SERVE_HOLD && !st.handoff) {
+  if (f.result === "served" && st.mode === "party" && f.resultT >= K.RESULT_HOLD && !f.passed) {
     // Drink's up: pass the phone. The next bartender picks up the grab in progress.
-    st.finish = null;
+    f.passed = true;
     const from = st.current;
     const to = pickNext(st, from);
-    if (to === from) {
-      showBanner(st, "KEEP GOING!", "#FFD500", 0.9);
-    } else {
+    if (to !== from) {
       releaseAll(st);
-      st.handoff = { reason: "served", from, to, t: 0, resume: st.grab.done ? "build" : "finish" };
+      st.handoff = { reason: "served", from, to, t: 0, resume: "finish" };
       setStage(st, "handoff");
       return;
     }
   }
 
-  const finishOver = !st.finish || (st.finish.result !== null && st.finish.resultT >= K.SERVE_HOLD);
+  const finishOver = f.result !== null && f.resultT >= K.RESULT_HOLD;
   if (finishOver && st.grab.done) toBuild(st);
 }
 
@@ -920,7 +1004,7 @@ function finishCentre(l: Layout) {
 
 function finishDrag(st: State, x: number, y: number) {
   const f = st.finish;
-  if (!f || f.result) return;
+  if (!f || f.result || f.cardT > 0) return;
   if (f.cocktail.finish === "shake") {
     f.tinY = Math.max(0, Math.min(1, (y - 50) / (K.H - 100)));
     let stroke = false;
@@ -945,7 +1029,7 @@ function finishDrag(st: State, x: number, y: number) {
     }
     if (stroke) {
       f.strokes++;
-      f.meter = Math.min(1, f.meter + 1 / K.shakeStrokes(level(st)));
+      f.meter = Math.min(1, f.meter + K.STROKE_GAIN);
     }
   } else {
     const c = finishCentre(st.layout);
@@ -961,13 +1045,13 @@ function finishDrag(st: State, x: number, y: number) {
       // A jump this big in one sample is a thumb cutting across the middle,
       // not going round it — a straight scrub would otherwise count half a lap
       // every pass.
-      if (Math.abs(d) <= Math.PI / 2) {
+      if (Math.abs(d) <= Math.PI / 3) {
         // Only new ground counts: rocking back and forth along an arc winds
         // the net turn up and down without ever passing its furthest point.
         f.revs += d / (Math.PI * 2);
         const gained = Math.max(0, Math.abs(f.revs) - f.stirBest);
         f.stirBest = Math.max(f.stirBest, Math.abs(f.revs));
-        f.meter = Math.min(1, f.meter + gained / K.stirRevs(level(st)));
+        f.meter = Math.min(1, f.meter + gained * K.STIR_GAIN_PER_REV);
       }
     }
     f.lastAngle = a;

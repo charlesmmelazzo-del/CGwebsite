@@ -26,7 +26,7 @@ export const MICRO_TITLE: Record<MicroKind, string> = {
 /** The one-line instruction under the title. */
 export const MICRO_HINT: Record<MicroKind, string> = {
   beer: "HOLD HIGHER TO TILT. DON'T FOAM OVER THE LINE!",
-  shots: "HOLD TO POUR. SLIDE ACROSS THE GLASSES!",
+  shots: "GRAB THE BOTTLE! POUR THE SHOTS!",
   pop: "TAP TO POP. HIT THE BUCKET, NOT A GUEST!",
 };
 
@@ -59,7 +59,7 @@ export function newBeer(level: number): BeerSim {
   return {
     kind: "beer",
     t: 0,
-    duration: Math.max(4.5, 6 - 0.15 * (level - 1)),
+    duration: Math.max(5, 6.5 - 0.12 * (level - 1)),
     outcome: null,
     tilt: 0,
     aim: 0,
@@ -95,21 +95,30 @@ function updateBeer(s: BeerSim, dt: number): MicroOutcome {
 
 // ─── LET'S DO SHOTS ──────────────────────────────────────────────────────────
 //
-// A bottle upside down with a speed pourer. Hold to pour, slide to move. Liquor
-// that isn't going into a glass with room in it is on the bar.
+// The bottle stands on the bar until a thumb grabs it. Held, it tips upside
+// down and pours through its speed pourer, following the thumb; let go and it
+// goes back down where it is. Liquor that isn't going into a glass with room in
+// it is on the bar.
 
 export const SHOT_MOUTH = 16;
 export const SHOT_POUR = 1.1;
 export const SHOT_FULL = 0.85;
 export const SHOT_SPILL_MAX = 1;
 export const SHOT_BOTTLE_SPEED = 900;
+/** How close to the standing bottle a tap has to be to pick it up. */
+export const SHOT_GRAB_RADIUS = 60;
+/** Where the standing bottle's middle is, from the top. */
+export const SHOT_REST_Y = H - 100;
 
 export interface ShotsSim extends Base {
   kind: "shots";
   glasses: { x: number; fill: number }[];
   bottleX: number;
   targetX: number;
+  /** In a thumb, tipped over and pouring. */
   pouring: boolean;
+  /** Has it been picked up yet — the prompt stays until it has. */
+  grabbed: boolean;
   spill: number;
   pointer: number | null;
   /** Where the stream is landing this frame, for the view: a glass index, or -1 for the bar. */
@@ -119,16 +128,17 @@ export interface ShotsSim extends Base {
 export function newShots(level: number, w: number): ShotsSim {
   const n = level >= 5 ? 5 : 4;
   const glasses = Array.from({ length: n }, (_, i) => ({ x: (w * (i + 1)) / (n + 1), fill: 0 }));
-  const start = glasses[0].x - 50;
+  const start = Math.max(40, glasses[0].x - 60);
   return {
     kind: "shots",
     t: 0,
-    duration: Math.max(4.8, 6.8 - 0.2 * (level - 1)),
+    duration: Math.max(5.5, 7.5 - 0.15 * (level - 1)),
     outcome: null,
     glasses,
     bottleX: start,
     targetX: start,
     pouring: false,
+    grabbed: false,
     spill: 0,
     pointer: null,
     landing: -1,
@@ -200,7 +210,7 @@ export function newPop(level: number, w: number, rand: () => number): PopSim {
   return {
     kind: "pop",
     t: 0,
-    duration: Math.max(3.6, 4.6 - 0.1 * (level - 1)),
+    duration: Math.max(4, 5 - 0.08 * (level - 1)),
     outcome: null,
     w,
     swaySpeed: Math.min(4.2, 2.4 + 0.15 * (level - 1)),
@@ -265,9 +275,13 @@ export function microPress(s: MicroSim, x: number, y: number, id: number): void 
     s.pointer = id;
     s.aim = beerAimFor(y);
   } else if (s.kind === "shots") {
+    // Only a tap on the bottle picks it up. Pouring starts in the hand.
+    if (s.pointer !== null) return;
+    if (Math.abs(x - s.bottleX) > SHOT_GRAB_RADIUS || Math.abs(y - SHOT_REST_Y) > SHOT_GRAB_RADIUS * 1.5) return;
     s.pointer = id;
     s.targetX = x;
     s.pouring = true;
+    s.grabbed = true;
   } else if (!s.cork) {
     s.cork = { angle: s.angle, t: 0, landX: popLandX(s.w, s.angle) };
   }

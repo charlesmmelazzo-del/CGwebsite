@@ -6,7 +6,8 @@
 //
 // Two sources:
 //   * art the game already had — ingredient bottles, the shaker, the mixing
-//     glass, finished drinks, a Let's Do Shots bottle — used as-is;
+//     glass, finished drinks, the bartender and guest, a Let's Do Shots bottle —
+//     used as-is;
 //   * the landscape rebuild's own sheets, cut into /popup/art/stick2/. Only the
 //     names listed in STICK2_READY are fetched, so art that hasn't been drawn
 //     yet never shows up as a wall of 404s. Add a name when its file lands.
@@ -28,6 +29,9 @@ export const ART = {
   life: "/popup/art/stick/life.png",
   lifeLost: "/popup/art/stick/life-lost.png",
   shotsBottle: "/popup/art/shots/bottle-tequila.png",
+  bartender: (pose: "happy" | "worried" | "panic" | "shake-up" | "shake-down" | "stir" | "serve") =>
+    `/popup/art/stick/bartender-${pose}.png`,
+  guest: (mood: "happy" | "angry" | "wait") => `/popup/art/stick/guest-${mood}.png`,
   stick2,
 } as const;
 
@@ -46,6 +50,8 @@ function allUrls(): string[] {
     ...DRINK_KEYS.map(ART.drink),
     ART.shaker1, ART.shaker2, ART.mixingGlass, ART.barSpoon, ART.life, ART.lifeLost,
     ART.shotsBottle,
+    ...(["happy", "worried", "panic", "shake-up", "shake-down", "stir", "serve"] as const).map(ART.bartender),
+    ...(["happy", "angry", "wait"] as const).map(ART.guest),
     ...STICK2_READY.map(stick2),
   ];
 }

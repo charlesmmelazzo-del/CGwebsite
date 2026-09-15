@@ -10,10 +10,12 @@ import { colorFor } from "../ingredients";
 import { ART, drawImgCentred } from "./art";
 import * as K from "./constants";
 import {
+  isWanted,
   laneButtonX,
   LANE_BUTTON_Y,
   level,
-  type Falling,
+  vesselPos,
+  type Flying,
   type Fx,
   type State,
 } from "./core";
@@ -28,6 +30,7 @@ import {
   POP_FLIGHT,
   POP_PIVOT_DY,
   POP_TARGET_Y,
+  SHOT_REST_Y,
   SHOT_SPILL_MAX,
   type BeerSim,
   type PopSim,
@@ -180,9 +183,121 @@ function drawHud(ctx: Ctx, st: State, s: number) {
   drawText(ctx, `DRINK ${level(st)}`, l.rightX - 8, 24, "#C8B89A", 1, "right");
 }
 
+// ─── Instruction cards ───────────────────────────────────────────────────────
+
+interface Line {
+  text: string;
+  color: string;
+  scale: number;
+}
+
+/** Break `text` into lines that fit `maxW` at `scale`. */
+function wrap(text: string, maxW: number, scale: number): string[] {
+  const words = text.split(" ");
+  const lines: string[] = [];
+  let cur = "";
+  for (const wd of words) {
+    const next = cur ? `${cur} ${wd}` : wd;
+    if (cur && textWidth(next, scale) > maxW) {
+      lines.push(cur);
+      cur = wd;
+    } else cur = next;
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+
+/**
+ * A flashing instruction card: the words, wrapped and centred, over a panel
+ * that pulses so the eye goes straight to it, with a bar showing how long it
+ * stays up — so it reads as "about to start", not as the game waiting.
+ */
+function drawCard(
+  ctx: Ctx,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  lines: Line[],
+  t: number,
+  remaining: number,
+  total: number,
+  accent = GOLD
+) {
+  const flash = blink(t, 3);
+  fill(ctx, x + 4, y + 5, w, h, "rgba(0,0,0,0.5)");
+  fill(ctx, x - 3, y - 3, w + 6, h + 6, flash ? accent : INK);
+  fill(ctx, x, y, w, h, flash ? "#2A1240" : "#1C0C2C");
+
+  const pad = 12;
+  const laid: { text: string; color: string; scale: number }[] = [];
+  for (const ln of lines) {
+    // Shrink before wrapping a short line; wrap a long one rather than shrinking it to nothing.
+    let sc = ln.scale;
+    while (sc > 1.5 && textWidth(ln.text, sc) > w - pad * 2 && !ln.text.includes(" ")) sc -= 0.5;
+    for (const part of wrap(ln.text, w - pad * 2, sc)) {
+      laid.push({ text: part, color: ln.color, scale: Math.min(sc, fitScale(part, w - pad * 2, sc)) });
+    }
+  }
+  const gap = 5;
+  const total_h = laid.reduce((a, l) => a + l.scale * 7 + gap, -gap);
+  let ly = y + (h - 12 - total_h) / 2;
+  for (const l of laid) {
+    say(ctx, l.text, x + w / 2, ly, l.color, l.scale);
+    ly += l.scale * 7 + gap;
+  }
+  meterBar(ctx, x + 14, y + h - 10, w - 28, 4, total > 0 ? remaining / total : 0, accent);
+}
+
+function centreBox(st: State) {
+  const l = st.layout;
+  return { x: l.side + 10, w: l.rightX - l.side - 20 };
+}
+
 // ─── Grab ────────────────────────────────────────────────────────────────────
 
-function drawItem(ctx: Ctx, s: number, st: State, it: Falling, t: number) {
+/**
+ * Canvas filters draw the greyed-out things in true greyscale. Safari hasn't
+ * always had them, so there the same things are drawn onto a layer and washed
+ * grey over their own pixels instead — flatter, but just as clearly "not this".
+ */
+const CANVAS_FILTER =
+  typeof CanvasRenderingContext2D !== "undefined" && "filter" in CanvasRenderingContext2D.prototype;
+let greyLayer: HTMLCanvasElement | null = null;
+
+function drawGreyed(ctx: Ctx, draw: (c: Ctx) => void) {
+  if (CANVAS_FILTER) {
+    ctx.save();
+    ctx.filter = "grayscale(1) brightness(0.62) contrast(0.85)";
+    draw(ctx);
+    ctx.restore();
+    return;
+  }
+  const W = ctx.canvas.width;
+  const Hh = ctx.canvas.height;
+  if (!greyLayer) greyLayer = document.createElement("canvas");
+  if (greyLayer.width !== W || greyLayer.height !== Hh) {
+    greyLayer.width = W;
+    greyLayer.height = Hh;
+  }
+  const g = greyLayer.getContext("2d");
+  if (!g) return draw(ctx);
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.clearRect(0, 0, W, Hh);
+  g.setTransform(ctx.getTransform());
+  draw(g);
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.globalCompositeOperation = "source-atop";
+  g.fillStyle = "rgba(84,82,90,0.8)";
+  g.fillRect(0, 0, W, Hh);
+  g.globalCompositeOperation = "source-over";
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(greyLayer, 0, 0);
+  ctx.restore();
+}
+
+function drawItem(ctx: Ctx, s: number, st: State, it: Flying, t: number) {
   const l = st.layout;
   const x = K.panelX(l, it.side) + it.x * l.side;
   const y = it.y;
@@ -270,7 +385,6 @@ function drawItem(ctx: Ctx, s: number, st: State, it: Falling, t: number) {
       fill(ctx, -w / 2 + 1, -2, w - 2, 12, "#FFFFFF");
       drawText(ctx, big ? "VODKUH" : "VODKA", 0, 1, "#3A3AC0", big ? 0.75 : 0.62, "center");
       ctx.restore();
-      // Flies
       for (let i = 0; i < 3; i++) {
         const a = t * 6 + i * 2.1;
         fill(ctx, Math.cos(a) * 16 - 1, -hh / 2 + Math.sin(a * 1.3) * 6 - 4, 2, 2, INK);
@@ -292,56 +406,49 @@ function drawItem(ctx: Ctx, s: number, st: State, it: Falling, t: number) {
       circle(ctx, 10, -20, big ? 5 : 3, big ? GOLD : "#FF7B00");
       break;
     }
-    case "tips":
-      roundRect(ctx, -13, -14, 26, 30, 4);
-      ctx.fillStyle = INK;
-      ctx.fill();
-      roundRect(ctx, -11, -12, 22, 26, 3);
-      ctx.fillStyle = "#E8B830";
-      ctx.fill();
-      fill(ctx, -8, -18, 6, 10, "#5AA04A");
-      fill(ctx, 1, -20, 6, 12, "#6AB05A");
-      say(ctx, "$", 0, -3, "#FFF6C0", 1.4, false);
-      break;
-    case "cherry":
-      ctx.strokeStyle = "#5A3A10";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(0, -2);
-      ctx.quadraticCurveTo(2, -16, 10, -18);
-      ctx.stroke();
-      circle(ctx, 0, 6, 12, INK);
-      circle(ctx, 0, 6, 10, "#FFB800");
-      circle(ctx, -3, 2, 3, "#FFF6C0");
-      if (blink(t, 4)) {
-        fill(ctx, 11, -6, 2, 8, "#FFFFFF");
-        fill(ctx, 8, -3, 8, 2, "#FFFFFF");
-      }
-      break;
-    case "ice":
-      fill(ctx, -15, -15, 30, 30, INK);
-      fill(ctx, -13, -13, 26, 26, "#BDEBFF");
-      fill(ctx, -13, -13, 26, 6, "#FFFFFF");
-      fill(ctx, 4, -2, 5, 9, "#8FD0F0");
-      break;
-    case "watch":
-      circle(ctx, 0, 2, 15, INK);
-      circle(ctx, 0, 2, 13, "#D8A840");
-      circle(ctx, 0, 2, 10, CREAM);
-      fill(ctx, -2, -17, 4, 6, "#D8A840");
-      fill(ctx, -1, -5, 2, 8, INK);
-      fill(ctx, -1, 1, 7, 2, INK);
-      break;
   }
   ctx.restore();
+}
+
+/** "Get ready", with which thumb, while a card is up over an empty panel. */
+function panelReady(ctx: Ctx, st: State, side: 0 | 1, t: number) {
+  const l = st.layout;
+  const cx = K.panelX(l, side) + l.side / 2;
+  if (blink(t, 2)) say(ctx, "GET READY!", cx, K.H / 2 - 18, GOLD, 2);
+  drawText(ctx, side === 0 ? "LEFT THUMB" : "RIGHT THUMB", cx, K.H / 2 + 8, CREAM, 1, "center");
 }
 
 function drawGrabPanel(ctx: Ctx, s: number, st: State, side: 0 | 1, t: number) {
   const l = st.layout;
   const g = st.grab;
   const x = K.panelX(l, side);
-  drawPanel(ctx, x, l.side, g.iceT > 0 ? "rgba(120,200,255,0.12)" : "rgba(0,0,0,0)");
-  for (const it of g.items) if (it.side === side) drawItem(ctx, s, st, it, t);
+  drawPanel(ctx, x, l.side, "rgba(0,0,0,0)");
+  if (g.cardT > 0) {
+    panelReady(ctx, st, side, t);
+    return;
+  }
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, 0, l.side, K.H);
+  ctx.clip();
+  const mine = g.items.filter((it) => it.side === side);
+  const wanted = mine.filter((it) => isWanted(st, it));
+  const rest = mine.filter((it) => !isWanted(st, it));
+  // Everything that isn't wanted first, grey and behind; then the wanted
+  // bottles in full colour on top, each in a pulsing glow.
+  if (rest.length) drawGreyed(ctx, (c) => rest.forEach((it) => drawItem(c, s, st, it, t)));
+  for (const it of wanted) {
+    const ix = x + it.x * l.side;
+    const r = 30 + Math.sin(t * 8) * 3;
+    const glow = ctx.createRadialGradient(ix, it.y, 4, ix, it.y, r);
+    glow.addColorStop(0, "rgba(255,220,90,0.55)");
+    glow.addColorStop(1, "rgba(255,220,90,0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(ix - r, it.y - r, r * 2, r * 2);
+    drawItem(ctx, s, st, it, t);
+  }
+  ctx.restore();
 
   if (g.stinkT[side] > 0) {
     const a = Math.min(1, g.stinkT[side] / 0.6) * 0.62;
@@ -357,14 +464,14 @@ function drawGrabPanel(ctx: Ctx, s: number, st: State, side: 0 | 1, t: number) {
 }
 
 /** The order ticket in the centre: what to grab, and what's been got. */
-function drawTicket(ctx: Ctx, s: number, st: State, label: string, t: number) {
+function drawTicket(ctx: Ctx, s: number, st: State, t: number) {
   const l = st.layout;
   const g = st.grab;
   const cw = l.rightX - l.side;
   const w = Math.min(cw - 24, 300);
   const x = l.w / 2 - w / 2;
-  const y = 44;
-  const h = 190;
+  const y = 36;
+  const h = 184;
   ctx.save();
   ctx.translate(l.w / 2, y + h / 2);
   ctx.rotate(Math.sin(t * 1.4) * 0.012);
@@ -374,13 +481,13 @@ function drawTicket(ctx: Ctx, s: number, st: State, label: string, t: number) {
   for (let i = 0; i < w; i += 8) fill(ctx, x + i, y - 3, 4, 3, "#F5EAD0");
   fill(ctx, l.w / 2 - 16, y - 8, 32, 10, "#B8903A");
 
-  drawText(ctx, label, l.w / 2, y + 8, "#8A6A4A", 1, "center");
+  drawText(ctx, "ORDER UP!", l.w / 2, y + 8, "#8A6A4A", 1, "center");
   const name = st.order.name.toUpperCase();
   drawText(ctx, name, l.w / 2, y + 20, INK, fitScale(name, w - 24, 2), "center");
 
   const n = st.order.recipe.length;
   const slot = (w - 16) / n;
-  const by = y + 80;
+  const by = y + 78;
   st.order.recipe.forEach((ing, i) => {
     const cx = x + 8 + slot * (i + 0.5);
     const got = g.got.includes(ing);
@@ -390,33 +497,56 @@ function drawTicket(ctx: Ctx, s: number, st: State, label: string, t: number) {
     ctx.globalAlpha = 1;
     const lab = (INGREDIENT_LABELS[ing as IngredientKey] ?? ing).toUpperCase();
     drawText(ctx, lab, cx, by + 36, INK, fitScale(lab, slot - 4, 1), "center");
-    if (got) {
-      ctx.strokeStyle = "#3A8A10";
-      ctx.lineWidth = 5;
-      ctx.lineCap = "round";
-      ctx.beginPath();
-      ctx.moveTo(cx - 12, by);
-      ctx.lineTo(cx - 3, by + 10);
-      ctx.lineTo(cx + 14, by - 14);
-      ctx.stroke();
-    }
+    if (got) check(ctx, cx, by);
   });
 
   const f = g.timeLeft / g.timeMax;
-  meterBar(ctx, x + 14, y + 150, w - 28, 10, f, f < 0.3 ? (blink(t, 6) ? RED : "#A02010") : "#E89A20");
+  meterBar(ctx, x + 14, y + 148, w - 28, 10, f, f < 0.3 ? (blink(t, 6) ? RED : "#A02010") : "#E89A20");
   const method = st.order.finish === "shake" ? "SHAKEN" : "STIRRED";
-  drawText(ctx, method, l.w / 2, y + 168, "#8A6A4A", 1, "center");
+  drawText(ctx, method, l.w / 2, y + 166, "#8A6A4A", 1, "center");
   ctx.restore();
+}
 
-  if (g.done) {
-    say(ctx, "ORDER READY!", l.w / 2, y + h + 14, LIME, 2);
+function check(ctx: Ctx, cx: number, cy: number, size = 1) {
+  ctx.strokeStyle = "#3A8A10";
+  ctx.lineWidth = 5 * size;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(cx - 12 * size, cy);
+  ctx.lineTo(cx - 3 * size, cy + 10 * size);
+  ctx.lineTo(cx + 14 * size, cy - 14 * size);
+  ctx.stroke();
+}
+
+const GRAB_CARD_LINES: Record<string, (st: State) => Line[]> = {
+  fresh: () => [
+    { text: "GRAB THE COLOR BOTTLES!", color: GOLD, scale: 2 },
+    { text: "AVOID THE REST!", color: RED, scale: 2 },
+  ],
+  retry: () => [
+    { text: "NEW ORDER!", color: RED, scale: 2 },
+    { text: "GRAB THE COLOR BOTTLES!", color: GOLD, scale: 2 },
+  ],
+};
+
+function drawGrabStage(ctx: Ctx, s: number, st: State, t: number) {
+  const g = st.grab;
+  drawCentreBack(ctx, st, t);
+  drawGrabPanel(ctx, s, st, 0, t);
+  drawGrabPanel(ctx, s, st, 1, t);
+  drawTicket(ctx, s, st, t);
+  if (g.cardT > 0) {
+    const { x, w } = centreBox(st);
+    const lines = (GRAB_CARD_LINES[g.card] ?? GRAB_CARD_LINES.fresh)(st);
+    drawCard(ctx, x, 226, w, 88, lines, t, g.cardT, g.card === "retry" ? K.GRAB_CARD_SHORT : K.GRAB_CARD);
   }
+  drawHud(ctx, st, s);
 }
 
 // ─── Build ───────────────────────────────────────────────────────────────────
 
-const VP_Y = 26;
-/** Perspective: 0 far .. 1 at the line. */
+const VP_Y = 30;
+/** Perspective: 0 far .. 1 at the tap zone. */
 function persp(z: number): number {
   const D = 2.6;
   const zz = Math.max(-0.2, Math.min(1.15, z));
@@ -429,95 +559,180 @@ function lanePoint(st: State, lane: number, z: number) {
   return {
     x: st.layout.w / 2 + (bx - st.layout.w / 2) * f,
     y: VP_Y + (LANE_BUTTON_Y - VP_Y) * f,
-    scale: 0.18 + 0.82 * f,
+    scale: 0.2 + 0.8 * f,
   };
+}
+
+function vesselUrl(st: State): string {
+  return st.order.finish === "shake" ? ART.shaker1 : ART.mixingGlass;
 }
 
 function drawBuild(ctx: Ctx, s: number, st: State, t: number, frozen: boolean) {
   const l = st.layout;
   const b = st.build;
-  fill(ctx, 0, 0, l.w, K.H, "#120812");
-  const rg = ctx.createRadialGradient(l.w / 2, VP_Y, 4, l.w / 2, VP_Y, 200);
-  rg.addColorStop(0, "rgba(255,190,90,0.5)");
+  const w = l.w;
+
+  // The room at the far end of the bar
+  const sky = ctx.createLinearGradient(0, 0, 0, K.H);
+  sky.addColorStop(0, "#2A1030");
+  sky.addColorStop(1, "#0C0608");
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, w, K.H);
+  const rg = ctx.createRadialGradient(w / 2, VP_Y, 4, w / 2, VP_Y, 220);
+  rg.addColorStop(0, "rgba(255,190,90,0.55)");
   rg.addColorStop(1, "rgba(255,190,90,0)");
   ctx.fillStyle = rg;
-  ctx.fillRect(0, 0, l.w, 220);
+  ctx.fillRect(0, 0, w, 240);
+
+  // The bar top, running away from the player to the far end
+  const top = ctx.createLinearGradient(0, VP_Y, 0, K.H);
+  top.addColorStop(0, "#3A1C0C");
+  top.addColorStop(1, "#7A4420");
+  ctx.fillStyle = top;
+  ctx.beginPath();
+  ctx.moveTo(w / 2 - 24, VP_Y);
+  ctx.lineTo(w / 2 + 24, VP_Y);
+  ctx.lineTo(w + 30, K.H);
+  ctx.lineTo(-30, K.H);
+  ctx.closePath();
+  ctx.fill();
+  // Plank seams converging on the far end
+  ctx.strokeStyle = "rgba(0,0,0,0.25)";
+  ctx.lineWidth = 1;
+  for (let i = -6; i <= 6; i++) {
+    ctx.beginPath();
+    ctx.moveTo(w / 2 + i * 4, VP_Y);
+    ctx.lineTo(w / 2 + i * (w / 11), K.H);
+    ctx.stroke();
+  }
   if (!b) return;
 
-  // Lane rails, with beat ticks rolling toward the player
+  // Where each bottle slides: a polished runner per lane
   for (let lane = 0; lane < K.LANES; lane++) {
     const bx = laneButtonX(l, lane);
-    const halfBottom = 26;
-    ctx.fillStyle = lane % 2 === 0 ? "#3A2014" : "#301A10";
+    ctx.fillStyle = "rgba(255,210,150,0.10)";
     ctx.beginPath();
-    ctx.moveTo(l.w / 2 - 1, VP_Y);
-    ctx.lineTo(l.w / 2 + 1, VP_Y);
-    ctx.lineTo(bx + halfBottom, LANE_BUTTON_Y);
-    ctx.lineTo(bx - halfBottom, LANE_BUTTON_Y);
+    ctx.moveTo(w / 2 - 2, VP_Y);
+    ctx.lineTo(w / 2 + 2, VP_Y);
+    ctx.lineTo(bx + 30, LANE_BUTTON_Y);
+    ctx.lineTo(bx - 30, LANE_BUTTON_Y);
     ctx.closePath();
     ctx.fill();
     ctx.strokeStyle = LANE_COLORS[lane];
-    ctx.globalAlpha = 0.5;
+    ctx.globalAlpha = 0.35;
     ctx.lineWidth = 1.5;
     ctx.stroke();
     ctx.globalAlpha = 1;
-    const beat = K.beatSeconds(level(st));
-    for (let k = 0; k < 8; k++) {
-      const z = 1 - (((k * beat - (b.clock % beat) + beat) / b.travel) % (8 * beat / b.travel));
-      if (z < 0 || z > 1) continue;
-      const p = lanePoint(st, lane, z);
-      fill(ctx, p.x - 20 * p.scale, p.y, 40 * p.scale, Math.max(1, 2 * p.scale), "rgba(255,220,160,0.18)");
-    }
   }
 
-  // Notes, far ones first
-  const notes = b.notes
-    .filter((n) => !n.judged || (n.judged === "miss" && b.clock - n.t < 0.3))
-    .map((n) => ({ n, z: 1 - (n.t - b.clock) / b.travel }))
-    .filter(({ z }) => z >= 0 && z <= 1.25)
-    .sort((a, c) => a.z - c.z);
-  for (const { n, z } of notes) {
-    const p = lanePoint(st, n.lane, z);
-    const r = 24 * p.scale;
-    ctx.globalAlpha = n.judged === "miss" ? 0.35 : 1;
-    circle(ctx, p.x, p.y, r + 2, INK);
-    circle(ctx, p.x, p.y, r, LANE_COLORS[n.lane]);
-    circle(ctx, p.x, p.y - r * 0.25, r * 0.7, "rgba(255,255,255,0.25)");
-    bottle(ctx, s, st.order.recipe[n.lane], p.x, p.y - 2 * p.scale, 34 * p.scale);
-    ctx.globalAlpha = 1;
+  // The bartender in the middle, behind his bit of counter, with the tin
+  const mood = b.mood;
+  const bartender = ART.bartender(mood);
+  const bob = mood === "panic" ? Math.sin(t * 30) * 1.5 : Math.sin(t * 3) * 1.5;
+  if (!drawImgCentred(ctx, s, bartender, w / 2, K.H - 104 + bob, 150)) {
+    circle(ctx, w / 2, K.H - 140, 34, "#F0B890");
+    fill(ctx, w / 2 - 40, K.H - 108, 80, 70, "#1A1A1A");
+  }
+  const counter = ctx.createLinearGradient(0, K.H - 44, 0, K.H);
+  counter.addColorStop(0, "#C88A48");
+  counter.addColorStop(0.15, "#8A5020");
+  counter.addColorStop(1, "#4A2408");
+  ctx.fillStyle = counter;
+  ctx.fillRect(w / 2 - 108, K.H - 44, 216, 44);
+  const v = vesselPos(l);
+  const landed = st.fx.some((f) => f.kind === "toss" && f.t > f.dur * 0.85);
+  const vh = 60 + (landed ? 4 : 0);
+  if (!drawImgCentred(ctx, s, vesselUrl(st), v.x, v.y + 12 - vh / 2, vh)) {
+    fill(ctx, v.x - 14, v.y + 12 - vh, 28, vh, "#C8D0D8");
   }
 
-  // Buttons
+  // Tap zones: a brass ring at the end of each runner, lit as a bottle nears
   for (let lane = 0; lane < K.LANES; lane++) {
     const bx = laneButtonX(l, lane);
     const since = b.clock - b.pressedAt[lane];
-    const lit = since >= 0 && since < 0.12;
-    circle(ctx, bx, LANE_BUTTON_Y + 3, 31, INK);
-    circle(ctx, bx, LANE_BUTTON_Y + 3, 29, "#B8903A");
-    circle(ctx, bx, LANE_BUTTON_Y + (lit ? 3 : 0), 24, lit ? "#FFFFFF" : LANE_COLORS[lane]);
-    circle(ctx, bx, LANE_BUTTON_Y - 5 + (lit ? 3 : 0), 15, "rgba(255,255,255,0.22)");
-    bottle(ctx, s, st.order.recipe[lane], bx, LANE_BUTTON_Y + (lit ? 3 : 0), 30);
+    const pressed = since >= 0 && since < 0.12;
+    const near = b.notes.some((n) => n.lane === lane && !n.judged && Math.abs(n.t - b.clock) < 0.35);
+    const pulse = near ? 0.6 + Math.sin(t * 20) * 0.25 : 0.25;
+    const halo = ctx.createRadialGradient(bx, LANE_BUTTON_Y, 20, bx, LANE_BUTTON_Y, 46);
+    halo.addColorStop(0, `rgba(255,220,120,${pulse})`);
+    halo.addColorStop(1, "rgba(255,220,120,0)");
+    ctx.fillStyle = halo;
+    ctx.fillRect(bx - 46, LANE_BUTTON_Y - 46, 92, 92);
+    circle(ctx, bx, LANE_BUTTON_Y, 31, INK);
+    circle(ctx, bx, LANE_BUTTON_Y, 28, pressed ? "#FFFFFF" : "#D8A840");
+    circle(ctx, bx, LANE_BUTTON_Y, 22, pressed ? LANE_COLORS[lane] : "rgba(20,10,6,0.85)");
+    ctx.globalAlpha = 0.35;
+    bottle(ctx, s, st.order.recipe[lane], bx, LANE_BUTTON_Y, 26);
+    ctx.globalAlpha = 1;
+    say(ctx, "TAP", bx, LANE_BUTTON_Y + 36, near ? GOLD : CREAM, 1, false);
   }
 
-  // The drink's name and the combo, top centre under the score
+  // Bottles sliding down the bar, far ones first. A missed one topples over the end.
+  const notes = b.notes
+    .filter((n) => !n.judged || (n.judged === "miss" && b.clock - n.t < 0.45))
+    .map((n) => ({ n, z: 1 - (n.t - b.clock) / b.travel }))
+    .filter(({ z }) => z >= 0 && z <= 1.4)
+    .sort((a, c) => a.z - c.z);
+  for (const { n, z } of notes) {
+    const p = lanePoint(st, n.lane, z);
+    const miss = n.judged === "miss";
+    const bh = 44 * p.scale;
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y + bh * 0.42, bh * 0.35, bh * 0.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    if (miss) {
+      const k = (b.clock - n.t) / 0.45;
+      ctx.globalAlpha = 1 - k;
+      ctx.rotate(k * 1.6 * (n.lane < 2 ? -1 : 1));
+    }
+    bottle(ctx, s, st.order.recipe[n.lane], 0, 0, bh);
+    ctx.restore();
+  }
+
   const name = st.order.name.toUpperCase();
-  drawText(ctx, name, l.w / 2, 30, CREAM, 1, "center");
-  if (b.combo >= 5) say(ctx, `${b.combo} COMBO`, l.w / 2, 44, b.combo >= 15 ? GOLD : LIME, 1.5);
-  if (frozen) fill(ctx, 0, 0, l.w, K.H, "rgba(0,0,0,0.5)");
+  drawText(ctx, name, w / 2, 34, CREAM, 1, "center");
+  if (b.combo >= 5) say(ctx, `${b.combo} COMBO`, w / 2, 120, b.combo >= 15 ? GOLD : LIME, 1.5);
+
+  if (b.cardT > 0 && !frozen) {
+    fill(ctx, 0, 0, w, K.H, "rgba(0,0,0,0.45)");
+    const vessel = st.order.finish === "shake" ? "COCKTAIL SHAKER" : "MIXING GLASS";
+    const cw = Math.min(w - 80, 440);
+    drawCard(
+      ctx,
+      w / 2 - cw / 2,
+      40,
+      cw,
+      170,
+      [
+        { text: "WE GOT OUR BOTTLES!", color: LIME, scale: 2.5 },
+        { text: "LET'S BUILD THE DRINK!", color: GOLD, scale: 3 },
+        { text: `TAP THE BOTTLES AS THEY SLIDE DOWN THE BAR TO TOSS THEM IN YOUR ${vessel}!`, color: CREAM, scale: 1.5 },
+      ],
+      t,
+      b.cardT,
+      K.BUILD_CARD
+    );
+  }
+  if (frozen) fill(ctx, 0, 0, w, K.H, "rgba(0,0,0,0.5)");
 }
 
 // ─── Finish ──────────────────────────────────────────────────────────────────
 
+function shakeWord(st: State): string {
+  return st.finish?.cocktail.finish === "stir" ? "STIRRING" : "SHAKING";
+}
+
+/** The right thumb's panel: the tin or the mixing glass, and its meter. */
 function drawFinishPanel(ctx: Ctx, s: number, st: State, t: number) {
   const l = st.layout;
   const x = l.rightX;
   const cx = x + l.side / 2;
   drawPanel(ctx, x, l.side, "rgba(40,120,200,0.06)");
   const f = st.finish;
-  if (!f) {
-    say(ctx, "SERVED!", cx, K.H / 2 - 8, LIME, 2);
-    return;
-  }
+  if (!f) return;
 
   if (f.result) {
     const ok = f.result === "served";
@@ -525,24 +740,26 @@ function drawFinishPanel(ctx: Ctx, s: number, st: State, t: number) {
     if (ok) {
       for (let i = 0; i < 8; i++) {
         const a = (i / 8) * Math.PI * 2 + t * 2;
-        const r = 40 + f.resultT * 30;
+        const r = 40 + Math.min(1, f.resultT) * 30;
         fill(ctx, cx + Math.cos(a) * r - 2, K.H * 0.45 + Math.sin(a) * r - 2, 4, 4, GOLD);
       }
-      if (!drawImgCentred(ctx, s, ART.drink(f.cocktail.key), cx, K.H * 0.45 + bob, 110)) {
-        circle(ctx, cx, K.H * 0.45, 30, "#E8A040");
-      }
     }
+    ctx.globalAlpha = ok ? 1 : 0.5;
+    if (!drawImgCentred(ctx, s, ART.drink(f.cocktail.key), cx, K.H * 0.45 + bob, 110)) {
+      circle(ctx, cx, K.H * 0.45, 30, "#E8A040");
+    }
+    ctx.globalAlpha = 1;
     say(ctx, ok ? "SERVED!" : f.cocktail.finish === "shake" ? "WATERY!" : "TOO WARM!", cx, K.H * 0.75, ok ? LIME : RED, 2);
     return;
   }
 
   const shake = f.cocktail.finish === "shake";
-  say(ctx, shake ? "SHAKE!" : "STIR!", cx, 36, GOLD, 2);
-
+  const ready = f.cardT > 0;
+  ctx.globalAlpha = ready ? 0.45 : 1;
   if (shake) {
     const y = 70 + f.tinY * (K.H - 150);
     const moving = f.pointer !== null;
-    const art = moving && Math.floor(f.strokes) % 2 === 1 ? ART.shaker2 : ART.shaker1;
+    const art = moving && f.strokes % 2 === 1 ? ART.shaker2 : ART.shaker1;
     if (!drawImgCentred(ctx, s, art, cx, y + 40, 120)) {
       roundRect(ctx, cx - 18, y, 36, 80, 6);
       ctx.fillStyle = INK;
@@ -550,23 +767,15 @@ function drawFinishPanel(ctx: Ctx, s: number, st: State, t: number) {
       roundRect(ctx, cx - 15, y + 3, 30, 74, 5);
       ctx.fillStyle = "#C8D0D8";
       ctx.fill();
-      fill(ctx, cx - 8, y + 6, 4, 68, "#FFFFFF");
     }
-    // Frost creeping up the tin as the meter fills
-    ctx.fillStyle = `rgba(230,245,255,${f.meter * 0.45})`;
-    ctx.fillRect(cx - 22, y + 80 - f.meter * 75, 44, f.meter * 75);
     if (moving) {
       for (let i = 0; i < 3; i++) fill(ctx, cx - 36 - i * 6, y + 20 + i * 14, 2, 18, "rgba(255,255,255,0.5)");
-    } else if (blink(t, 2)) {
-      say(ctx, "DRAG", cx, K.H - 64, CREAM, 1.5);
-      say(ctx, "UP + DOWN", cx, K.H - 48, CREAM, 1.5);
     }
   } else {
     const c = { x: cx, y: K.H * 0.52 };
     if (!drawImgCentred(ctx, s, ART.mixingGlass, c.x, c.y + 20, 120)) {
       fill(ctx, c.x - 28, c.y - 30, 56, 80, INK);
       fill(ctx, c.x - 25, c.y - 27, 50, 74, "#9CC8E0");
-      fill(ctx, c.x - 25, c.y, 50, 47, "#C8702A");
     }
     ctx.strokeStyle = "rgba(255,213,0,0.35)";
     ctx.lineWidth = 2;
@@ -576,43 +785,204 @@ function drawFinishPanel(ctx: Ctx, s: number, st: State, t: number) {
     ctx.stroke();
     ctx.setLineDash([]);
     const a = f.lastAngle ?? t * 2;
-    const sx = c.x + Math.cos(a) * 18;
-    const sy = c.y + Math.sin(a) * 8 - 50;
     ctx.strokeStyle = "#D8D8E0";
     ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.moveTo(sx, sy);
+    ctx.moveTo(c.x + Math.cos(a) * 18, c.y + Math.sin(a) * 8 - 50);
     ctx.lineTo(c.x + Math.cos(a) * 10, c.y + 10);
     ctx.stroke();
-    const tx = c.x + Math.cos(a) * 46;
-    const ty = c.y + Math.sin(a) * 46;
-    circle(ctx, tx, ty, 8, f.pointer !== null ? GOLD : "rgba(255,213,0,0.5)");
-    if (f.pointer === null && blink(t, 2)) say(ctx, "CIRCLES!", cx, K.H - 40, CREAM, 1.5);
+    circle(ctx, c.x + Math.cos(a) * 46, c.y + Math.sin(a) * 46, 8, f.pointer !== null ? GOLD : "rgba(255,213,0,0.5)");
+  }
+  ctx.globalAlpha = 1;
+
+  if (ready) {
+    panelReady(ctx, st, 1, t);
+    return;
+  }
+  say(ctx, shake ? "SHAKE!" : "STIR!", cx, 30, GOLD, 2);
+  if (f.pointer === null && blink(t, 2)) {
+    say(ctx, shake ? "DRAG UP + DOWN" : "CIRCLES!", cx, K.H - 44, CREAM, 1.5);
   }
 
-  // Meter up the inside edge, time along the bottom
-  meterBar(ctx, x + 8, 60, 8, K.H - 120, 0, "#000");
-  const mh = (K.H - 120) * f.meter;
-  fill(ctx, x + 8, 60 + (K.H - 120) - mh, 8, mh, shake ? "#BDEBFF" : "#E8A040");
-  const tf = f.timeLeft / K.FINISH_SECONDS;
-  meterBar(ctx, x + 14, K.H - 18, l.side - 28, 7, tf, tf < 0.3 && blink(t, 6) ? RED : "#E89A20");
+  // The meter up the inside edge, with the line it has to stay above
+  const mx = x + 8;
+  const my = 60;
+  const mh = K.H - 120;
+  meterBar(ctx, mx, my, 10, mh, 0, "#000");
+  const low = f.meter < K.FINISH_LINE;
+  fill(ctx, mx, my + mh * (1 - f.meter), 10, mh * f.meter, low ? (blink(t, 6) ? RED : "#A02010") : shake ? "#BDEBFF" : "#E8A040");
+  fill(ctx, mx - 4, my + mh * (1 - K.FINISH_LINE) - 1, 18, 3, GOLD);
+  if (low && f.clock > K.FINISH_GRACE) say(ctx, "FASTER!", cx, K.H / 2 + 60, RED, 2);
+  meterBar(ctx, x + 22, K.H - 18, l.side - 36, 7, 1 - f.clock / K.FINISH_PLAY, "#E89A20");
 }
 
-function drawWaitingPanel(ctx: Ctx, st: State, t: number) {
+/** A strip of bar counter, for a bartender to stand behind. */
+function barCounter(ctx: Ctx, x: number, w: number, y: number) {
+  const g = ctx.createLinearGradient(0, y, 0, K.H);
+  g.addColorStop(0, "#C88A48");
+  g.addColorStop(0.15, "#8A5020");
+  g.addColorStop(1, "#4A2408");
+  ctx.fillStyle = g;
+  ctx.fillRect(x, y, w, K.H - y);
+}
+
+/** The left thumb's panel while it isn't grabbing. */
+function drawLeftIdle(ctx: Ctx, st: State, t: number) {
   const l = st.layout;
-  drawPanel(ctx, 0, l.side, "rgba(156,232,0,0.06)");
+  const g = st.grab;
+  drawPanel(ctx, 0, l.side, g.done ? "rgba(156,232,0,0.06)" : "rgba(0,0,0,0.25)");
   const cx = l.side / 2;
-  circle(ctx, cx, K.H / 2 - 20, 26, "#3A8A10");
-  ctx.strokeStyle = "#FFFFFF";
-  ctx.lineWidth = 6;
-  ctx.lineCap = "round";
+  if (g.done) {
+    circle(ctx, cx, K.H / 2 - 20, 26, "#3A8A10");
+    ctx.strokeStyle = "#FFFFFF";
+    ctx.lineWidth = 6;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(cx - 12, K.H / 2 - 20);
+    ctx.lineTo(cx - 3, K.H / 2 - 10);
+    ctx.lineTo(cx + 13, K.H / 2 - 32);
+    ctx.stroke();
+    say(ctx, "GOT 'EM!", cx, K.H / 2 + 16, LIME, 2);
+  } else if (g.cardT > 0 && !g.pending) {
+    panelReady(ctx, st, 0, t);
+  }
+}
+
+/** A slash down the middle: the next order on the left, the drink in hand on the right. */
+function drawSplit(ctx: Ctx, s: number, st: State, t: number) {
+  const l = st.layout;
+  const f = st.finish!;
+  const g = st.grab;
+  const x0 = l.side;
+  const x1 = l.rightX;
+  const mid = (x0 + x1) / 2;
+  const lw = mid - x0;
+
+  // Left: the order
+  const lc = x0 + lw / 2 - 6;
+  if (g.done) {
+    circle(ctx, lc, 130, 30, "#3A8A10");
+    check(ctx, lc, 130, 1.2);
+    say(ctx, "GOT THE", lc, 180, LIME, 2);
+    say(ctx, "BOTTLES!", lc, 200, LIME, 2);
+  } else {
+    say(ctx, "ORDER UP!", lc, 36, GOLD, fitScale("ORDER UP!", lw - 24, 2));
+    const name = st.order.name.toUpperCase();
+    drawText(ctx, name, lc, 58, CREAM, fitScale(name, lw - 24, 1.5), "center");
+    st.order.recipe.forEach((ing, i) => {
+      const bx = lc + (i % 2 === 0 ? -30 : 30);
+      const by = 108 + Math.floor(i / 2) * 76;
+      const got = g.got.includes(ing);
+      ctx.globalAlpha = got ? 0.4 : 1;
+      bottle(ctx, s, ing, bx, by, 42);
+      ctx.globalAlpha = 1;
+      if (got) check(ctx, bx, by, 0.9);
+    });
+    const tf = g.timeLeft / g.timeMax;
+    meterBar(ctx, x0 + 14, K.H - 30, lw - 40, 8, tf, tf < 0.3 ? (blink(t, 6) ? RED : "#A02010") : "#E89A20");
+    if (blink(t, 1.5)) drawText(ctx, "< LEFT THUMB", lc, K.H - 16, CREAM, 1, "center");
+  }
+
+  // The slash
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 9;
   ctx.beginPath();
-  ctx.moveTo(cx - 12, K.H / 2 - 20);
-  ctx.lineTo(cx - 3, K.H / 2 - 10);
-  ctx.lineTo(cx + 13, K.H / 2 - 32);
+  ctx.moveTo(mid + 22, 24);
+  ctx.lineTo(mid - 22, K.H);
   ctx.stroke();
-  say(ctx, "GOT IT!", cx, K.H / 2 + 16, LIME, 2);
-  if (blink(t, 2)) drawText(ctx, "FINISH THE DRINK", cx, K.H / 2 + 40, CREAM, 1, "center");
+  ctx.strokeStyle = GOLD;
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  // Right: the drink being finished, then the guest getting it
+  const rc = mid + lw / 2 + 6;
+  if (!f.result) {
+    const word = shakeWord(st);
+    say(ctx, "KEEP", rc, 36, LIME, 2);
+    say(ctx, `${word}!`, rc, 56, LIME, fitScale(`${word}!`, lw - 20, 2));
+    const pose = f.cocktail.finish === "stir" ? "stir" : f.strokes % 2 ? "shake-up" : "shake-down";
+    if (!drawImgCentred(ctx, s, ART.bartender(pose), rc, 190, 150)) {
+      circle(ctx, rc, 160, 30, "#F0B890");
+    }
+    barCounter(ctx, mid - 10, x1 - mid + 10, K.H - 58);
+    if (blink(t, 1.5)) drawText(ctx, "RIGHT THUMB >", rc, K.H - 16, CREAM, 1, "center");
+  } else {
+    const ok = f.result === "served";
+    const pop = 1 + Math.max(0, 0.25 - f.resultT) * 2;
+    say(ctx, ok ? "GOOD JOB!" : "OH NO!", rc, 36, ok ? LIME : RED, fitScale("GOOD JOB!", lw - 16, 2) * pop);
+    const bob = Math.sin(t * (ok ? 6 : 14)) * (ok ? 3 : 1.5);
+    if (!drawImgCentred(ctx, s, ART.guest(ok ? "happy" : "angry"), rc, 176 + bob, 140)) {
+      circle(ctx, rc, 170, 34, ok ? "#F0B890" : "#E07060");
+    }
+    drawText(ctx, ok ? "ONE HAPPY GUEST" : "SENT IT BACK", rc, K.H - 30, ok ? CREAM : RED, 1, "center");
+  }
+}
+
+function drawFinishStage(ctx: Ctx, s: number, st: State, t: number) {
+  const l = st.layout;
+  const f = st.finish;
+  const g = st.grab;
+  if (!f) return;
+  drawCentreBack(ctx, st, t);
+  if (g.pending || g.done || g.cardT > 0) drawLeftIdle(ctx, st, t);
+  else drawGrabPanel(ctx, s, st, 0, t);
+  drawFinishPanel(ctx, s, st, t);
+
+  const { x, w } = centreBox(st);
+  const word = shakeWord(st);
+  if (f.cardT > 0) {
+    const shake = f.cocktail.finish === "shake";
+    drawCard(
+      ctx,
+      x,
+      36,
+      w,
+      270,
+      [
+        { text: shake ? "SHAKE IT!" : "STIR IT!", color: GOLD, scale: 4 },
+        { text: f.cocktail.name.toUpperCase(), color: LIME, scale: 2 },
+        {
+          text: shake ? "DRAG YOUR RIGHT THUMB UP AND DOWN!" : "MOVE YOUR RIGHT THUMB IN CIRCLES!",
+          color: CREAM,
+          scale: 1.5,
+        },
+      ],
+      t,
+      f.cardT,
+      K.FINISH_CARD
+    );
+  } else if (g.pending) {
+    // The right thumb alone: the bartender working the drink, big.
+    say(ctx, `KEEP ${word}!`, l.w / 2, 40, LIME, fitScale(`KEEP ${word}!`, w, 3));
+    const pose = f.cocktail.finish === "stir" ? "stir" : f.strokes % 2 ? "shake-up" : "shake-down";
+    if (!f.result) {
+      drawImgCentred(ctx, s, ART.bartender(pose), l.w / 2, 196, 200);
+      barCounter(ctx, l.side, l.rightX - l.side, K.H - 40);
+    } else drawSplit(ctx, s, st, t);
+  } else if (g.cardT > 0 && !g.done) {
+    const lines: Line[] =
+      g.card === "turn"
+        ? [
+            { text: "YOUR TURN!", color: GOLD, scale: 3 },
+            ...(f.result ? [] : [{ text: `KEEP ${word}!`, color: LIME, scale: 2 }]),
+            { text: "GRAB THE COLOR BOTTLES WITH YOUR LEFT THUMB!", color: CREAM, scale: 1.5 },
+          ]
+        : g.card === "retry"
+          ? [
+              { text: "NEW ORDER!", color: RED, scale: 2.5 },
+              { text: "GRAB THE COLOR BOTTLES WITH YOUR LEFT THUMB!", color: CREAM, scale: 1.5 },
+            ]
+          : [
+              ...(f.result ? [] : [{ text: `KEEP ${word}!`, color: LIME, scale: 2.5 }]),
+              { text: "ORDER UP FOR A NEW COCKTAIL!", color: GOLD, scale: 2 },
+              { text: "START GRABBING BOTTLES WITH YOUR LEFT THUMB!", color: CREAM, scale: 1.5 },
+            ];
+    const total = g.card === "left" ? K.GRAB_CARD_LEFT : K.GRAB_CARD_SHORT;
+    drawCard(ctx, x, 36, w, 270, lines, t, g.cardT, total, LIME);
+  } else {
+    drawSplit(ctx, s, st, t);
+  }
+  drawHud(ctx, st, s);
 }
 
 // ─── Micro games ─────────────────────────────────────────────────────────────
@@ -816,12 +1186,13 @@ function drawShots(ctx: Ctx, s: number, sim: ShotsSim, w: number, t: number) {
       ctx.stroke();
     }
   }
-  // Upside-down bottle with its pourer
+  // The bottle: standing on the bar until grabbed, upside down and pouring in the hand
   const bx = sim.bottleX;
-  const by = 70;
+  const held = sim.pointer !== null;
+  const by = held ? 70 : SHOT_REST_Y;
   ctx.save();
   ctx.translate(bx, by);
-  ctx.rotate(Math.PI);
+  if (held) ctx.rotate(Math.PI);
   if (!drawImgCentred(ctx, s, ART.shotsBottle, 0, 0, 90)) {
     roundRect(ctx, -16, -40, 32, 60, 6);
     ctx.fillStyle = INK;
@@ -832,14 +1203,27 @@ function drawShots(ctx: Ctx, s: number, sim: ShotsSim, w: number, t: number) {
     fill(ctx, -6, -54, 12, 16, INK);
   }
   ctx.restore();
-  fill(ctx, bx - 2, by + 44, 4, 12, "#C8C8D0");
-  if (sim.pouring) {
+  if (held) {
+    fill(ctx, bx - 2, by + 44, 4, 12, "#C8C8D0");
     const land = sim.landing >= 0 ? counter - 44 : counter;
     fill(ctx, bx - 1.5, by + 56, 3, land - by - 56, "#F0B040");
+  } else {
+    fill(ctx, bx - 2, by - 56, 4, 12, "#C8C8D0");
+    // Point at it until it's in a hand
+    const bounce = Math.abs(Math.sin(t * 6)) * 8;
+    const label = sim.grabbed ? "GRAB IT!" : "GRAB THE BOTTLE!";
+    const half = textWidth(label, 2) / 2 + 10;
+    say(ctx, label, Math.max(half, Math.min(w - half, bx)), by - 110 - bounce, GOLD, 2);
+    ctx.fillStyle = GOLD;
+    ctx.beginPath();
+    ctx.moveTo(bx - 10, by - 86 - bounce);
+    ctx.lineTo(bx + 10, by - 86 - bounce);
+    ctx.lineTo(bx, by - 72 - bounce);
+    ctx.closePath();
+    ctx.fill();
   }
   drawText(ctx, "SPILL", 16, 22, CREAM, 1, "left");
   meterBar(ctx, 50, 20, 90, 8, sim.spill / SHOT_SPILL_MAX, RED);
-  if (sim.pointer === null && blink(t, 2)) say(ctx, "HOLD TO POUR", w / 2, 130, CREAM, 2);
 }
 
 /** A party guest from the chest up — the stand-in until the guest sheet lands. */
@@ -1030,7 +1414,8 @@ function drawOver(ctx: Ctx, st: State, t: number) {
 
 // ─── Effects ─────────────────────────────────────────────────────────────────
 
-function drawFx(ctx: Ctx, f: Fx) {
+function drawFx(ctx: Ctx, s: number, f: Fx) {
+  const bottleArt = (c: Ctx, ing: string, h: number) => bottle(c, s, ing, 0, 0, h);
   const k = f.t / f.dur;
   switch (f.kind) {
     case "word": {
@@ -1080,6 +1465,20 @@ function drawFx(ctx: Ctx, f: Fx) {
         fill(ctx, x - 5, y - 1, 10, 2, "#FFFFFF");
       }
       break;
+    case "toss": {
+      // The bottle arcs from its tap zone into the tin, spinning
+      const tx = f.tx ?? f.x;
+      const ty = f.ty ?? f.y;
+      const x = f.x + (tx - f.x) * k;
+      const y = f.y + (ty - f.y) * k - Math.sin(k * Math.PI) * 70;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(k * Math.PI * 2);
+      ctx.globalAlpha = k > 0.85 ? (1 - k) / 0.15 : 1;
+      bottleArt(ctx, f.ing ?? "ice", 30);
+      ctx.restore();
+      break;
+    }
     default:
       break;
   }
@@ -1111,19 +1510,10 @@ export function drawFrame(ctx: Ctx, st: State, s: number, t: number): void {
 
   switch (st.stage) {
     case "grab":
-      drawCentreBack(ctx, st, t);
-      drawGrabPanel(ctx, s, st, 0, t);
-      drawGrabPanel(ctx, s, st, 1, t);
-      drawTicket(ctx, s, st, "ORDER UP", t);
-      drawHud(ctx, st, s);
+      drawGrabStage(ctx, s, st, t);
       break;
     case "finish":
-      drawCentreBack(ctx, st, t);
-      if (st.grab.done) drawWaitingPanel(ctx, st, t);
-      else drawGrabPanel(ctx, s, st, 0, t);
-      drawFinishPanel(ctx, s, st, t);
-      drawTicket(ctx, s, st, "NEXT ORDER", t);
-      drawHud(ctx, st, s);
+      drawFinishStage(ctx, s, st, t);
       break;
     case "build":
       drawBuild(ctx, s, st, t, false);
@@ -1141,7 +1531,7 @@ export function drawFrame(ctx: Ctx, st: State, s: number, t: number): void {
   }
 
   if (st.stage !== "micro" && st.stage !== "handoff") {
-    for (const f of st.fx) drawFx(ctx, f);
+    for (const f of st.fx) drawFx(ctx, s, f);
     drawBanner(ctx, st);
   }
   if (st.flash) {
