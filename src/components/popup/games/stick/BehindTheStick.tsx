@@ -22,6 +22,7 @@ import {
   type State,
 } from "./core";
 import { drawFrame } from "./draw";
+import { HowToSlides, TitleScreen } from "./Intro";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // BEHIND THE STICK
@@ -112,7 +113,9 @@ function releaseLandscape() {
 }
 
 export default function BehindTheStick({ onGameOver, demo = false, paused = false }: ArcadeGameProps) {
-  const [screenName, setScreenName] = useState<"setup" | "party" | "play">(demo ? "play" : "setup");
+  const [screenName, setScreenName] = useState<"title" | "party" | "howto" | "play">(demo ? "play" : "title");
+  const [mode, setMode] = useState<Mode>("solo");
+  const [party, setParty] = useState<string[]>([]);
   const [names, setNames] = useState<string[]>(["", ""]);
   const [sideways, setSideways] = useState(false);
   const [portrait, setPortrait] = useState(false);
@@ -209,18 +212,31 @@ export default function BehindTheStick({ onGameOver, demo = false, paused = fals
           rotate={!demo && sideways}
           pointer={pointer}
         />
-      ) : screenName === "setup" ? (
-        <SetupScreen onSolo={() => start("solo")} onParty={() => setScreenName("party")} />
-      ) : (
+      ) : screenName === "title" ? (
+        <TitleScreen
+          onPick={(m) => {
+            setMode(m);
+            setScreenName(m === "party" ? "party" : "howto");
+          }}
+        />
+      ) : screenName === "party" ? (
         <PartyScreen
           names={names}
           setNames={setNames}
-          onBack={() => setScreenName("setup")}
+          onBack={() => setScreenName("title")}
           onStart={() => {
-            const party = finalNames(names);
-            writeStored(NAMES_KEY, party);
-            start("party", party);
+            const final = finalNames(names);
+            writeStored(NAMES_KEY, final);
+            setParty(final);
+            setScreenName("howto");
           }}
+        />
+      ) : (
+        <HowToSlides
+          mode={mode}
+          names={party}
+          onBack={() => setScreenName(mode === "party" ? "party" : "title")}
+          onDone={() => start(mode, mode === "party" ? party : [])}
         />
       )}
 
@@ -250,39 +266,6 @@ function Frame({ children }: { children: React.ReactNode }) {
         <div className="w-full max-w-[420px] text-center">{children}</div>
       </div>
     </div>
-  );
-}
-
-function SetupScreen({ onSolo, onParty }: { onSolo: () => void; onParty: () => void }) {
-  return (
-    <Frame>
-      <p className="text-[10px] tracking-[0.25em] uppercase" style={{ color: C.cream, opacity: 0.6 }}>
-        Behind the Stick
-      </p>
-      <h1 className="mt-3 text-[22px] leading-tight" style={{ color: C.gold, textShadow: "3px 3px 0 #000" }}>
-        It&apos;s a Rush
-      </h1>
-      <p className="mt-4 text-[9px] leading-relaxed" style={{ color: C.cream, opacity: 0.8 }}>
-        Hold your phone sideways. A thumb on each side. Grab the bottles, play the build, shake it
-        out while the next order comes in.
-      </p>
-
-      <div className="mt-8 flex flex-col gap-4">
-        <CabButton color={C.gold} size="lg" className="w-full" onClick={onSolo}>
-          Solo
-        </CabButton>
-        <p className="-mt-2 text-[8px]" style={{ color: C.cream, opacity: 0.55 }}>
-          Three lives. Solo high scores.
-        </p>
-        <CabButton color={C.magenta} size="lg" className="w-full" onClick={onParty}>
-          Party Mode
-        </CabButton>
-        <p className="-mt-2 text-[8px] leading-relaxed" style={{ color: C.cream, opacity: 0.55 }}>
-          2 to 10 players pass the phone. Mess up and you&apos;re out. Last one standing. Team score
-          goes on the party board.
-        </p>
-      </div>
-    </Frame>
   );
 }
 
@@ -353,7 +336,7 @@ function PartyScreen({
           Back
         </CabButton>
         <CabButton color={C.gold} size="md" className="w-full" disabled={!ready} onClick={onStart}>
-          Start
+          Next
         </CabButton>
       </div>
       {!ready && (
