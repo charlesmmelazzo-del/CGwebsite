@@ -4,9 +4,14 @@ import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
 import { getViewer } from "@/lib/popup/auth";
 import { getCocktails, getMenuById, resolveLiveMenu } from "@/lib/popup/menus";
 import { getGameBoard, MAX_SCORE, recordScore } from "@/lib/popup/scores";
-import { isPlayableGame } from "@/lib/popup/games";
+import { boardKey, hasPartyBoard, isPlayableGame, type BoardMode } from "@/lib/popup/games";
 import { checkRateLimit } from "@/lib/popup/access";
 import { completeRun, reopenRun } from "@/lib/popup/tickets";
+
+/** A party board only exists for a game that has one; anything else is solo. */
+function boardModeFrom(gameKey: string, raw: unknown): BoardMode {
+  return raw === "party" && hasPartyBoard(gameKey) ? "party" : "solo";
+}
 
 /**
  * GET — the public leaderboard for one game on one pop-up.
@@ -28,7 +33,8 @@ export async function GET(req: NextRequest) {
   const isTest = req.nextUrl.searchParams.get("sandbox") === "1" && isAdmin;
 
   const viewer = await getViewer();
-  const board = await getGameBoard(menu.id, gameKey, viewer?.userId ?? null, isTest);
+  const key = boardKey(gameKey, boardModeFrom(gameKey, req.nextUrl.searchParams.get("board")));
+  const board = await getGameBoard(menu.id, key, viewer?.userId ?? null, isTest);
 
   return NextResponse.json({ board });
 }
@@ -132,11 +138,15 @@ export async function POST(req: NextRequest) {
     ? (detail as Record<string, unknown>)
     : {};
 
+  // A party run spends the game's ticket like any other, but its team score
+  // lands on the party board.
+  const scoreKey = boardKey(gameKey, boardModeFrom(gameKey, body.board));
+
   const saved = await recordScore({
     menuId: menu.id,
     cocktailId: cocktail?.id ?? null,
     userId: viewer.userId,
-    gameKey,
+    gameKey: scoreKey,
     score,
     detail: safeDetail,
     isTest,
@@ -149,7 +159,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: saved.error }, { status: 500 });
   }
 
-  const board = await getGameBoard(menu.id, gameKey, viewer.userId, isTest);
+  const board = await getGameBoard(menu.id, scoreKey, viewer.userId, isTest);
 
   return NextResponse.json({
     ok: true,

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { DEMO_SECONDS, getGameMeta } from "@/lib/popup/games";
+import { DEMO_SECONDS, getGameMeta, hasPartyBoard, type BoardMode } from "@/lib/popup/games";
 import { demoSecondsLeft, saveDemoSecondsLeft } from "./demoTime";
 import { getGameComponent } from "./registry";
 import { P, pad } from "./arcade";
@@ -90,6 +90,9 @@ export default function GameShell({
   const [phase, setPhase] = useState<Phase>(autoStart ? "playing" : "attract");
   const [score, setScore] = useState(0);
   const [board, setBoard] = useState<GameBoard | null>(null);
+  /** Which board is showing: a game with a party mode keeps its team scores apart. */
+  const [boardMode, setBoardMode] = useState<BoardMode>("solo");
+  const partyBoard = hasPartyBoard(gameKey);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedThisRun, setSavedThisRun] = useState(false);
@@ -109,17 +112,17 @@ export default function GameShell({
   // sandbox has no tickets, so the owner can replay freely there.
   const needsTicket = !freePlay && !isSandbox;
   const [runSpent, setRunSpent] = useState(false);
-  const lastRun = useRef<{ score: number; detail: Record<string, unknown> } | null>(null);
+  const lastRun = useRef<{ score: number; detail: Record<string, unknown>; mode: BoardMode } | null>(null);
 
   const playAgain = useCallback(() => {
     if (needsTicket && runSpent && onNewRun) onNewRun();
     else setPhase("playing");
   }, [needsTicket, runSpent, onNewRun]);
 
-  const loadBoard = useCallback(async () => {
+  const loadBoard = useCallback(async (mode: BoardMode = "solo") => {
     try {
       const res = await fetch(
-        `/api/popup/score?menuId=${encodeURIComponent(menuId)}&gameKey=${encodeURIComponent(gameKey)}${isSandbox ? "&sandbox=1" : ""}`
+        `/api/popup/score?menuId=${encodeURIComponent(menuId)}&gameKey=${encodeURIComponent(gameKey)}${isSandbox ? "&sandbox=1" : ""}${mode === "party" ? "&board=party" : ""}`
       );
       if (!res.ok) return;
       const data = await res.json();
@@ -220,6 +223,7 @@ export default function GameShell({
           gameKey,
           score: run.score,
           detail: run.detail,
+          board: run.mode,
           sandbox: isSandbox,
           runId,
         }),
@@ -244,15 +248,32 @@ export default function GameShell({
       setPhase("over");
       setSavedThisRun(false);
       setSaveError(null);
-      lastRun.current = { score: finalScore, detail: detail ?? {} };
+      const mode: BoardMode = partyBoard && detail?.mode === "party" ? "party" : "solo";
+      lastRun.current = { score: finalScore, detail: detail ?? {}, mode };
+      // The score screen shows the board this run was played for. When the run
+      // posts, the POST answers with that board; otherwise fetch it.
+      setBoardMode(mode);
+      const posts = !freePlay && Boolean(viewerId) && scoringOpen && Boolean(runId || isSandbox);
+      if (mode !== boardMode) {
+        setBoard(null);
+        if (!posts) void loadBoard(mode);
+      }
 
       if (freePlay) return;
       setRunSpent(true);
-      if (!viewerId || !scoringOpen) return;
-      if (!runId && !isSandbox) return;
+      if (!posts) return;
       await postScore();
     },
-    [freePlay, viewerId, scoringOpen, runId, isSandbox, postScore]
+    [freePlay, viewerId, scoringOpen, runId, isSandbox, postScore, partyBoard, boardMode, loadBoard]
+  );
+
+  const switchBoard = useCallback(
+    (mode: BoardMode) => {
+      setBoardMode(mode);
+      setBoard(null);
+      void loadBoard(mode);
+    },
+    [loadBoard]
   );
 
   if (!meta || !Game) {
@@ -348,6 +369,8 @@ export default function GameShell({
               needsTicket={needsTicket}
               onRetrySave={runId ? postScore : undefined}
               onReplay={playAgain}
+              boardMode={partyBoard ? boardMode : undefined}
+              onBoardMode={switchBoard}
               onQuit={leave}
             />
           </div>
@@ -377,6 +400,8 @@ export default function GameShell({
           emailVerified={emailVerified}
           freePlay={freePlay}
           onStart={playAgain}
+          boardMode={partyBoard ? boardMode : undefined}
+          onBoardMode={switchBoard}
         />
       </div>
     </div>
@@ -534,7 +559,11 @@ function AttractScreen({
   emailVerified,
   freePlay,
   onStart,
+  boardMode,
+  onBoardMode,
 }: {
+  boardMode?: BoardMode;
+  onBoardMode: (mode: BoardMode) => void;
   meta: NonNullable<ReturnType<typeof getGameMeta>>;
   board: GameBoard | null;
   accent: string;
@@ -573,9 +602,9 @@ function AttractScreen({
         Press Start
       </CabButton>
 
-      {board && board.entries.length > 0 && (
+      {((board && board.entries.length > 0) || boardMode) && (
         <div className="mt-5">
-          <BoardTable board={board} accent={accent} />
+          <BoardTable board={board} accent={accent} mode={boardMode} onMode={onBoardMode} />
         </div>
       )}
     </div>
@@ -600,7 +629,11 @@ function GameOverScreen({
   onRetrySave,
   onReplay,
   onQuit,
+  boardMode,
+  onBoardMode,
 }: {
+  boardMode?: BoardMode;
+  onBoardMode: (mode: BoardMode) => void;
   score: number;
   board: GameBoard | null;
   accent: string;
@@ -687,9 +720,9 @@ function GameOverScreen({
         </CabButton>
       </div>
 
-      {board && board.entries.length > 0 && (
+      {((board && board.entries.length > 0) || boardMode) && (
         <div className="mt-5">
-          <BoardTable board={board} accent={accent} />
+          <BoardTable board={board} accent={accent} mode={boardMode} onMode={onBoardMode} />
         </div>
       )}
     </div>
@@ -750,12 +783,47 @@ function PrizeNotice({
   );
 }
 
-function BoardTable({ board, accent }: { board: GameBoard; accent: string }) {
+function BoardTable({
+  board,
+  accent,
+  mode,
+  onMode,
+}: {
+  board: GameBoard | null;
+  accent: string;
+  /** Set only for a game with a party board: shows the Solo / Party switch. */
+  mode?: BoardMode;
+  onMode: (mode: BoardMode) => void;
+}) {
   return (
     <>
       <p className="text-center text-[10px] tracking-[0.3em] uppercase text-white/45 mb-2">
         High Scores
       </p>
+      {mode && (
+        <div role="tablist" aria-label="Leaderboard" className="mb-2 grid grid-cols-2 gap-1">
+          {(["solo", "party"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              role="tab"
+              aria-selected={mode === m}
+              onClick={() => mode !== m && onMode(m)}
+              style={mode === m ? { background: accent, color: "#000" } : undefined}
+              className={`py-1.5 text-[10px] tracking-[0.2em] uppercase font-bold ${
+                mode === m ? "" : "bg-white/10 text-white/60"
+              }`}
+            >
+              {m === "solo" ? "Solo" : "Party"}
+            </button>
+          ))}
+        </div>
+      )}
+      {!board || board.entries.length === 0 ? (
+        <p className="py-3 text-center text-[11px] text-white/40">
+          {board ? "No scores yet. Be the first." : "Loading…"}
+        </p>
+      ) : (
       <ol className="space-y-0.5">
         {board.entries.map((e, i) => (
           <li
@@ -771,7 +839,8 @@ function BoardTable({ board, accent }: { board: GameBoard; accent: string }) {
           </li>
         ))}
       </ol>
-      {board.yourBest != null &&
+      )}
+      {board && board.yourBest != null &&
         !board.entries.some((e) => e.isYou) && (
           <p style={{ color: accent }} className="mt-2 text-center text-[10px] tabular-nums">
             Your best: {pad(board.yourBest)} · rank #{board.yourPosition}

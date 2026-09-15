@@ -12,7 +12,7 @@
 // board and the gift-card notice for free.
 
 import type { ComponentType } from "react";
-import BehindTheStick from "./BehindTheStick";
+import BehindTheStick from "./stick/BehindTheStick";
 import LetsDoShots from "./shots/LetsDoShots";
 import TaterTales from "./tater/TaterTales";
 import TikiWars from "./tiki/TikiWars";

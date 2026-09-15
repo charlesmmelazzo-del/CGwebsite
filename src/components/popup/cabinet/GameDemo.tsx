@@ -20,6 +20,7 @@ import { getGameComponent } from "../games/registry";
 import { GAME_H, GAME_W } from "../games/arcade";
 import * as SHOTS from "../games/shots/constants";
 import * as TIKI from "../games/tiki/constants";
+import * as STICK from "../games/stick/constants";
 import { withAlpha, C } from "./theme";
 
 /**
@@ -37,6 +38,8 @@ import { withAlpha, C } from "./theme";
 const DEMO_ASPECT: Record<string, number> = {
   "tiki-wars": TIKI.W / TIKI.H_REF,
   "lets-do-shots": SHOTS.W / SHOTS.H_REF,
+  // Played sideways, so its demo is a letterbox.
+  "behind-the-stick": STICK.W_REF / STICK.H,
 };
 
 export function demoAspect(gameKey: string | undefined): number {

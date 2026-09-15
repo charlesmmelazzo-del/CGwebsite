@@ -24,20 +24,42 @@ export interface GameMeta {
    * it would waste the screen its art is drawn for.
    */
   fullBleed?: boolean;
+  /**
+   * The game has a pass-the-phone party mode whose team scores go on a board
+   * of their own, so a group never competes against solo players. Party scores
+   * are stored under boardKey(key, "party"); the ticket run is still the game's.
+   */
+  partyBoard?: boolean;
+}
+
+export type BoardMode = "solo" | "party";
+
+/** The game_key a board's scores are stored under. Solo is the game's own key. */
+export function boardKey(gameKey: string, mode: BoardMode): string {
+  return mode === "party" ? `${gameKey}:party` : gameKey;
+}
+
+/** True when this game keeps a separate party board. */
+export function hasPartyBoard(gameKey: string | undefined): boolean {
+  return Boolean(gameKey && GAMES[gameKey]?.partyBoard);
 }
 
 export const GAMES: Record<string, GameMeta> = {
   "behind-the-stick": {
     key: "behind-the-stick",
     title: "Behind the Stick",
-    blurb: "Build the drink. Don't drop it.",
+    blurb: "It's a rush. Two thumbs, no mercy.",
     howToPlay: [
-      "Ingredients slide across the rail.",
-      "Hit the matching button while it's inside the window.",
-      "Three misses and you're done.",
-      "Every ten pours, shake or stir it out.",
+      "Hold your phone sideways, a thumb on each side.",
+      "Tap the order's bottles as they fall. Dodge the junk, the vodka and the bombs.",
+      "Play the build down the highway: two buttons per thumb.",
+      "Shake or stir with your right thumb while the next order falls on the left.",
+      "Micro games cut in. Win them for big points.",
+      "Party Mode: up to 10 friends pass the phone. Mess up and you're out.",
     ],
     playable: true,
+    fullBleed: true,
+    partyBoard: true,
   },
   "top-shelf": {
     key: "top-shelf",

@@ -11,6 +11,7 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import type { GameBoard, GameScoreEntry } from "./types";
+import { boardKey, hasPartyBoard } from "./games";
 
 /** Highest score a single run may claim. Mirrors the DB check constraint. */
 export const MAX_SCORE = 10_000_000;
@@ -213,12 +214,21 @@ export async function getGameWinners(
 
   const results: GameWinner[] = [];
 
-  for (const c of withGames) {
-    const gameKey = c.gameKey!;
+  // A game with a party mode has two boards, and each one has its own winner.
+  const boards = withGames.flatMap((c) => {
+    const key = c.gameKey!;
+    const solo = { gameKey: key, cocktailName: c.name };
+    return hasPartyBoard(key)
+      ? [solo, { gameKey: boardKey(key, "party"), cocktailName: `${c.name} (Party)` }]
+      : [solo];
+  });
+
+  for (const c of boards) {
+    const gameKey = c.gameKey;
     const board = await getGameBoard(menuId, gameKey, null, isTest);
 
     if (!board.entries.length) {
-      results.push({ gameKey, cocktailName: c.name, winner: null, totalPlayers: 0 });
+      results.push({ gameKey, cocktailName: c.cocktailName, winner: null, totalPlayers: 0 });
       continue;
     }
 
@@ -269,7 +279,7 @@ export async function getGameWinners(
 
     results.push({
       gameKey,
-      cocktailName: c.name,
+      cocktailName: c.cocktailName,
       winner,
       totalPlayers: board.totalPlayers,
     });
