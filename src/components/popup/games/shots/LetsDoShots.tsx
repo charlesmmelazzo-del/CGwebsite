@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef } from "react";
 import type { ArcadeGameProps } from "../registry";
 import { drawText, drawTextMarquee, textWidth } from "../arcade";
 import ShotsCanvas, { type SwipeDir } from "./ShotsCanvas";
-import { HOWTO_COPY, PARAGRAPH_GAP, lineHeight, wrapLines } from "./text";
+import { BUBBLE_TIGHT_LEADING, HOWTO_COPY, PARAGRAPH_GAP, lineHeight, wrapLines } from "./text";
 import {
   BARBACK_BODY_H, BARBACK_RUN, BOARD_H, BOARD_W, BOARD_X, C, CELL, COLS,
   HUD_CONTENT, RECIPE_H, ROWS, W, barBackPass, layoutFor, type Layout,
@@ -983,12 +983,18 @@ function drawBubble(
 
   for (const scale of [2, 1]) {
     const lines = wrapLines(text, box.w, scale);
-    const total = lines.length * lineHeight(scale);
-    if (total > box.h && scale > 1) continue;
+    let leading = lineHeight(scale);
+    if (lines.length * leading > box.h) {
+      if (scale > 1) continue;
+      // Already at the smallest lettering: close the gap between lines rather
+      // than let the last one spill out of the balloon on a short screen.
+      leading = BUBBLE_TIGHT_LEADING;
+    }
+    const total = lines.length * leading;
     let ty = box.y + Math.max(0, (box.h - total) / 2);
     for (const line of lines) {
       drawText(ctx, line, box.x + box.w / 2, ty, C.black, scale, "center");
-      ty += lineHeight(scale);
+      ty += leading;
     }
     return;
   }

@@ -13,6 +13,13 @@ export function lineHeight(scale: number): number {
   return 7 * scale + 3 * scale;
 }
 
+/**
+ * Line spacing at the small lettering when the normal gap will not fit: one
+ * pixel between 7-pixel glyphs. Still legible, and the speech bubble falls back
+ * to it rather than letting a long order run out of the balloon.
+ */
+export const BUBBLE_TIGHT_LEADING = 8;
+
 /** Break `text` into lines no wider than `maxW`. */
 export function wrapLines(text: string, maxW: number, scale: number): string[] {
   const words = text.split(/\s+/).filter(Boolean);

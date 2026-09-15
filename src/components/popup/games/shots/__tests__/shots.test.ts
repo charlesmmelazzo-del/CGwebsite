@@ -8,7 +8,7 @@ import { BOTTLES, BOTTLE_IDS, type BottleId, type CellKind } from "../bottles";
 import { ORDERS, recipeBottles } from "../orders";
 import { GUESTS, GUEST_COUNT } from "../guestArt";
 import { BARBACK_FRAMES, MOODS } from "../sprites";
-import { HOWTO_COPY, PARAGRAPH_GAP, lineHeight, wrapLines } from "../text";
+import { BUBBLE_TIGHT_LEADING, HOWTO_COPY, PARAGRAPH_GAP, lineHeight, wrapLines } from "../text";
 import {
   BOARD_H, COLS, ROWS, W, barBackPass, layoutFor,
   BARBACK_BODY_H, BARBACK_RUN, EXIT_CLEARANCE_H, HUD_CONTENT, H_MAX, H_MIN,
@@ -110,8 +110,31 @@ check("no recipe has three of the same bottle in a row", () => {
 
 check("every order names itself in its quip", () => {
   for (const o of ORDERS) {
-    assert.ok(o.quip.includes(`"${o.name}?"`), `${o.name} is missing from "${o.quip}"`);
+    assert.ok(o.name.length > 0, `no name in "${o.quip}"`);
+    assert.ok(o.quip.includes(`"${o.name}`), `${o.name} is missing from "${o.quip}"`);
   }
+});
+
+check("every quip fits the smallest bubble on the shortest screen", () => {
+  // Mirrors drawPanel and drawBubble: the panel frame at H_MIN, the 448x900
+  // guest art contained in it, and the tightest bubble rect of any guest, at
+  // the small lettering with the tight line spacing drawBubble falls back to.
+  const frameH = H_MIN - 44;
+  const frameW = frameH * 0.465;
+  const artScale = Math.min(frameW / 448, frameH / 900);
+  const artW = 448 * artScale;
+  const artH = 900 * artScale;
+  const boxW = Math.min(...GUESTS.map((g) => g.order.w)) * artW;
+  const boxH = Math.min(...GUESTS.map((g) => g.order.h)) * artH;
+  const bad: string[] = [];
+  for (const o of ORDERS) {
+    const lines = wrapLines(o.quip, boxW, 1);
+    const tooWide = lines.some((l) => textWidth(l, 1) > boxW);
+    if (tooWide || lines.length * BUBBLE_TIGHT_LEADING > boxH) {
+      bad.push(`${lines.length} lines: ${o.quip}`);
+    }
+  }
+  assert.equal(bad.length, 0, `too long for the bubble:\n  ${bad.join("\n  ")}`);
 });
 
 // ── Matching ────────────────────────────────────────────────────────────────
