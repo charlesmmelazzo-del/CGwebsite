@@ -17,7 +17,31 @@
 import { useEffect, useRef, useState } from "react";
 import { getGameMeta } from "@/lib/popup/games";
 import { getGameComponent } from "../games/registry";
+import { GAME_H, GAME_W } from "../games/arcade";
+import * as SHOTS from "../games/shots/constants";
+import * as TIKI from "../games/tiki/constants";
 import { withAlpha, C } from "./theme";
+
+/**
+ * Width ÷ height of each game's own screen, so a demo window is the shape the
+ * game draws for and nothing is squashed.
+ *
+ * The string-art games are a fixed 224×288. The full-bleed games pick their
+ * height from the box they're given but only within a range (H_MIN..H_MAX), so
+ * a box shorter than that range stretches them — they get their reference
+ * shape here instead.
+ *
+ * TO ADD A FULL-BLEED GAME: add its W / H_REF below. A game left off gets the
+ * 224×288 shape.
+ */
+const DEMO_ASPECT: Record<string, number> = {
+  "tiki-wars": TIKI.W / TIKI.H_REF,
+  "lets-do-shots": SHOTS.W / SHOTS.H_REF,
+};
+
+export function demoAspect(gameKey: string | undefined): number {
+  return (gameKey && DEMO_ASPECT[gameKey]) || GAME_W / GAME_H;
+}
 
 export default function GameDemo({
   gameKey,
@@ -56,6 +80,7 @@ export default function GameDemo({
   }, []);
 
   const live = running && onScreen && !!Game;
+  const aspectRatio = String(demoAspect(gameKey));
 
   return (
     <div ref={boxRef} className="relative w-full">
@@ -66,14 +91,14 @@ export default function GameDemo({
         // The aspect box gives the game a definite height to fill. Without one,
         // its percentage heights resolve to auto and the screen collapses to
         // its intrinsic 224px.
-        <div className="pointer-events-none w-full aspect-[224/288]">
+        <div className="pointer-events-none w-full" style={{ aspectRatio }}>
           <Game onGameOver={() => {}} demo />
         </div>
       ) : (
         // A still frame, so a slide never flashes empty as it scrolls in.
         <div
-          className="aspect-[224/288] w-full flex flex-col items-center justify-center gap-2 px-6 text-center"
-          style={{ background: "#05030F" }}
+          className="w-full flex flex-col items-center justify-center gap-2 px-6 text-center"
+          style={{ background: "#05030F", aspectRatio }}
         >
           <p
             className="text-[11px] tracking-[0.25em] uppercase font-black"

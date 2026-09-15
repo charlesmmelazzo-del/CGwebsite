@@ -19,7 +19,7 @@ import Image from "next/image";
 import type { PopupCocktail } from "@/lib/popup/types";
 import { getGameMeta } from "@/lib/popup/games";
 import CabButton, { CabArrow, CabIconButton } from "./CabButton";
-import GameDemo from "./GameDemo";
+import GameDemo, { demoAspect } from "./GameDemo";
 import { withAlpha, C } from "./theme";
 
 /**
@@ -195,10 +195,15 @@ function CocktailSlide({
             {cocktail.name}
           </h3>
 
-          {/* The demo, as big as the screen allows once everything else fits. */}
+          {/*
+            The demo, as big as the screen allows once everything else fits,
+            in the shape of that game's own screen so nothing is stretched.
+          */}
           <div
             className="mx-auto mt-2.5"
-            style={{ width: `min(100%, calc((100dvh - ${CHROME_HEIGHT}px) * 224 / 288))` }}
+            style={{
+              width: `min(100%, calc((100dvh - ${CHROME_HEIGHT}px) * ${demoAspect(cocktail.gameKey)}))`,
+            }}
           >
             <GameDemo gameKey={cocktail.gameKey} running={active && !flipped} />
           </div>
