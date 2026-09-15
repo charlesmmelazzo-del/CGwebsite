@@ -65,6 +65,21 @@ export const GAMES: Record<string, GameMeta> = {
     playable: true,
     fullBleed: true,
   },
+  "tater-tales": {
+    key: "tater-tales",
+    title: "Tater Tales",
+    blurb: "Blast up Mr. Tater's shelves. How high can you go?",
+    howToPlay: [
+      "Tap once to stop the arrow where you want to go.",
+      "Tap again to stop the carbonation gauge.",
+      "Fuller means faster and further. Bank off the walls.",
+      "Grab mixers and hand them to the dusty bottles up there.",
+      "Knock Tater off his top shelf, then do it again. Every lap is harder.",
+      "Falling never kills you. Running out of fizz ends the run.",
+    ],
+    playable: true,
+    fullBleed: true,
+  },
   "tiki-wars": {
     key: "tiki-wars",
     title: "Tiki Wars",
