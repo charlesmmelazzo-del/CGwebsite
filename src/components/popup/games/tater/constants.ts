@@ -236,8 +236,6 @@ export const KNOCKDOWN_ROWS = 3;
 export const SCORE_MATCH = 1000;
 /** Picking a mixer up. */
 export const SCORE_MIXER = 250;
-/** Landing on Allie's shelf, before Tater turns up and takes her away again. */
-export const SCORE_ALLIE = 2500;
 /** Spraying Tater off the top of a world. Times the lap number. */
 export const SCORE_SHOWDOWN = 1500;
 /** Lap one's summit: knocking Tater off his top shelf and getting Allie back. */

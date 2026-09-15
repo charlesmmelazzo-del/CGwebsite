@@ -10,8 +10,8 @@ import path from "node:path";
 import { unrenderable } from "../../arcade";
 import { ART } from "../artManifest";
 import {
-  ALLIE_AGAIN, ALLIE_KEEP_GOING, ALLIE_LINE, FLAT_LINE, GUILLERMO_LINE, LONELY_BOTTLES, MIXERS,
-  SHOWDOWN_ESCAPE, SHOWDOWN_ESCAPE_AGAIN, SHOWDOWN_HIT, SHOWDOWN_TAUNTS, SUMMIT_BOTTLES, TATER_LINE, TATER_SOAKED, TATER_TAUNT, TATER_TAUNT_AGAIN, THANK_YOU,
+  ALLIE_AGAIN, ALLIE_KEEP_GOING, FLAT_LINE, GUILLERMO_LINE, LONELY_BOTTLES, MIXERS,
+  SHOWDOWN_ESCAPE, SHOWDOWN_ESCAPE_AGAIN, SHOWDOWN_HIT, SHOWDOWN_TAUNTS, SUMMIT_BOTTLES, TATER_SOAKED, TATER_TAUNT, TATER_TAUNT_AGAIN, THANK_YOU,
   summitBottleFor,
 } from "../cast";
 import {
@@ -24,7 +24,7 @@ import { ROWS_PER_ZONE, SUMMIT_ROW, ZONES, zoneForRow, zoneIndexForRow } from ".
 import { SLIDES } from "../story";
 import { HOWTO_COPY } from "../text";
 import {
-  ALLIE_ROWS, CHARGE_TIME, REACH_X, aimAt, bestShot, build, createGame, isShowdownRow,
+  CHARGE_TIME, REACH_X, aimAt, bestShot, build, createGame, isShowdownRow,
   BOB_MAX, cancelHold, drainEvents, endScene, gravityAtRow, slideFrictionAtRow, heightRows, nextLap, platformX, platformY,
   powerAt, press, release,
   score, simulateBlast, speedFor, makeRng, step, velocityFor, type Phase, type TaterState,
@@ -69,7 +69,6 @@ function playRun(seed: number, opts: { maxSeconds?: number; noise?: number } = {
   let t = 0;
   let landings = 0;
   let matches = 0;
-  let allies = 0;
   let summits = 0;
   let pendingLap = false;
 
@@ -80,7 +79,6 @@ function playRun(seed: number, opts: { maxSeconds?: number; noise?: number } = {
     for (const e of drainEvents(g)) {
       if (e.kind === "rest") landings++;
       if (e.kind === "match") matches++;
-      if (e.kind === "allie") allies++;
       if (e.kind === "summit") { summits++; pendingLap = true; }
     }
 
@@ -109,14 +107,14 @@ function playRun(seed: number, opts: { maxSeconds?: number; noise?: number } = {
     }
   }
 
-  return { g, seconds: t, landings, matches, allies, summits, finished: g.over };
+  return { g, seconds: t, landings, matches, summits, finished: g.over };
 }
 
 // ── Everything on screen has to be drawable ─────────────────────────────────
 
 check("every line in the game can be drawn by the 5x7 font", () => {
   const strings = [
-    ...THANK_YOU, GUILLERMO_LINE, ALLIE_LINE, TATER_LINE, FLAT_LINE,
+    ...THANK_YOU, GUILLERMO_LINE, FLAT_LINE,
     TATER_TAUNT, TATER_TAUNT_AGAIN, TATER_SOAKED, ALLIE_KEEP_GOING, ALLIE_AGAIN,
     ...SHOWDOWN_TAUNTS, SHOWDOWN_HIT, SHOWDOWN_ESCAPE, SHOWDOWN_ESCAPE_AGAIN,
     ...ZONES.map((z) => `${z.title}!!!`), "YOU REACHED", "KA-BLOOEY!", "LET GO!",
@@ -198,18 +196,6 @@ check("the bottom shelf is one unbroken floor with Guillermo on it", () => {
   assert.equal(ground.length, 1, "the floor should be a single shelf");
   assert.ok(ground[0].w >= W - WALL_MARGIN * 2, "the floor should span the shaft");
   assert.equal(ground[0].item?.kind, "guillermo");
-});
-
-check("Allie appears on the far right of her rows and nowhere else", () => {
-  const g = createGame(3);
-  openGates(g);
-  const found = g.platforms.filter((p) => p.item?.kind === "allie");
-  assert.deepEqual(found.map((p) => p.row).sort((a, b) => a - b), ALLIE_ROWS);
-  for (const p of found) {
-    const row = g.platforms.filter((q) => q.row === p.row);
-    const rightmost = row.reduce((a, b) => (b.x + b.w > a.x + a.w ? b : a));
-    assert.equal(p.id, rightmost.id, `row ${p.row}: Allie is not the far-right shelf`);
-  }
 });
 
 // ── The physics ─────────────────────────────────────────────────────────────
@@ -421,16 +407,15 @@ check("a bottle without a mixer stays put, and is paid for when you come back", 
   assert.equal(g.platforms.find((p) => p.id === shelf!.id)?.item, null, "the bottle is still there");
 });
 
-check("landing on Allie pauses the game for her scene", () => {
+check("a showdown pauses the simulation until it is over", () => {
   const g = createGame(3);
-  openGates(g);
-  const shelf = g.platforms.find((p) => p.item?.kind === "allie");
-  assert.ok(shelf, "Allie was not generated");
-  g.elmer = { x: shelf!.x + shelf!.w / 2, y: shelf!.y - 2, vx: 0, vy: 0, facing: 1, standing: null };
+  build(g, ROWS_PER_ZONE);
+  const shelf = g.byRow.get(ROWS_PER_ZONE - 1)![0];
+  g.elmer = { x: shelf.x + shelf.w / 2, y: shelf.y - 2, vx: 0, vy: 0, facing: 1, standing: null };
   setPhase(g, "flight");
   g.fizz = 20;
   for (let i = 0; i < 600 && g.phase !== "scene"; i++) step(g, 1 / 60);
-  assert.equal(g.phase, "scene", "her scene never started");
+  assert.equal(g.phase, "scene", "the showdown never started");
   const before = { ...g.elmer };
   step(g, 1);
   assert.equal(g.elmer.y, before.y, "the simulation ran on during a cutscene");
@@ -509,7 +494,6 @@ check("moving shelves stay in the shaft and never overlap, at any moment", () =>
       }
     }
   }
-  assert.ok(!g.platforms.some((p) => p.move && p.item?.kind === "allie"), "Allie's shelf moves");
 });
 
 check("higher worlds move more shelves, faster, and bob some of them", () => {
@@ -701,13 +685,6 @@ check("the next lap starts at the bottom with the score carried and the can full
   assert.equal(g.phase, "aim");
   assert.equal(g.fizz, FIZZ_MAX);
   assert.equal(score(g), carried, "the score changed across the lap");
-});
-
-check("Allie is only snatched on lap one", () => {
-  const g = createGame(3);
-  nextLap(g);
-  openGates(g);
-  assert.equal(g.platforms.filter((p) => p.item?.kind === "allie").length, 0);
 });
 
 check("each lap is harder: faster sweeps and smaller shelves", () => {

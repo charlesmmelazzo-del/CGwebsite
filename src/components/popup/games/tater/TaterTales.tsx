@@ -6,8 +6,8 @@ import type { ArcadeGameProps } from "../registry";
 import TaterCanvas from "./TaterCanvas";
 import { ART, type ArtName } from "./artManifest";
 import {
-  ALLIE_AGAIN, ALLIE_KEEP_GOING, ALLIE_LINE, FLAT_LINE, GUILLERMO_LINE, SHOWDOWN_ESCAPE,
-  SHOWDOWN_ESCAPE_AGAIN, SHOWDOWN_HIT, SHOWDOWN_TAUNTS, TATER_LINE,
+  ALLIE_AGAIN, ALLIE_KEEP_GOING, FLAT_LINE, GUILLERMO_LINE, SHOWDOWN_ESCAPE,
+  SHOWDOWN_ESCAPE_AGAIN, SHOWDOWN_HIT, SHOWDOWN_TAUNTS,
   TATER_SOAKED, TATER_TAUNT, TATER_TAUNT_AGAIN, THANK_YOU, summitBottleFor, type BottleId,
 } from "./cast";
 import {
@@ -21,7 +21,7 @@ import {
 import { DEMO_SLIDE_HOLD, SLIDES } from "./story";
 import {
   bestShot, cancelHold, createGame, drainEvents, endScene, heightRows, holdCycles, nextLap,
-  platformById, press, release, rowsFor, score, step, type Item, type TaterEvent, type TaterState,
+  press, release, rowsFor, score, step, type Item, type TaterEvent, type TaterState,
 } from "./taterCore";
 import { HOWTO_COPY, PARAGRAPH_GAP, lineHeight, wrapLines } from "./text";
 import { SUMMIT_ROW, SUMMIT_ZONE, ZONES, zoneForRow, type ZoneArt } from "./zones";
@@ -45,21 +45,12 @@ const SUMMIT_CABINET_X = W * 0.9;
 // ─── Scenes ──────────────────────────────────────────────────────────────────
 
 type BeatId =
-  // Allie, part way up lap one
-  | "help" | "land" | "grab" | "leap"
   // The summit, and the showdown at the top of every world
   | "taunt" | "spray" | "soaked" | "together" | "freed" | "fall" | "landed" | "hit" | "escape"
   // The showdown's lead-in and its payoff: the way into the next world
   | "arrive" | "gate";
 
 interface Beat { id: BeatId; hold: number; line?: string }
-
-const ALLIE_BEATS: Beat[] = [
-  { id: "help", hold: 1.6, line: ALLIE_LINE },
-  { id: "land", hold: 1.0 },
-  { id: "grab", hold: 3.0, line: TATER_LINE },
-  { id: "leap", hold: 1.3 },
-];
 
 function finaleBeats(lap: number, bottle: BottleId | null): Beat[] {
   if (lap === 1) {
@@ -99,11 +90,11 @@ function showdownBeats(zone: number, lap: number): Beat[] {
 }
 
 interface Scene {
-  kind: "allie" | "finale" | "showdown";
+  kind: "finale" | "showdown";
   beats: Beat[];
   beat: number;
   t: number;
-  /** World x of the character the scene is about (Allie, or Tater on the summit). */
+  /** World x of Tater. */
   x: number;
   /** World y of the shelf surface. */
   y: number;
@@ -121,7 +112,7 @@ interface Scene {
 // ─── The view ────────────────────────────────────────────────────────────────
 
 type Screen = "title" | "story" | "howto" | "play" | "flat";
-type ElmerAnim = "shake" | "blast" | "fly" | "fall" | "land" | "thud" | "react";
+type ElmerAnim = "shake" | "blast" | "fly" | "fall" | "land" | "thud";
 
 interface Float { text: string; x: number; y: number; t: number; color: string }
 interface Bubble { text: string; x: number; y: number; t: number; life: number }
@@ -289,7 +280,11 @@ function inside(x: number, y: number, r: { x: number; y: number; w: number; h: n
 }
 
 /** Every sprite and tile: small, and all of it can turn up within a lap. */
-const PLAY_ART = (Object.keys(ART) as ArtName[]).filter((n) => !n.startsWith("cutscene-"));
+const PLAY_ART = (Object.keys(ART) as ArtName[]).filter(
+  // Cutscenes load a slide at a time; the last three belong to the mid-climb
+  // Allie scene, which was retired once every world ended in a showdown.
+  (n) => !n.startsWith("cutscene-") && n !== "allie-help" && n !== "tater-grab" && n !== "elmer-react"
+);
 
 function startPlay(v: View) {
   v.screen = "play";
@@ -418,7 +413,6 @@ function update(v: View, dt: number, h: number) {
 
 function animFor(g: TaterState, v: View): ElmerAnim {
   const thudding = v.anim === "thud" && v.animT < 0.5;
-  if (v.scene?.kind === "allie") return "react";
   if (v.scene?.kind === "finale" || v.scene?.kind === "showdown") return "shake";
   switch (g.phase) {
     case "aim":
@@ -473,14 +467,6 @@ function handle(v: View, e: TaterEvent, h: number) {
       v.shake = 0.45;
       v.floats.push({ text: "KA-BLOOEY!", x: e.x, y: e.y - 44, t: 0, color: T.hot });
       v.floats.push({ text: `DOWN ${e.rows}`, x: e.x, y: e.y - 32, t: 0, color: T.white });
-      break;
-    }
-    case "allie": {
-      const p = platformById(g, e.platformId);
-      const ax = p ? p.x + p.w - 10 : e.x;
-      v.scene = makeScene("allie", ALLIE_BEATS, ax, e.y, g);
-      v.floats.push({ text: "+2500", x: ax, y: e.y - 44, t: 0, color: T.allieLit });
-      openBeat(v);
       break;
     }
     case "showdown": {
@@ -548,8 +534,6 @@ function openBeat(v: View) {
 function speakerSpot(v: View, id: BeatId): { x: number; y: number } {
   const s = v.scene!;
   switch (id) {
-    case "help": return { x: s.x, y: s.y - 42 };
-    case "grab": return { x: s.x - 22, y: s.y - 80 };
     case "taunt":
     case "hit":
     case "escape":
@@ -571,7 +555,7 @@ function advanceScene(v: View, dt: number, h: number) {
   if (!beat) return;
 
   // Walk Elmer to his mark on the summit while Tater talks.
-  if (s.kind !== "allie" && beat.id === "taunt") {
+  if (beat.id === "taunt") {
     const k = Math.min(1, s.t / 0.8);
     v.g.elmer.x = s.elmerFrom + (SUMMIT_ELMER_X - s.elmerFrom) * k;
     v.g.elmer.facing = 1;
@@ -772,9 +756,6 @@ function drawItem(
       // Dusty and sad until somebody brings a mixer.
       drawArt(ctx, `thanks-${item.id}` as ArtName, 0, cx, sy);
       break;
-    case "allie":
-      if (v.scene?.kind !== "allie") drawArt(ctx, "allie-help", Math.floor(t * 4) % 4, x + w - 10, sy);
-      break;
     case "guillermo": {
       const gx = x + w - 30;
       drawArt(ctx, "guillermo-luck", Math.floor(t * 5), gx, sy);
@@ -835,9 +816,6 @@ function drawElmer(ctx: CanvasRenderingContext2D, v: View, x: number, y: number)
     case "thud":
       drawArt(ctx, "elmer-thud", Math.min(5, at * 12), x, y);
       break;
-    case "react":
-      drawArt(ctx, "elmer-react", Math.min(5, at * 3), x, y);
-      break;
   }
 }
 
@@ -847,33 +825,6 @@ function drawScene(ctx: CanvasRenderingContext2D, v: View, cam: number, h: numbe
   if (!beat) return;
   const k = Math.min(1, s.t / beat.hold);
   const sy = s.y - cam;
-
-  if (s.kind === "allie") {
-    const taterX = Math.max(34, s.x - 34);
-    switch (beat.id) {
-      case "help":
-        drawArt(ctx, "allie-help", Math.floor(s.t * 5) % 4, s.x, sy);
-        break;
-      case "land": {
-        drawArt(ctx, "allie-help", 5, s.x, sy);
-        const drop = k < 0.35 ? (1 - k / 0.35) * 140 : 0;
-        drawArt(ctx, "tater-land", Math.min(5, k * 6), taterX, sy - drop);
-        break;
-      }
-      case "grab": {
-        const f = s.t < 1.2 ? Math.min(3, s.t / 0.3) : 4 + (Math.floor(s.t * 4) % 2);
-        drawArt(ctx, "tater-grab", f, s.x - 22, sy);
-        break;
-      }
-      case "leap": {
-        const rise = k > 0.25 ? ((k - 0.25) / 0.75) * (h + 80) : 0;
-        drawArt(ctx, "tater-leap", Math.min(5, k * 7), s.x - 22, sy - rise);
-        break;
-      }
-    }
-    drawTapHint(ctx, "TAP TO SKIP", h, t);
-    return;
-  }
 
   const solo = s.lap >= 2;
   const ex = SUMMIT_ELMER_X;

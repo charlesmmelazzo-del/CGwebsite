@@ -85,11 +85,7 @@ export const THANK_YOU: string[] = [
 /** Guillermo, holding the bottom shelf so you always know where the floor is. */
 export const GUILLERMO_LINE = "GOOD LUCK!";
 
-/** Allie, when her shelf comes into view. */
-export const ALLIE_LINE = "HELP ME!";
 
-/** Mr. Tater, taking her away again. */
-export const TATER_LINE = "YOU DON'T BELONG WITH THIS BOTTOM SHELF RIFF RAFF!";
 
 /** Mixey, out of fizz. The end of the run. */
 export const FLAT_LINE = "MIXEY IS FLAT";

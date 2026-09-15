@@ -24,7 +24,7 @@ import {
   FIZZ_PER_MIXER, FIZZ_PER_NEW_ROW, FIZZ_REFUND_MAX, FIZZ_START, GRAVITY,
   LAND_SPEED, MAX_FALL,
   PLATFORM_BOUNCE, PLATFORM_W, POWER_PERIOD, REST_SPEED, ROW_GAP,
-  SCORE_ALLIE, SCORE_MATCH, SCORE_MIXER, SCORE_NEW_ZONE, SCORE_PER_ROW,
+  SCORE_MATCH, SCORE_MIXER, SCORE_NEW_ZONE, SCORE_PER_ROW,
   SCORE_RESCUE, SCORE_SUMMIT_PER_LAP, SCORE_SHOWDOWN, FIZZ_PER_ZONE, KNOCKDOWN_ROWS, OVERSHAKE_CYCLES,
   SLIDE_FRICTION, SLIDE_FRICTION_PER_ZONE, V_MAX, V_MIN, W, WALL_BOUNCE, WALL_MARGIN,
   aimPeriodFor, lapDifficulty, powerPeriodFor,
@@ -58,7 +58,6 @@ function pick<T>(rng: Rng, list: readonly T[]): T {
 export type Item =
   | { kind: "mixer"; id: MixerId }
   | { kind: "bottle"; id: BottleId }
-  | { kind: "allie" }
   | { kind: "guillermo" }
   /** Mr. Tater, blocking the top of a world. Spray him off to go on. */
   | { kind: "tater" }
@@ -145,15 +144,6 @@ const MOVING_FROM_ROW = 8;
 const MIXER_EVERY: [number, number] = [3, 5];
 /** Rows apart, roughly, that a dusty bottle is waiting. Closer together on later laps. */
 const BOTTLE_EVERY: [number, number] = [6, 9];
-
-/**
- * Where Allie is being carried to, one shelf at a time.
- *
- * Fixed rows rather than random ones: she is the story beat of the run, and a
- * story beat that might not happen is not one. Spaced far enough apart that
- * seeing her again is an event and not a checkpoint.
- */
-export const ALLIE_ROWS = [35, 95, 155, 215];
 
 function spanFor(rng: Rng, [lo, hi]: [number, number]): number {
   return lo + Math.floor(rng() * (hi - lo + 1));
@@ -248,15 +238,7 @@ function placeRow(rng: Rng, row: number, below: Platform[], ctx: RowContext): Pl
   }
 
   // ── What is standing on them ─────────────────────────────────────────────
-  // Allie is only snatched on the way up during lap one. After the rescue she
-  // stays safe on the bottom shelf.
-  if (ctx.lap === 1 && ALLIE_ROWS.includes(row)) {
-    // Far right of the shaft, always. The design pins her there so the cutscene
-    // that follows only ever has to be animated running one direction.
-    let right = out[0];
-    for (const p of out) if (p.x + p.w > right.x + right.w) right = p;
-    right.item = { kind: "allie" };
-  } else if (row >= ctx.nextBottleRow) {
+  if (row >= ctx.nextBottleRow) {
     pick(rng, out).item = { kind: "bottle", id: pick(rng, BOTTLE_IDS) };
     ctx.nextBottleRow = row + Math.max(3, spanFor(rng, BOTTLE_EVERY) - Math.round(hard * 3));
   }
@@ -276,7 +258,7 @@ function placeRow(rng: Rng, row: number, below: Platform[], ctx: RowContext): Pl
   //
   // Any number can move in a row. Each swings through at most HALF the gap to
   // each neighbour (all of it against a wall), so two movers heading for each
-  // other can never meet, whatever their timing. Never Allie's shelf: her scene
+  // other can never meet, whatever their timing.
   // is staged against one that stays put.
   if (row >= MOVING_FROM_ROW) {
     const zone = zoneIndexForRow(row);
@@ -284,7 +266,7 @@ function placeRow(rng: Rng, row: number, below: Platform[], ctx: RowContext): Pl
     const pace = 1 + zone * 0.09 + hard * 0.35;
     const sorted = [...out].sort((a, b) => a.x - b.x);
     sorted.forEach((p, i) => {
-      if (p.item?.kind === "allie" || rng() >= odds) return;
+      if (rng() >= odds) return;
       const leftGap = i > 0 ? p.x - (sorted[i - 1].x + sorted[i - 1].w) : 0;
       const rightGap = i < sorted.length - 1 ? sorted[i + 1].x - (p.x + p.w) : 0;
       const leftRoom = i > 0 ? (leftGap - 10) / 2 : p.x - WALL_MARGIN;
@@ -344,7 +326,6 @@ export type TaterEvent =
   | { kind: "zone"; index: number }
   | { kind: "pickup"; id: MixerId; x: number; y: number }
   | { kind: "match"; id: BottleId; x: number; y: number }
-  | { kind: "allie"; platformId: number; x: number; y: number }
   /** Standing on Tater's top shelf. The renderer plays the finale, then calls nextLap. */
   | { kind: "summit"; lap: number; bottle: BottleId | null; bonus: number; y: number }
   /** Standing on a world's top shelf with Tater on it. The renderer plays the showdown. */
@@ -370,7 +351,7 @@ export type Phase =
   | "slide"
   /** Standing still. Whatever is on the shelf resolves, then back to aim. */
   | "settle"
-  /** Something is being played out — Allie, Tater. The simulation is paused. */
+  /** Something is being played out — a showdown or the finale. The simulation is paused. */
   | "scene"
   | "over";
 
@@ -963,8 +944,8 @@ function slide(g: TaterState, h: number): void {
  * Standing still on a shelf. Everything a landing is worth is paid out here.
  *
  * On coming to REST, not on touching down, and the difference is the design:
- * skimming a shelf on the way past is not landing on it. Handing out Allie's
- * bonus for a graze would also fire her cutscene mid-flight.
+ * skimming a shelf on the way past is not landing on it. Handing out a showdown's
+ * bonus for a graze would also fire its cutscene mid-flight.
  */
 function rest(g: TaterState, p: Platform): void {
   g.phase = "settle";
@@ -1009,15 +990,6 @@ function rest(g: TaterState, p: Platform): void {
           p.spent = true;
           p.item = null;
         }
-        break;
-
-      case "allie":
-        g.bonus += SCORE_ALLIE;
-        g.events.push({ kind: "allie", platformId: p.id, x: centreX, y: p.y });
-        p.spent = true;
-        p.item = null;
-        // Tater is on his way. The renderer plays it out and calls endScene.
-        g.phase = "scene";
         break;
 
       case "guillermo":
@@ -1147,7 +1119,6 @@ export function bestShot(g: TaterState): { angle: number; power: number } | null
       const plat = hit.platformId != null ? g.platforms.find((q) => q.id === hit.platformId) : undefined;
       if (plat?.item?.kind === "mixer") value += 25;
       if (plat?.item?.kind === "bottle" && g.mixers > 0) value += 30;
-      if (plat?.item?.kind === "allie") value += 60;
       if (plat?.item?.kind === "summit") value += 400;
       if (plat?.item?.kind === "tater") value += 200;
       if (!best || value > best.value) best = { angle, power, value };
