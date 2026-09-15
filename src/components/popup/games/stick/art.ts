@@ -186,7 +186,9 @@ export function drawBackdrop(
   if (anchorSrc !== undefined && anchorY !== undefined) {
     const srcY = anchorSrc * ih;
     const dstY = anchorY - y;
-    k = Math.max(k, dstY / srcY, (h - dstY) / (ih - srcY));
+    // Big enough that the image still reaches both edges once it's pinned.
+    if (srcY > 0) k = Math.max(k, dstY / srcY);
+    if (ih - srcY > 0) k = Math.max(k, (h - dstY) / (ih - srcY));
     oy = dstY - srcY * k;
   } else {
     oy = (h - ih * k) / 2;

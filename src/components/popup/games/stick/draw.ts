@@ -631,26 +631,60 @@ function persp(z: number): number {
 }
 
 /**
- * How far each lane leans in toward the middle over the length of the bar, as
- * a share of its distance from the middle. Small on purpose: the left thumb's
- * lanes stay over the left side and the right thumb's over the right, so a
- * far-off bottle is already lined up with its button.
+ * The two bar runners painted in bg-highway, measured off the image (1536x1024
+ * source pixels). Each is bounded by a brass rail, and both rails lean in
+ * toward the middle as they run up the image, the outer one more steeply.
+ * The right runner is the mirror of the left.
+ *
+ * The backdrop is pinned by its bottom edge and scaled to the screen's width,
+ * so a screen x maps straight onto the image and a screen y onto a row
+ * measured up from the image's bottom.
  */
-const LANE_LEAN = 0.2;
+const RUNNER = {
+  srcW: 1536,
+  srcH: 1024,
+  /** Row the "at" values were measured on. */
+  atY: 1010,
+  outerAt: 35,
+  outerLean: 0.269,
+  innerAt: 339,
+  innerLean: 0.167,
+  /** Half a rail's thickness, so lanes run on the wood rather than the brass. */
+  rail: 8,
+};
 
-/** Where a lane starts at the far end of the bar. */
-function laneFarX(st: State, lane: number): number {
-  const bx = laneButtonX(st.layout, lane);
-  return bx + (st.layout.w / 2 - bx) * LANE_LEAN;
+/** The left runner's wood at a screen y: its outer and inner edge, in screen x. */
+function runnerEdges(w: number, y: number): [number, number] {
+  const srcY = RUNNER.srcH - ((K.H - y) * RUNNER.srcW) / w;
+  const up = RUNNER.atY - srcY;
+  const k = w / RUNNER.srcW;
+  return [
+    (RUNNER.outerAt + RUNNER.outerLean * up + RUNNER.rail) * k,
+    (RUNNER.innerAt + RUNNER.innerLean * up - RUNNER.rail) * k,
+  ];
+}
+
+/**
+ * Where a lane is at a screen y. Each lane keeps the place across its runner
+ * that its button has, so it runs down the painted wood and ends on its button.
+ */
+function laneX(st: State, lane: number, y: number): number {
+  const w = st.layout.w;
+  const right = lane >= 2;
+  const bx = laneButtonX(st.layout, right ? 3 - lane : lane);
+  const [o0, i0] = runnerEdges(w, LANE_BUTTON_Y);
+  const across = (bx - o0) / (i0 - o0);
+  const [o, i] = runnerEdges(w, y);
+  const x = o + across * (i - o);
+  return right ? w - x : x;
 }
 
 function lanePoint(st: State, lane: number, z: number) {
   const f = persp(z);
-  const bx = laneButtonX(st.layout, lane);
-  const fx = laneFarX(st, lane);
+  const y = VP_Y + (LANE_BUTTON_Y - VP_Y) * f;
   return {
-    x: fx + (bx - fx) * f,
-    y: VP_Y + (LANE_BUTTON_Y - VP_Y) * f,
+    x: laneX(st, lane, y),
+    y,
     scale: 0.35 + 0.65 * f,
   };
 }
@@ -664,7 +698,7 @@ function drawBuild(ctx: Ctx, s: number, st: State, t: number, frozen: boolean) {
   const b = st.build;
   const w = l.w;
 
-  const painted = drawBackdrop(ctx, s, ART.v2("bg-highway"), 0, 0, w, K.H, 0.17, VP_Y - 8);
+  const painted = drawBackdrop(ctx, s, ART.v2("bg-highway"), 0, 0, w, K.H, 1, K.H);
   // The room at the far end of the bar
   if (!painted) {
   const sky = ctx.createLinearGradient(0, 0, 0, K.H);
@@ -702,22 +736,20 @@ function drawBuild(ctx: Ctx, s: number, st: State, t: number, frozen: boolean) {
   }
   if (!b) return;
 
-  // Where each bottle slides: a polished runner per lane
+  // Where each bottle slides: a faint guide down the painted runner per lane
   for (let lane = 0; lane < K.LANES; lane++) {
-    const bx = laneButtonX(l, lane);
-    const fx = laneFarX(st, lane);
-    ctx.fillStyle = "rgba(255,210,150,0.12)";
-    ctx.beginPath();
-    ctx.moveTo(fx - 10, VP_Y);
-    ctx.lineTo(fx + 10, VP_Y);
-    ctx.lineTo(bx + 30, LANE_BUTTON_Y);
-    ctx.lineTo(bx - 30, LANE_BUTTON_Y);
-    ctx.closePath();
-    ctx.fill();
+    const x0 = laneX(st, lane, VP_Y);
+    const x1 = laneX(st, lane, LANE_BUTTON_Y);
     ctx.strokeStyle = LANE_COLORS[lane];
-    ctx.globalAlpha = 0.55;
+    ctx.globalAlpha = painted ? 0.4 : 0.55;
     ctx.lineWidth = 2;
+    ctx.setLineDash([10, 8]);
+    ctx.lineDashOffset = -b.clock * 60;
+    ctx.beginPath();
+    ctx.moveTo(x0, VP_Y);
+    ctx.lineTo(x1, LANE_BUTTON_Y);
     ctx.stroke();
+    ctx.setLineDash([]);
     ctx.globalAlpha = 1;
   }
 
