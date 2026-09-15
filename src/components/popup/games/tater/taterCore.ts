@@ -25,13 +25,13 @@ import {
   LAND_SPEED, MAX_FALL,
   PLATFORM_BOUNCE, PLATFORM_W, POWER_PERIOD, REST_SPEED, ROW_GAP,
   SCORE_ALLIE, SCORE_MATCH, SCORE_MIXER, SCORE_NEW_ZONE, SCORE_PER_ROW,
-  SCORE_RESCUE, SCORE_SUMMIT_PER_LAP, FIZZ_PER_ZONE, KNOCKDOWN_ROWS, OVERSHAKE_CYCLES,
+  SCORE_RESCUE, SCORE_SUMMIT_PER_LAP, SCORE_SHOWDOWN, FIZZ_PER_ZONE, KNOCKDOWN_ROWS, OVERSHAKE_CYCLES,
   SLIDE_FRICTION, V_MAX, V_MIN, W, WALL_BOUNCE, WALL_MARGIN,
   aimPeriodFor, lapDifficulty, powerPeriodFor,
   type PlatformSize,
 } from "./constants";
 import { BOTTLE_IDS, MIXER_IDS, summitBottleFor, type BottleId, type MixerId } from "./cast";
-import { SUMMIT_ROW, zoneIndexForRow } from "./zones";
+import { ROWS_PER_ZONE, SUMMIT_ROW, zoneIndexForRow } from "./zones";
 
 // ─── Randomness ──────────────────────────────────────────────────────────────
 
@@ -60,6 +60,8 @@ export type Item =
   | { kind: "bottle"; id: BottleId }
   | { kind: "allie" }
   | { kind: "guillermo" }
+  /** Mr. Tater, blocking the top of a world. Spray him off to go on. */
+  | { kind: "tater" }
   /** Tater's golden top shelf. Landing here ends the lap. */
   | { kind: "summit" };
 
@@ -160,6 +162,15 @@ function placeRow(rng: Rng, row: number, below: Platform[], ctx: RowContext): Pl
     }];
   }
 
+  // The top of every world below heaven: Tater, on a floor wall to wall, so
+  // nobody climbs into the next world without facing him.
+  if (isShowdownRow(row)) {
+    return [{
+      id: ctx.nextId++, row, size: "large", x: WALL_MARGIN, y, w: W - WALL_MARGIN * 2,
+      item: { kind: "tater" }, spent: false,
+    }];
+  }
+
   const push = (size: PlatformSize, cx: number) => {
     const w = PLATFORM_W[size];
     const x = Math.round(Math.min(W - WALL_MARGIN - w, Math.max(WALL_MARGIN, cx - w / 2)));
@@ -257,6 +268,14 @@ function placeRow(rng: Rng, row: number, below: Platform[], ctx: RowContext): Pl
   return out;
 }
 
+/**
+ * The last row of each world, heaven excepted — heaven's top is the summit
+ * itself, one row further up.
+ */
+export function isShowdownRow(row: number): boolean {
+  return row > 0 && (row + 1) % ROWS_PER_ZONE === 0 && row < SUMMIT_ROW - ROWS_PER_ZONE;
+}
+
 /** The bottom shelf: one unbroken floor, with Guillermo on it wishing you luck. */
 function groundRow(ctx: RowContext): Platform[] {
   const w = W - WALL_MARGIN * 2;
@@ -287,6 +306,8 @@ export type TaterEvent =
   | { kind: "allie"; platformId: number; x: number; y: number }
   /** Standing on Tater's top shelf. The renderer plays the finale, then calls nextLap. */
   | { kind: "summit"; lap: number; bottle: BottleId | null; bonus: number; y: number }
+  /** Standing on a world's top shelf with Tater on it. The renderer plays the showdown. */
+  | { kind: "showdown"; zone: number; lap: number; bonus: number; y: number }
   /** Held the gauge too long: Mixey blew. Elmer is knocked down `rows` rows. */
   | { kind: "explode"; x: number; y: number; rows: number }
   | { kind: "flat" };
@@ -921,6 +942,16 @@ function rest(g: TaterState, p: Platform): void {
       case "guillermo":
         break;
 
+      case "tater": {
+        const bonus = SCORE_SHOWDOWN * g.lap;
+        g.bonus += bonus;
+        g.events.push({ kind: "showdown", zone: zoneIndexForRow(p.row), lap: g.lap, bonus, y: p.y });
+        p.spent = true;
+        p.item = null;
+        g.phase = "scene";
+        break;
+      }
+
       case "summit": {
         const bottle = summitBottleFor(g.lap);
         const bonus = g.lap === 1 ? SCORE_RESCUE : SCORE_SUMMIT_PER_LAP * g.lap;
@@ -1023,6 +1054,7 @@ export function bestShot(g: TaterState): { angle: number; power: number } | null
       if (plat?.item?.kind === "bottle" && g.mixers > 0) value += 30;
       if (plat?.item?.kind === "allie") value += 60;
       if (plat?.item?.kind === "summit") value += 400;
+      if (plat?.item?.kind === "tater") value += 200;
       if (!best || value > best.value) best = { angle, power, value };
     }
   }

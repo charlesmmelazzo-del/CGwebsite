@@ -105,6 +105,32 @@ export const TATER_TAUNT_AGAIN = "YOU AGAIN?! MY BOTTLES STAY ON MY SHELF!";
 /** Tater, soaked, going over the edge. */
 export const TATER_SOAKED = "MY SHIRT!!";
 
+/**
+ * Tater at the top of each world, in ladder order: the bottom shelf, the sky,
+ * space, the moon, deeper space, Mars, deep space, Pluto, the long dark, the
+ * alien ship, the far side. Heaven's top is the summit, which has its own lines.
+ */
+export const SHOWDOWN_TAUNTS: string[] = [
+  "GET BACK ON THE BOTTOM SHELF WHERE YOU BELONG!",
+  "THE SKY'S THE LIMIT... FOR ME, NOT YOU!",
+  "IN SPACE, NOBODY CAN HEAR YOU FIZZ!",
+  "ONE SMALL STEP FOR A POTATO. NO STEPS FOR YOU!",
+  "STILL CLIMBING? HOW VERY BOTTOM SHELF.",
+  "MARS IS MY WINE CELLAR, RIFF RAFF!",
+  "BONDED BUT ONLY 4 YEAR? BARELY A DRAIN POUR!",
+  "COLD UP HERE, ISN'T IT? STAY ON ICE!",
+  "NOBODY DRINKS THE GOOD STUFF. IT'S FOR COLLECTING!",
+  "EVEN THE ALIENS KNOW NOT TO TOUCH MY BOTTLES!",
+  "HEAVEN IS FOR ALLOCATED BOTTLES ONLY!",
+];
+
+/** Soaked at a world's top, before he leaps away. */
+export const SHOWDOWN_HIT = "ARGH! SODA! ON MY BOURBON SHIRT!";
+
+/** Getting away up the shelves. Lap one he still has Allie. */
+export const SHOWDOWN_ESCAPE = "YOU'LL NEVER GET HER BACK!";
+export const SHOWDOWN_ESCAPE_AGAIN = "SEE YOU AT THE NEXT SHELF!";
+
 /** Allie, back on the bottom shelf after the rescue. From the design. */
 export const ALLIE_KEEP_GOING = "KEEP GOING! SEE IF YOU CAN REACH TATER AGAIN AND TAKE HIM ON!";
 

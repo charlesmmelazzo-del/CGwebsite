@@ -11,7 +11,7 @@ import { unrenderable } from "../../arcade";
 import { ART } from "../artManifest";
 import {
   ALLIE_AGAIN, ALLIE_KEEP_GOING, ALLIE_LINE, FLAT_LINE, GUILLERMO_LINE, LONELY_BOTTLES, MIXERS,
-  SUMMIT_BOTTLES, TATER_LINE, TATER_SOAKED, TATER_TAUNT, TATER_TAUNT_AGAIN, THANK_YOU,
+  SHOWDOWN_ESCAPE, SHOWDOWN_ESCAPE_AGAIN, SHOWDOWN_HIT, SHOWDOWN_TAUNTS, SUMMIT_BOTTLES, TATER_LINE, TATER_SOAKED, TATER_TAUNT, TATER_TAUNT_AGAIN, THANK_YOU,
   summitBottleFor,
 } from "../cast";
 import {
@@ -24,7 +24,7 @@ import { ROWS_PER_ZONE, SUMMIT_ROW, ZONES, zoneForRow, zoneIndexForRow } from ".
 import { SLIDES } from "../story";
 import { HOWTO_COPY } from "../text";
 import {
-  ALLIE_ROWS, CHARGE_TIME, REACH_X, aimAt, bestShot, build, createGame,
+  ALLIE_ROWS, CHARGE_TIME, REACH_X, aimAt, bestShot, build, createGame, isShowdownRow,
   cancelHold, drainEvents, endScene, heightRows, nextLap, platformX, powerAt, press, release,
   score, simulateBlast, speedFor, makeRng, step, velocityFor, type Phase, type TaterState,
 } from "../taterCore";
@@ -117,6 +117,7 @@ check("every line in the game can be drawn by the 5x7 font", () => {
   const strings = [
     ...THANK_YOU, GUILLERMO_LINE, ALLIE_LINE, TATER_LINE, FLAT_LINE,
     TATER_TAUNT, TATER_TAUNT_AGAIN, TATER_SOAKED, ALLIE_KEEP_GOING, ALLIE_AGAIN,
+    ...SHOWDOWN_TAUNTS, SHOWDOWN_HIT, SHOWDOWN_ESCAPE, SHOWDOWN_ESCAPE_AGAIN,
     ...ZONES.map((z) => `${z.title}!!!`), "YOU REACHED", "KA-BLOOEY!", "LET GO!",
     ...HOWTO_COPY.flat(),
     ...LONELY_BOTTLES.map((b) => b.label),
@@ -542,6 +543,34 @@ function landOn(state: TaterState, id: number) {
     if (state.phase === "settle" || state.phase === "aim" || state.phase === "over" || state.phase === "scene") break;
   }
 }
+
+check("Tater blocks the top of every world but heaven, on a floor wall to wall", () => {
+  const g = createGame(8);
+  build(g, SUMMIT_ROW);
+  const rows = g.platforms.filter((p) => p.item?.kind === "tater").map((p) => p.row);
+  assert.equal(rows.length, ZONES.length - 1, `${rows.length} showdowns`);
+  assert.equal(SHOWDOWN_TAUNTS.length, ZONES.length - 1, "a world without a taunt");
+  for (const r of rows) {
+    assert.ok(isShowdownRow(r));
+    assert.equal(zoneForRow(r + 1).fromRow, r + 1, `row ${r} is not the top of its world`);
+    const [floor, ...rest] = g.byRow.get(r)!;
+    assert.equal(rest.length, 0);
+    assert.ok(floor.w >= W - WALL_MARGIN * 2 && !floor.move);
+  }
+});
+
+check("standing on Tater's shelf pays out and pauses for the showdown", () => {
+  const g = createGame(8);
+  build(g, ROWS_PER_ZONE + 2);
+  const shelf = g.byRow.get(ROWS_PER_ZONE - 1)![0];
+  landOn(g, shelf.id);
+  const ev = drainEvents(g).find((e) => e.kind === "showdown");
+  assert.ok(ev, "no showdown");
+  assert.equal(g.phase, "scene");
+  assert.equal(shelf.item, null, "Tater is still there to fight again");
+  endScene(g);
+  assert.equal(g.phase, "aim");
+});
 
 check("nothing is built above the summit, and it is one floor wall to wall", () => {
   const g = createGame(8);

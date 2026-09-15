@@ -6,7 +6,8 @@ import type { ArcadeGameProps } from "../registry";
 import TaterCanvas from "./TaterCanvas";
 import { ART, type ArtName } from "./artManifest";
 import {
-  ALLIE_AGAIN, ALLIE_KEEP_GOING, ALLIE_LINE, FLAT_LINE, GUILLERMO_LINE, TATER_LINE,
+  ALLIE_AGAIN, ALLIE_KEEP_GOING, ALLIE_LINE, FLAT_LINE, GUILLERMO_LINE, SHOWDOWN_ESCAPE,
+  SHOWDOWN_ESCAPE_AGAIN, SHOWDOWN_HIT, SHOWDOWN_TAUNTS, TATER_LINE,
   TATER_SOAKED, TATER_TAUNT, TATER_TAUNT_AGAIN, THANK_YOU, summitBottleFor, type BottleId,
 } from "./cast";
 import {
@@ -46,8 +47,8 @@ const SUMMIT_CABINET_X = W * 0.9;
 type BeatId =
   // Allie, part way up lap one
   | "help" | "land" | "grab" | "leap"
-  // The summit
-  | "taunt" | "spray" | "soaked" | "together" | "freed" | "fall" | "landed";
+  // The summit, and the showdown at the top of every world
+  | "taunt" | "spray" | "soaked" | "together" | "freed" | "fall" | "landed" | "hit" | "escape";
 
 interface Beat { id: BeatId; hold: number; line?: string }
 
@@ -79,8 +80,21 @@ function finaleBeats(lap: number, bottle: BottleId | null): Beat[] {
   ];
 }
 
+/**
+ * Tater at the top of a world: he taunts, Elmer sprays him, and he leaps away
+ * up the shelves — with Allie, on lap one — to wait at the top of the next.
+ */
+function showdownBeats(zone: number, lap: number): Beat[] {
+  return [
+    { id: "taunt", hold: 2.4, line: SHOWDOWN_TAUNTS[zone % SHOWDOWN_TAUNTS.length] },
+    { id: "spray", hold: 1.2 },
+    { id: "hit", hold: 1.3, line: SHOWDOWN_HIT },
+    { id: "escape", hold: 1.5, line: lap === 1 ? SHOWDOWN_ESCAPE : SHOWDOWN_ESCAPE_AGAIN },
+  ];
+}
+
 interface Scene {
-  kind: "allie" | "finale";
+  kind: "allie" | "finale" | "showdown";
   beats: Beat[];
   beat: number;
   t: number;
@@ -388,7 +402,7 @@ function update(v: View, dt: number, h: number) {
 function animFor(g: TaterState, v: View): ElmerAnim {
   const thudding = v.anim === "thud" && v.animT < 0.5;
   if (v.scene?.kind === "allie") return "react";
-  if (v.scene?.kind === "finale") return "shake";
+  if (v.scene?.kind === "finale" || v.scene?.kind === "showdown") return "shake";
   switch (g.phase) {
     case "aim":
     case "power": return thudding ? "thud" : "shake";
@@ -445,6 +459,12 @@ function handle(v: View, e: TaterEvent, h: number) {
       openBeat(v);
       break;
     }
+    case "showdown": {
+      v.scene = makeScene("showdown", showdownBeats(e.zone, e.lap), SUMMIT_TATER_X, e.y, g);
+      v.floats.push({ text: `+${e.bonus}`, x: SUMMIT_ELMER_X, y: e.y - 50, t: 0, color: T.brass });
+      openBeat(v);
+      break;
+    }
     case "summit": {
       v.scene = makeScene("finale", finaleBeats(e.lap, e.bottle), SUMMIT_TATER_X, e.y, g);
       v.scene.lap = e.lap;
@@ -496,6 +516,8 @@ function speakerSpot(v: View, id: BeatId): { x: number; y: number } {
     case "help": return { x: s.x, y: s.y - 42 };
     case "grab": return { x: s.x - 22, y: s.y - 80 };
     case "taunt":
+    case "hit":
+    case "escape":
     case "soaked": return { x: SUMMIT_TATER_X, y: s.y - 82 };
     case "freed": return { x: SUMMIT_CABINET_X, y: s.y - 44 };
     case "landed": {
@@ -514,7 +536,7 @@ function advanceScene(v: View, dt: number, h: number) {
   if (!beat) return;
 
   // Walk Elmer to his mark on the summit while Tater talks.
-  if (s.kind === "finale" && beat.id === "taunt") {
+  if (s.kind !== "allie" && beat.id === "taunt") {
     const k = Math.min(1, s.t / 0.8);
     v.g.elmer.x = s.elmerFrom + (SUMMIT_ELMER_X - s.elmerFrom) * k;
     v.g.elmer.facing = 1;
@@ -719,6 +741,10 @@ function drawItem(
       if (v.g.lap >= 2) drawArt(ctx, "allie-cheer", Math.floor(t * 5), gx - 30, sy);
       break;
     }
+    case "tater":
+      // Waiting at the top of this world.
+      drawArt(ctx, v.g.lap >= 2 ? "tater-summit-solo" : "tater-summit", Math.floor(t * 4), SUMMIT_TATER_X, sy);
+      break;
     case "summit": {
       drawArt(ctx, "tile-summit-deco1", 0, SUMMIT_CABINET_X, sy, { scale: 3 });
       // From lap two, the rare bottle waiting in front of his cabinet.
@@ -737,7 +763,7 @@ function drawItem(
 
 function sceneDrawsElmer(v: View): boolean {
   const id = v.scene?.beats[v.scene.beat]?.id;
-  return id === "spray" || id === "together" || id === "fall" ||
+  return id === "spray" || id === "hit" || id === "together" || id === "fall" ||
     (id === "soaked" || id === "freed");
 }
 
@@ -808,9 +834,40 @@ function drawScene(ctx: CanvasRenderingContext2D, v: View, cam: number, h: numbe
     return;
   }
 
-  // ── The finale ───────────────────────────────────────────────────────────
   const solo = s.lap >= 2;
   const ex = SUMMIT_ELMER_X;
+
+  // ── A world's showdown ───────────────────────────────────────────────────
+  if (s.kind === "showdown") {
+    switch (beat.id) {
+      case "taunt":
+        drawArt(ctx, solo ? "tater-summit-solo" : "tater-summit", Math.floor(s.t * 4), SUMMIT_TATER_X, sy);
+        break;
+      case "spray": {
+        drawArt(ctx, solo ? "tater-summit-solo" : "tater-summit", 1, SUMMIT_TATER_X, sy);
+        const f = Math.min(5, s.t * 6);
+        drawArt(ctx, "elmer-spray", f, ex, sy);
+        if (f >= 3) sodaJet(ctx, ex + 20, SUMMIT_TATER_X - 18, sy - 20, t);
+        break;
+      }
+      case "hit":
+        // Only the first three frames: soaked and flailing, but still standing.
+        drawArt(ctx, solo ? "tater-soaked-solo" : "tater-soaked", Math.min(2, k * 4), SUMMIT_TATER_X, sy);
+        drawArt(ctx, "elmer-spray", 5, ex, sy);
+        if (k < 0.35) sodaJet(ctx, ex + 20, SUMMIT_TATER_X - 18, sy - 20, t);
+        break;
+      case "escape": {
+        const rise = k > 0.25 ? ((k - 0.25) / 0.75) * (h + 100) : 0;
+        if (solo) drawArt(ctx, "tater-land", 0, SUMMIT_TATER_X, sy - rise);
+        else drawArt(ctx, "tater-leap", Math.min(5, k * 7), SUMMIT_TATER_X, sy - rise);
+        break;
+      }
+    }
+    drawTapHint(ctx, "TAP TO SKIP", h, t);
+    return;
+  }
+
+  // ── The finale ───────────────────────────────────────────────────────────
   switch (beat.id) {
     case "taunt":
       drawArt(ctx, solo ? "tater-summit-solo" : "tater-summit", Math.floor(s.t * 4), SUMMIT_TATER_X, sy);
