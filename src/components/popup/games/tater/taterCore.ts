@@ -26,7 +26,7 @@ import {
   PLATFORM_BOUNCE, PLATFORM_W, POWER_PERIOD, REST_SPEED, ROW_GAP,
   SCORE_ALLIE, SCORE_MATCH, SCORE_MIXER, SCORE_NEW_ZONE, SCORE_PER_ROW,
   SCORE_RESCUE, SCORE_SUMMIT_PER_LAP, SCORE_SHOWDOWN, FIZZ_PER_ZONE, KNOCKDOWN_ROWS, OVERSHAKE_CYCLES,
-  SLIDE_FRICTION, V_MAX, V_MIN, W, WALL_BOUNCE, WALL_MARGIN,
+  SLIDE_FRICTION, SLIDE_FRICTION_PER_ZONE, V_MAX, V_MIN, W, WALL_BOUNCE, WALL_MARGIN,
   aimPeriodFor, lapDifficulty, powerPeriodFor,
   type PlatformSize,
 } from "./constants";
@@ -82,13 +82,45 @@ export interface Platform {
    * A shelf that slides from side to side. `x` is kept current by `step`;
    * `baseX` is where it was generated, and it swings `amp` either side of that.
    */
-  move?: { baseX: number; amp: number; speed: number; phase: number };
+  move?: {
+    baseX: number; amp: number; speed: number; phase: number;
+    /** Up-and-down bob, in world pixels either side of the row's surface. 0 for none. */
+    baseY: number; ampY: number; speedY: number; phaseY: number;
+  };
+  /** Where the surface was last frame, for catching a shelf that rises into him. */
+  prevY?: number;
 }
 
 /** Where a shelf is at a given moment. */
 export function platformX(p: Platform, time: number): number {
-  if (!p.move) return p.x;
+  if (!p.move || !p.move.amp) return p.move ? p.move.baseX : p.x;
   return p.move.baseX + p.move.amp * Math.sin(p.move.phase + time * p.move.speed);
+}
+
+export function platformY(p: Platform, time: number): number {
+  if (!p.move || !p.move.ampY) return p.move ? p.move.baseY : p.y;
+  return p.move.baseY + p.move.ampY * Math.sin(p.move.phaseY + time * p.move.speedY);
+}
+
+/**
+ * The most a bobbing shelf rises or sinks. A fifth of a row, so rows never
+ * cross and the reach worked out for REACH_X still holds with room to spare.
+ */
+export const BOB_MAX = 13;
+
+/**
+ * Gravity at a height: a little lighter in every world, so the climb gets
+ * floatier the further from the bottom shelf it goes.
+ */
+export function gravityAtRow(row: number): number {
+  const zone = zoneIndexForRow(Math.max(0, row));
+  return GRAVITY * Math.max(0.7, 1 - zone * 0.026);
+}
+
+/** Friction along a shelf at a height: grippy at the bottom, slipperier each world up. */
+export function slideFrictionAtRow(row: number): number {
+  const zone = zoneIndexForRow(Math.max(0, row));
+  return SLIDE_FRICTION - zone * SLIDE_FRICTION_PER_ZONE;
 }
 
 /**
@@ -238,31 +270,40 @@ function placeRow(rng: Rng, row: number, below: Platform[], ctx: RowContext): Pl
   }
 
   // ── Moving shelves ───────────────────────────────────────────────────────
-  // None on the first few rows, then more of them the higher the climb and the
-  // later the lap. At most one per row, and it swings only through the gap its
-  // neighbours leave, so shelves never overlap and never leave the shaft.
-  // Never Allie's: her scene is staged against a shelf that stays put.
+  // None on the first few rows, then more and more the higher the climb and
+  // the later the lap, moving faster world by world. Some slide, some bob up
+  // and down, and higher up some do both.
+  //
+  // Any number can move in a row. Each swings through at most HALF the gap to
+  // each neighbour (all of it against a wall), so two movers heading for each
+  // other can never meet, whatever their timing. Never Allie's shelf: her scene
+  // is staged against one that stays put.
   if (row >= MOVING_FROM_ROW) {
-    const odds = Math.min(0.7, 0.22 + (row / SUMMIT_ROW) * 0.3 + hard * 0.25);
-    if (rng() < odds) {
-      const candidates = out.filter((p) => p.item?.kind !== "allie");
-      if (candidates.length) {
-        const p = pick(rng, candidates);
-        const sorted = [...out].sort((a, b) => a.x - b.x);
-        const i = sorted.indexOf(p);
-        const leftBound = i > 0 ? sorted[i - 1].x + sorted[i - 1].w + 10 : WALL_MARGIN;
-        const rightBound = i < sorted.length - 1 ? sorted[i + 1].x - 10 : W - WALL_MARGIN;
-        const amp = Math.min(p.x - leftBound, rightBound - (p.x + p.w), 64);
-        if (amp >= 14) {
-          p.move = {
-            baseX: p.x,
-            amp,
-            speed: 0.7 + rng() * 0.6 + hard * 0.5,
-            phase: rng() * Math.PI * 2,
-          };
-        }
-      }
-    }
+    const zone = zoneIndexForRow(row);
+    const odds = Math.min(0.9, 0.2 + zone * 0.065 + hard * 0.2);
+    const pace = 1 + zone * 0.09 + hard * 0.35;
+    const sorted = [...out].sort((a, b) => a.x - b.x);
+    sorted.forEach((p, i) => {
+      if (p.item?.kind === "allie" || rng() >= odds) return;
+      const leftGap = i > 0 ? p.x - (sorted[i - 1].x + sorted[i - 1].w) : 0;
+      const rightGap = i < sorted.length - 1 ? sorted[i + 1].x - (p.x + p.w) : 0;
+      const leftRoom = i > 0 ? (leftGap - 10) / 2 : p.x - WALL_MARGIN;
+      const rightRoom = i < sorted.length - 1 ? (rightGap - 10) / 2 : W - WALL_MARGIN - (p.x + p.w);
+      const room = Math.max(0, Math.min(leftRoom, rightRoom, 64));
+
+      // Bobbing turns up from the third world, and both at once from the sixth.
+      const roll = rng();
+      const bob = zone >= 2 && roll < 0.3 + zone * 0.02;
+      const both = zone >= 5 && roll < 0.12 + zone * 0.015;
+      const slides = !bob || both;
+      const amp = slides && room >= 12 ? room : 0;
+      const ampY = bob ? 8 + rng() * (BOB_MAX - 8) : 0;
+      if (!amp && !ampY) return;
+      p.move = {
+        baseX: p.x, amp, speed: (0.6 + rng() * 0.5) * pace, phase: rng() * Math.PI * 2,
+        baseY: p.y, ampY, speedY: (0.9 + rng() * 0.6) * pace, phaseY: rng() * Math.PI * 2,
+      };
+    });
   }
 
   return out;
@@ -702,8 +743,14 @@ function movePlatforms(g: TaterState): void {
     for (const p of list) {
       if (!p.move) continue;
       const nx = platformX(p, g.elapsed);
-      if (standing === p.id) g.elmer.x += nx - p.x;
+      const ny = platformY(p, g.elapsed);
+      if (standing === p.id) {
+        g.elmer.x += nx - p.x;
+        g.elmer.y += ny - p.y;
+      }
+      p.prevY = p.y;
       p.x = nx;
+      p.y = ny;
     }
   }
 }
@@ -753,7 +800,7 @@ function integrate(g: TaterState, h: number): void {
   const px = e.x;
   const py = e.y;
 
-  e.vy = Math.min(MAX_FALL, e.vy + GRAVITY * h);
+  e.vy = Math.min(MAX_FALL, e.vy + gravityAtRow(Math.floor(-e.y / ROW_GAP)) * h);
   e.x += e.vx * h;
   e.y += e.vy * h;
 
@@ -804,8 +851,9 @@ function collide(g: TaterState, px: number, py: number): void {
   // A shelf he could have crossed has its surface between where his feet were
   // and where they are, and row r's surface is exactly -r * ROW_GAP — so the
   // handful of rows worth testing can be named rather than searched for.
-  const rLo = Math.floor(-e.y / ROW_GAP);
-  const rHi = Math.ceil(-py / ROW_GAP);
+  // One row of slack either side for shelves that bob off their row's line.
+  const rLo = Math.floor(-e.y / ROW_GAP) - 1;
+  const rHi = Math.ceil(-py / ROW_GAP) + 1;
 
   for (let r = rLo; r <= rHi; r++) {
     const list = g.byRow.get(r);
@@ -815,7 +863,10 @@ function collide(g: TaterState, px: number, py: number): void {
     for (const p of list) {
       if (!(e.x + half > p.x && e.x - half < p.x + p.w)) continue;
       // His feet were above this surface a substep ago and are through it now.
-      if (!(py <= p.y && e.y >= p.y)) continue;
+      // Measured against where a bobbing shelf WAS as well, so one rising up
+      // into his falling feet catches him instead of passing through.
+      const was = Math.max(p.y, p.prevY ?? p.y);
+      if (!(py <= was && e.y >= p.y)) continue;
 
       e.y = p.y;
       if (Math.abs(e.vy) > LAND_SPEED) {
@@ -852,7 +903,9 @@ function slide(g: TaterState, h: number): void {
     return;
   }
 
-  const drag = SLIDE_FRICTION * h;
+  // Riding a bobbing shelf.
+  e.y = p.y;
+  const drag = slideFrictionAtRow(p.row) * h;
   if (Math.abs(e.vx) <= drag) e.vx = 0;
   else e.vx -= Math.sign(e.vx) * drag;
   e.x += e.vx * h;

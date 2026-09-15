@@ -145,6 +145,13 @@ export const LAND_SPEED = 340;
  */
 export const SLIDE_FRICTION = 1400;
 
+/**
+ * Sliding gets a little slipperier in every world: the other half of the deal
+ * with gravity. Up high you jump further, but landings skid further too.
+ * The bottom shelf grips at SLIDE_FRICTION; the top world at about 900.
+ */
+export const SLIDE_FRICTION_PER_ZONE = 45;
+
 /** Below this the slide is over and Elmer is standing. */
 export const REST_SPEED = 12;
 

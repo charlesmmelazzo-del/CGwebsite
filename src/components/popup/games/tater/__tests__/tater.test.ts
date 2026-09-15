@@ -25,7 +25,8 @@ import { SLIDES } from "../story";
 import { HOWTO_COPY } from "../text";
 import {
   ALLIE_ROWS, CHARGE_TIME, REACH_X, aimAt, bestShot, build, createGame, isShowdownRow,
-  cancelHold, drainEvents, endScene, heightRows, nextLap, platformX, powerAt, press, release,
+  BOB_MAX, cancelHold, drainEvents, endScene, gravityAtRow, slideFrictionAtRow, heightRows, nextLap, platformX, platformY,
+  powerAt, press, release,
   score, simulateBlast, speedFor, makeRng, step, velocityFor, type Phase, type TaterState,
 } from "../taterCore";
 
@@ -316,8 +317,10 @@ check("the same seed and the same taps replay the same climb", () => {
 });
 
 check("a run ends, and it ends because the can went flat", () => {
+  // A steady player rather than the near-perfect bot: that one can climb for a
+  // very long time, which is the point of being near-perfect.
   for (const seed of [1, 8, 64, 512]) {
-    const run = playRun(seed);
+    const run = playRun(seed, { noise: 0.15 });
     assert.ok(run.finished, `seed ${seed}: the run never ended in ten minutes`);
     assert.ok(run.g.fizz <= 0, `seed ${seed}: ended with ${run.g.fizz} fizz left`);
     assert.equal(run.g.phase, "over");
@@ -486,6 +489,10 @@ check("moving shelves stay in the shaft and never overlap, at any moment", () =>
   for (const t of [0, 0.7, 1.9, 3.3, 10, 57.1]) {
     for (const [row, list] of Array.from(g.byRow.entries())) {
       const at = list.map((p) => ({ x: platformX(p, t), w: p.w })).sort((a, b) => a.x - b.x);
+      for (const p of list) {
+        const dy = platformY(p, t) + p.row * ROW_GAP;
+        assert.ok(Math.abs(dy) <= BOB_MAX + 1e-9, `row ${p.row} bobs ${dy.toFixed(1)} off its line`);
+      }
       for (let i = 0; i < at.length; i++) {
         assert.ok(at[i].x >= 0 && at[i].x + at[i].w <= W, `row ${row} leaves the shaft at t=${t}`);
         if (i) assert.ok(at[i].x >= at[i - 1].x + at[i - 1].w, `row ${row} overlaps at t=${t}`);
@@ -493,6 +500,53 @@ check("moving shelves stay in the shaft and never overlap, at any moment", () =>
     }
   }
   assert.ok(!g.platforms.some((p) => p.move && p.item?.kind === "allie"), "Allie's shelf moves");
+});
+
+check("higher worlds move more shelves, faster, and bob some of them", () => {
+  const g = createGame(23);
+  build(g, SUMMIT_ROW);
+  const band = (z: number) => g.platforms.filter((p) => zoneIndexForRow(p.row) === z && p.row > 0 && p.item?.kind !== "tater" && p.row < SUMMIT_ROW);
+  const share = (z: number) => band(z).filter((p) => p.move).length / band(z).length;
+  const pace = (z: number) => {
+    const m = band(z).filter((p) => p.move);
+    return m.reduce((a, p) => a + p.move!.speed + p.move!.speedY, 0) / Math.max(1, m.length);
+  };
+  console.log(`       moving share by world: ${ZONES.map((_, z) => share(z).toFixed(2)).join(" ")}`);
+  assert.ok(share(10) > share(1) + 0.3, `world 11 moves ${share(10)} vs world 2 ${share(1)}`);
+  assert.ok(pace(10) > pace(2), "shelves are not faster higher up");
+  assert.ok(g.platforms.some((p) => p.move && p.move.ampY > 0), "nothing bobs");
+  assert.ok(g.platforms.some((p) => p.move && p.move.ampY > 0 && p.move.amp > 0), "nothing moves both ways");
+});
+
+check("gravity lightens and shelves get slipperier, world by world", () => {
+  assert.equal(gravityAtRow(0), GRAVITY);
+  for (let z = 1; z < ZONES.length; z++) {
+    assert.ok(slideFrictionAtRow(z * ROWS_PER_ZONE) < slideFrictionAtRow((z - 1) * ROWS_PER_ZONE), `world ${z + 1} is not slipperier`);
+  }
+  assert.ok(slideFrictionAtRow(SUMMIT_ROW - 1) >= 800, "the top world is an ice rink");
+  for (let z = 1; z < ZONES.length; z++) {
+    assert.ok(gravityAtRow(z * ROWS_PER_ZONE) < gravityAtRow((z - 1) * ROWS_PER_ZONE), `world ${z + 1} is not lighter`);
+  }
+  assert.ok(gravityAtRow(SUMMIT_ROW) >= GRAVITY * 0.7, "heaven is floating away");
+});
+
+check("a bobbing shelf carries Elmer up and down with it", () => {
+  const g = createGame(29);
+  build(g, SUMMIT_ROW);
+  const shelf = g.platforms.find((p) => p.move && p.move.ampY > 0 && !p.move.amp)!;
+  g.elapsed = 0;
+  shelf.x = platformX(shelf, 0);
+  shelf.y = platformY(shelf, 0);
+  g.elmer = { x: shelf.x + shelf.w / 2, y: shelf.y, vx: 0, vy: 0, facing: 1, standing: shelf.id };
+  setPhase(g, "aim");
+  let moved = 0;
+  for (let i = 0; i < 90; i++) {
+    const before = g.elmer.y;
+    step(g, 1 / 60);
+    moved += Math.abs(g.elmer.y - before);
+    assert.ok(Math.abs(g.elmer.y - shelf.y) < 1e-6, "he is not standing on the shelf");
+  }
+  assert.ok(moved > 1, "the shelf did not bob");
 });
 
 check("a moving shelf carries Elmer with it", () => {
