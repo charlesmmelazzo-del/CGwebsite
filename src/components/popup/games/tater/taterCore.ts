@@ -31,7 +31,7 @@ import {
   type PlatformSize,
 } from "./constants";
 import { BOTTLE_IDS, MIXER_IDS, summitBottleFor, type BottleId, type MixerId } from "./cast";
-import { ROWS_PER_ZONE, SUMMIT_ROW, zoneIndexForRow } from "./zones";
+import { ROWS_PER_ZONE, SUMMIT_ROW, ZONES, zoneIndexForRow } from "./zones";
 
 // ─── Randomness ──────────────────────────────────────────────────────────────
 
@@ -349,6 +349,8 @@ export type TaterEvent =
   | { kind: "summit"; lap: number; bottle: BottleId | null; bonus: number; y: number }
   /** Standing on a world's top shelf with Tater on it. The renderer plays the showdown. */
   | { kind: "showdown"; zone: number; lap: number; bonus: number; y: number }
+  /** Tater's shelf crumbling away behind Elmer once he has left it. No way back. */
+  | { kind: "vanish"; x: number; y: number; w: number; row: number }
   /** Held the gauge too long: Mixey blew. Elmer is knocked down `rows` rows. */
   | { kind: "explode"; x: number; y: number; rows: number }
   | { kind: "flat" };
@@ -503,7 +505,13 @@ export function createGame(seed: number, opts: { startRow?: number } = {}): Tate
  */
 function startAt(g: TaterState, row: number): void {
   const target = Math.min(SUMMIT_ROW - 1, row);
-  build(g, target + BUILD_AHEAD);
+  // Every Tater gate on the way counts as beaten.
+  for (let guard = 0; guard < 64 && g.builtTo < Math.min(SUMMIT_ROW, target + BUILD_AHEAD); guard++) {
+    build(g, target + BUILD_AHEAD);
+    const gate = g.byRow.get(g.builtTo)?.[0];
+    if (gate?.item?.kind === "tater" && gate.row < target) { gate.item = null; gate.spent = true; }
+    else if (gate?.item?.kind === "tater") break;
+  }
   const shelf = g.byRow.get(target)?.[0];
   if (!shelf) return;
   g.elmer.x = shelf.x + shelf.w / 2;
@@ -542,8 +550,11 @@ export function nextLap(g: TaterState): void {
 
 /** Lay down shelves up to `row`, if they are not there already. */
 export function build(g: TaterState, row: number): void {
-  // Nothing above the summit.
+  // Nothing above the summit, and nothing above a Tater gate until he has been
+  // beaten: a blast past his shelf finds nowhere to land and falls back onto
+  // it, so nobody climbs into the next world without the showdown.
   while (g.builtTo < Math.min(row, SUMMIT_ROW)) {
+    if (isShowdownRow(g.builtTo) && g.byRow.get(g.builtTo)?.[0]?.item?.kind === "tater") break;
     const next = g.builtTo + 1;
     const made = placeRow(g.rng, next, g.byRow.get(g.builtTo) ?? [], g.ctx);
     g.platforms.push(...made);
@@ -759,9 +770,26 @@ function movePlatforms(g: TaterState): void {
  * Held too long. Mixey blows his top, Elmer is thrown off the shelf and falls
  * past the next KNOCKDOWN_ROWS rows before anything can catch him.
  */
+/**
+ * Elmer is leaving the shelf he stands on. If it is a beaten Tater gate, it
+ * crumbles behind him: there is no floor to catch him at the top of the old
+ * world any more, and a bad blast drops him all the way back into it.
+ */
+function leaveShelf(g: TaterState): void {
+  const id = g.elmer.standing;
+  if (id == null || g.probe) return;
+  const p = g.byId.get(id);
+  if (!p || !isShowdownRow(p.row) || !p.spent) return;
+  g.byId.delete(p.id);
+  g.byRow.set(p.row, (g.byRow.get(p.row) ?? []).filter((q) => q.id !== p.id));
+  g.platforms = g.platforms.filter((q) => q.id !== p.id);
+  g.events.push({ kind: "vanish", x: p.x, y: p.y, w: p.w, row: p.row });
+}
+
 function explode(g: TaterState): void {
   const e = g.elmer;
   const p = e.standing != null ? platformById(g, e.standing) : undefined;
+  leaveShelf(g);
   const from = p ? p.row : Math.max(0, Math.round(heightRows(g)));
   const to = Math.max(0, from - KNOCKDOWN_ROWS);
   g.fizz -= FIZZ_PER_BLAST;
@@ -780,6 +808,7 @@ function explode(g: TaterState): void {
 }
 
 function launch(g: TaterState): void {
+  leaveShelf(g);
   const { vx, vy } = velocityFor(g.lockedAngle, g.lockedPower);
   g.elmer.vx = vx;
   g.elmer.vy = vy;
@@ -822,6 +851,7 @@ function integrate(g: TaterState, h: number): void {
 
   collide(g, px, py);
 }
+
 
 /**
  * Elmer against the shelves, having already moved.
@@ -949,13 +979,11 @@ function rest(g: TaterState, p: Platform): void {
     g.fizz = Math.min(FIZZ_MAX, g.fizz + gained);
     g.events.push({ kind: "height", row: p.row });
 
-    const zone = zoneIndexForRow(p.row);
-    if (zone > g.maxZone) {
-      g.maxZone = zone;
-      g.bonus += SCORE_NEW_ZONE;
-      g.fizz = Math.min(FIZZ_MAX, g.fizz + FIZZ_PER_ZONE);
-      g.events.push({ kind: "zone", index: zone });
-    }
+    // Worlds are normally entered through Tater's gate, which pays for the new
+    // world itself (see the "tater" case). This is the fallback, and the summit,
+    // whose own finale is the fanfare, is not announced.
+    const zone = Math.min(zoneIndexForRow(p.row), ZONES.length - 1);
+    if (zone > g.maxZone) enterZone(g, zone);
     build(g, g.maxRow + BUILD_AHEAD);
   }
 
@@ -998,9 +1026,15 @@ function rest(g: TaterState, p: Platform): void {
       case "tater": {
         const bonus = SCORE_SHOWDOWN * g.lap;
         g.bonus += bonus;
-        g.events.push({ kind: "showdown", zone: zoneIndexForRow(p.row), lap: g.lap, bonus, y: p.y });
+        const zone = zoneIndexForRow(p.row);
+        // Beating him IS arriving in the next world: its bonus is paid now, and
+        // the renderer announces it at the end of the showdown.
+        if (zone + 1 > g.maxZone) enterZone(g, zone + 1, true);
+        g.events.push({ kind: "showdown", zone, lap: g.lap, bonus, y: p.y });
         p.spent = true;
         p.item = null;
+        // The next world appears above him now that the way is open.
+        build(g, p.row + BUILD_AHEAD);
         g.phase = "scene";
         break;
       }
@@ -1029,6 +1063,14 @@ function rest(g: TaterState, p: Platform): void {
     g.phase = "over";
     g.events.push({ kind: "flat" });
   }
+}
+
+/** Pay out for reaching a new world. `quiet` leaves the announcement to the showdown. */
+function enterZone(g: TaterState, zone: number, quiet = false): void {
+  g.maxZone = zone;
+  g.bonus += SCORE_NEW_ZONE;
+  g.fizz = Math.min(FIZZ_MAX, g.fizz + FIZZ_PER_ZONE);
+  if (!quiet) g.events.push({ kind: "zone", index: zone });
 }
 
 /** Drain the events the renderer has not read yet. */

@@ -139,7 +139,7 @@ check("every line in the game can be drawn by the 5x7 font", () => {
 
 check("no platform is ever off the edge of the shaft", () => {
   const g = createGame(7);
-  build(g, 400);
+  openGates(g);
   for (const p of g.platforms) {
     assert.ok(p.x >= 0, `row ${p.row} starts at ${p.x}`);
     assert.ok(p.x + p.w <= W, `row ${p.row} ends at ${p.x + p.w}, shaft is ${W}`);
@@ -149,7 +149,7 @@ check("no platform is ever off the edge of the shaft", () => {
 
 check("platforms on a row never overlap", () => {
   const g = createGame(11);
-  build(g, 400);
+  openGates(g);
   const byRow = new Map<number, typeof g.platforms>();
   for (const p of g.platforms) {
     const list = byRow.get(p.row) ?? [];
@@ -172,7 +172,7 @@ check("every shelf has something within reach on the row above it", () => {
   // because the repair pass in placeRow only runs when a scatter needs it.
   for (const seed of [1, 2, 3, 17, 99, 12345]) {
     const g = createGame(seed);
-    build(g, 300);
+    openGates(g);
     const byRow = new Map<number, typeof g.platforms>();
     for (const p of g.platforms) {
       const list = byRow.get(p.row) ?? [];
@@ -202,7 +202,7 @@ check("the bottom shelf is one unbroken floor with Guillermo on it", () => {
 
 check("Allie appears on the far right of her rows and nowhere else", () => {
   const g = createGame(3);
-  build(g, SUMMIT_ROW);
+  openGates(g);
   const found = g.platforms.filter((p) => p.item?.kind === "allie");
   assert.deepEqual(found.map((p) => p.row).sort((a, b) => a - b), ALLIE_ROWS);
   for (const p of found) {
@@ -327,6 +327,16 @@ check("a run ends, and it ends because the can went flat", () => {
   }
 });
 
+/** Beat every Tater gate, so a test can build the whole shaft. */
+function openGates(g: TaterState) {
+  for (let i = 0; i < ZONES.length; i++) {
+    build(g, SUMMIT_ROW);
+    const gate = g.byRow.get(g.builtTo)?.[0];
+    if (gate?.item?.kind === "tater") { gate.item = null; gate.spent = true; }
+  }
+  build(g, SUMMIT_ROW);
+}
+
 /** Rows climbed across every lap of a run. */
 const climbed = (g: TaterState) => g.banked / SCORE_PER_ROW + g.maxRow;
 
@@ -368,7 +378,7 @@ check("height is only ever paid for once", () => {
   // Climb, fall back down, climb again: the score must not move on the way up
   // through rows already banked.
   const g = createGame(9);
-  build(g, 60);
+  openGates(g);
   for (const p of g.platforms) if (p.item?.kind !== "guillermo") p.item = null;
   g.maxRow = 20;
   const before = score(g);
@@ -413,7 +423,7 @@ check("a bottle without a mixer stays put, and is paid for when you come back", 
 
 check("landing on Allie pauses the game for her scene", () => {
   const g = createGame(3);
-  build(g, 40);
+  openGates(g);
   const shelf = g.platforms.find((p) => p.item?.kind === "allie");
   assert.ok(shelf, "Allie was not generated");
   g.elmer = { x: shelf!.x + shelf!.w / 2, y: shelf!.y - 2, vx: 0, vy: 0, facing: 1, standing: null };
@@ -483,7 +493,7 @@ check("holding past three full fills explodes and knocks Elmer down", () => {
 
 check("moving shelves stay in the shaft and never overlap, at any moment", () => {
   const g = createGame(17);
-  build(g, SUMMIT_ROW);
+  openGates(g);
   const moving = g.platforms.filter((p) => p.move);
   assert.ok(moving.length > 30, `only ${moving.length} moving shelves`);
   for (const t of [0, 0.7, 1.9, 3.3, 10, 57.1]) {
@@ -504,7 +514,7 @@ check("moving shelves stay in the shaft and never overlap, at any moment", () =>
 
 check("higher worlds move more shelves, faster, and bob some of them", () => {
   const g = createGame(23);
-  build(g, SUMMIT_ROW);
+  openGates(g);
   const band = (z: number) => g.platforms.filter((p) => zoneIndexForRow(p.row) === z && p.row > 0 && p.item?.kind !== "tater" && p.row < SUMMIT_ROW);
   const share = (z: number) => band(z).filter((p) => p.move).length / band(z).length;
   const pace = (z: number) => {
@@ -532,7 +542,7 @@ check("gravity lightens and shelves get slipperier, world by world", () => {
 
 check("a bobbing shelf carries Elmer up and down with it", () => {
   const g = createGame(29);
-  build(g, SUMMIT_ROW);
+  openGates(g);
   const shelf = g.platforms.find((p) => p.move && p.move.ampY > 0 && !p.move.amp)!;
   g.elapsed = 0;
   shelf.x = platformX(shelf, 0);
@@ -551,7 +561,7 @@ check("a bobbing shelf carries Elmer up and down with it", () => {
 
 check("a moving shelf carries Elmer with it", () => {
   const g = createGame(17);
-  build(g, 60);
+  openGates(g);
   const shelf = g.platforms.find((p) => p.move)!;
   g.elapsed = 0;
   shelf.x = platformX(shelf, 0);
@@ -601,7 +611,10 @@ function landOn(state: TaterState, id: number) {
 check("Tater blocks the top of every world but heaven, on a floor wall to wall", () => {
   const g = createGame(8);
   build(g, SUMMIT_ROW);
-  const rows = g.platforms.filter((p) => p.item?.kind === "tater").map((p) => p.row);
+  const first = g.byRow.get(ROWS_PER_ZONE - 1)?.[0];
+  assert.equal(first?.item?.kind, "tater", "no Tater on the first world's top shelf");
+  openGates(g);
+  const rows = Array.from(g.byRow.keys()).filter((r) => isShowdownRow(r));
   assert.equal(rows.length, ZONES.length - 1, `${rows.length} showdowns`);
   assert.equal(SHOWDOWN_TAUNTS.length, ZONES.length - 1, "a world without a taunt");
   for (const r of rows) {
@@ -626,9 +639,36 @@ check("standing on Tater's shelf pays out and pauses for the showdown", () => {
   assert.equal(g.phase, "aim");
 });
 
+check("nothing is built above Tater's shelf until he is beaten", () => {
+  const g = createGame(8);
+  build(g, ROWS_PER_ZONE * 3);
+  assert.equal(g.builtTo, ROWS_PER_ZONE - 1, `built to ${g.builtTo}`);
+  landOn(g, g.byRow.get(ROWS_PER_ZONE - 1)![0].id);
+  assert.ok(g.builtTo > ROWS_PER_ZONE, "the next world never appeared");
+});
+
+check("once Tater is beaten, his shelf vanishes when Elmer blasts off it", () => {
+  const g = createGame(8);
+  build(g, ROWS_PER_ZONE + 4);
+  const gate = g.byRow.get(ROWS_PER_ZONE - 1)![0];
+  landOn(g, gate.id);
+  endScene(g);
+  drainEvents(g);
+  g.elmer.standing = gate.id;
+  g.elmer.y = gate.y;
+  setPhase(g, "aim");
+  press(g);
+  step(g, 0.2);
+  release(g);
+  for (let i = 0; i < 40; i++) step(g, 1 / 60);
+  assert.ok(drainEvents(g).some((e) => e.kind === "vanish"), "no vanish event");
+  assert.equal(g.byId.get(gate.id), undefined, "the shelf is still there");
+  assert.equal(g.byRow.get(ROWS_PER_ZONE - 1)!.length, 0);
+});
+
 check("nothing is built above the summit, and it is one floor wall to wall", () => {
   const g = createGame(8);
-  build(g, SUMMIT_ROW + 50);
+  openGates(g);
   assert.equal(g.builtTo, SUMMIT_ROW);
   const top = g.byRow.get(SUMMIT_ROW)!;
   assert.equal(top.length, 1);
@@ -638,7 +678,7 @@ check("nothing is built above the summit, and it is one floor wall to wall", () 
 
 check("standing on the summit pays out and pauses for the finale", () => {
   const g = createGame(4);
-  build(g, SUMMIT_ROW);
+  openGates(g);
   const top = g.byRow.get(SUMMIT_ROW)![0];
   const before = score(g);
   landOn(g, top.id);
@@ -651,7 +691,7 @@ check("standing on the summit pays out and pauses for the finale", () => {
 
 check("the next lap starts at the bottom with the score carried and the can full", () => {
   const g = createGame(4);
-  build(g, SUMMIT_ROW);
+  openGates(g);
   landOn(g, g.byRow.get(SUMMIT_ROW)![0].id);
   const carried = score(g);
   nextLap(g);
@@ -666,7 +706,7 @@ check("the next lap starts at the bottom with the score carried and the can full
 check("Allie is only snatched on lap one", () => {
   const g = createGame(3);
   nextLap(g);
-  build(g, SUMMIT_ROW);
+  openGates(g);
   assert.equal(g.platforms.filter((p) => p.item?.kind === "allie").length, 0);
 });
 
@@ -677,7 +717,7 @@ check("each lap is harder: faster sweeps and smaller shelves", () => {
   const avgWidth = (lap: number) => {
     const g = createGame(77);
     for (let i = 1; i < lap; i++) nextLap(g);
-    build(g, SUMMIT_ROW - 1);
+    openGates(g);
     const shelves = g.platforms.filter((p) => p.row > 0 && p.row < SUMMIT_ROW);
     return shelves.reduce((a, p) => a + p.w, 0) / shelves.length;
   };

@@ -48,7 +48,9 @@ type BeatId =
   // Allie, part way up lap one
   | "help" | "land" | "grab" | "leap"
   // The summit, and the showdown at the top of every world
-  | "taunt" | "spray" | "soaked" | "together" | "freed" | "fall" | "landed" | "hit" | "escape";
+  | "taunt" | "spray" | "soaked" | "together" | "freed" | "fall" | "landed" | "hit" | "escape"
+  // The showdown's lead-in and its payoff: the way into the next world
+  | "arrive" | "gate";
 
 interface Beat { id: BeatId; hold: number; line?: string }
 
@@ -86,10 +88,13 @@ function finaleBeats(lap: number, bottle: BottleId | null): Beat[] {
  */
 function showdownBeats(zone: number, lap: number): Beat[] {
   return [
+    { id: "arrive", hold: 1.6 },
     { id: "taunt", hold: 2.4, line: SHOWDOWN_TAUNTS[zone % SHOWDOWN_TAUNTS.length] },
     { id: "spray", hold: 1.2 },
     { id: "hit", hold: 1.3, line: SHOWDOWN_HIT },
     { id: "escape", hold: 1.5, line: lap === 1 ? SHOWDOWN_ESCAPE : SHOWDOWN_ESCAPE_AGAIN },
+    // The camera lifts into the new world while it is announced.
+    { id: "gate", hold: ZONE_BANNER_LIFE },
   ];
 }
 
@@ -105,6 +110,8 @@ interface Scene {
   lap: number;
   bottle: BottleId | null;
   bonus: number;
+  /** For a showdown: the world whose top this is. */
+  zone: number;
   /** Elmer's x when the scene started, for walking him into place. */
   elmerFrom: number;
   /** The camera when the fall down the shaft started. */
@@ -135,11 +142,13 @@ interface View {
   thanks: Array<{ id: BottleId; x: number; y: number; t: number }>;
   floats: Float[];
   bubble: Bubble | null;
-  banner: { text: string; sub: string; t: number; big?: boolean } | null;
+  banner: { text: string; sub: string; t: number; big?: boolean; header?: string } | null;
   /** Soda and bubbles flying out of an exploded can. */
   bursts: Array<{ x: number; y: number; vx: number; vy: number; t: number; color: string }>;
   /** Seconds of screen shake left. */
   shake: number;
+  /** Tater's shelf breaking up after Elmer leaves it. */
+  crumbles: Array<{ x: number; y: number; vy: number; t: number; art: ZoneArt; frame: number }>;
 
   demo: boolean;
   demoHold: number;
@@ -162,7 +171,7 @@ function makeView(demo: boolean, practice = false): View {
     cam: 0, camReady: false,
     anim: "shake", animT: 0,
     scene: null, thanks: [],
-    floats: [], bubble: null, banner: null, bursts: [], shake: 0,
+    floats: [], bubble: null, banner: null, bursts: [], shake: 0, crumbles: [],
     demo, demoHold: 0, demoWant: null,
     practice, logoTaps: [],
     finished: false,
@@ -290,6 +299,7 @@ function startPlay(v: View) {
     v.bubble = { text: GUILLERMO_LINE, x: floor.x + floor.w - 30, y: floor.y - 44, t: 0, life: 2.6 };
   }
   if (v.practice) v.banner = { text: "PRACTICE", sub: "NEAR THE TOP", t: 0 };
+  else v.banner = { header: `STAGE 1`, text: `${ZONES[0].title}!!!`, sub: "HOW HIGH CAN YOU GO?", t: 0, big: true };
 }
 
 function finish(v: View, onGameOver: ArcadeGameProps["onGameOver"]) {
@@ -364,8 +374,13 @@ function update(v: View, dt: number, h: number) {
   for (const e of drainEvents(g)) handle(v, e, h);
 
   // ── Camera ───────────────────────────────────────────────────────────────
-  const fallBeat = v.scene?.beats[v.scene.beat]?.id === "fall";
-  if (fallBeat && v.scene) {
+  const beatNow = v.scene?.beats[v.scene.beat]?.id;
+  const fallBeat = beatNow === "fall";
+  if (beatNow === "gate" && v.scene) {
+    // Look up past Tater's shelf into the world beyond it.
+    const want = v.scene.y - h * 0.92;
+    v.cam += (want - v.cam) * Math.min(1, 2.2 * dt);
+  } else if (fallBeat && v.scene) {
     // Racing back down the shaft to the bottom shelf.
     const s = v.scene;
     const beat = s.beats[s.beat];
@@ -394,6 +409,8 @@ function update(v: View, dt: number, h: number) {
   }
   for (const b of v.bursts) { b.t += dt; b.vy += 500 * dt; b.x += b.vx * dt; b.y += b.vy * dt; }
   v.bursts = v.bursts.filter((b) => b.t < 1.2);
+  for (const c of v.crumbles) { c.t += dt; if (c.t > 0) { c.vy += 700 * dt; c.y += c.vy * dt; } }
+  v.crumbles = v.crumbles.filter((c) => c.t < 1.6);
   v.shake = Math.max(0, v.shake - dt);
 
   if (g.over && v.screen === "play" && !v.scene) { v.screen = "flat"; v.demoHold = 0; }
@@ -431,9 +448,16 @@ function handle(v: View, e: TaterEvent, h: number) {
       v.floats.push({ text: "+1000", x: e.x, y: e.y - 16, t: 0, color: T.brass });
       break;
     }
-    case "zone": {
-      const z = e.index < ZONES.length ? ZONES[e.index] : SUMMIT_ZONE;
-      v.banner = { text: `${z.title}!!!`, sub: `+${SCORE_NEW_ZONE} BONUS   +${FIZZ_PER_ZONE} FIZZ`, t: 0, big: true };
+    case "zone":
+      v.banner = zoneBanner(e.index);
+      break;
+    case "vanish": {
+      // Block by block, falling away behind him.
+      const art = zoneForRow(e.row).art;
+      for (let bx = 0; bx < e.w; bx += 16) {
+        v.crumbles.push({ x: e.x + bx, y: e.y, vy: -20 - hash(bx, e.row) * 60, t: -hash(e.row, bx) * 0.25, art, frame: bx === 0 ? 0 : 1 });
+      }
+      v.floats.push({ text: "NO WAY BACK!", x: W / 2, y: e.y - 8, t: 0, color: T.hot });
       break;
     }
     case "explode": {
@@ -461,6 +485,7 @@ function handle(v: View, e: TaterEvent, h: number) {
     }
     case "showdown": {
       v.scene = makeScene("showdown", showdownBeats(e.zone, e.lap), SUMMIT_TATER_X, e.y, g);
+      v.scene.zone = e.zone;
       v.floats.push({ text: `+${e.bonus}`, x: SUMMIT_ELMER_X, y: e.y - 50, t: 0, color: T.brass });
       openBeat(v);
       break;
@@ -478,9 +503,18 @@ function handle(v: View, e: TaterEvent, h: number) {
   }
 }
 
+/** The big YOU REACHED banner for world `index`. */
+function zoneBanner(index: number): NonNullable<View["banner"]> {
+  const z = index < ZONES.length ? ZONES[index] : SUMMIT_ZONE;
+  return {
+    header: "YOU REACHED", text: `${z.title}!!!`,
+    sub: `STAGE ${index + 1}   +${SCORE_NEW_ZONE}   +${FIZZ_PER_ZONE} FIZZ`, t: 0, big: true,
+  };
+}
+
 function makeScene(kind: Scene["kind"], beats: Beat[], x: number, y: number, g: TaterState): Scene {
   return {
-    kind, beats, beat: 0, t: 0, x, y, lap: g.lap, bottle: null, bonus: 0,
+    kind, beats, beat: 0, t: 0, x, y, lap: g.lap, bottle: null, bonus: 0, zone: 0,
     elmerFrom: g.elmer.x, camFrom: 0,
   };
 }
@@ -494,6 +528,7 @@ function openBeat(v: View) {
   s.t = 0;
 
   if (beat.id === "fall") s.camFrom = v.cam;
+  if (beat.id === "gate") v.banner = zoneBanner(s.zone + 1);
   if (beat.id === "landed") {
     // The shaft behind us is thrown away and a harder one built.
     nextLap(v.g);
@@ -632,6 +667,12 @@ function drawPlay(ctx: CanvasRenderingContext2D, v: View, h: number, t: number) 
   }
 
   for (const b of v.bursts) fill(ctx, b.x - 1, b.y - cam - 1, 3, 3, b.color);
+  for (const c of v.crumbles) {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, 1.4 - c.t));
+    drawPlatformTiles(ctx, c.art, c.x, c.y - cam, 16, c.frame);
+    ctx.restore();
+  }
 
   if (v.scene) drawScene(ctx, v, cam, h, t);
 
@@ -651,7 +692,7 @@ function drawPlay(ctx: CanvasRenderingContext2D, v: View, h: number, t: number) 
   ctx.restore();
 
   drawHud(ctx, v);
-  if (v.banner?.big) drawZoneBanner(ctx, v.banner.text, v.banner.sub, h, v.banner.t);
+  if (v.banner?.big) drawZoneBanner(ctx, v.banner.header ?? "YOU REACHED", v.banner.text, v.banner.sub, h, v.banner.t);
   else if (v.banner) drawBanner(ctx, v.banner.text, v.banner.sub, h, v.banner.t);
 }
 
@@ -840,6 +881,23 @@ function drawScene(ctx: CanvasRenderingContext2D, v: View, cam: number, h: numbe
   // ── A world's showdown ───────────────────────────────────────────────────
   if (s.kind === "showdown") {
     switch (beat.id) {
+      case "arrive": {
+        drawArt(ctx, solo ? "tater-summit-solo" : "tater-summit", Math.floor(s.t * 4), SUMMIT_TATER_X, sy);
+        const next = ZONES[Math.min(ZONES.length - 1, s.zone + 1)];
+        const top = Math.round(h * 0.26);
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, s.t * 5);
+        fill(ctx, -WALL_W, top - 8, VIEW_W, 64, "rgba(0,0,0,0.78)");
+        fill(ctx, -WALL_W, top - 8, VIEW_W, 2, T.hot);
+        fill(ctx, -WALL_W, top + 54, VIEW_W, 2, T.hot);
+        drawTextMarquee(ctx, "MR. TATER!", W / 2, top, Math.floor(s.t * 8) % 2 ? T.hot : T.white, 3, "center");
+        drawText(ctx, "STANDS BETWEEN YOU AND", W / 2, top + 30, T.bone, 1, "center");
+        drawTextMarquee(ctx, next.title, W / 2, top + 42, T.brass, 1, "center");
+        ctx.restore();
+        break;
+      }
+      case "gate":
+        break;
       case "taunt":
         drawArt(ctx, solo ? "tater-summit-solo" : "tater-summit", Math.floor(s.t * 4), SUMMIT_TATER_X, sy);
         break;
@@ -984,7 +1042,9 @@ function drawBubble(ctx: CanvasRenderingContext2D, text: string, x: number, y: n
  * YOU REACHED MARS!!! — big, flashing, and up for a while. Reaching a new world
  * takes minutes of climbing, so it gets a proper fanfare.
  */
-function drawZoneBanner(ctx: CanvasRenderingContext2D, place: string, sub: string, h: number, t: number) {
+function drawZoneBanner(
+  ctx: CanvasRenderingContext2D, header: string, place: string, sub: string, h: number, t: number
+) {
   const life = ZONE_BANNER_LIFE;
   const alpha = t < 0.15 ? t / 0.15 : t > life - 0.5 ? (life - t) / 0.5 : 1;
   ctx.save();
@@ -1000,7 +1060,7 @@ function drawZoneBanner(ctx: CanvasRenderingContext2D, place: string, sub: strin
   fill(ctx, 0, top - 8, VIEW_W, 2, T.brass);
   fill(ctx, 0, top - 8 + boxH - 2, VIEW_W, 2, T.brass);
   const flash = Math.floor(t * 6) % 2 === 0;
-  drawTextMarquee(ctx, "YOU REACHED", VIEW_W / 2, top, T.white, 2, "center");
+  drawTextMarquee(ctx, header, VIEW_W / 2, top, T.white, 2, "center");
   words.forEach((line, i) => {
     drawTextMarquee(ctx, line, VIEW_W / 2, top + head + i * lh, flash ? T.brass : T.hot, pop, "center");
   });
