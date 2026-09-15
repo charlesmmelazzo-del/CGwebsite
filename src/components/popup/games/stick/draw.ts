@@ -630,13 +630,28 @@ function persp(z: number): number {
   return (1 / (D - zz * (D - 1)) - 1 / D) / (1 - 1 / D);
 }
 
+/**
+ * How far each lane leans in toward the middle over the length of the bar, as
+ * a share of its distance from the middle. Small on purpose: the left thumb's
+ * lanes stay over the left side and the right thumb's over the right, so a
+ * far-off bottle is already lined up with its button.
+ */
+const LANE_LEAN = 0.2;
+
+/** Where a lane starts at the far end of the bar. */
+function laneFarX(st: State, lane: number): number {
+  const bx = laneButtonX(st.layout, lane);
+  return bx + (st.layout.w / 2 - bx) * LANE_LEAN;
+}
+
 function lanePoint(st: State, lane: number, z: number) {
   const f = persp(z);
   const bx = laneButtonX(st.layout, lane);
+  const fx = laneFarX(st, lane);
   return {
-    x: st.layout.w / 2 + (bx - st.layout.w / 2) * f,
+    x: fx + (bx - fx) * f,
     y: VP_Y + (LANE_BUTTON_Y - VP_Y) * f,
-    scale: 0.2 + 0.8 * f,
+    scale: 0.35 + 0.65 * f,
   };
 }
 
@@ -690,17 +705,18 @@ function drawBuild(ctx: Ctx, s: number, st: State, t: number, frozen: boolean) {
   // Where each bottle slides: a polished runner per lane
   for (let lane = 0; lane < K.LANES; lane++) {
     const bx = laneButtonX(l, lane);
-    ctx.fillStyle = "rgba(255,210,150,0.10)";
+    const fx = laneFarX(st, lane);
+    ctx.fillStyle = "rgba(255,210,150,0.12)";
     ctx.beginPath();
-    ctx.moveTo(w / 2 - 2, VP_Y);
-    ctx.lineTo(w / 2 + 2, VP_Y);
+    ctx.moveTo(fx - 10, VP_Y);
+    ctx.lineTo(fx + 10, VP_Y);
     ctx.lineTo(bx + 30, LANE_BUTTON_Y);
     ctx.lineTo(bx - 30, LANE_BUTTON_Y);
     ctx.closePath();
     ctx.fill();
     ctx.strokeStyle = LANE_COLORS[lane];
-    ctx.globalAlpha = 0.35;
-    ctx.lineWidth = 1.5;
+    ctx.globalAlpha = 0.55;
+    ctx.lineWidth = 2;
     ctx.stroke();
     ctx.globalAlpha = 1;
   }
