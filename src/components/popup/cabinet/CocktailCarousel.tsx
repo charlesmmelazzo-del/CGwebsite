@@ -9,7 +9,8 @@
 //
 // The whole thing is sized to the phone's screen, so the name, the demo, both
 // ways to play and the info button are all visible without scrolling. The demo
-// takes whatever height is left over.
+// takes whatever height is left over, measured by the layout itself (a flex
+// column plus a container query) rather than guessed, so it fills any phone.
 //
 // Built on embla, already a dependency here (see components/home/HomeCarousel).
 
@@ -21,13 +22,6 @@ import { getGameMeta } from "@/lib/popup/games";
 import CabButton, { CabArrow, CabIconButton } from "./CabButton";
 import GameDemo, { demoAspect } from "./GameDemo";
 import { withAlpha, C } from "./theme";
-
-/**
- * Screen height taken by everything that isn't the demo: the zone's top bar,
- * page padding, the cocktail name, the buttons and their captions, the info
- * button, and the arrows underneath. The demo gets the rest.
- */
-const CHROME_HEIGHT = 300;
 
 export default function CocktailCarousel({
   cocktails,
@@ -76,9 +70,9 @@ export default function CocktailCarousel({
   const slideCount = cocktails.length;
 
   return (
-    <div className="relative">
-      <div className="overflow-hidden" ref={emblaRef}>
-        <div className="flex touch-pan-y">
+    <div className="relative flex-1 min-h-0 flex flex-col">
+      <div className="flex-1 min-h-0 overflow-hidden" ref={emblaRef}>
+        <div className="flex h-full touch-pan-y">
           {cocktails.map((c, i) => (
             <Slide key={c.id} active={selected === i}>
               <CocktailSlide
@@ -125,9 +119,9 @@ export default function CocktailCarousel({
  */
 function Slide({ children, active }: { children: React.ReactNode; active: boolean }) {
   return (
-    <div className="min-w-0 shrink-0 grow-0 basis-[82%] sm:basis-[70%] px-2 sm:px-3">
+    <div className="min-w-0 h-full shrink-0 grow-0 basis-[82%] sm:basis-[70%] px-2 sm:px-3">
       <div
-        className="transition-all duration-300"
+        className="h-full transition-all duration-300"
         style={{
           transform: active ? "scale(1)" : "scale(0.9)",
           opacity: active ? 1 : 0.45,
@@ -173,9 +167,9 @@ function CocktailSlide({
   };
 
   return (
-    <div style={{ perspective: "1600px" }}>
+    <div className="h-full" style={{ perspective: "1600px" }}>
       <div
-        className="relative transition-transform duration-700"
+        className="relative h-full transition-transform duration-700"
         style={{
           transformStyle: "preserve-3d",
           transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
@@ -183,7 +177,11 @@ function CocktailSlide({
         }}
       >
         {/* ── Front ─────────────────────────────────────────────────────── */}
-        <div style={{ ...face, transform: "rotateY(0deg)" }} aria-hidden={flipped}>
+        <div
+          className="h-full flex flex-col"
+          style={{ ...face, transform: "rotateY(0deg)" }}
+          aria-hidden={flipped}
+        >
           <h3
             className="text-center text-2xl sm:text-3xl font-black uppercase tracking-tight leading-none truncate"
             style={{
@@ -199,17 +197,19 @@ function CocktailSlide({
             The demo, as big as the screen allows once everything else fits,
             in the shape of that game's own screen so nothing is stretched.
           */}
-          <div
-            className="mx-auto mt-2.5"
-            style={{
-              width: `min(100%, calc((100dvh - ${CHROME_HEIGHT}px) * ${demoAspect(cocktail.gameKey)}))`,
-            }}
-          >
-            <GameDemo gameKey={cocktail.gameKey} running={active && !flipped} />
+          <div className="mt-2.5 flex-1 min-h-0 flex justify-center" style={{ containerType: "size" }}>
+            <div
+              style={{
+                width: `min(100cqw, calc(100cqh * ${demoAspect(cocktail.gameKey)}))`,
+                height: `min(100cqh, calc(100cqw / ${demoAspect(cocktail.gameKey)}))`,
+              }}
+            >
+              <GameDemo gameKey={cocktail.gameKey} running={active && !flipped} />
+            </div>
           </div>
 
           {game ? (
-            <div className="mt-3 grid grid-cols-2 gap-3">
+            <div className="mt-3 w-full max-w-sm mx-auto grid grid-cols-2 gap-3">
               <div className="flex flex-col items-center">
                 <CabButton color={C.teal} size="md" className="w-full !px-1 !text-[8px] sm:!text-[10px]" onClick={onFreePlay}>
                   Free Play

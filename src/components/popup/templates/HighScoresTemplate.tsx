@@ -87,12 +87,13 @@ export default function HighScoresTemplate({
   }, [cocktails, viewer, isLive]);
 
   return (
-    // Fills the screen under the zone bar (48px plus its 1px rule) and no more,
-    // so the page never scrolls.
-    <div className="min-h-[calc(100dvh-49px)] bg-[#05030F] text-white relative overflow-hidden">
+    // Exactly the screen under the zone bar (48px plus its 1px rule), as a
+    // column — so the page never scrolls, and the carousel gets every pixel of
+    // height that's left to give to the demo.
+    <div className="h-[calc(100dvh-49px)] flex flex-col bg-[#05030F] text-white relative overflow-hidden">
       <ArcadeBackdrop />
 
-      <div className="relative px-1 sm:px-6 py-3 sm:py-6">
+      <div className="relative flex-1 min-h-0 flex flex-col px-1 sm:px-6 py-3 sm:py-5">
         {!isLive && (
           <p
             className="mb-3 text-center text-[10px] tracking-[0.25em] uppercase"
