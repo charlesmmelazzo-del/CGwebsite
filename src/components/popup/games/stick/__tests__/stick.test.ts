@@ -19,10 +19,12 @@ import {
   type State,
 } from "../core";
 import {
-  BEER_LINE,
-  beerAimFor,
+  BEER_COUNTER_Y,
+  BEER_GLASS_H,
+  BEER_SPILL_MAX,
   microMove,
   microPress,
+  microRelease,
   newBeer,
   newPop,
   newShots,
@@ -503,23 +505,55 @@ check("the attract-mode bot serves drinks on its own", () => {
 
 // ── Micro games ──
 
-check("beer: a gentle pour fills the glass", () => {
-  const s = newBeer(1);
-  microPress(s, 0, 0, 1);
-  s.aim = 0.55;
-  let out = null;
-  for (let i = 0; i < 60 * 8 && !out; i++) out = updateMicro(s, DT);
-  eq(out, "win");
+const glassMid = BEER_COUNTER_Y - BEER_GLASS_H / 2;
+
+check("beer: nothing pours, and the bottle waits, until the glass is grabbed", () => {
+  const s = newBeer(1, 640, seeded(3));
+  const bottle = s.bottleX;
+  microPress(s, s.bottleX, 150, 1);
+  for (let i = 0; i < 90; i++) updateMicro(s, DT);
+  eq(s.grabbed, false);
+  eq(s.fill + s.spill, 0);
+  eq(s.bottleX, bottle);
 });
 
-check("beer: slamming it foams over the line", () => {
-  const s = newBeer(1);
-  microPress(s, 0, 20, 1);
-  eq(beerAimFor(20), 1);
+check("beer: holding the glass under the moving bottle fills it", () => {
+  const s = newBeer(1, 640, seeded(3));
+  microPress(s, s.glassX + 10, glassMid, 1);
+  eq(s.grabbed, true);
   let out = null;
-  for (let i = 0; i < 60 * 8 && !out; i++) out = updateMicro(s, DT);
+  let moved = 0;
+  let last = s.bottleX;
+  for (let i = 0; i < 60 * 10 && !out; i++) {
+    // Thumb 10px right of where it grabbed, tracking the bottle.
+    microMove(s, s.bottleX + 10, glassMid, 1);
+    out = updateMicro(s, DT);
+    moved += Math.abs(s.bottleX - last);
+    last = s.bottleX;
+  }
+  eq(out, "win");
+  assert.ok(moved > 100, "the bottle wandered");
+});
+
+check("beer: holding the glass still while the bottle wanders spills and loses", () => {
+  const s = newBeer(1, 640, seeded(3));
+  microPress(s, s.glassX, glassMid, 1);
+  let out = null;
+  for (let i = 0; i < 60 * 10 && !out; i++) out = updateMicro(s, DT);
   eq(out, "lose");
-  assert.ok(s.liquid + s.foam > BEER_LINE);
+  assert.ok(s.spill > BEER_SPILL_MAX);
+});
+
+check("beer: the glass follows the thumb only while it's held", () => {
+  const s = newBeer(1, 640, seeded(3));
+  microPress(s, s.glassX, glassMid, 1);
+  microMove(s, 200, glassMid, 1);
+  for (let i = 0; i < 30; i++) updateMicro(s, DT);
+  assert.ok(Math.abs(s.glassX - 200) < 1);
+  microRelease(s, 1);
+  microMove(s, 500, glassMid, 1);
+  for (let i = 0; i < 30; i++) updateMicro(s, DT);
+  assert.ok(Math.abs(s.glassX - 200) < 1);
 });
 
 check("shots: nothing pours until the bottle is grabbed", () => {

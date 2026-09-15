@@ -91,7 +91,7 @@ function slidesFor(mode: Mode, names: string[]): Slide[] {
       show: <BothHandsPicture />,
     },
     {
-      say: "Sometimes a guest wants something special. Pour a beer, line up shots, pop the bubbly. Nail it for big points!",
+      say: "Sometimes a guest wants something special. Catch a beer from a runaway bottle, line up shots, pop the bubbly. Nail it for big points!",
       pose: "happy",
       show: <MicroPicture />,
     },

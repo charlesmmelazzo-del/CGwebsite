@@ -25,7 +25,7 @@ export const MICRO_TITLE: Record<MicroKind, string> = {
 
 /** The one-line instruction under the title. */
 export const MICRO_HINT: Record<MicroKind, string> = {
-  beer: "HOLD HIGHER TO TILT. DON'T FOAM OVER THE LINE!",
+  beer: "GRAB THE GLASS! CATCH THE BEER!",
   shots: "GRAB THE BOTTLE! POUR THE SHOTS!",
   pop: "TAP TO POP. HIT THE BUCKET, NOT A GUEST!",
 };
@@ -38,58 +38,112 @@ interface Base {
 
 // ─── GIMME A BEER ────────────────────────────────────────────────────────────
 //
-// The higher the thumb, the further the bottle tips. Tip it gently and the
-// glass fills clean; slam it and the foam climbs past the line.
+// A bottle hangs upside down over the bar, pouring, and it won't stay still.
+// The pint glass sits on the bar until a thumb grabs it; held, it slides with
+// the thumb, and the player has to keep it under the stream. Beer that misses
+// the glass is on the bar, and too much of that loses. Nothing pours until the
+// glass has been picked up, so the first second is reading, not panicking.
 
-export const BEER_TARGET = 0.72;
-export const BEER_LINE = 0.92;
+/** How far either side of the glass's middle the stream still lands inside it. */
+export const BEER_MOUTH = 24;
+/** Glasses a second, when every drop is caught. */
+export const BEER_POUR = 0.24;
+export const BEER_SPILL_MAX = 0.5;
+/** Where the bottle's spout is, and the top of the bar the glass stands on. */
+export const BEER_BOTTLE_Y = 64;
+export const BEER_COUNTER_Y = H - 40;
+export const BEER_GLASS_H = 84;
+export const BEER_GRAB_RADIUS = 56;
+export const BEER_GLASS_SPEED = 1400;
 
 export interface BeerSim extends Base {
   kind: "beer";
-  /** 0 upright .. 1 upside down. Chases `aim`, so a slam still takes a moment. */
-  tilt: number;
-  aim: number;
-  /** Fractions of the glass. */
-  liquid: number;
-  foam: number;
+  w: number;
+  rand: () => number;
+  bottleX: number;
+  /** Where the bottle is heading next. */
+  bottleTo: number;
+  bottleSpeed: number;
+  /** A beat where the bottle hangs still before it lurches off again. */
+  hold: number;
+  glassX: number;
+  /** Where the thumb wants the glass, allowing for where on it the thumb landed. */
+  glassTo: number;
+  grabOffset: number;
   pointer: number | null;
+  /** Picked up at least once — the pour starts then and doesn't stop. */
+  grabbed: boolean;
+  fill: number;
+  spill: number;
+  /** Whether the stream is landing in the glass this frame, for the view. */
+  catching: boolean;
 }
 
-export function newBeer(level: number): BeerSim {
+export function newBeer(level: number, w: number, rand: () => number): BeerSim {
+  const bottleX = w * 0.32;
+  const glassX = w * 0.68;
   return {
     kind: "beer",
     t: 0,
-    duration: Math.max(5, 6.5 - 0.12 * (level - 1)),
+    duration: Math.max(6, 7.5 - 0.1 * (level - 1)),
     outcome: null,
-    tilt: 0,
-    aim: 0,
-    liquid: 0,
-    foam: 0,
+    w,
+    rand,
+    bottleX,
+    bottleTo: bottleX,
+    bottleSpeed: Math.min(380, 150 + 22 * (level - 1)),
+    hold: 0.4,
+    glassX,
+    glassTo: glassX,
+    grabOffset: 0,
     pointer: null,
+    grabbed: false,
+    fill: 0,
+    spill: 0,
+    catching: false,
   };
 }
 
-/** Where on the screen a thumb has to be for a given tilt. */
-export function beerAimFor(y: number): number {
-  return Math.max(0, Math.min(1, (H - 40 - y) / (H - 100)));
-}
-
-export function beerFlow(tilt: number): { flow: number; foam: number } {
-  const p = Math.max(0, (tilt - 0.15) / 0.85);
-  const flow = 0.42 * p;
-  return { flow, foam: flow * (0.06 + 3 * Math.max(0, p - 0.55)) };
+function nextBottleStop(s: BeerSim): number {
+  const lo = 70;
+  const hi = s.w - 70;
+  // Far enough that the glass has to actually travel.
+  for (let i = 0; i < 6; i++) {
+    const x = lo + s.rand() * (hi - lo);
+    if (Math.abs(x - s.bottleX) >= 120) return x;
+  }
+  return s.bottleX < s.w / 2 ? hi : lo;
 }
 
 function updateBeer(s: BeerSim, dt: number): MicroOutcome {
-  const rate = 6 * dt;
-  s.tilt += Math.max(-rate, Math.min(rate, s.aim - s.tilt));
-  const { flow, foam } = beerFlow(s.tilt);
-  // Foam settles, and some of it turns back into beer as it does.
-  const settle = Math.min(s.foam, s.foam * 0.1 * dt);
-  s.foam += foam * dt - settle;
-  s.liquid += flow * dt + settle * 0.3;
-  if (s.liquid + s.foam > BEER_LINE) return "lose";
-  if (s.liquid >= BEER_TARGET) return "win";
+  const g = BEER_GLASS_SPEED * dt;
+  s.glassX += Math.max(-g, Math.min(g, s.glassTo - s.glassX));
+  s.catching = false;
+  if (!s.grabbed) return null;
+
+  if (s.hold > 0) {
+    s.hold -= dt;
+  } else {
+    const step = s.bottleSpeed * dt;
+    const d = s.bottleTo - s.bottleX;
+    if (Math.abs(d) <= step) {
+      s.bottleX = s.bottleTo;
+      s.bottleTo = nextBottleStop(s);
+      if (s.rand() < 0.35) s.hold = 0.2 + s.rand() * 0.3;
+    } else {
+      s.bottleX += Math.sign(d) * step;
+    }
+  }
+
+  const amount = BEER_POUR * dt;
+  if (Math.abs(s.bottleX - s.glassX) <= BEER_MOUTH) {
+    s.catching = true;
+    s.fill = Math.min(1, s.fill + amount);
+  } else {
+    s.spill += amount;
+  }
+  if (s.fill >= 1) return "win";
+  if (s.spill > BEER_SPILL_MAX) return "lose";
   return null;
 }
 
@@ -250,7 +304,7 @@ function updatePop(s: PopSim, dt: number): MicroOutcome {
 export type MicroSim = BeerSim | ShotsSim | PopSim;
 
 export function newMicro(kind: MicroKind, level: number, w: number, rand: () => number): MicroSim {
-  if (kind === "beer") return newBeer(level);
+  if (kind === "beer") return newBeer(level, w, rand);
   if (kind === "shots") return newShots(level, w);
   return newPop(level, w, rand);
 }
@@ -272,8 +326,14 @@ export function updateMicro(s: MicroSim, dt: number): MicroOutcome {
 export function microPress(s: MicroSim, x: number, y: number, id: number): void {
   if (s.outcome) return;
   if (s.kind === "beer") {
+    // Only a tap on the glass picks it up.
+    if (s.pointer !== null) return;
+    const glassMid = BEER_COUNTER_Y - BEER_GLASS_H / 2;
+    if (Math.abs(x - s.glassX) > BEER_GRAB_RADIUS || Math.abs(y - glassMid) > BEER_GRAB_RADIUS * 1.5) return;
     s.pointer = id;
-    s.aim = beerAimFor(y);
+    s.grabOffset = s.glassX - x;
+    s.glassTo = s.glassX;
+    s.grabbed = true;
   } else if (s.kind === "shots") {
     // Only a tap on the bottle picks it up. Pouring starts in the hand.
     if (s.pointer !== null) return;
@@ -289,14 +349,17 @@ export function microPress(s: MicroSim, x: number, y: number, id: number): void 
 
 export function microMove(s: MicroSim, x: number, y: number, id: number): void {
   if (s.outcome) return;
-  if (s.kind === "beer" && s.pointer === id) s.aim = beerAimFor(y);
+  if (s.kind === "beer" && s.pointer === id) {
+    s.glassTo = Math.max(40, Math.min(s.w - 40, x + s.grabOffset));
+  }
   else if (s.kind === "shots" && s.pointer === id) s.targetX = x;
 }
 
 export function microRelease(s: MicroSim, id: number): void {
   if (s.kind === "beer" && s.pointer === id) {
+    // Put down where it is. The beer keeps coming.
     s.pointer = null;
-    s.aim = 0;
+    s.glassTo = s.glassX;
   } else if (s.kind === "shots" && s.pointer === id) {
     s.pointer = null;
     s.pouring = false;

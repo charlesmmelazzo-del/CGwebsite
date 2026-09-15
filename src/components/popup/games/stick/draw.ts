@@ -20,9 +20,11 @@ import {
   type State,
 } from "./core";
 import {
-  BEER_LINE,
-  BEER_TARGET,
-  beerFlow,
+  BEER_BOTTLE_Y,
+  BEER_COUNTER_Y,
+  BEER_GLASS_H,
+  BEER_MOUTH,
+  BEER_SPILL_MAX,
   MICRO_HINT,
   MICRO_TITLE,
   popLandX,
@@ -1061,78 +1063,111 @@ function barScene(ctx: Ctx, w: number, top: string, counterY: number) {
 }
 
 function drawBeer(ctx: Ctx, s: number, sim: BeerSim, w: number, t: number) {
-  const counter = K.H - 40;
+  const counter = BEER_COUNTER_Y;
   barScene(ctx, w, "#3A2410", counter);
-  const gx = w / 2;
-  const gw = 86;
-  const gh = 170;
-  const top = counter - gh;
-  // Glass body, then beer and foam inside it
-  ctx.fillStyle = "rgba(200,230,255,0.18)";
-  ctx.beginPath();
-  ctx.moveTo(gx - gw / 2, top);
-  ctx.lineTo(gx + gw / 2, top);
-  ctx.lineTo(gx + gw / 2 - 10, counter);
-  ctx.lineTo(gx - gw / 2 + 10, counter);
-  ctx.closePath();
+
+  // Puddle from everything that missed
+  if (sim.spill > 0) {
+    ctx.fillStyle = "rgba(232,154,16,0.55)";
+    ctx.beginPath();
+    ctx.ellipse(w / 2, counter + 14, 30 + sim.spill * 480, 6 + sim.spill * 14, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // The glass: on the bar, or lifted a touch while it's in a thumb
+  const held = sim.pointer !== null;
+  const gx = sim.glassX;
+  const gBottom = counter - (held ? 8 : 0);
+  const gTop = gBottom - BEER_GLASS_H;
+  const topHalf = BEER_MOUTH + 6;
+  const botHalf = topHalf - 8;
+  const glassPath = () => {
+    ctx.beginPath();
+    ctx.moveTo(gx - topHalf, gTop);
+    ctx.lineTo(gx + topHalf, gTop);
+    ctx.lineTo(gx + botHalf, gBottom);
+    ctx.lineTo(gx - botHalf, gBottom);
+    ctx.closePath();
+  };
+  if (held) {
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.beginPath();
+    ctx.ellipse(gx, counter + 3, botHalf + 4, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // The stream: from the spout to the beer in the glass, or all the way to the bar
+  const spoutY = BEER_BOTTLE_Y + 46;
+  if (sim.grabbed) {
+    const beerTop = gBottom - 6 - sim.fill * (BEER_GLASS_H - 12);
+    const end = sim.catching ? beerTop : counter;
+    const wob = Math.sin(t * 40) * 0.6;
+    fill(ctx, sim.bottleX - 2 + wob, spoutY, 4, end - spoutY, "#F0A820");
+    if (!sim.catching) {
+      for (let i = 0; i < 5; i++) {
+        const a = t * 9 + i * 1.3;
+        circle(ctx, sim.bottleX + Math.cos(a) * 14, counter - 4 - Math.abs(Math.sin(a)) * 12, 2.5, "#F0B840");
+      }
+    }
+  }
+
+  glassPath();
+  ctx.fillStyle = "rgba(210,235,255,0.22)";
   ctx.fill();
   ctx.save();
+  glassPath();
   ctx.clip();
-  const lh = sim.liquid * gh;
-  const fh = sim.foam * gh;
-  fill(ctx, gx - gw, counter - lh, gw * 2, lh, "#E89A10");
-  for (let i = 0; i < 6; i++) {
-    const by = counter - ((t * 40 + i * 29) % Math.max(1, lh));
-    fill(ctx, gx - 30 + ((i * 17) % 60), by, 3, 3, "rgba(255,240,180,0.6)");
+  const inner = BEER_GLASS_H - 12;
+  const beerH = sim.fill * inner;
+  fill(ctx, gx - topHalf, gBottom - 6 - beerH, topHalf * 2, beerH, "#E89A10");
+  for (let i = 0; i < 5 && beerH > 6; i++) {
+    const by = gBottom - 6 - ((t * 30 + i * 17) % beerH);
+    fill(ctx, gx - 12 + ((i * 11) % 24), by, 2, 2, "rgba(255,240,180,0.7)");
   }
-  fill(ctx, gx - gw, counter - lh - fh, gw * 2, fh, "#FFF8E8");
+  if (beerH > 2) fill(ctx, gx - topHalf, gBottom - 6 - beerH - 7, topHalf * 2, 8, "#FFF8E8");
+  fill(ctx, gx - topHalf, gBottom - 6, topHalf * 2, 6, "rgba(210,235,255,0.5)");
   ctx.restore();
-  ctx.strokeStyle = "#E8F4FF";
+  glassPath();
+  ctx.strokeStyle = sim.catching ? LIME : "#E8F4FF";
   ctx.lineWidth = 3;
   ctx.stroke();
+  fill(ctx, gx - topHalf + 7, gTop + 6, 3, BEER_GLASS_H - 20, "rgba(255,255,255,0.55)");
 
-  // The foam line, and the tick for "full enough"
-  const ly = counter - BEER_LINE * gh;
-  ctx.strokeStyle = RED;
-  ctx.lineWidth = 2;
-  ctx.setLineDash([8, 5]);
-  ctx.beginPath();
-  ctx.moveTo(gx - gw / 2 - 30, ly);
-  ctx.lineTo(gx + gw / 2 + 30, ly);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  drawText(ctx, "TOO MUCH FOAM", gx + gw / 2 + 34, ly - 3, RED, 1, "left");
-  const ty = counter - BEER_TARGET * gh;
-  fill(ctx, gx - gw / 2 - 16, ty - 1, 10, 3, LIME);
-  drawText(ctx, "FULL", gx - gw / 2 - 20, ty - 3, LIME, 1, "right");
-
-  // The bottle, tipping over the rim
-  const angle = sim.tilt * 2.3;
+  // The bottle, upside down over the bar
   ctx.save();
-  ctx.translate(gx - 20, top - 16);
-  ctx.rotate(angle);
-  roundRect(ctx, -14, -80, 28, 64, 6);
+  ctx.translate(sim.bottleX, BEER_BOTTLE_Y);
+  ctx.rotate(Math.PI + Math.sin(t * 5) * (sim.grabbed ? 0.06 : 0.02));
+  roundRect(ctx, -15, -40, 30, 62, 7);
   ctx.fillStyle = INK;
   ctx.fill();
-  roundRect(ctx, -11, -77, 22, 58, 5);
+  roundRect(ctx, -12, -37, 24, 56, 6);
   ctx.fillStyle = "#6A3A10";
   ctx.fill();
-  fill(ctx, -7, -16, 14, 18, INK);
-  fill(ctx, -5, -14, 10, 16, "#6A3A10");
-  fill(ctx, -10, -60, 20, 18, CREAM);
+  fill(ctx, -10, -22, 20, 18, CREAM);
+  fill(ctx, -7, -56, 14, 18, INK);
+  fill(ctx, -5, -54, 10, 16, "#6A3A10");
   ctx.restore();
-  if (beerFlow(sim.tilt).flow > 0) {
-    const px = gx - 20 + Math.sin(angle) * 2;
-    fill(ctx, px - 2, top - 10, 4, counter - sim.liquid * gh - top + 10, "#F0A820");
-  }
 
-  // The thumb slider down the right edge
-  const sx = w - 40;
-  fill(ctx, sx - 4, 50, 8, K.H - 110, "rgba(0,0,0,0.5)");
-  const ky = K.H - 40 - sim.aim * (K.H - 100);
-  circle(ctx, sx, ky, 16, sim.pointer !== null ? GOLD : CREAM);
-  drawText(ctx, "TILT", sx, 34, CREAM, 1.5, "center");
-  if (sim.pointer === null && blink(t, 2)) say(ctx, "HOLD + SLIDE UP", w * 0.2, K.H / 2, CREAM, 1.5);
+  // Prompts and the spill meter
+  if (!held) {
+    const bounce = Math.abs(Math.sin(t * 6)) * 8;
+    const label = sim.grabbed ? "GRAB IT!" : "GRAB THE GLASS!";
+    const half = textWidth(label, 2) / 2 + 10;
+    say(ctx, label, Math.max(half, Math.min(w - half, gx)), gTop - 42 - bounce, GOLD, 2);
+    ctx.fillStyle = GOLD;
+    ctx.beginPath();
+    ctx.moveTo(gx - 10, gTop - 20 - bounce);
+    ctx.lineTo(gx + 10, gTop - 20 - bounce);
+    ctx.lineTo(gx, gTop - 6 - bounce);
+    ctx.closePath();
+    ctx.fill();
+  } else if (!sim.catching && blink(t, 4)) {
+    say(ctx, "CATCH IT!", w / 2, 150, RED, 2);
+  }
+  drawText(ctx, "SPILL", 16, 22, CREAM, 1, "left");
+  meterBar(ctx, 50, 20, 90, 8, sim.spill / BEER_SPILL_MAX, RED);
+  drawText(ctx, "FULL", w - 140, 22, CREAM, 1, "left");
+  meterBar(ctx, w - 110, 20, 90, 8, sim.fill, LIME);
 }
 
 function drawShots(ctx: Ctx, s: number, sim: ShotsSim, w: number, t: number) {
