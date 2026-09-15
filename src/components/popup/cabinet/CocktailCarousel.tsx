@@ -202,6 +202,15 @@ function CocktailSlide({
           >
             {cocktail.name}
           </h3>
+          {game && (
+            // The drink is the headline; the game is what it brings with it.
+            <p
+              className="mt-1.5 text-center text-[10px] sm:text-[11px] tracking-[0.2em] uppercase leading-none truncate"
+              style={{ color: withAlpha(C.cream, 0.7) }}
+            >
+              presents: <span className="font-black" style={{ color: C.teal }}>{game.title}</span>
+            </p>
+          )}
 
           {/*
             The demo, as big as the screen allows once everything else fits,

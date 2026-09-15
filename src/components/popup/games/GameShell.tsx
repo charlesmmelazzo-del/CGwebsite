@@ -386,8 +386,11 @@ export default function GameShell({
         style={{ borderColor: accent }}
         className="border-2 border-b-0 bg-black px-3 py-2 text-center"
       >
-        <p style={{ color: accent }} className="text-[11px] tracking-[0.3em] uppercase font-bold">
-          {meta.title}
+        <p style={{ color: accent }} className="text-[13px] tracking-[0.2em] uppercase font-black leading-tight">
+          {cocktailName}
+        </p>
+        <p className="mt-0.5 text-[10px] tracking-[0.25em] uppercase text-white/60">
+          presents: <span className="font-bold text-white">{meta.title}</span>
         </p>
       </div>
       <div style={{ borderColor: accent }} className="border-2 bg-black">
