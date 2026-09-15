@@ -180,6 +180,8 @@ export const FINISH_LINE = 0.45;
 /** Seconds under the line, after the grace, before the drink is ruined. */
 export const FINISH_SLOW_TOLERANCE = 1.6;
 export const FINISH_GRACE = 1.2;
+/** The shaker and mixing glass sit this far right of their panel's middle, clear of the thermometer. */
+export const FINISH_TOOL_DX = 18;
 /** Thumb travel that counts as one shake stroke. */
 export const STROKE_PX = 22;
 export const STROKE_GAIN = 0.11;

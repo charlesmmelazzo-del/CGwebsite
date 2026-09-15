@@ -11,7 +11,7 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import CabButton from "../../cabinet/CabButton";
 import { C } from "../../cabinet/theme";
-import { ART } from "./art";
+import { ART, type V2Name } from "./art";
 import type { Mode } from "./core";
 
 const LOGO = "/popup/art/stick/logo-title.png";
@@ -286,13 +286,10 @@ function Thumb({ side }: { side: "L" | "R" }) {
 function PhoneSideways() {
   return (
     <Card>
-      <div
-        className="relative w-[220px] h-[110px] rounded-xl flex items-center justify-between px-3"
-        style={{ border: `4px solid ${C.cream}`, background: "#140A1E" }}
-      >
-        <Thumb side="L" />
-        <div className="flex-1 mx-2 h-[70%] rounded" style={{ background: "rgba(255,233,196,0.08)" }} />
-        <Thumb side="R" />
+      <div className="flex items-center gap-1">
+        <Img src={ART.v2("thumb-l")} size={70} />
+        <Img src={ART.v2("phone-landscape")} size={120} />
+        <Img src={ART.v2("thumb-r")} size={70} />
       </div>
       <Label>Left thumb left. Right thumb right.</Label>
     </Card>
@@ -316,10 +313,7 @@ function GrabPicture() {
           <Label color="#FF6A5A">Nope</Label>
         </div>
         <div className="flex flex-col items-center gap-1">
-          <div className="relative w-[40px] h-[46px] flex items-end justify-center">
-            <div className="w-[34px] h-[34px] rounded-full" style={{ background: "#3A3A40", border: `3px solid ${C.ink}` }} />
-            <div className="absolute top-0 right-1 w-2 h-2 rounded-full" style={{ background: "#8A8A8A" }} />
-          </div>
+          <Img src={ART.v2("bomb-1")} size={48} />
           <Label color="#FF6A5A">Boom</Label>
         </div>
       </div>
@@ -328,17 +322,18 @@ function GrabPicture() {
   );
 }
 
-function Ring({ ing, lit = false }: { ing: string; lit?: boolean }) {
+function Ring({ ing, lane, lit = false }: { ing: string; lane: number; lit?: boolean }) {
   return (
     <div
-      className="w-[54px] h-[54px] rounded-full flex items-center justify-center"
-      style={{
-        border: `5px solid #D8A840`,
-        background: "rgba(20,10,6,0.85)",
-        boxShadow: lit ? "0 0 16px 4px rgba(255,220,120,0.8)" : "0 0 0 3px #140A06",
-      }}
+      className="relative w-[58px] h-[58px] flex items-center justify-center rounded-full"
+      style={{ boxShadow: lit ? "0 0 18px 6px rgba(255,220,120,0.75)" : undefined }}
     >
-      <Bottle ing={ing} size={34} />
+      <div className="absolute inset-0">
+        <Img src={ART.v2(`btn-${lane}` as V2Name)} size={58} />
+      </div>
+      <div className="relative opacity-80">
+        <Bottle ing={ing} size={30} />
+      </div>
     </div>
   );
 }
@@ -349,15 +344,15 @@ function BuildPicture() {
       <div className="flex items-center gap-5">
         <div className="flex flex-col items-center gap-1">
           <div className="flex gap-2">
-            <Ring ing="gin" lit />
-            <Ring ing="lime" />
+            <Ring ing="gin" lane={0} lit />
+            <Ring ing="lime" lane={1} />
           </div>
           <Label>Left thumb</Label>
         </div>
         <div className="flex flex-col items-center gap-1">
           <div className="flex gap-2">
-            <Ring ing="sugar" />
-            <Ring ing="ice" lit />
+            <Ring ing="sugar" lane={2} />
+            <Ring ing="ice" lane={3} lit />
           </div>
           <Label>Right thumb</Label>
         </div>
@@ -415,18 +410,16 @@ function MicroPicture() {
   return (
     <Card>
       <div className="flex flex-col gap-2 w-full max-w-[240px]">
-        {[
-          ["Gimme a Beer!", "#FF9A1A"],
-          ["Let's Do Shots!", "#9A3AE0"],
-          ["Pop It!", "#FFC928"],
-        ].map(([title, color]) => (
-          <div
-            key={title}
-            className="px-3 py-2 text-[10px] uppercase text-center"
-            style={{ background: color, color: C.ink, border: `3px solid ${C.ink}`, transform: "rotate(-1.5deg)" }}
-          >
-            {title}
-          </div>
+        {(["w-gimme-a-beer", "w-lets-do-shots", "w-pop-it"] as const).map((name, i) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={name}
+            src={ART.v2(name)}
+            alt=""
+            className="w-full"
+            style={{ transform: `rotate(${i % 2 ? 2 : -2}deg)` }}
+            draggable={false}
+          />
         ))}
       </div>
       <Label>Win big. Lose a little. You stay in.</Label>
@@ -439,7 +432,7 @@ function StrikesPicture() {
     <Card>
       <div className="flex gap-3">
         {[0, 1, 2].map((i) => (
-          <Img key={i} src={ART.life} size={40} />
+          <Img key={i} src={ART.v2(i === 2 ? "heart-broken" : "heart")} size={44} />
         ))}
       </div>
       <Label>Three strikes and you&apos;re out</Label>
@@ -450,6 +443,7 @@ function StrikesPicture() {
 function PartyPicture({ names }: { names: string[] }) {
   return (
     <Card>
+      <Img src={ART.v2("icon-party")} size={96} />
       <div className="flex flex-wrap justify-center gap-1.5 max-w-[300px]">
         {names.map((n, i) => (
           <span

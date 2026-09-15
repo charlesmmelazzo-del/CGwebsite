@@ -7,7 +7,7 @@ import CabButton from "../../cabinet/CabButton";
 import { pixelFont } from "../../cabinet/pixelArt";
 import { C } from "../../cabinet/theme";
 import StickCanvas from "./StickCanvas";
-import { warmArt } from "./art";
+import { ART, warmArt } from "./art";
 import { newBot, botStep, type Bot } from "./bot";
 import { MAX_PLAYERS, MIN_PARTY_PLAYERS, NAME_MAX } from "./constants";
 import {
@@ -357,17 +357,27 @@ function RotatePrompt({ onSideways }: { onSideways: () => void }) {
       style={{ background: "rgba(10,4,16,0.94)" }}
       onPointerDown={(e) => e.stopPropagation()}
     >
-      <div
-        className="w-16 h-28 rounded-lg"
-        style={{
-          border: `4px solid ${C.cream}`,
-          animation: "bts-turn 1.8s ease-in-out infinite",
-        }}
-      />
-      <style>{`@keyframes bts-turn { 0%,25% { transform: rotate(0deg) } 60%,100% { transform: rotate(-90deg) } }`}</style>
-      <p className="text-[16px] leading-snug" style={{ color: C.gold, textShadow: "3px 3px 0 #000" }}>
-        Rotate Your Phone
-      </p>
+      <div className="relative w-[150px] h-[150px]">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={ART.v2("phone-portrait")}
+          alt=""
+          className="absolute inset-0 w-full h-full object-contain"
+          style={{ animation: "bts-flip-a 2.4s steps(1) infinite" }}
+          draggable={false}
+        />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={ART.v2("phone-landscape")}
+          alt=""
+          className="absolute inset-0 w-full h-full object-contain"
+          style={{ animation: "bts-flip-b 2.4s steps(1) infinite" }}
+          draggable={false}
+        />
+      </div>
+      <style>{`@keyframes bts-flip-a { 0% { opacity: 1 } 50% { opacity: 0 } } @keyframes bts-flip-b { 0% { opacity: 0 } 50% { opacity: 1 } }`}</style>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={ART.v2("w-rotate-phone")} alt="Rotate your phone" className="w-full max-w-[300px]" draggable={false} />
       <p className="text-[9px] leading-relaxed" style={{ color: C.cream, opacity: 0.8 }}>
         Behind the Stick is played sideways, with a thumb on each side.
       </p>

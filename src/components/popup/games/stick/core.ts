@@ -188,7 +188,7 @@ export interface Handoff {
 
 // ─── Effects the view animates ───────────────────────────────────────────────
 
-export type FxKind = "grab" | "boom" | "shatter" | "stink" | "splash" | "sparkle" | "word" | "toss";
+export type FxKind = "grab" | "boom" | "shatter" | "stink" | "splash" | "sparkle" | "word" | "toss" | "flame";
 
 export interface Fx {
   kind: FxKind;
@@ -845,6 +845,7 @@ function pressLane(st: State, lane: number) {
   setMood(b, "happy", 0.6);
   addScore(st, (perfect ? K.PTS_PERFECT : K.PTS_GOOD) + Math.min(b.combo, K.COMBO_CAP) * K.COMBO_BONUS);
   const v = vesselPos(st.layout);
+  if (perfect) addFx(st, { kind: "flame", x: bx, y: LANE_BUTTON_Y, dur: 0.35 });
   addFx(st, { kind: "toss", x: bx, y: LANE_BUTTON_Y, tx: v.x, ty: v.y - 30, dur: 0.45, ing: st.order.recipe[lane] });
   word(st, bx, LANE_BUTTON_Y - 50, perfect ? "PERFECT" : "GOOD", perfect ? "#FFD500" : "#9CE800");
 }
@@ -999,7 +1000,7 @@ function updateFinishStage(st: State, dt: number) {
 }
 
 function finishCentre(l: Layout) {
-  return { x: l.rightX + l.side / 2, y: K.H * 0.52 };
+  return { x: l.rightX + l.side / 2 + K.FINISH_TOOL_DX, y: K.H * 0.52 };
 }
 
 function finishDrag(st: State, x: number, y: number) {
