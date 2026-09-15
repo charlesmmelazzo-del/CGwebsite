@@ -30,6 +30,18 @@ export const MICRO_HINT: Record<MicroKind, string> = {
   pop: "TAP TO POP. HIT THE BUCKET, NOT A GUEST!",
 };
 
+/**
+ * How far into the difficulty curve a level is: 0 on the first drink a micro
+ * game can turn up on, 1 by drink 14, easing in so the first few are gentle
+ * and the squeeze comes later.
+ */
+export function microEase(level: number): number {
+  const d = Math.max(0, Math.min(1, (level - 2) / 12));
+  return d * d * (3 - 2 * d);
+}
+
+const lerp = (easy: number, hard: number, d: number) => easy + (hard - easy) * d;
+
 interface Base {
   t: number;
   duration: number;
@@ -44,11 +56,8 @@ interface Base {
 // the glass is on the bar, and too much of that loses. Nothing pours until the
 // glass has been picked up, so the first second is reading, not panicking.
 
-/** How far either side of the glass's middle the stream still lands inside it. */
-export const BEER_MOUTH = 24;
 /** Glasses a second, when every drop is caught. */
 export const BEER_POUR = 0.24;
-export const BEER_SPILL_MAX = 0.5;
 /** Where the bottle's spout is, and the top of the bar the glass stands on. */
 export const BEER_BOTTLE_Y = 64;
 export const BEER_COUNTER_Y = H - 40;
@@ -66,6 +75,12 @@ export interface BeerSim extends Base {
   bottleSpeed: number;
   /** A beat where the bottle hangs still before it lurches off again. */
   hold: number;
+  /** Chance of such a beat at each stop. */
+  holdChance: number;
+  /** How far either side of the glass's middle the stream still lands inside it. */
+  mouth: number;
+  /** How much can miss before the round is lost. */
+  spillMax: number;
   glassX: number;
   /** Where the thumb wants the glass, allowing for where on it the thumb landed. */
   glassTo: number;
@@ -82,17 +97,21 @@ export interface BeerSim extends Base {
 export function newBeer(level: number, w: number, rand: () => number): BeerSim {
   const bottleX = w * 0.32;
   const glassX = w * 0.68;
+  const d = microEase(level);
   return {
     kind: "beer",
     t: 0,
-    duration: Math.max(6, 7.5 - 0.1 * (level - 1)),
+    duration: lerp(12, 7.5, d),
     outcome: null,
     w,
     rand,
     bottleX,
     bottleTo: bottleX,
-    bottleSpeed: Math.min(380, 150 + 22 * (level - 1)),
-    hold: 0.4,
+    bottleSpeed: lerp(90, 320, d),
+    hold: 0.6,
+    holdChance: lerp(0.6, 0.3, d),
+    mouth: lerp(28, 22, d),
+    spillMax: lerp(1, 0.5, d),
     glassX,
     glassTo: glassX,
     grabOffset: 0,
@@ -129,21 +148,21 @@ function updateBeer(s: BeerSim, dt: number): MicroOutcome {
     if (Math.abs(d) <= step) {
       s.bottleX = s.bottleTo;
       s.bottleTo = nextBottleStop(s);
-      if (s.rand() < 0.35) s.hold = 0.2 + s.rand() * 0.3;
+      if (s.rand() < s.holdChance) s.hold = 0.2 + s.rand() * 0.3;
     } else {
       s.bottleX += Math.sign(d) * step;
     }
   }
 
   const amount = BEER_POUR * dt;
-  if (Math.abs(s.bottleX - s.glassX) <= BEER_MOUTH) {
+  if (Math.abs(s.bottleX - s.glassX) <= s.mouth) {
     s.catching = true;
     s.fill = Math.min(1, s.fill + amount);
   } else {
     s.spill += amount;
   }
   if (s.fill >= 1) return "win";
-  if (s.spill > BEER_SPILL_MAX) return "lose";
+  if (s.spill > s.spillMax) return "lose";
   return null;
 }
 
@@ -154,10 +173,8 @@ function updateBeer(s: BeerSim, dt: number): MicroOutcome {
 // goes back down where it is. Liquor that isn't going into a glass with room in
 // it is on the bar.
 
-export const SHOT_MOUTH = 16;
 export const SHOT_POUR = 1.1;
 export const SHOT_FULL = 0.85;
-export const SHOT_SPILL_MAX = 1;
 export const SHOT_BOTTLE_SPEED = 900;
 /** How close to the standing bottle a tap has to be to pick it up. */
 export const SHOT_GRAB_RADIUS = 60;
@@ -174,19 +191,24 @@ export interface ShotsSim extends Base {
   /** Has it been picked up yet — the prompt stays until it has. */
   grabbed: boolean;
   spill: number;
+  /** How much can hit the bar before the round is lost. */
+  spillMax: number;
+  /** How far either side of a glass's middle still pours into it. */
+  mouth: number;
   pointer: number | null;
   /** Where the stream is landing this frame, for the view: a glass index, or -1 for the bar. */
   landing: number;
 }
 
 export function newShots(level: number, w: number): ShotsSim {
-  const n = level >= 5 ? 5 : 4;
+  const d = microEase(level);
+  const n = d < 0.35 ? 3 : d < 0.75 ? 4 : 5;
   const glasses = Array.from({ length: n }, (_, i) => ({ x: (w * (i + 1)) / (n + 1), fill: 0 }));
   const start = Math.max(40, glasses[0].x - 60);
   return {
     kind: "shots",
     t: 0,
-    duration: Math.max(5.5, 7.5 - 0.15 * (level - 1)),
+    duration: lerp(11, 6, d),
     outcome: null,
     glasses,
     bottleX: start,
@@ -194,6 +216,8 @@ export function newShots(level: number, w: number): ShotsSim {
     pouring: false,
     grabbed: false,
     spill: 0,
+    spillMax: lerp(1.6, 1, d),
+    mouth: lerp(22, 15, d),
     pointer: null,
     landing: -1,
   };
@@ -205,7 +229,7 @@ function updateShots(s: ShotsSim, dt: number): MicroOutcome {
   s.landing = -1;
   if (s.pouring) {
     const amount = SHOT_POUR * dt;
-    const i = s.glasses.findIndex((g) => Math.abs(g.x - s.bottleX) <= SHOT_MOUTH);
+    const i = s.glasses.findIndex((g) => Math.abs(g.x - s.bottleX) <= s.mouth);
     if (i >= 0) {
       s.landing = i;
       const g = s.glasses[i];
@@ -216,7 +240,7 @@ function updateShots(s: ShotsSim, dt: number): MicroOutcome {
       s.spill += amount;
     }
   }
-  if (s.spill > SHOT_SPILL_MAX) return "lose";
+  if (s.spill > s.spillMax) return "lose";
   if (s.glasses.every((g) => g.fill >= SHOT_FULL)) return "win";
   return null;
 }
@@ -230,7 +254,6 @@ export const POP_PIVOT_DY = 22;
 export const POP_TARGET_Y = 76;
 export const POP_MAX_ANGLE = 1;
 export const POP_FLIGHT = 0.35;
-export const POP_BUCKET_HALF = 34;
 export const POP_GUEST_HALF = 30;
 const POP_SLOTS = 5;
 
@@ -242,8 +265,10 @@ export interface PopSim extends Base {
   angle: number;
   /** Slot index of the bucket; the other slots hold guests. */
   bucketSlot: number;
-  /** Bucket drifts from level 4. */
+  /** How far the bucket drifts side to side, once things have got harder. */
   bucketDrift: number;
+  /** How far either side of the bucket's middle still counts as in. */
+  bucketHalf: number;
   bucketX: number;
   guests: number[];
   /** Set when the cork has been fired. */
@@ -258,20 +283,22 @@ export function popSlotX(w: number, slot: number): number {
 }
 
 export function newPop(level: number, w: number, rand: () => number): PopSim {
+  const d = microEase(level);
   const bucketSlot = Math.floor(rand() * POP_SLOTS);
   const guests: number[] = [];
   for (let i = 0; i < POP_SLOTS; i++) if (i !== bucketSlot) guests.push(popSlotX(w, i));
   return {
     kind: "pop",
     t: 0,
-    duration: Math.max(4, 5 - 0.08 * (level - 1)),
+    duration: lerp(8, 4.5, d),
     outcome: null,
     w,
-    swaySpeed: Math.min(4.2, 2.4 + 0.15 * (level - 1)),
+    swaySpeed: lerp(1.3, 3.8, d),
     phase: rand() * Math.PI * 2,
     angle: 0,
     bucketSlot,
-    bucketDrift: level >= 4 ? 40 : 0,
+    bucketDrift: d < 0.4 ? 0 : lerp(0, 40, (d - 0.4) / 0.6),
+    bucketHalf: lerp(44, 32, d),
     bucketX: popSlotX(w, bucketSlot),
     guests,
     cork: null,
@@ -293,7 +320,7 @@ function updatePop(s: PopSim, dt: number): MicroOutcome {
   s.cork.t += dt;
   if (s.cork.t < POP_FLIGHT) return null;
   const x = s.cork.landX;
-  if (Math.abs(x - s.bucketX) <= POP_BUCKET_HALF) return "win";
+  if (Math.abs(x - s.bucketX) <= s.bucketHalf) return "win";
   const hit = s.guests.findIndex((g) => Math.abs(g - x) <= POP_GUEST_HALF);
   if (hit >= 0) s.bonked = hit;
   return "lose";

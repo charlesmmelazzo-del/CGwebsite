@@ -23,17 +23,13 @@ import {
   BEER_BOTTLE_Y,
   BEER_COUNTER_Y,
   BEER_GLASS_H,
-  BEER_MOUTH,
-  BEER_SPILL_MAX,
   MICRO_HINT,
   MICRO_TITLE,
   popLandX,
-  POP_BUCKET_HALF,
   POP_FLIGHT,
   POP_PIVOT_DY,
   POP_TARGET_Y,
   SHOT_REST_Y,
-  SHOT_SPILL_MAX,
   type BeerSim,
   type PopSim,
   type ShotsSim,
@@ -1276,7 +1272,7 @@ function drawBeer(ctx: Ctx, s: number, sim: BeerSim, w: number, t: number) {
 
   // Everything that missed, pooling on the bar
   if (sim.spill > 0) {
-    const k = Math.min(1, sim.spill / BEER_SPILL_MAX);
+    const k = Math.min(1, sim.spill / sim.spillMax);
     if (!spr(ctx, s, "splat", w / 2, counter + 10, 20 + k * 60)) {
       ctx.fillStyle = "rgba(232,154,16,0.55)";
       ctx.beginPath();
@@ -1292,7 +1288,7 @@ function drawBeer(ctx: Ctx, s: number, sim: BeerSim, w: number, t: number) {
   const gTop = gBottom - BEER_GLASS_H;
   const pint = ART.v2("pint");
   const pa = aspectOf(pint);
-  const gw = pa !== null ? BEER_GLASS_H * pa : (BEER_MOUTH + 6) * 2;
+  const gw = pa !== null ? BEER_GLASS_H * pa : (sim.mouth + 6) * 2;
   const topHalf = gw / 2 - (pa !== null ? gw * 0.08 : 0);
   const botHalf = topHalf * 0.72;
   // The inside of the glass, for the beer to fill
@@ -1388,7 +1384,7 @@ function drawBeer(ctx: Ctx, s: number, sim: BeerSim, w: number, t: number) {
     say(ctx, "CATCH IT!", w / 2, 150, RED, 2);
   }
   drawText(ctx, "SPILL", 16, 22, CREAM, 1, "left");
-  brassMeter(ctx, 58, 21, 80, 7, sim.spill / BEER_SPILL_MAX, RED);
+  brassMeter(ctx, 58, 21, 80, 7, sim.spill / sim.spillMax, RED);
   drawText(ctx, "FULL", w - 150, 22, CREAM, 1, "left");
   brassMeter(ctx, w - 110, 21, 80, 7, sim.fill, LIME);
 }
@@ -1406,7 +1402,7 @@ function drawShots(ctx: Ctx, s: number, sim: ShotsSim, w: number, t: number) {
   spr(ctx, s, "salt", w - 36, counter + 4, 44);
   // Spill puddle
   if (sim.spill > 0) {
-    const k = Math.min(1, sim.spill / SHOT_SPILL_MAX);
+    const k = Math.min(1, sim.spill / sim.spillMax);
     if (!spr(ctx, s, k < 0.5 ? "spill-1" : "spill-2", w / 2, counter + 16, 30 + k * 50)) {
       ctx.fillStyle = "rgba(232,154,16,0.55)";
       ctx.beginPath();
@@ -1493,7 +1489,7 @@ function drawShots(ctx: Ctx, s: number, sim: ShotsSim, w: number, t: number) {
     ctx.fill();
   }
   drawText(ctx, "SPILL", 16, 22, CREAM, 1, "left");
-  brassMeter(ctx, 58, 21, 80, 7, sim.spill / SHOT_SPILL_MAX, RED);
+  brassMeter(ctx, 58, 21, 80, 7, sim.spill / sim.spillMax, RED);
 }
 
 /** A party guest from the chest up — the stand-in until the guest sheet lands. */
@@ -1555,19 +1551,19 @@ function drawPop(ctx: Ctx, s: number, sim: PopSim, w: number, t: number) {
   // Ice bucket
   const bx = sim.bucketX;
   const by = POP_TARGET_Y + 6;
-  if (spr(ctx, s, "bucket", bx, by + 2, 62)) {
+  if (spr(ctx, s, "bucket", bx, by + 2, sim.bucketHalf * 1.8)) {
     if (blink(t, 3)) say(ctx, "AIM HERE", bx, by + 38, GOLD, 1);
   } else {
   ctx.fillStyle = INK;
   ctx.beginPath();
-  ctx.moveTo(bx - POP_BUCKET_HALF - 2, by - 20);
-  ctx.lineTo(bx + POP_BUCKET_HALF + 2, by - 20);
-  ctx.lineTo(bx + POP_BUCKET_HALF - 8, by + 26);
-  ctx.lineTo(bx - POP_BUCKET_HALF + 8, by + 26);
+  ctx.moveTo(bx - sim.bucketHalf - 2, by - 20);
+  ctx.lineTo(bx + sim.bucketHalf + 2, by - 20);
+  ctx.lineTo(bx + sim.bucketHalf - 8, by + 26);
+  ctx.lineTo(bx - sim.bucketHalf + 8, by + 26);
   ctx.closePath();
   ctx.fill();
-  fill(ctx, bx - POP_BUCKET_HALF + 2, by - 17, POP_BUCKET_HALF * 2 - 4, 8, "#E8F0F8");
-  fill(ctx, bx - POP_BUCKET_HALF + 6, by - 9, POP_BUCKET_HALF * 2 - 12, 32, "#A8B8C8");
+  fill(ctx, bx - sim.bucketHalf + 2, by - 17, sim.bucketHalf * 2 - 4, 8, "#E8F0F8");
+  fill(ctx, bx - sim.bucketHalf + 6, by - 9, sim.bucketHalf * 2 - 12, 32, "#A8B8C8");
   if (blink(t, 3)) say(ctx, "AIM HERE", bx, by + 32, GOLD, 1);
   }
 

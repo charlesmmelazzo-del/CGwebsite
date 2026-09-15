@@ -21,12 +21,12 @@ import {
 import {
   BEER_COUNTER_Y,
   BEER_GLASS_H,
-  BEER_SPILL_MAX,
   microMove,
   microPress,
   microRelease,
   newBeer,
   newPop,
+  microEase,
   newShots,
   popLandX,
   SHOT_REST_Y,
@@ -541,7 +541,7 @@ check("beer: holding the glass still while the bottle wanders spills and loses",
   let out = null;
   for (let i = 0; i < 60 * 10 && !out; i++) out = updateMicro(s, DT);
   eq(out, "lose");
-  assert.ok(s.spill > BEER_SPILL_MAX);
+  assert.ok(s.spill > s.spillMax);
 });
 
 check("beer: the glass follows the thumb only while it's held", () => {
@@ -554,6 +554,23 @@ check("beer: the glass follows the thumb only while it's held", () => {
   microMove(s, 500, glassMid, 1);
   for (let i = 0; i < 30; i++) updateMicro(s, DT);
   assert.ok(Math.abs(s.glassX - 200) < 1);
+});
+
+check("micro games start gentle and tighten slowly", () => {
+  eq(microEase(1), 0);
+  eq(microEase(2), 0);
+  assert.ok(microEase(5) < 0.25, "still easy a few drinks in");
+  eq(microEase(14), 1);
+  eq(microEase(40), 1);
+  const w = 640;
+  const r = seeded(9);
+  const [b0, b1] = [newBeer(2, w, r), newBeer(14, w, r)];
+  assert.ok(b0.duration > b1.duration && b0.bottleSpeed < b1.bottleSpeed && b0.spillMax > b1.spillMax);
+  const [s0, s1] = [newShots(2, w), newShots(14, w)];
+  assert.ok(s0.duration > s1.duration && s0.glasses.length < s1.glasses.length);
+  const [p0, p1] = [newPop(2, w, r), newPop(14, w, r)];
+  assert.ok(p0.duration > p1.duration && p0.swaySpeed < p1.swaySpeed && p0.bucketHalf > p1.bucketHalf);
+  eq(p0.bucketDrift, 0);
 });
 
 check("shots: nothing pours until the bottle is grabbed", () => {
