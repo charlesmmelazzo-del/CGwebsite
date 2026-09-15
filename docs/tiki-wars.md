@@ -460,7 +460,7 @@ holding.
 | **Shotgun** | Three bullets in a spray. |
 | **Uzi** | Single bullet, straight, much faster tempo. |
 | **Laser** | A round **passes through** what it hits — the answer to a wall of blockers rather than to a crowd. Deliberately slow: at six rounds a second it was eighteen damage a second AND piercing, which made every other gun pointless. The piercing is the weapon; the rate of fire is what it pays for it. |
-| **Flamethrower** | Shortest range, widest spread, high damage. Sets enemies alight - they keep burning and taking damage after the stream leaves them, so a sweep across a crowd kills things that walked out of range. The close-range panic button: devastating if they reach you, useless at distance. |
+| **Flamethrower** | Short range, widest spread, high damage. Sets enemies alight - they keep burning and taking damage after the stream leaves them, so a sweep across a crowd kills things that walked out of range. The close-range panic button: devastating if they reach you, useless at distance. |
 
 ### Helpers
 
@@ -535,8 +535,10 @@ able to spend your position to dodge both is.
 
 Rounds landed on a panel walk it **up its own ladder, one rung at a time**. A
 `-3 RUM` becomes `-2`, then `-1`, then `NOTHING`, and only then starts paying
-out. Each rung costs five rounds, so dragging a `-3` all the way to a reward is
-fifteen rounds not spent on the things walking at you.
+out. Each rung costs three rounds, so dragging a `-3` all the way to a reward is
+nine rounds not spent on the things walking at you. (It was five; guns lost
+their reach to the horizon, so a panel is only in range for about the last
+second of its approach.)
 
 That is the point: a bad gate stops being something that happens *to* you and
 becomes a problem you can shoot your way out of, priced in the only currency the
@@ -738,13 +740,23 @@ everything dies at the horizon, the field empties, and the stage becomes a walk
 down a beach with nothing to do.
 
 So the game measures **how deep enemies get before they die** and opens the taps
-until they are reaching mid-field again.
+until they are reaching the near field again (`PRESSURE_TARGET_Z = 0.2`, where
+an enemy is over half its full size).
+
+That target used to be 0.45, which sounds like mid-field but through the
+perspective divide sits four-fifths of the way up the screen at a third of full
+size. Combined with guns that reached the horizon, the loop sat pinned near its
+ceiling: the guest either picked off specks on the skyline or drowned. See
+*Range* below.
 
 * `killDepth` is a running average of where enemies stop existing. A **miss**
   counts nearly twice as heavily as a kill — an enemy getting past is the
   clearest evidence the guest is at their limit, and pressure has to come off
   faster than it went on. The loop must never be the reason a run ends.
-* `pressure` multiplies the spawn rate, between **1x and 4x**.
+* `pressure` runs between **1x and 3x**. Its square root shortens the beats; the
+  other half of it goes into **crowd size** (`crowdSize`, capped at 10), so a
+  guest who is clearing comfortably gets a bigger crowd to mow down rather than
+  a faster conveyor of small ones.
 * It is floored at 1, so it can only ever ADD to the stage curve. A struggling
   guest is left alone.
 
@@ -753,10 +765,43 @@ and the pressure falls back on its own. Measured behaviour:
 
 | Guest | Pressure | What happens |
 |---|---|---|
-| Kills everything at the horizon | 1 -> 4 over ~20s | Field fills from 0 to 13 enemies |
-| Killing around mid-field | 1.00, flat | Loop never interferes |
-| Only killing close in | 1.00 floor | No extra pressure piled on |
+| Kills everything at the edge of range | climbs toward 3 | Bigger crowds, sooner |
+| Killing in the near field | ~1.0-1.5 | Loop barely interferes |
+| Only killing right on top of you | 1.00 floor | No extra pressure piled on |
 | Barely killing anything | 1.00 floor | Left alone entirely |
+
+### Range — the fight happens up close
+
+Every gun has an **effective range** in z (`gunRange`); a round past it fades
+out and hits nothing. Before this, rounds flew to the horizon with a hitbox the
+same width in nx at every depth, so anything lined up with the hero died the
+moment it appeared — at a fifth of its size. A simple steer-at-the-nearest bot
+had its median kill at z 0.69 and almost nothing ever entered the near field.
+
+| Gun | Range at stage 1 | Screen position |
+|---|---|---|
+| Shotgun | 0.26 | ~62% of the way up the field |
+| Pistol | 0.30 | ~68% |
+| Uzi | 0.32 | ~70% |
+| Laser | 0.36 | ~74% |
+| Flame | 0.34 (fixed) | cone, unchanged |
+
+Range **stretches with enemy speed**, so what stays constant is time on target,
+not distance — at a fixed range a stage-14 wave crossed it in under a second and
+deep runs collapsed.
+
+Two things support it:
+
+* **Approach pace** (`approachPace`): enemies move up to 2x speed across the far
+  field and 0.8x in the near field. At constant speed they spent ~80% of their
+  walk in the top half of the screen, small and out of reach.
+* **Bigger waves, softer growth**: stage one sends four soldiers, not two, and
+  grunt/blocker health and wave size grow more slowly with depth, because the
+  gun has less time to work on each wave.
+
+Measured with the same bot after the change: median kill at z ~0.2 (over half
+full size), 5-9 enemies in the near field at the peak of a wave, and hits taken
+on deep stages roughly where they were before.
 
 ### A stage is a sequence, not a sprinkler
 

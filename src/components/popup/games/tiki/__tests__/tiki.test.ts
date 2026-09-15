@@ -18,6 +18,7 @@ import {
   TRACK_LIMIT, contactNx, gateSpeed, buildWaveCycle, makeGate,
   PLAYER_NX_LIMIT, HELPER_NX_LIMIT, HELPER_DAMAGE,
   rungOf, type State,
+  gunRange, approachPace, crowdSize, MAX_CROWD, type GunKind,
 } from "../tikiCore";
 
 let passed = 0;
@@ -241,7 +242,9 @@ check("a miss leaves a floating number, because the HUD has no score", () => {
     id: 1, kind: "lime", tier: "grunt", z: 0.05, nx: -0.9, hp: 1, maxHp: 1, speed: 0.5,
     burn: 0, flash: 0, stagger: 0, tracks: false, aim: 0, dying: 0, attacking: 0,
   }];
-  run(st, 0.15);
+  // Long enough to get past at its near-field pace, which is slower than its
+  // nominal speed — see approachPace.
+  run(st, 0.25);
   assert.ok(st.pops.length > 0, "penalty was applied with no feedback at all");
   assert.equal(st.pops[0].good, false);
 });
@@ -341,15 +344,21 @@ check("helpers widen the hero's fire without multiplying it", () => {
 });
 
 check("a full rank of helpers roughly doubles output, not quadruples it", () => {
+  // Counted by identity: rounds expire at the edge of their range every frame,
+  // so netting the damage in flight before and after undercounts whoever's
+  // rounds happen to be expiring.
   const dps = (helpers: number) => {
     const st = fresh();
     st.helpers = helpers;
+    const seen = new Set<object>();
     let total = 0;
     for (let i = 0; i < 600; i++) {
-      const before = st.bullets.reduce((n, x) => n + x.damage, 0);
       update(st, DT);
-      const after = st.bullets.reduce((n, x) => n + x.damage, 0);
-      if (after > before) total += after - before;
+      for (const b of st.bullets) {
+        if (seen.has(b)) continue;
+        seen.add(b);
+        total += b.damage;
+      }
     }
     return total;
   };
@@ -1046,13 +1055,12 @@ check("a gate outruns the wave, so only the road ahead needs clearing", () => {
 
 // ── Spread ──────────────────────────────────────────────────────────────────
 
-check("a wave of two straddles the middle, not both kerbs", () => {
+check("a wave straddles the middle, not both kerbs", () => {
   // The bug this guards: slots taken from the ENDPOINTS of the road meant
   // i/(n-1) gave exactly -1 and +1, so every pair spawned hard against both
   // sides with the whole middle empty.
   const st = fresh();
   st.stage = 1;
-  assert.equal(waveSize(1), 2);
   const xs: number[] = [];
   for (let i = 0; i < 200; i++) {
     st.enemies = [];
@@ -1061,7 +1069,7 @@ check("a wave of two straddles the middle, not both kerbs", () => {
     for (const e of st.enemies) xs.push(Math.abs(e.nx));
   }
   const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
-  assert.ok(mean < 0.6, `a wave of two averages ${mean.toFixed(2)} from centre — still hugging the kerbs`);
+  assert.ok(mean < 0.6, `a wave averages ${mean.toFixed(2)} from centre — still hugging the kerbs`);
   assert.ok(Math.max(...xs) < 0.92, "something spawned on the very edge");
 });
 
@@ -1104,7 +1112,9 @@ check("blockers close in abreast, not nose to tail", () => {
 check("fewer but tougher: a soldier takes real fire to drop", () => {
   assert.ok(gruntHp(1) >= 3, "soldiers are back to dying too quickly");
   assert.ok(blockerHp(1) >= 6, "blockers do not soak enough");
-  assert.ok(waveSize(1) <= 2, "stage one sends too many at once");
+  // A crowd, not a horde: enough to sweep through, few enough that the pistol
+  // can finish a wave inside its range.
+  assert.ok(waveSize(1) <= 4, "stage one sends too many at once");
   // A stage-1 soldier should be over half a second of sustained pistol fire.
   const seconds = gruntHp(1) / (GUNS.pistol.rate * GUNS.pistol.damage);
   assert.ok(seconds > 0.4, `a soldier dies in ${seconds.toFixed(2)}s — no weight to it`);
@@ -1194,7 +1204,19 @@ check("the ramp cannot run away past the boss", () => {
 });
 
 check("stage one opens gently", () => {
-  const opening = waveSize(1) / spawnInterval(1) * stageRamp(0);
+  // Measured off the beats the stage actually plays, with the pressure loop
+  // held at its floor, rather than from a formula.
+  const st = fresh();
+  let spawned = 0;
+  const secs = 20;
+  for (let i = 0; i < secs / DT; i++) {
+    st.killDepth = PRESSURE_TARGET_Z;
+    const before = st.enemies.length;
+    update(st, DT);
+    if (st.enemies.length > before) spawned += st.enemies.length - before;
+    st.enemies = [];
+  }
+  const opening = spawned / secs;
   assert.ok(opening < 1.5,
     `stage one opens at ${opening.toFixed(2)} enemies a second — too busy to find your feet`);
 });
@@ -1282,10 +1304,14 @@ check("more pressure really does mean more enemies", () => {
 check("a miss counts for more than a kill", () => {
   // Pressure must come off faster than it goes on: the loop should never be
   // the reason a run ends.
+  //
+  // The kill is at the furthest a round can reach on stage one. Nothing dies
+  // further out than that any more, so a kill on the horizon is not a real case.
   const up = fresh();
   up.killDepth = PRESSURE_TARGET_Z;
+  const reach = Math.max(...(Object.keys(GUNS) as GunKind[]).map((g) => gunRange(g, 1)));
   up.enemies = [{
-    id: 1, kind: "lime", tier: "grunt", z: 0.9, nx: 0, hp: 0, maxHp: 2, speed: 0,
+    id: 1, kind: "lime", tier: "grunt", z: reach, nx: 0, hp: 0, maxHp: 2, speed: 0,
     burn: 0, flash: 0, stagger: 0, tracks: false, aim: 0, dying: 0, attacking: 0,
   }];
   update(up, DT);
@@ -1505,6 +1531,63 @@ check("a new run keeps money, armor, luck and score but not health", () => {
   assert.equal(st.health, MAX_HEALTH, "health should always start full");
   assert.equal(st.gun, "pistol", "guns should never carry into a new run");
   assert.equal(st.helpers, 0, "helpers should never carry into a new run");
+});
+
+// ── The fight happens up close ───────────────────────────────────────────────
+
+check("a round cannot hit anything on the horizon", () => {
+  const st = fresh();
+  st.enemies = [{
+    id: 1, kind: "lime", tier: "grunt", z: 0.8, nx: 0, hp: 99, maxHp: 99, speed: 0,
+    burn: 0, flash: 0, stagger: 0, tracks: false, aim: 0, dying: 0, attacking: 0,
+  }];
+  run(st, 2);
+  assert.equal(st.enemies[0].hp, 99, "a soldier on the skyline took fire");
+});
+
+check("every bullet gun stops well short of the horizon on stage one", () => {
+  for (const g of ["pistol", "shotgun", "uzi", "laser"] as GunKind[]) {
+    assert.ok(gunRange(g, 1) <= 0.45, `${g} reaches ${gunRange(g, 1)} — kills drift back to the skyline`);
+  }
+});
+
+check("range stretches as enemies speed up, so deep stages stay winnable", () => {
+  assert.ok(gunRange("pistol", 20) > gunRange("pistol", 1));
+  assert.ok(gunRange("laser", 200) <= 0.9, "range ran away past the field");
+});
+
+check("enemies hurry through the far field and slow in the near one", () => {
+  assert.ok(approachPace(1) > approachPace(0.5));
+  assert.ok(approachPace(0.5) > approachPace(0.1));
+  assert.ok(approachPace(0) >= 0.8, "near the hero an enemy would slide slower than the ground");
+});
+
+check("pressure brings a bigger crowd, not just a faster conveyor", () => {
+  assert.ok(crowdSize(1, PRESSURE_MAX) > crowdSize(1, PRESSURE_MIN));
+  assert.equal(crowdSize(1, PRESSURE_MIN), waveSize(1));
+  assert.ok(crowdSize(99, PRESSURE_MAX) <= MAX_CROWD);
+});
+
+check("a well-played stage puts the kills in the near field", () => {
+  // A bot that simply steers at whatever is closest. Before range was capped,
+  // its median kill was at z 0.69 — a quarter of full size, on the skyline.
+  const st = fresh();
+  st.health = 1e9;
+  const depths: number[] = [];
+  const dead = new Set<number>();
+  for (let i = 0; i < 60 / DT; i++) {
+    const live = st.enemies.filter((e) => e.dying <= 0).sort((a, b) => a.z - b.z);
+    st.targetNx = live.length ? live[0].nx : 0;
+    update(st, DT);
+    for (const e of st.enemies) {
+      if (e.dying > 0 && e.hp <= 0 && !dead.has(e.id)) { dead.add(e.id); depths.push(e.z); }
+    }
+    st.gate = null;
+  }
+  depths.sort((a, b) => a - b);
+  const median = depths[Math.floor(depths.length / 2)];
+  assert.ok(depths.length > 20, `only ${depths.length} kills in a minute — the road is empty`);
+  assert.ok(median < 0.3, `median kill at z ${median.toFixed(2)} — still shooting at the horizon`);
 });
 
 console.log(`\n${passed} checks passed`);

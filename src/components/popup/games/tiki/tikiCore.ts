@@ -449,16 +449,29 @@ export const GUNS: Record<GunKind, {
   count: number;
   /** Half-angle of the spray, in nx per unit z. */
   spread: number;
-  /** Flamethrower only: how far up the field the stream reaches. */
+  /**
+   * How far up the field a round can still hurt something, in z.
+   *
+   * The flamethrower's stream, and every other gun's EFFECTIVE RANGE. Rounds
+   * used to fly all the way to the horizon, and with a hitbox that is the same
+   * width in nx at every depth, a soldier lined up with you died the moment it
+   * appeared — at a fifth of its size, where you could barely see it. The fight
+   * happened on the skyline and the near field, where the art is big and the
+   * kills feel like something, sat empty.
+   *
+   * Capping range is what brings the wave in. See ENGAGE_Z.
+   */
   range: number;
 }> = {
-  pistol: { rate: 5.5, damage: 1, count: 1, spread: 0, range: 1 },
+  pistol: { rate: 5.5, damage: 1, count: 1, spread: 0, range: 0.3 },
   // Every upgrade is tuned to sit HALFWAY between where it used to be and the
   // pistol. They were two to three times the base gun, which made the first
   // gun gate the moment a run stopped being a game — and made the pistol feel
   // like a punishment rather than a starting point.
-  shotgun: { rate: 2.5, damage: 1, count: 3, spread: 0.42, range: 1 },
-  uzi: { rate: 9.2, damage: 1, count: 1, spread: 0.04, range: 1 },
+  // Shortest of the bullet guns: a spread is a close-quarters weapon, and its
+  // fan is widest exactly where the range stops it.
+  shotgun: { rate: 2.5, damage: 1, count: 3, spread: 0.42, range: 0.26 },
+  uzi: { rate: 9.2, damage: 1, count: 1, spread: 0.04, range: 0.32 },
   // Damage is per second and applies to everything inside the cone at once,
   // plus a burn that keeps ticking after the stream moves off. Devastating up
   // close, useless at any distance — the panic button, not an upgrade.
@@ -470,8 +483,23 @@ export const GUNS: Record<GunKind, {
   // AND piercing — over three times the pistol against a single target and
   // far more against a column, which made every other gun pointless. The
   // piercing is the weapon; the rate of fire is what it pays for it.
-  laser: { rate: 2.1, damage: 3, count: 1, spread: 0, range: 1 },
+  // Reaches furthest, so a column of blockers can be skewered as it lines up.
+  laser: { rate: 2.1, damage: 3, count: 1, spread: 0, range: 0.36 },
 };
+
+/**
+ * A gun's effective range at a given stage.
+ *
+ * Stretches as the enemies get faster. A fixed range is a fixed DISTANCE, but
+ * what the guest actually gets is TIME on target, and by stage fourteen things
+ * were crossing the range in under a second — the gun could no longer finish a
+ * wave however well it was aimed, and deep runs collapsed. Growing a little
+ * slower than enemy speed keeps late stages harder without making them hopeless.
+ */
+export function gunRange(gun: GunKind, stage: number): number {
+  const faster = enemySpeed(stage) / enemySpeed(1);
+  return Math.min(0.9, GUNS[gun].range * faster);
+}
 
 /** Guns whose rounds are not consumed by the first thing they hit. */
 export const PIERCING: Partial<Record<GunKind, boolean>> = { laser: true };
@@ -580,7 +608,7 @@ export function isFinaleBoss(stage: number): boolean {
  * not.
  */
 export function gruntHp(stage: number): number {
-  return 3 + Math.floor((stage - 1) / 8);
+  return 3 + Math.floor((stage - 1) / 12);
 }
 
 /**
@@ -677,6 +705,8 @@ export interface Bullet {
   fromHelper?: boolean;
   /** Carries on through what it hits, instead of stopping at the first. */
   pierce?: boolean;
+  /** Depth past which the round is spent. Absent means the whole field. */
+  range?: number;
   /**
    * Set once this round has been counted against a gate panel.
    *
@@ -808,8 +838,12 @@ export const GATE_GAP = 0.14;
  * The cost is per STEP, not per gate, so dragging a -3 all the way to a payout
  * is a real investment — fifteen rounds not spent on the things walking at you.
  * Curing a -1 to harmless is cheap; turning it into a reward is a decision.
+ *
+ * Three, down from five, because rounds no longer reach a gate on the horizon.
+ * A panel is only in range for about the last second of its approach, and at
+ * five a pistol could barely move it one rung in that window.
  */
-export const GATE_CURE_HITS = 5;
+export const GATE_CURE_HITS = 3;
 
 /** Floating score text — the only feedback the guest gets on a miss. */
 export interface Pop {
@@ -1111,7 +1145,26 @@ export function stageRamp(stageT: number): number {
 export function waveSize(stage: number): number {
   // Scales more slowly than it did: the count climbs with depth, but a stage is
   // now paced by its beats rather than by how fast the sprinkler runs.
-  return Math.min(6, 2 + Math.floor((stage - 1) * 0.18));
+  //
+  // Bigger than it was, now that range is capped: a wave has to be a CROWD by
+  // the time it reaches the near field, or capping range just makes the road
+  // emptier. Two soldiers abreast was something to aim at; four is something to
+  // sweep through.
+  return Math.min(6, 4 + Math.floor((stage - 1) * 0.12));
+}
+
+/**
+ * How many soldiers a wave actually brings, once pressure has had its say.
+ *
+ * Pressure puts BODIES on the road rather than just speeding the beats up: a
+ * guest who is clearing the near field comfortably gets a bigger crowd to clear,
+ * which is the fun of the game, instead of a faster conveyor of small ones.
+ */
+export const MAX_CROWD = 10;
+
+export function crowdSize(stage: number, pressure: number): number {
+  const extra = Math.sqrt(Math.max(1, pressure));
+  return Math.min(MAX_CROWD, Math.round(waveSize(stage) * extra));
 }
 
 /** How many blockers a blocker beat sends. */
@@ -1131,11 +1184,20 @@ export function blockerWaveSize(stage: number): number {
 // not a difficulty setting: lose the gun at the next gate and the pressure
 // falls back on its own.
 
-/** Where we want kills to be happening — mid-field. */
-export const PRESSURE_TARGET_Z = 0.45;
+/**
+ * Where we want kills to be happening.
+ *
+ * In the NEAR field, where an enemy is well over half its full size. This used
+ * to be 0.45, which reads as "mid-field" in z but is not mid-SCREEN: through the
+ * perspective divide 0.45 sits four-fifths of the way up to the horizon at a
+ * third of full size. Kills at the skyline counted as on target, so the loop
+ * kept opening the taps until the guest was drowning, then slammed them shut —
+ * either a quiet horizon shoot or a wall of bodies, and nothing in between.
+ */
+export const PRESSURE_TARGET_Z = 0.2;
 /** Never gentler than the stage curve, and never more than this much harder. */
 export const PRESSURE_MIN = 1;
-export const PRESSURE_MAX = 4;
+export const PRESSURE_MAX = 3;
 /** How fast the loop responds, in multiplier per second at full error. */
 const PRESSURE_RATE = 0.6;
 /** Weight of one death in the running average of kill depth. */
@@ -1181,8 +1243,34 @@ export function enemySpeed(stage: number): number {
   return worldSpeed(stage) + enemyWalk(stage);
 }
 
+/**
+ * How an enemy's pace changes with depth, as a multiple of its speed.
+ *
+ * Quick across the far field, slower in the near one. At a constant speed an
+ * enemy spent about four-fifths of its approach in the top half of the field,
+ * where the perspective divide makes it small and bunched — nothing to look at
+ * and, with range capped, nothing to shoot. Hurrying them through that stretch
+ * gets the crowd in front of you sooner and lets it linger where it is big.
+ *
+ * Never below 0.8, so near the hero an enemy still outpaces the ground it walks
+ * on and does not read as sliding.
+ */
+export function approachPace(z: number): number {
+  const d = Math.max(0, Math.min(1, z));
+  return 0.8 + 1.2 * d * d;
+}
+
+/**
+ * Blocker health.
+ *
+ * Grows more slowly than it did. A blocker used to be under fire from the moment
+ * it crested the horizon; with range capped it is only in reach for the last
+ * stretch of its walk, and at the old curve a stage-fourteen blocker simply
+ * could not be brought down in that window — it walked into the guest every
+ * time, which is not a wall to break but a tax to pay.
+ */
 export function blockerHp(stage: number): number {
-  return 7 + Math.floor((stage - 1) * 1.1);
+  return 6 + Math.floor((stage - 1) * 0.7);
 }
 
 export function bossHp(stage: number): number {
@@ -1507,6 +1595,7 @@ function fire(st: State): void {
       z: 0.02, nx: st.playerNx, vnx: off * g.spread, damage: g.damage,
       side: g.count === 1 ? st.muzzle : off < 0 ? -1 : 1,
       pierce: PIERCING[st.gun] ?? false,
+      range: gunRange(st.gun, st.stage),
     });
   }
 }
@@ -1536,6 +1625,7 @@ function fireHelpers(st: State): void {
       damage: HELPER_DAMAGE,
       side: u.dnx < 0 ? -1 : 1,
       fromHelper: true,
+      range: gunRange("pistol", st.stage),
     });
   }
 }
@@ -1671,7 +1761,7 @@ export function update(st: State, dt: number): void {
     b.z += BULLET_SPEED * dt;
     b.nx += b.vnx * dt;
   }
-  st.bullets = st.bullets.filter((b) => b.z < 1.05 && Math.abs(b.nx) < 1.4);
+  st.bullets = st.bullets.filter((b) => b.z < (b.range ?? 1.05) && Math.abs(b.nx) < 1.4);
 
   // ── Stage progression ──
   if (st.phase === "play") {
@@ -1686,16 +1776,22 @@ export function update(st: State, dt: number): void {
     // The stage plays its cycle: wave, pause, wave, pause, gate. Pressure and
     // the stage ramp shorten the holds rather than opening a tap, so a busy
     // stage is a FASTER sequence of waves, never a continuous stream.
-    st.waveT -= dt * st.pressure * stageRamp(st.stageT);
+    //
+    // Only the square root of pressure goes to pace; the rest goes into how
+    // many bodies a wave brings (crowdSize). Beats overlapping is what turned
+    // high pressure into a stream you could not read, where a bigger crowd
+    // arriving abreast is exactly the thing worth mowing down.
+    st.waveT -= dt * Math.sqrt(st.pressure) * stageRamp(st.stageT);
     if (st.waveT <= 0) {
       if (st.waves.length === 0) st.waves = buildWaveCycle(st.rng);
       const beat = st.waves.shift()!;
       st.waveT = beat.hold;
 
-      if (beat.kind === "soldiers") spawnWave(st, waveSize(st.stage), 0);
+      const crowd = crowdSize(st.stage, st.pressure);
+      if (beat.kind === "soldiers") spawnWave(st, crowd, 0);
       else if (beat.kind === "blockers") spawnWave(st, 0, blockerWaveSize(st.stage));
       else if (beat.kind === "mixed") {
-        spawnWave(st, Math.max(1, waveSize(st.stage) - 1), 1);
+        spawnWave(st, Math.max(1, crowd - 1), 1);
       } else if (beat.kind === "gate" && !st.gate) {
         st.gate = makeGate(st);
       }
@@ -1762,7 +1858,7 @@ export function update(st: State, dt: number): void {
     const stalled = e.stagger > 0
       ? (e.tier === "boss" ? BOSS_STAGGER_SPEED : STAGGER_SPEED)
       : 1;
-    e.z -= e.speed * stalled * dt;
+    e.z -= e.speed * approachPace(e.z) * stalled * dt;
     if (e.tracks) {
       const lim = TRACK_LIMIT[e.tier] ?? 1;
       const want = Math.max(-lim, Math.min(lim, st.playerNx + e.aim));

@@ -903,9 +903,16 @@ function drawField(
     const artH = Math.max(10, (b.pierce ? 34 : 26) * Math.max(0.45, sc));
     // The trailing frame alternates per muzzle, so a stream of rounds does not
     // pulse in step with itself.
+    // Guns have range now, so a round dies partway up the field. Fading it over
+    // the last stretch reads as the shot petering out; stopping it dead reads
+    // as the bullet vanishing.
+    const reach = b.range ?? 1.05;
+    const fade = Math.max(0, Math.min(1, (reach - b.z) / 0.08));
+    ctx.globalAlpha = fade;
     drawSprite(ctx, key, Math.floor(t * 16) + (b.side > 0 ? 1 : 0), x, y + artH, {
       h: artH, pixelScale: PIXEL_SCALE,
     });
+    ctx.globalAlpha = 1;
   }
 
   // Muzzle flash. This is what actually anchors the shooting to the character —
