@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { getGameMeta } from "@/lib/popup/games";
+import { DEMO_SECONDS, getGameMeta } from "@/lib/popup/games";
+import { demoSecondsLeft, saveDemoSecondsLeft } from "./demoTime";
 import { getGameComponent } from "./registry";
 import { P, pad } from "./arcade";
 import CabButton, { CabIconButton } from "../cabinet/CabButton";
@@ -31,6 +32,14 @@ export interface GameShellProps {
    * no progress file. Anyone can do it, signed in or not.
    */
   freePlay?: boolean;
+  /**
+   * Demo play: free play with a clock. The guest gets DEMO_SECONDS per game on
+   * this device; when it runs out the game freezes behind a screen telling them
+   * which cocktail to order to unlock it. Implies freePlay.
+   */
+  demo?: boolean;
+  /** "I have a ticket" on the demo-over screen: open the unlock prompt. */
+  onUnlock?: () => void;
   /**
    * The raffle ticket this High Score Run was started on (from
    * /api/popup/ticket). The score endpoint refuses a run without one, except in
@@ -67,13 +76,16 @@ export default function GameShell({
   isSandbox = false,
   accent = P.yellow,
   autoStart = false,
-  freePlay = false,
+  freePlay: freePlayProp = false,
+  demo = false,
+  onUnlock,
   runId = null,
   onNewRun,
   onExit,
 }: GameShellProps) {
   const meta = getGameMeta(gameKey);
   const Game = getGameComponent(gameKey);
+  const freePlay = freePlayProp || demo;
 
   const [phase, setPhase] = useState<Phase>(autoStart ? "playing" : "attract");
   const [score, setScore] = useState(0);
@@ -82,6 +94,16 @@ export default function GameShell({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedThisRun, setSavedThisRun] = useState(false);
   const [paused, setPaused] = useState(false);
+
+  // ── Demo clock ────────────────────────────────────────────────────────────
+  const [demoLeft, setDemoLeft] = useState(DEMO_SECONDS);
+  const [demoOver, setDemoOver] = useState(false);
+  useEffect(() => {
+    if (!demo) return;
+    const left = demoSecondsLeft(menuId, cocktailId);
+    setDemoLeft(left);
+    setDemoOver(left <= 0);
+  }, [demo, menuId, cocktailId]);
 
   // A ticketed run is spent once it ends; going again needs a new ticket. The
   // sandbox has no tickets, so the owner can replay freely there.
@@ -132,6 +154,26 @@ export default function GameShell({
     if (onExit) onExit();
     else setPhase("attract");
   }, [onExit]);
+
+  // The clock only runs while the game is actually being played: not paused,
+  // not on the score screen, not while the phone is in the guest's pocket.
+  useEffect(() => {
+    if (!demo || phase !== "playing" || paused || demoOver) return;
+    let last = performance.now();
+    const id = window.setInterval(() => {
+      const now = performance.now();
+      const dt = Math.min(1, (now - last) / 1000);
+      last = now;
+      if (document.hidden) return;
+      setDemoLeft((prev) => {
+        const next = Math.max(0, prev - dt);
+        saveDemoSecondsLeft(menuId, cocktailId, next);
+        if (next <= 0) setDemoOver(true);
+        return next;
+      });
+    }, 250);
+    return () => window.clearInterval(id);
+  }, [demo, phase, paused, demoOver, menuId, cocktailId]);
 
   // A pause never outlives the run it paused.
   useEffect(() => {
@@ -233,7 +275,7 @@ export default function GameShell({
   // full-bleed games keep that corner clear of their HUD (EXIT_CLEARANCE in
   // TikiWars.tsx, the same idea in the others), and a pause is one tap away
   // from the way out without a stray tap ever ending a run.
-  if (phase === "playing") {
+  if (phase === "playing" || (demo && demoOver)) {
     return (
       <div className="fixed inset-0 z-[70] bg-black">
         <Game
@@ -242,14 +284,23 @@ export default function GameShell({
           // Free play keeps no save file, so progress can't be farmed at home
           // and carried into a ticketed run.
           viewerId={freePlay ? null : viewerId}
-          paused={paused}
+          paused={paused || (demo && demoOver)}
           onShowScores={() => setPhase("attract")}
         />
-        {paused ? (
+        {demo && demoOver ? (
+          <DemoOverScreen
+            title={meta.title}
+            cocktailName={cocktailName}
+            accent={accent}
+            onUnlock={onUnlock}
+            onExit={leave}
+          />
+        ) : paused ? (
           <PauseScreen
             title={meta.title}
             accent={accent}
             ticketRun={needsTicket}
+            demo={demo}
             onResume={() => setPaused(false)}
             onExit={leave}
           />
@@ -265,6 +316,7 @@ export default function GameShell({
             className="absolute top-1 right-1 z-10"
           />
         )}
+        {demo && !demoOver && <DemoClock seconds={demoLeft} />}
       </div>
     );
   }
@@ -279,7 +331,7 @@ export default function GameShell({
               {meta.title}
             </p>
             <p className="mt-1 text-center text-[9px] tracking-[0.3em] uppercase text-white/40">
-              {freePlay ? "Free Play" : "High Score Run"}
+              {demo ? "Demo Play" : freePlay ? "Free Play" : "High Score Run"}
             </p>
             <GameOverScreen
               score={score}
@@ -292,6 +344,7 @@ export default function GameShell({
               viewerId={viewerId}
               emailVerified={emailVerified}
               freePlay={freePlay}
+              demo={demo}
               needsTicket={needsTicket}
               onRetrySave={runId ? postScore : undefined}
               onReplay={playAgain}
@@ -330,6 +383,88 @@ export default function GameShell({
   );
 }
 
+// ─── Demo ────────────────────────────────────────────────────────────────────
+
+/** The countdown, small, beside the pause button in the corner every game keeps clear. */
+function DemoClock({ seconds }: { seconds: number }) {
+  const s = Math.ceil(seconds);
+  const low = s <= 15;
+  return (
+    <div
+      aria-live="off"
+      className="pointer-events-none absolute top-2 right-11 z-10 px-2 py-1 text-[10px] font-bold tracking-[0.15em] uppercase tabular-nums"
+      style={{
+        background: "rgba(0,0,0,0.72)",
+        color: low ? "#FF5A5A" : "#FFD500",
+        boxShadow: `0 0 0 2px ${low ? "#FF5A5A" : "rgba(255,213,0,0.6)"}`,
+        animation: low ? "demo-blink 0.5s steps(2) infinite" : undefined,
+      }}
+    >
+      Demo {Math.floor(s / 60)}:{String(s % 60).padStart(2, "0")}
+      <style>{`@keyframes demo-blink { 50% { opacity: 0.35 } }`}</style>
+    </div>
+  );
+}
+
+/**
+ * Time's up. The game stays frozen underneath, and the one thing on screen is
+ * which drink unlocks it.
+ */
+function DemoOverScreen({
+  title,
+  cocktailName,
+  accent,
+  onUnlock,
+  onExit,
+}: {
+  title: string;
+  cocktailName: string;
+  accent: string;
+  onUnlock?: () => void;
+  onExit: () => void;
+}) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Demo over"
+      className="absolute inset-0 z-20 flex items-center justify-center bg-black/85 p-6"
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <div className="w-full max-w-[320px] text-center">
+        <p className="text-[10px] tracking-[0.3em] uppercase text-white/50">{title}</p>
+        <p
+          className="mt-3 text-4xl font-black tracking-[0.12em] uppercase leading-none"
+          style={{ color: "#FF3B6B", animation: "demo-flash 0.6s steps(2) infinite", textShadow: "3px 3px 0 #000" }}
+        >
+          Demo Over
+        </p>
+        <style>{`@keyframes demo-flash { 50% { color: ${accent} } }`}</style>
+        <p className="mt-5 text-sm leading-relaxed text-white/80">Your demo time is up.</p>
+        <p className="mt-3 text-sm leading-relaxed text-white/80">
+          To unlock {title}, order the
+        </p>
+        <p style={{ color: accent }} className="mt-1 text-2xl font-black uppercase tracking-tight leading-tight">
+          {cocktailName}
+        </p>
+        <p className="mt-3 text-xs leading-relaxed text-white/55">
+          Enter the ticket that comes with it for unlimited free play and 3 High Score Runs.
+        </p>
+        <div className="mt-7 flex flex-col gap-3">
+          {onUnlock && (
+            <CabButton color={C.magenta} size="lg" className="w-full" onClick={onUnlock}>
+              I Have a Ticket
+            </CabButton>
+          )}
+          <CabButton color={C.plum} size="md" className="w-full" onClick={onExit}>
+            Exit
+          </CabButton>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Pause ───────────────────────────────────────────────────────────────────
 
 /**
@@ -340,12 +475,14 @@ function PauseScreen({
   title,
   accent,
   ticketRun,
+  demo,
   onResume,
   onExit,
 }: {
   title: string;
   accent: string;
   ticketRun: boolean;
+  demo: boolean;
   onResume: () => void;
   onExit: () => void;
 }) {
@@ -373,7 +510,12 @@ function PauseScreen({
         </div>
         {ticketRun && (
           <p className="mt-3 text-[10px] leading-relaxed text-white/45">
-            Exiting ends this High Score Run. Your ticket has been used.
+            Exiting ends this High Score Run. The run has been used.
+          </p>
+        )}
+        {demo && (
+          <p className="mt-3 text-[10px] leading-relaxed text-white/45">
+            The demo clock is stopped while paused.
           </p>
         )}
       </div>
@@ -453,6 +595,7 @@ function GameOverScreen({
   viewerId,
   emailVerified,
   freePlay,
+  demo,
   needsTicket,
   onRetrySave,
   onReplay,
@@ -468,6 +611,7 @@ function GameOverScreen({
   viewerId: string | null;
   emailVerified: boolean;
   freePlay: boolean;
+  demo: boolean;
   needsTicket: boolean;
   onRetrySave?: () => void;
   onReplay: () => void;
@@ -514,8 +658,8 @@ function GameOverScreen({
 
       {freePlay && scoringOpen && (
         <p className="mt-3 text-center text-[11px] text-white/50 leading-relaxed">
-          Free play — this score isn&apos;t recorded. Play a High Score Run with the ticket from
-          your cocktail to get on the board.
+          {demo ? "Demo play" : "Free play"} — this score isn&apos;t recorded. Play a High Score Run
+          with the ticket from your cocktail to get on the board.
         </p>
       )}
 

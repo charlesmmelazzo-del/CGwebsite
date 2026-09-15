@@ -155,6 +155,8 @@ export async function recordScore(args: {
   isTest?: boolean;
   /** The raffle ticket this run was played on. */
   redemptionId?: string | null;
+  /** The High Score Run (one of the ticket's three). */
+  runId?: string | null;
 }): Promise<{ ok: boolean; error?: string }> {
   try {
     const sb = getSupabaseAdmin();
@@ -167,6 +169,7 @@ export async function recordScore(args: {
       detail: args.detail ?? {},
       is_test: args.isTest ?? false,
       redemption_id: args.redemptionId ?? null,
+      run_id: args.runId ?? null,
     });
     if (error) throw error;
     return { ok: true };

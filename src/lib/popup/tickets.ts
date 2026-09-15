@@ -1,11 +1,13 @@
-// ─── Pop Up Zone — raffle-ticket high score runs ─────────────────────────────
+// ─── Pop Up Zone — raffle tickets ────────────────────────────────────────────
 //
-// Every cocktail comes with a physical raffle ticket. Its serial number buys one
-// "High Score Run" on one game, so the prize goes to someone playing at the bar
-// rather than someone replaying at home all week. See db/popup-tickets.sql.
+// Every cocktail comes with a physical raffle ticket. Entering its serial number
+// UNLOCKS that cocktail's game for the guest — unlimited free play instead of
+// the short demo — and gives them RUNS_PER_TICKET High Score Runs on it. The
+// games are a garnish on the drink: to really play, order it.
+// See db/popup-tickets.sql and db/popup-ticket-runs.sql.
 //
-// The ticket is spent when the run STARTS, not when it ends. Otherwise a guest
-// could quit or reload a bad run and try the same ticket again forever.
+// A run is spent when it STARTS, not when it ends. Otherwise a guest could quit
+// or reload a bad run and try again forever.
 
 import { unstable_noStore as noStore } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabase";
@@ -15,6 +17,9 @@ const MAX_DIGITS = 15;
 
 /** Largest single range, so a typo can't validate a million tickets at once. */
 export const MAX_RANGE_SIZE = 100_000;
+
+/** High Score Runs that come with one ticket. */
+export const RUNS_PER_TICKET = 3;
 
 export interface TicketRange {
   id: string;
@@ -34,8 +39,16 @@ export interface TicketRedemption {
   guestName: string;
   guestEmail: string;
   redeemedAt: string;
-  completed: boolean;
+  runsUsed: number;
+  runsAllowed: number;
+  /** Best score across this ticket's runs, or null if none finished. */
   score: number | null;
+}
+
+/** What a signed-in guest has unlocked on one cocktail's game. */
+export interface GameAccess {
+  unlocked: boolean;
+  runsLeft: number;
 }
 
 export type RedeemFailure =
@@ -162,7 +175,7 @@ export async function listRedemptions(menuId: string, limit = 100): Promise<Tick
   const sb = getSupabaseAdmin();
   const { data: rows } = await sb
     .from("popup_ticket_redemptions")
-    .select("id, serial, cocktail_id, game_key, user_id, redeemed_at, completed_at")
+    .select("id, serial, cocktail_id, game_key, user_id, redeemed_at, runs_allowed")
     .eq("menu_id", menuId)
     .order("redeemed_at", { ascending: false })
     .limit(limit);
@@ -170,15 +183,23 @@ export async function listRedemptions(menuId: string, limit = 100): Promise<Tick
 
   const userIds = Array.from(new Set(rows.map((r) => String(r.user_id))));
   const ids = rows.map((r) => String(r.id));
-  const [{ data: profiles }, { data: scores }] = await Promise.all([
+  const [{ data: profiles }, { data: scores }, { data: runs }] = await Promise.all([
     sb.from("popup_profiles").select("id, first_name, last_name, email").in("id", userIds),
     sb.from("popup_game_scores").select("redemption_id, score").in("redemption_id", ids),
+    sb.from("popup_ticket_runs").select("redemption_id").in("redemption_id", ids),
   ]);
 
   const profileById = new Map((profiles ?? []).map((p) => [String(p.id), p]));
-  const scoreByRedemption = new Map(
-    (scores ?? []).map((s) => [String(s.redemption_id), Number(s.score)])
-  );
+  const scoreByRedemption = new Map<string, number>();
+  for (const sc of scores ?? []) {
+    const k = String(sc.redemption_id);
+    scoreByRedemption.set(k, Math.max(scoreByRedemption.get(k) ?? 0, Number(sc.score)));
+  }
+  const runsByRedemption = new Map<string, number>();
+  for (const r of runs ?? []) {
+    const k = String(r.redemption_id);
+    runsByRedemption.set(k, (runsByRedemption.get(k) ?? 0) + 1);
+  }
 
   return rows.map((r) => {
     const p = profileById.get(String(r.user_id));
@@ -190,20 +211,21 @@ export async function listRedemptions(menuId: string, limit = 100): Promise<Tick
       guestName: [p?.first_name, p?.last_name].filter(Boolean).join(" ") || "Unknown",
       guestEmail: p?.email ?? "",
       redeemedAt: String(r.redeemed_at),
-      completed: Boolean(r.completed_at),
+      runsUsed: runsByRedemption.get(String(r.id)) ?? 0,
+      runsAllowed: Number(r.runs_allowed ?? RUNS_PER_TICKET),
       score: scoreByRedemption.get(String(r.id)) ?? null,
     };
   });
 }
 
-// ─── Guests: spending a ticket ───────────────────────────────────────────────
+// ─── Guests: unlocking with a ticket ─────────────────────────────────────────
 
 /**
- * Spend a ticket on one run of one cocktail's game.
+ * Enter a ticket: unlock one cocktail's game for this guest, with its runs.
  *
- * Returns the redemption id, which the client sends back with the score. The
- * unique index on (menu_id, serial) is the real guard against a ticket being
- * used twice — the lookup before it only exists to give a helpful message.
+ * The unique index on (menu_id, serial) is the real guard against a ticket
+ * being used twice — the lookup before it only exists to give a helpful
+ * message. Entering your OWN ticket again is not an error: it is already yours.
  */
 export async function redeemTicket(args: {
   menuId: string;
@@ -212,7 +234,7 @@ export async function redeemTicket(args: {
   userId: string;
   serial: number;
 }): Promise<
-  | { ok: true; redemptionId: string }
+  | { ok: true; redemptionId: string; alreadyYours: boolean }
   | { ok: false; reason: RedeemFailure; otherCocktailId?: string }
 > {
   const { menuId, cocktailId, gameKey, userId, serial } = args;
@@ -243,62 +265,173 @@ export async function redeemTicket(args: {
         user_id: userId,
         serial,
         game_key: gameKey,
+        runs_allowed: RUNS_PER_TICKET,
       })
       .select("id")
       .single();
 
     if (error) {
-      // 23505 = unique_violation: somebody already played this ticket.
-      if (error.code === "23505") return { ok: false, reason: "already_used" };
+      // 23505 = unique_violation: this ticket has been entered before.
+      if (error.code === "23505") {
+        const { data: existing } = await sb
+          .from("popup_ticket_redemptions")
+          .select("id, user_id")
+          .eq("menu_id", menuId)
+          .eq("serial", serial)
+          .maybeSingle();
+        if (existing && String(existing.user_id) === userId) {
+          return { ok: true, redemptionId: String(existing.id), alreadyYours: true };
+        }
+        return { ok: false, reason: "already_used" };
+      }
       throw error;
     }
-    return { ok: true, redemptionId: String(data.id) };
+    return { ok: true, redemptionId: String(data.id), alreadyYours: false };
   } catch (e) {
     console.error("[popup] redeemTicket failed", e);
     return { ok: false, reason: "error" };
   }
 }
 
+/** A guest's tickets on one pop-up, with how many runs each has used. */
+async function ticketsFor(menuId: string, userId: string, cocktailId?: string) {
+  const sb = getSupabaseAdmin();
+  let q = sb
+    .from("popup_ticket_redemptions")
+    .select("id, cocktail_id, game_key, runs_allowed, redeemed_at")
+    .eq("menu_id", menuId)
+    .eq("user_id", userId)
+    .order("redeemed_at", { ascending: true });
+  if (cocktailId) q = q.eq("cocktail_id", cocktailId);
+  const { data: tickets, error } = await q;
+  if (error) throw error;
+  if (!tickets?.length) return [];
+
+  const { data: runs, error: runsError } = await sb
+    .from("popup_ticket_runs")
+    .select("redemption_id")
+    .in("redemption_id", tickets.map((t) => String(t.id)));
+  if (runsError) throw runsError;
+  const used = new Map<string, number>();
+  for (const r of runs ?? []) {
+    const k = String(r.redemption_id);
+    used.set(k, (used.get(k) ?? 0) + 1);
+  }
+  return tickets.map((t) => ({
+    id: String(t.id),
+    cocktailId: t.cocktail_id ? String(t.cocktail_id) : null,
+    gameKey: String(t.game_key),
+    allowed: Number(t.runs_allowed ?? RUNS_PER_TICKET),
+    used: used.get(String(t.id)) ?? 0,
+  }));
+}
+
+/** Every game this guest has unlocked on a pop-up, keyed by cocktail id. */
+export async function getAccess(menuId: string, userId: string): Promise<Record<string, GameAccess>> {
+  noStore();
+  const out: Record<string, GameAccess> = {};
+  for (const t of await ticketsFor(menuId, userId)) {
+    if (!t.cocktailId) continue;
+    const a = out[t.cocktailId] ?? { unlocked: true, runsLeft: 0 };
+    a.runsLeft += Math.max(0, t.allowed - t.used);
+    out[t.cocktailId] = a;
+  }
+  return out;
+}
+
+export type StartRunFailure = "locked" | "no_runs" | "error";
+
 /**
- * Mark a guest's ticket run as finished so its score can be saved — once.
+ * Start one High Score Run on a game this guest has unlocked, spending a run
+ * from their oldest ticket that still has one. The unique (ticket, run number)
+ * index stops two phones taking the same run at once; losing that race just
+ * tries again with the next number.
+ */
+export async function startRun(args: {
+  menuId: string;
+  cocktailId: string;
+  gameKey: string;
+  userId: string;
+}): Promise<{ ok: true; runId: string; runsLeft: number } | { ok: false; reason: StartRunFailure }> {
+  try {
+    const sb = getSupabaseAdmin();
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const tickets = await ticketsFor(args.menuId, args.userId, args.cocktailId);
+      if (!tickets.length) return { ok: false, reason: "locked" };
+      const ticket = tickets.find((t) => t.used < t.allowed);
+      if (!ticket) return { ok: false, reason: "no_runs" };
+
+      const { data, error } = await sb
+        .from("popup_ticket_runs")
+        .insert({
+          redemption_id: ticket.id,
+          menu_id: args.menuId,
+          user_id: args.userId,
+          game_key: args.gameKey,
+          run_number: ticket.used + 1,
+        })
+        .select("id")
+        .single();
+      if (error) {
+        if (error.code === "23505") continue;
+        throw error;
+      }
+      const left = tickets.reduce((n, t) => n + Math.max(0, t.allowed - t.used), 0) - 1;
+      return { ok: true, runId: String(data.id), runsLeft: Math.max(0, left) };
+    }
+    return { ok: false, reason: "error" };
+  } catch (e) {
+    console.error("[popup] startRun failed", e);
+    return { ok: false, reason: "error" };
+  }
+}
+
+/**
+ * Mark a guest's run as finished so its score can be saved — once.
  *
  * The update only matches an unfinished run belonging to this guest, game and
- * pop-up, so a replayed request or someone else's ticket id matches nothing.
+ * pop-up, so a replayed request or someone else's run id matches nothing.
  */
-export async function completeRedemption(args: {
-  redemptionId: string;
+export async function completeRun(args: {
+  runId: string;
   userId: string;
   menuId: string;
   gameKey: string;
-}): Promise<{ ok: true; cocktailId: string | null } | { ok: false }> {
+}): Promise<{ ok: true; redemptionId: string; cocktailId: string | null } | { ok: false }> {
   try {
     const sb = getSupabaseAdmin();
     const { data, error } = await sb
-      .from("popup_ticket_redemptions")
+      .from("popup_ticket_runs")
       .update({ completed_at: new Date().toISOString() })
-      .eq("id", args.redemptionId)
+      .eq("id", args.runId)
       .eq("user_id", args.userId)
       .eq("menu_id", args.menuId)
       .eq("game_key", args.gameKey)
       .is("completed_at", null)
-      .select("cocktail_id")
+      .select("redemption_id")
       .maybeSingle();
     if (error || !data) return { ok: false };
-    return { ok: true, cocktailId: data.cocktail_id ? String(data.cocktail_id) : null };
+    const { data: ticket } = await sb
+      .from("popup_ticket_redemptions")
+      .select("cocktail_id")
+      .eq("id", data.redemption_id)
+      .maybeSingle();
+    return {
+      ok: true,
+      redemptionId: String(data.redemption_id),
+      cocktailId: ticket?.cocktail_id ? String(ticket.cocktail_id) : null,
+    };
   } catch {
     return { ok: false };
   }
 }
 
 /** Put a run back to unfinished, when its score couldn't be saved after all. */
-export async function reopenRedemption(redemptionId: string): Promise<void> {
+export async function reopenRun(runId: string): Promise<void> {
   try {
     const sb = getSupabaseAdmin();
-    await sb
-      .from("popup_ticket_redemptions")
-      .update({ completed_at: null })
-      .eq("id", redemptionId);
+    await sb.from("popup_ticket_runs").update({ completed_at: null }).eq("id", runId);
   } catch {
-    /* the admin log still shows the ticket as played */
+    /* the admin log still shows the run as played */
   }
 }

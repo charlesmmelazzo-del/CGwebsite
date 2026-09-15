@@ -91,7 +91,7 @@ export default function AdminGuestsPage() {
               <tr className="text-[10px] tracking-widest uppercase text-gray-400 border-b border-gray-200">
                 <th className="text-left font-normal px-4 py-2.5">Name</th>
                 <th className="text-left font-normal px-4 py-2.5">Email</th>
-                <th className="text-right font-normal px-4 py-2.5">Ticket runs</th>
+                <th className="text-right font-normal px-4 py-2.5">Tickets</th>
                 <th className="text-left font-normal px-4 py-2.5">Joined</th>
                 <th className="text-left font-normal px-4 py-2.5">Last sign-in</th>
               </tr>
@@ -211,8 +211,7 @@ function GuestEditor({
           <div>
             <h2 className="text-sm text-gray-800">Edit guest</h2>
             <p className="mt-0.5 text-[11px] text-gray-400">
-              Joined {formatDate(guest.createdAt)} · {guest.ticketRuns} ticket{" "}
-              {guest.ticketRuns === 1 ? "run" : "runs"}
+              Joined {formatDate(guest.createdAt)} · {guest.ticketRuns} {guest.ticketRuns === 1 ? "ticket" : "tickets"}
             </p>
           </div>
           <button onClick={onClose} aria-label="Close" className="text-gray-300 hover:text-gray-600">

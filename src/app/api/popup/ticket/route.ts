@@ -3,13 +3,13 @@ import { getViewer } from "@/lib/popup/auth";
 import { getCocktails, getMenuById, resolveLiveMenu } from "@/lib/popup/menus";
 import { isPlayableGame } from "@/lib/popup/games";
 import { checkRateLimit } from "@/lib/popup/access";
-import { parseSerial, redeemTicket } from "@/lib/popup/tickets";
+import { getAccess, parseSerial, redeemTicket, RUNS_PER_TICKET } from "@/lib/popup/tickets";
 
 /**
- * POST — spend a raffle ticket on one High Score Run.
+ * POST — enter a raffle ticket: unlock that cocktail's game for this guest,
+ * with RUNS_PER_TICKET High Score Runs. Starting a run is /api/popup/run.
  *
- * Signed-in guests only, on the live pop-up only. Returns a `runId` the game
- * sends back with its score; without one, a score is never recorded.
+ * Signed-in guests only, on the live pop-up only.
  *
  * Ticket serials are sequential, so a wrong guess is rate limited much harder
  * than a right one — trying numbers near your own ticket should run dry fast.
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   const viewer = await getViewer();
   if (!viewer) {
     return NextResponse.json(
-      { error: "Sign in to start a High Score Run.", reason: "not_signed_in" },
+      { error: "Sign in to unlock this game.", reason: "not_signed_in" },
       { status: 401 }
     );
   }
@@ -72,7 +72,13 @@ export async function POST(req: NextRequest) {
   });
 
   if (result.ok) {
-    return NextResponse.json({ ok: true, runId: result.redemptionId });
+    const access = await getAccess(menu.id, viewer.userId);
+    return NextResponse.json({
+      ok: true,
+      alreadyYours: result.alreadyYours,
+      runsPerTicket: RUNS_PER_TICKET,
+      access: access[cocktail.id] ?? { unlocked: true, runsLeft: 0 },
+    });
   }
 
   // Only wrong numbers count toward the stricter limit.
@@ -97,7 +103,7 @@ export async function POST(req: NextRequest) {
     wrong_game: other
       ? `That ticket is for ${other}. Play it on that game instead.`
       : "That ticket is for a different game.",
-    already_used: "That ticket has already been played.",
+    already_used: "That ticket has already been used by another player.",
     error: "Something went wrong. Please try again.",
   };
 

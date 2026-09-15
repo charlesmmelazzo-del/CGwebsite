@@ -110,3 +110,19 @@ export function isPlayableGame(key: string | undefined): boolean {
 export function listGames(): GameMeta[] {
   return Object.values(GAMES);
 }
+
+// ─── Demo play ───────────────────────────────────────────────────────────────
+//
+// The games are a garnish on the drink. Anyone can try one for DEMO_SECONDS;
+// to keep playing — unlimited free play, plus High Score Runs — they enter the
+// ticket that came with that cocktail. The owner can open a game up to
+// everyone (say, once the pop-up has sold out) with the cocktail's "enable free
+// play" switch in the admin panel, stored as meta.freePlay.
+
+/** How long a demo lasts, in seconds of actual play. */
+export const DEMO_SECONDS = 90;
+
+/** True when the owner has opened this cocktail's game to everyone, no ticket needed. */
+export function isFreePlayEnabled(cocktail: { meta?: Record<string, unknown> } | null | undefined): boolean {
+  return cocktail?.meta?.freePlay === true;
+}

@@ -6,7 +6,7 @@ import { getCocktails, getMenuById, resolveLiveMenu } from "@/lib/popup/menus";
 import { getGameBoard, MAX_SCORE, recordScore } from "@/lib/popup/scores";
 import { isPlayableGame } from "@/lib/popup/games";
 import { checkRateLimit } from "@/lib/popup/access";
-import { completeRedemption, reopenRedemption } from "@/lib/popup/tickets";
+import { completeRun, reopenRun } from "@/lib/popup/tickets";
 
 /**
  * GET — the public leaderboard for one game on one pop-up.
@@ -108,10 +108,12 @@ export async function POST(req: NextRequest) {
 
   // Outside the sandbox, a score needs a ticket — and each ticket saves once.
   const runId = String(body.runId ?? "");
+  let redemptionId: string | null = null;
   if (!isTest) {
     const claimed = runId
-      ? await completeRedemption({ redemptionId: runId, userId: viewer.userId, menuId: menu.id, gameKey })
+      ? await completeRun({ runId, userId: viewer.userId, menuId: menu.id, gameKey })
       : { ok: false as const };
+    if (claimed.ok) redemptionId = claimed.redemptionId;
     if (!claimed.ok) {
       return NextResponse.json(
         { error: "Only a High Score Run played on a ticket goes on the board.", reason: "no_ticket" },
@@ -138,11 +140,12 @@ export async function POST(req: NextRequest) {
     score,
     detail: safeDetail,
     isTest,
-    redemptionId: isTest ? null : runId,
+    redemptionId: isTest ? null : redemptionId,
+    runId: isTest ? null : runId,
   });
   if (!saved.ok) {
-    // Let the guest retry the save rather than losing the ticket to a blip.
-    if (!isTest) await reopenRedemption(runId);
+    // Let the guest retry the save rather than losing the run to a blip.
+    if (!isTest) await reopenRun(runId);
     return NextResponse.json({ error: saved.error }, { status: 500 });
   }
 

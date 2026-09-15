@@ -585,6 +585,24 @@ function CocktailCard({
             />
             <span className="text-xs text-gray-600">Show on the pop-up</span>
           </label>
+          {cocktail.gameKey && (
+            <label className="flex items-start gap-2.5">
+              <input
+                type="checkbox"
+                checked={cocktail.meta?.freePlay === true}
+                onChange={(e) => onUpdate({ meta: { ...(cocktail.meta ?? {}), freePlay: e.target.checked } })}
+                className="accent-[#C97D5A] mt-0.5"
+              />
+              <span className="text-xs text-gray-600">
+                Enable free play
+                <span className="block text-[10px] text-gray-400 leading-relaxed">
+                  Everyone gets unlimited play on this game, no ticket needed — for when the
+                  cocktail has sold out or the pop-up has ended. Off: guests get a 90-second demo
+                  until they enter the ticket from their drink. High Score Runs always need a ticket.
+                </span>
+              </span>
+            </label>
+          )}
         </div>
       )}
     </div>
@@ -609,12 +627,13 @@ interface RedemptionRow {
   guestName: string;
   guestEmail: string;
   redeemedAt: string;
-  completed: boolean;
+  runsUsed: number;
+  runsAllowed: number;
   score: number | null;
 }
 
 /**
- * Which ticket numbers buy a High Score Run on which game.
+ * Which ticket numbers unlock which game (with its 3 High Score Runs).
  *
  * Saved the moment they're added — no need to hit the page's Save button — but
  * only for cocktails that have already been saved, since a range hangs off the
@@ -670,11 +689,12 @@ function TicketsPanel({ menuId, cocktails }: { menuId: string; cocktails: Editab
   const nameById = new Map(cocktails.map((c) => [c.id, c.name || "Untitled cocktail"]));
 
   return (
-    <Section title="Raffle Tickets — High Score Runs" defaultOpen>
+    <Section title="Raffle Tickets — Unlocks & High Score Runs" defaultOpen>
       <p className="text-[11px] text-gray-400 leading-relaxed mb-4">
-        Each ticket number is good for one High Score Run on one game. Enter the first and last
-        number on each roll of tickets for that cocktail. Only runs played on a ticket go on the
-        high score boards — free play never does.
+        Each ticket number unlocks one game for the guest who enters it — unlimited free play
+        instead of the 90-second demo — and gives them 3 High Score Runs on it. Enter the first and
+        last number on each roll of tickets for that cocktail. Only High Score Runs go on the
+        boards; demo and free play never do.
       </p>
 
       {error && (
@@ -710,7 +730,7 @@ function TicketsPanel({ menuId, cocktails }: { menuId: string; cocktails: Editab
       {redemptions.length > 0 && (
         <div className="mt-6">
           <p className="text-[10px] tracking-widest uppercase text-gray-400 mb-2">
-            Recently played tickets
+            Recently entered tickets
           </p>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -719,7 +739,8 @@ function TicketsPanel({ menuId, cocktails }: { menuId: string; cocktails: Editab
                   <th className="text-left font-normal py-2">Ticket</th>
                   <th className="text-left font-normal py-2">Game</th>
                   <th className="text-left font-normal py-2">Guest</th>
-                  <th className="text-right font-normal py-2">Score</th>
+                  <th className="text-right font-normal py-2">Runs</th>
+                  <th className="text-right font-normal py-2">Best</th>
                   <th className="text-right font-normal py-2">When</th>
                 </tr>
               </thead>
@@ -732,10 +753,11 @@ function TicketsPanel({ menuId, cocktails }: { menuId: string; cocktails: Editab
                       {r.guestName}
                       <span className="block text-[10px] text-gray-400 break-all">{r.guestEmail}</span>
                     </td>
+                    <td className="py-2 text-right tabular-nums text-gray-600">
+                      {r.runsUsed} / {r.runsAllowed}
+                    </td>
                     <td className="py-2 text-right tabular-nums text-gray-800">
-                      {r.score !== null ? r.score.toLocaleString() : (
-                        <span className="text-gray-400">{r.completed ? "—" : "Not finished"}</span>
-                      )}
+                      {r.score !== null ? r.score.toLocaleString() : <span className="text-gray-400">—</span>}
                     </td>
                     <td className="py-2 text-right text-gray-400 whitespace-nowrap">
                       {new Date(r.redeemedAt).toLocaleString("en-US", {
@@ -800,7 +822,7 @@ function TicketGame({
         <>
           {ranges.length === 0 ? (
             <p className="mt-2 text-xs text-amber-700">
-              No tickets yet — nobody can play a High Score Run on this game.
+              No tickets yet — nobody can unlock this game or play a High Score Run on it.
             </p>
           ) : (
             <ul className="mt-2 space-y-1">
@@ -812,7 +834,7 @@ function TicketGame({
                       {r.startSerial} – {r.endSerial}
                     </span>
                     <span className="text-gray-400">
-                      {r.used.toLocaleString()} of {total.toLocaleString()} played
+                      {r.used.toLocaleString()} of {total.toLocaleString()} used
                     </span>
                     <button
                       onClick={() => onToggle(r)}

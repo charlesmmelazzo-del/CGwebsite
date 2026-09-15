@@ -115,7 +115,7 @@ export default function CabinetFrame({
               color={C.plum}
               ink={C.cream}
               rotate={6}
-              text="Explore the cocktails, order one to receive tickets to play its corresponding game"
+              text="Explore the cocktails — order one to unlock its game, or try a 90-second demo"
             />
             {/* Pixel accents along the bottom, as on the reference bezel. */}
             <div className="hidden sm:flex items-end gap-3 opacity-90">

@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
   } catch (e) {
     console.error("[GET /api/admin/popup/tickets]", e);
     return NextResponse.json(
-      { error: "Could not load tickets. Has db/popup-tickets.sql been run in Supabase?" },
+      { error: "Could not load tickets. Have db/popup-tickets.sql and db/popup-ticket-runs.sql been run in Supabase?" },
       { status: 500 }
     );
   }

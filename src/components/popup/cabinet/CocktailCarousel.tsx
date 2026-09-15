@@ -29,6 +29,7 @@ export default function CocktailCarousel({
   startIndex = 0,
   onFreePlay,
   onHighScoreRun,
+  playButton,
 }: {
   cocktails: PopupCocktail[];
   /** False once the pop-up has closed — High Score Runs stop with it. */
@@ -37,6 +38,12 @@ export default function CocktailCarousel({
   startIndex?: number;
   onFreePlay: (id: string) => void;
   onHighScoreRun: (id: string) => void;
+  /**
+   * What the two buttons say for one cocktail: Demo Play or Free Play, and the
+   * captions under each (demo time left, runs left). Decided by the template,
+   * which knows what the guest has unlocked.
+   */
+  playButton: (cocktail: PopupCocktail) => { label: string; caption: string; runCaption: string };
 }) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
     align: "center",
@@ -79,6 +86,7 @@ export default function CocktailCarousel({
                 cocktail={c}
                 active={selected === i}
                 scoringOpen={scoringOpen}
+                buttons={playButton(c)}
                 onFreePlay={() => onFreePlay(c.id)}
                 onHighScoreRun={() => onHighScoreRun(c.id)}
               />
@@ -144,12 +152,14 @@ function CocktailSlide({
   cocktail,
   active,
   scoringOpen,
+  buttons,
   onFreePlay,
   onHighScoreRun,
 }: {
   cocktail: PopupCocktail;
   active: boolean;
   scoringOpen: boolean;
+  buttons: { label: string; caption: string; runCaption: string };
   onFreePlay: () => void;
   onHighScoreRun: () => void;
 }) {
@@ -212,9 +222,9 @@ function CocktailSlide({
             <div className="mt-3 w-full max-w-sm mx-auto grid grid-cols-2 gap-3">
               <div className="flex flex-col items-center">
                 <CabButton color={C.teal} size="md" className="w-full !px-1 !text-[8px] sm:!text-[10px]" onClick={onFreePlay}>
-                  Free Play
+                  {buttons.label}
                 </CabButton>
-                <Caption className="mt-2">No high scores</Caption>
+                <Caption className="mt-2">{buttons.caption}</Caption>
               </div>
               <div className="flex flex-col items-center">
                 <CabButton
@@ -226,7 +236,7 @@ function CocktailSlide({
                 >
                   High Score Run
                 </CabButton>
-                <Caption className="mt-2">{scoringOpen ? "Win prizes" : "Scores are final"}</Caption>
+                <Caption className="mt-2">{scoringOpen ? buttons.runCaption : "Scores are final"}</Caption>
               </div>
             </div>
           ) : (

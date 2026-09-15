@@ -10,6 +10,8 @@ import CrtPanel from "../cabinet/CrtPanel";
 import { artLayer, pixelFont, UI } from "../cabinet/pixelArt";
 import { C, withAlpha } from "../cabinet/theme";
 import type { PopupCocktail, PopupTemplateProps } from "@/lib/popup/types";
+import { DEMO_SECONDS, isFreePlayEnabled } from "@/lib/popup/games";
+import { demoSecondsLeft } from "../games/demoTime";
 
 /**
  * HIGH SCORES — a golden-age arcade pop-up.
@@ -17,10 +19,14 @@ import type { PopupCocktail, PopupTemplateProps } from "@/lib/popup/types";
  * The whole page is dressed as a room full of cabinets, and each cocktail is a
  * screen in a carousel: its name, its game playing itself, and two ways in.
  *
- *   FREE PLAY       — anyone, any time, nothing recorded.
- *   HIGH SCORE RUN  — a signed-in guest spends the raffle ticket that came with
- *                     their cocktail on one run that counts for the prize. That
- *                     is what stops someone replaying at home all week to win.
+ *   DEMO PLAY       — anyone can try a game for 90 seconds. Nothing recorded.
+ *   UNLOCK          — the raffle ticket that comes with a cocktail unlocks its
+ *                     game for that guest: unlimited FREE PLAY, and three...
+ *   HIGH SCORE RUNS — ...runs that count for the prize. The games are a garnish
+ *                     on the drink; to really play, order it.
+ *
+ * The owner can open any game to everyone with its "enable free play" switch
+ * in the admin panel, for when a pop-up has sold out or closed.
  *
  * Built mobile-first throughout, because nearly everyone meets this standing at
  * the bar with a phone in one hand and a drink in the other.
@@ -30,8 +36,12 @@ import type { PopupCocktail, PopupTemplateProps } from "@/lib/popup/types";
 interface Play {
   cocktailId: string;
   freePlay: boolean;
+  /** Free play on the demo clock. */
+  demo: boolean;
   runId: string | null;
 }
+
+interface Access { unlocked: boolean; runsLeft: number }
 
 /** Query param that reopens the ticket prompt after signing in or up. */
 const RUN_PARAM = "run";
@@ -46,9 +56,54 @@ export default function HighScoresTemplate({
   const [play, setPlay] = useState<Play | null>(null);
   const playing = cocktails.find((c) => c.id === play?.cocktailId) ?? null;
 
-  // The two prompts in front of a High Score Run.
+  // The two prompts in front of unlocking a game.
   const [signInFor, setSignInFor] = useState<PopupCocktail | null>(null);
   const [ticketFor, setTicketFor] = useState<PopupCocktail | null>(null);
+  const [ticketNotice, setTicketNotice] = useState<string | null>(null);
+
+  // What this guest has unlocked, and how much demo time is left on each game.
+  const [access, setAccess] = useState<Record<string, Access>>({});
+  const [accessReady, setAccessReady] = useState(!viewer);
+  const [demoLeft, setDemoLeft] = useState<Record<string, number>>({});
+
+  const loadAccess = useCallback(async () => {
+    if (!viewer || isSandbox) { setAccessReady(true); return; }
+    try {
+      const res = await fetch(`/api/popup/access?menuId=${encodeURIComponent(menu.id)}`);
+      const data = await res.json();
+      setAccess(data.access ?? {});
+    } catch {
+      /* a guest who can't be checked just sees the demo */
+    } finally {
+      setAccessReady(true);
+    }
+  }, [viewer, isSandbox, menu.id]);
+
+  useEffect(() => { void loadAccess(); }, [loadAccess]);
+
+  // Re-read the demo clocks whenever a game closes.
+  useEffect(() => {
+    if (play) return;
+    const next: Record<string, number> = {};
+    for (const c of cocktails) next[c.id] = demoSecondsLeft(menu.id, c.id);
+    setDemoLeft(next);
+  }, [play, cocktails, menu.id]);
+
+  /** Unlimited play: the sandbox, a game the owner opened up, or one this guest unlocked. */
+  const isOpen = useCallback(
+    (c: PopupCocktail) => isSandbox || isFreePlayEnabled(c) || Boolean(access[c.id]?.unlocked),
+    [isSandbox, access]
+  );
+
+  const unlock = useCallback(
+    (cocktail: PopupCocktail, notice: string | null = null) => {
+      setPlay(null);
+      setTicketNotice(notice);
+      if (!viewer) setSignInFor(cocktail);
+      else setTicketFor(cocktail);
+    },
+    [viewer]
+  );
 
   // The attract screen, shown on EVERY load rather than once per session. It
   // carries the logo, what the pop-up is, and the prize, so none of that has to
@@ -57,21 +112,43 @@ export default function HighScoresTemplate({
   const [startIndex, setStartIndex] = useState(0);
 
   const startHighScoreRun = useCallback(
-    (cocktail: PopupCocktail) => {
+    async (cocktail: PopupCocktail) => {
       setPlay(null);
       // The sandbox has no tickets — the owner tests the real flow otherwise.
-      if (isSandbox) setPlay({ cocktailId: cocktail.id, freePlay: false, runId: null });
-      else if (!viewer) setSignInFor(cocktail);
-      else setTicketFor(cocktail);
+      if (isSandbox) { setPlay({ cocktailId: cocktail.id, freePlay: false, demo: false, runId: null }); return; }
+      if (!viewer) { setSignInFor(cocktail); return; }
+      const a = access[cocktail.id];
+      if (!a?.unlocked) { unlock(cocktail); return; }
+      if (a.runsLeft <= 0) {
+        unlock(cocktail, "You've used all 3 High Score Runs from your ticket. Another ticket gets you 3 more.");
+        return;
+      }
+      try {
+        const res = await fetch("/api/popup/run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ menuId: menu.id, cocktailId: cocktail.id }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.runId) {
+          void loadAccess();
+          unlock(cocktail, data.error ?? "That run couldn't start. Try again.");
+          return;
+        }
+        setAccess((prev) => ({ ...prev, [cocktail.id]: { unlocked: true, runsLeft: Number(data.runsLeft ?? 0) } }));
+        setPlay({ cocktailId: cocktail.id, freePlay: false, demo: false, runId: String(data.runId) });
+      } catch {
+        unlock(cocktail, "Network error — check your connection and try again.");
+      }
     },
-    [isSandbox, viewer]
+    [isSandbox, viewer, access, unlock, menu.id, loadAccess]
   );
 
   // Back from signing in to play a particular game: skip the attract screen,
   // land on that game, and ask for the ticket straight away.
   const handledReturn = useRef(false);
   useEffect(() => {
-    if (handledReturn.current) return;
+    if (handledReturn.current || !accessReady) return;
     handledReturn.current = true;
     const url = new URL(window.location.href);
     const id = url.searchParams.get(RUN_PARAM);
@@ -83,8 +160,28 @@ export default function HighScoresTemplate({
     if (index < 0) return;
     setStarted(true);
     setStartIndex(index);
-    if (viewer && isLive) setTicketFor(cocktails[index]);
-  }, [cocktails, viewer, isLive]);
+    if (viewer && isLive && !access[cocktails[index].id]?.unlocked) setTicketFor(cocktails[index]);
+  }, [cocktails, viewer, isLive, access, accessReady]);
+
+  const playButton = useCallback(
+    (c: PopupCocktail) => {
+      const a = access[c.id];
+      const left = Math.ceil(demoLeft[c.id] ?? DEMO_SECONDS);
+      const open = isOpen(c);
+      return {
+        label: open ? "Free Play" : "Demo Play",
+        caption: open
+          ? "Unlimited"
+          : left > 0
+            ? `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")} demo`
+            : "Demo used",
+        runCaption: a?.unlocked
+          ? `${a.runsLeft} ${a.runsLeft === 1 ? "run" : "runs"} left`
+          : "Ticket unlocks 3",
+      };
+    },
+    [access, demoLeft, isOpen]
+  );
 
   return (
     // Exactly the screen under the zone bar (48px plus its 1px rule), as a
@@ -112,10 +209,14 @@ export default function HighScoresTemplate({
             cocktails={cocktails}
             scoringOpen={isLive}
             startIndex={startIndex}
-            onFreePlay={(id) => setPlay({ cocktailId: id, freePlay: true, runId: null })}
+            playButton={playButton}
+            onFreePlay={(id) => {
+              const c = cocktails.find((x) => x.id === id);
+              if (c) setPlay({ cocktailId: id, freePlay: true, demo: !isOpen(c), runId: null });
+            }}
             onHighScoreRun={(id) => {
               const c = cocktails.find((x) => x.id === id);
-              if (c) startHighScoreRun(c);
+              if (c) void startHighScoreRun(c);
             }}
           />
         )}
@@ -128,7 +229,7 @@ export default function HighScoresTemplate({
       {playing?.gameKey && play && (
         <GameShell
           // A new ticket is a new cabinet: fresh score, fresh "spent" state.
-          key={`${playing.id}:${play.freePlay ? "free" : play.runId ?? "sandbox"}`}
+          key={`${playing.id}:${play.demo ? "demo" : play.freePlay ? "free" : play.runId ?? "sandbox"}`}
           menuId={menu.id}
           cocktailId={playing.id}
           cocktailName={playing.name}
@@ -138,11 +239,13 @@ export default function HighScoresTemplate({
           scoringOpen={isLive}
           isSandbox={isSandbox}
           freePlay={play.freePlay}
+          demo={play.demo}
+          onUnlock={() => unlock(playing)}
           runId={play.runId}
-          onNewRun={() => startHighScoreRun(playing)}
+          onNewRun={() => void startHighScoreRun(playing)}
           accent="#FFD500"
           autoStart
-          onExit={() => setPlay(null)}
+          onExit={() => { setPlay(null); void loadAccess(); }}
         />
       )}
 
@@ -154,10 +257,18 @@ export default function HighScoresTemplate({
         <TicketPrompt
           menuId={menu.id}
           cocktail={ticketFor}
+          notice={ticketNotice}
+          scoringOpen={isLive}
           onCancel={() => setTicketFor(null)}
-          onRedeemed={(runId) => {
+          onUnlocked={(a) => setAccess((prev) => ({ ...prev, [ticketFor.id]: a }))}
+          onFreePlay={() => {
             setTicketFor(null);
-            setPlay({ cocktailId: ticketFor.id, freePlay: false, runId });
+            setPlay({ cocktailId: ticketFor.id, freePlay: true, demo: false, runId: null });
+          }}
+          onHighScoreRun={() => {
+            const c = ticketFor;
+            setTicketFor(null);
+            void startHighScoreRun(c);
           }}
         />
       )}
@@ -231,9 +342,10 @@ function SignInPrompt({ cocktail, onCancel }: { cocktail: PopupCocktail; onCance
   const from = encodeURIComponent(back);
 
   return (
-    <PromptFrame label="High Score Run" title={cocktail.name} onCancel={onCancel}>
+    <PromptFrame label="Unlock this game" title={cocktail.name} onCancel={onCancel}>
       <p className="mt-5 text-sm leading-relaxed" style={{ color: withAlpha(C.cream, 0.8) }}>
-        High Score Runs need a player account, so we know who to send your prize to.
+        Your ticket unlocks this game on your player account — unlimited free play and 3 High
+        Score Runs, and we know who to send your prize to.
       </p>
       <p className="mt-2 text-xs leading-relaxed" style={{ color: withAlpha(C.cream, 0.5) }}>
         One account works for this pop-up and every one after it.
@@ -270,19 +382,29 @@ function SignInPrompt({ cocktail, onCancel }: { cocktail: PopupCocktail; onCance
 function TicketPrompt({
   menuId,
   cocktail,
+  notice,
+  scoringOpen,
   onCancel,
-  onRedeemed,
+  onUnlocked,
+  onFreePlay,
+  onHighScoreRun,
 }: {
   menuId: string;
   cocktail: PopupCocktail;
+  /** Why the prompt opened, when it wasn't the guest asking — e.g. out of runs. */
+  notice: string | null;
+  scoringOpen: boolean;
   onCancel: () => void;
-  onRedeemed: (runId: string) => void;
+  onUnlocked: (access: Access) => void;
+  onFreePlay: () => void;
+  onHighScoreRun: () => void;
 }) {
   const [serial, setSerial] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** Set once the ticket is accepted: it tears, then the run starts. */
+  /** Set once the ticket is accepted: it tears, then the game is unlocked. */
   const [torn, setTorn] = useState(false);
+  const [unlocked, setUnlocked] = useState<{ access: Access; alreadyYours: boolean } | null>(null);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -296,12 +418,14 @@ function TicketPrompt({
         body: JSON.stringify({ menuId, cocktailId: cocktail.id, serial }),
       });
       const data = await res.json();
-      if (!res.ok || !data.runId) {
+      if (!res.ok || !data.ok) {
         setError(data.error ?? "That ticket didn't work. Try again.");
         return;
       }
       setTorn(true);
-      window.setTimeout(() => onRedeemed(String(data.runId)), 750);
+      const access: Access = data.access ?? { unlocked: true, runsLeft: 3 };
+      onUnlocked(access);
+      window.setTimeout(() => setUnlocked({ access, alreadyYours: Boolean(data.alreadyYours) }), 750);
     } catch {
       setError("Network error — check your connection and try again.");
     } finally {
@@ -309,19 +433,61 @@ function TicketPrompt({
     }
   }
 
+  if (unlocked) {
+    const runs = unlocked.access.runsLeft;
+    return (
+      <PromptFrame label="Game unlocked" title={cocktail.name} onCancel={onCancel}>
+        <p
+          className={`${pixelFont.className} mt-5 text-[12px] uppercase leading-relaxed`}
+          style={{ color: C.gold, animation: "unlock-flash 0.5s steps(2) 4" }}
+        >
+          Unlocked!
+        </p>
+        <style>{`@keyframes unlock-flash { 50% { color: ${C.magenta} } }`}</style>
+        <p className="mt-4 text-sm leading-relaxed" style={{ color: withAlpha(C.cream, 0.85) }}>
+          {unlocked.alreadyYours
+            ? "You already entered this ticket — the game is yours."
+            : "Unlimited free play is yours."}
+        </p>
+        <p className="mt-2 text-sm leading-relaxed" style={{ color: withAlpha(C.cream, 0.85) }}>
+          You have <span style={{ color: C.gold }}>{runs} High Score {runs === 1 ? "Run" : "Runs"}</span> left
+          on this game.
+        </p>
+        <div className="mt-6 flex flex-col items-center gap-3">
+          {scoringOpen && runs > 0 && (
+            <CabButton color={C.magenta} size="md" className="w-full" onClick={onHighScoreRun}>
+              Start High Score Run
+            </CabButton>
+          )}
+          <CabButton color={C.teal} size="md" className="w-full" onClick={onFreePlay}>
+            Free Play
+          </CabButton>
+          <CabButton color={C.plum} size="sm" onClick={onCancel}>
+            Done
+          </CabButton>
+        </div>
+      </PromptFrame>
+    );
+  }
+
   const box = UI.ticket.box;
 
   return (
-    <PromptFrame label="High Score Run" title={cocktail.name} onCancel={onCancel}>
+    <PromptFrame label="Unlock this game" title={cocktail.name} onCancel={onCancel}>
       <form onSubmit={submit}>
+        {notice && (
+          <p className="mt-4 text-xs leading-relaxed" style={{ color: C.gold }}>
+            {notice}
+          </p>
+        )}
         <p className="mt-5 text-sm leading-relaxed" style={{ color: withAlpha(C.cream, 0.85) }}>
-          Enter the code from the ticket included with your cocktail.
+          Enter the code from the ticket included with your {cocktail.name}.
         </p>
         <p
           className={`${pixelFont.className} mt-3 text-[9px] uppercase leading-relaxed`}
           style={{ color: C.gold }}
         >
-          One ticket = 1 play
+          1 ticket = free play + 3 runs
         </p>
 
         {/* The ticket itself, with the number typed into its dark box. */}
@@ -369,10 +535,10 @@ function TicketPrompt({
         )}
 
         <p className="mt-3 text-[10px] leading-relaxed" style={{ color: withAlpha(C.cream, 0.45) }}>
-          {torn ? "Ticket accepted — get ready!" : "Your ticket is used as soon as the run starts."}
+          {torn ? "Ticket accepted!" : "Each ticket can only be used by one player."}
         </p>
 
-        {/* A real submit button so the phone keyboard's "Go" starts the run. */}
+        {/* A real submit button so the phone keyboard's "Go" submits. */}
         <div className="mt-5 flex flex-col items-center gap-3">
           <CabButton
             type="submit"
@@ -381,7 +547,7 @@ function TicketPrompt({
             className="w-full"
             disabled={busy || torn || !serial.trim()}
           >
-            {busy ? "Checking…" : "Start Run"}
+            {busy ? "Checking…" : "Unlock Game"}
           </CabButton>
           <CabButton color={C.plum} size="sm" onClick={onCancel} disabled={torn}>
             Cancel
