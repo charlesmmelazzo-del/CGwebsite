@@ -19,10 +19,37 @@ import type { PopupProfile, PopupViewer } from "./types";
 /** Minimum age to hold a Pop Up Zone account. */
 export const MINIMUM_AGE = 21;
 
+/**
+ * Nothing here runs in the browser, so the anon credentials don't need to be
+ * `NEXT_PUBLIC_*` — and being public is exactly what makes them fragile. Next
+ * inlines every `NEXT_PUBLIC_*` read at BUILD time, so a deploy that builds
+ * before the variable is saved bakes in `undefined`, and no amount of
+ * restarting fixes it; the whole zone just says "guest accounts aren't set up"
+ * until someone rebuilds. That bit us on the production cutover.
+ *
+ * The un-prefixed names are read at RUNTIME instead: set them on the host and
+ * a restart is enough. The NEXT_PUBLIC_ names still work as a fallback so
+ * existing deployments keep running untouched.
+ */
+let warnedMissing = false;
+
 function anonEnv(): { url: string; key: string } | null {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) return null;
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) {
+    // "Guest accounts aren't set up yet" is the right message for a guest, but
+    // it tells whoever is deploying nothing. Name the missing variable once, so
+    // the host's logs answer the question instead of a code read.
+    if (!warnedMissing) {
+      warnedMissing = true;
+      const missing = [!url && "SUPABASE_URL", !key && "SUPABASE_ANON_KEY"].filter(Boolean);
+      console.error(
+        `[popup] guest accounts disabled — missing ${missing.join(" and ")}. ` +
+          `Set them on this deployment and restart.`
+      );
+    }
+    return null;
+  }
   return { url, key };
 }
 
