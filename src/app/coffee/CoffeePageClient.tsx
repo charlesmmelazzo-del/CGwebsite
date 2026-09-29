@@ -8,6 +8,7 @@ import { resolveTheme } from "@/lib/themes";
 import type { ThemeName } from "@/lib/themes";
 import clsx from "clsx";
 import type { CoffeeMenu } from "@/lib/coffeedata";
+import MenuPdfView from "@/components/ui/MenuPdfView";
 
 interface Props {
   menus: CoffeeMenu[];
@@ -79,7 +80,7 @@ export default function CoffeePageClient({ menus, header }: Props) {
         )}
 
         {/* Menu image */}
-        <div className="px-4 pb-16 max-w-3xl mx-auto">
+        <div className={clsx("px-4 pb-16 mx-auto", activeMenu?.pdfPages?.length ? "max-w-5xl" : "max-w-3xl")}>
           {menus.length === 0 ? (
             <div
               className="w-full aspect-[8.5/11] rounded-lg flex items-center justify-center"
@@ -92,6 +93,15 @@ export default function CoffeePageClient({ menus, header }: Props) {
                 Coffee menu coming soon
               </p>
             </div>
+          ) : activeMenu?.pdfPages?.length ? (
+            <>
+              <div className="hidden md:block">
+                <MenuPdfView key={activeMenu.id} tab={activeMenu} textColor={theme.text} mutedColor={theme.muted} layout="spread" />
+              </div>
+              <div className="md:hidden -mx-4">
+                <MenuPdfView key={activeMenu.id} tab={activeMenu} textColor={theme.text} mutedColor={theme.muted} layout="stack" />
+              </div>
+            </>
           ) : activeMenu?.imageUrl ? (
             <button
               onClick={() => setLightboxOpen(true)}

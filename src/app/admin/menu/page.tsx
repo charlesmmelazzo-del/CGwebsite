@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Save, GripVertical, Loader2 } from "lucide-react";
+import { Plus, Trash2, Save, GripVertical, Loader2, FileText, Martini } from "lucide-react";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { MenuTab, MenuItem } from "@/types";
 import ColorPicker from "@/components/ui/ColorPicker";
 import ImagePicker from "@/components/ui/ImagePicker";
+import PdfTabPanel from "@/components/admin/PdfTabPanel";
 import clsx from "clsx";
 
 function newId() { return `m-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
@@ -68,8 +69,14 @@ function MenuAdminPanel({
     });
   }
 
-  function addTab() {
-    const newTab: MenuTab = { id: newId(), label: "New Tab", order: tabs.length, active: true };
+  function addTab(kind: "cocktails" | "pdf") {
+    const newTab: MenuTab = {
+      id: newId(),
+      label: kind === "pdf" ? "New PDF Section" : "New Tab",
+      order: tabs.length,
+      active: true,
+      kind,
+    };
     setTabs((prev) => [...prev, newTab]);
     setActiveTabId(newTab.id);
   }
@@ -78,7 +85,14 @@ function MenuAdminPanel({
     setTabs((prev) => prev.map((t) => t.id === id ? { ...t, label } : t));
   }
 
+  function updateTab(id: string, patch: Partial<MenuTab>) {
+    setTabs((prev) => prev.map((t) => t.id === id ? { ...t, ...patch } : t));
+  }
+
   function removeTab(id: string) {
+    const tab = tabs.find((t) => t.id === id);
+    if (tab?.kind === "pdf" && tab.pdfPages?.length &&
+        !confirm(`Remove the "${tab.label}" section and its PDF?`)) return;
     setTabs((prev) => prev.filter((t) => t.id !== id));
     setItems((prev) => prev.filter((i) => i.tabId !== id));
     if (activeTabId === id) setActiveTabId(tabs.find((t) => t.id !== id)?.id ?? "");
@@ -159,6 +173,7 @@ function MenuAdminPanel({
   }
 
   const activeItems = items.filter((i) => i.tabId === activeTabId).sort((a, b) => a.order - b.order);
+  const activeTab = tabs.find((t) => t.id === activeTabId);
 
   if (loading) {
     return (
@@ -208,37 +223,53 @@ function MenuAdminPanel({
               ))}
             </SortableContext>
           </DndContext>
-          <button
-            onClick={addTab}
-            className="px-2 py-1.5 text-gray-400 hover:text-[#C97D5A] transition-colors"
-          >
-            <Plus size={14} />
-          </button>
+          <div className="flex items-center gap-1 ml-1">
+            <button
+              onClick={() => addTab("cocktails")}
+              title="Add a section of individual cocktails with photos"
+              className="flex items-center gap-1 px-2 py-1.5 text-[10px] tracking-widest uppercase text-gray-400 hover:text-[#C97D5A] transition-colors"
+            >
+              <Plus size={12} /> Cocktails
+            </button>
+            <button
+              onClick={() => addTab("pdf")}
+              title="Add a section that shows an uploaded PDF menu"
+              className="flex items-center gap-1 px-2 py-1.5 text-[10px] tracking-widest uppercase text-gray-400 hover:text-[#C97D5A] transition-colors"
+            >
+              <Plus size={12} /> PDF
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Items */}
-      <div className="space-y-2 mb-4">
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleItemDragEnd}>
-          <SortableContext items={activeItems.map((i) => i.id)} strategy={verticalListSortingStrategy}>
-            {activeItems.map((item) => (
-              <SortableItem
-                key={item.id}
-                item={item}
-                onEdit={openEditItem}
-                onRemove={removeItem}
-              />
-            ))}
-          </SortableContext>
-        </DndContext>
-      </div>
+      {activeTab?.kind === "pdf" ? (
+        <PdfTabPanel tab={activeTab} onChange={(patch) => updateTab(activeTab.id, patch)} />
+      ) : (
+        <>
+          {/* Items */}
+          <div className="space-y-2 mb-4">
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleItemDragEnd}>
+              <SortableContext items={activeItems.map((i) => i.id)} strategy={verticalListSortingStrategy}>
+                {activeItems.map((item) => (
+                  <SortableItem
+                    key={item.id}
+                    item={item}
+                    onEdit={openEditItem}
+                    onRemove={removeItem}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+          </div>
 
-      <button
-        onClick={openNewItem}
-        className="w-full flex items-center justify-center gap-2 py-3 border border-dashed border-gray-200 text-gray-400 hover:text-[#C97D5A] hover:border-[#C97D5A]/30 transition-colors text-xs tracking-widest uppercase rounded-sm"
-      >
-        <Plus size={14} /> Add Item
-      </button>
+          <button
+            onClick={openNewItem}
+            className="w-full flex items-center justify-center gap-2 py-3 border border-dashed border-gray-200 text-gray-400 hover:text-[#C97D5A] hover:border-[#C97D5A]/30 transition-colors text-xs tracking-widest uppercase rounded-sm"
+          >
+            <Plus size={14} /> Add Item
+          </button>
+        </>
+      )}
 
       {/* Edit modal */}
       {editingItem && (
@@ -411,6 +442,9 @@ function SortableTab({ tab, active, onClick, onLabelChange, onRemove }: {
       <button {...attributes} {...listeners} className="text-gray-300 hover:text-gray-500 px-1 cursor-grab active:cursor-grabbing touch-none">
         <GripVertical size={12} />
       </button>
+      {tab.kind === "pdf"
+        ? <FileText size={11} className="text-gray-400" aria-label="PDF section" />
+        : <Martini size={11} className="text-gray-300" aria-label="Cocktail section" />}
       {editing ? (
         <input
           type="text"

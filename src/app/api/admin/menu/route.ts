@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import type { MenuTab } from "@/types";
 
 // GET — return all menu tabs and items
 export async function GET() {
@@ -14,6 +15,9 @@ export async function GET() {
       label: r.label,
       order: r.order,
       active: r.active,
+      kind: r.kind ?? "cocktails",
+      pdfUrl: r.pdf_url ?? undefined,
+      pdfPages: r.pdf_pages ?? undefined,
     }));
     const items = (itemsRes.data ?? []).map((r) => ({
       id: r.id,
@@ -73,11 +77,14 @@ export async function POST(req: NextRequest) {
     // 3. Upsert tabs
     if (newTabIds.length) {
       const { error: tabErr } = await sb.from("menu_tabs").upsert(
-        tabs.map((t: { id: string; label: string; order: number; active: boolean }) => ({
+        tabs.map((t: MenuTab) => ({
           id: t.id,
           label: t.label,
           order: t.order,
           active: t.active,
+          kind: t.kind ?? "cocktails",
+          pdf_url: t.pdfUrl ?? null,
+          pdf_pages: t.pdfPages ?? null,
         })),
         { onConflict: "id" }
       );

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import type { MenuPdfPage } from "@/types";
 
 export interface CoffeeMenu {
   id: string;
@@ -8,6 +9,8 @@ export interface CoffeeMenu {
   alt: string;
   order: number;
   active: boolean;
+  pdfUrl?: string;            // a PDF menu, shown instead of the image
+  pdfPages?: MenuPdfPage[];
 }
 
 // GET — return all menus ordered by order_num
@@ -28,6 +31,8 @@ export async function GET() {
       alt: r.alt ?? "",
       order: r.order_num,
       active: r.active,
+      pdfUrl: r.pdf_url ?? undefined,
+      pdfPages: r.pdf_pages ?? undefined,
     }));
 
     return NextResponse.json({ menus });
@@ -69,6 +74,8 @@ export async function POST(req: NextRequest) {
           alt: m.alt ?? "",
           order_num: m.order,
           active: m.active,
+          pdf_url: m.pdfUrl ?? null,
+          pdf_pages: m.pdfPages ?? null,
           updated_at: new Date().toISOString(),
         })),
         { onConflict: "id" }

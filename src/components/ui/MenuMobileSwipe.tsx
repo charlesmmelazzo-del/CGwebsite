@@ -2,11 +2,12 @@
 
 import { useState, useRef, useMemo, useEffect } from "react";
 import Image from "next/image";
-import { Heart, List, Undo2, ArrowRight } from "lucide-react";
+import { Heart, List, Undo2, ArrowRight, Martini } from "lucide-react";
 import { motion, useMotionValue, useTransform, animate, type PanInfo, type MotionValue } from "framer-motion";
 import type { MenuItem, MenuTab } from "@/types";
 import clsx from "clsx";
 import EnlargedTileOverlay from "./EnlargedTileOverlay";
+import MenuPdfView from "./MenuPdfView";
 
 interface Props {
   items: MenuItem[];
@@ -209,6 +210,12 @@ export default function MenuMobileSwipe({
   const [globalIndex, setGlobalIndex] = useState(0);
   const [enlargedItem, setEnlargedItem] = useState<MenuItem | null>(null);
   const [enlargedStartFlipped, setEnlargedStartFlipped] = useState(false);
+  // A PDF section replaces the card stack while it's open. The deck keeps its
+  // place underneath, so tapping back to a cocktail tab resumes where you were.
+  const [pdfTabId, setPdfTabId] = useState<string | null>(() =>
+    items.length === 0 ? (tabs.find((t) => t.kind === "pdf")?.id ?? null) : null
+  );
+  const pdfTab = pdfTabId ? tabs.find((t) => t.id === pdfTabId) : undefined;
 
   // Shared MotionValue for the active card — lifted so buttons can drive it
   const cardX = useMotionValue(0);
@@ -275,8 +282,19 @@ export default function MenuMobileSwipe({
   }, [wrappedIndex, allItems.length]);
 
   function handleTabClick(tabId: string) {
+    if (tabs.find((t) => t.id === tabId)?.kind === "pdf") {
+      setPdfTabId(tabId);
+      return;
+    }
     const bp = sectionBreakpoints.find((b) => b.tabId === tabId);
     if (!bp || isAnimating.current) return;
+    if (pdfTabId) {
+      // Coming back from a PDF — just show the deck, no swipe-away animation.
+      setPdfTabId(null);
+      setGlobalIndex(bp.startIndex);
+      setActiveTabId(tabId);
+      return;
+    }
     isAnimating.current = true;
     animate(cardX, -500, { duration: 0.3, ease: "easeOut" }).then(() => {
       setGlobalIndex(bp.startIndex);
@@ -314,109 +332,138 @@ export default function MenuMobileSwipe({
   return (
     <div className="h-full flex flex-col">
       {/* Tab bar */}
-      <TabBar tabs={tabs} activeTabId={activeTabId} onTabClick={handleTabClick} textColor={textColor} />
+      <TabBar tabs={tabs} activeTabId={pdfTabId ?? activeTabId} onTabClick={handleTabClick} textColor={textColor} />
 
-      {/* Card area — tighter padding to maximise card height */}
-      <div className="flex-1 relative px-4 py-2">
-        {/* Stacked preview cards behind the active card */}
-        {nextItems.slice(0, 2).map((nextItem, i) => (
-          <div
-            key={nextItem.id}
-            className="absolute inset-x-4 inset-y-2 rounded-2xl overflow-hidden pointer-events-none"
-            style={{
-              transform: `scale(${1 - (i + 1) * 0.04}) translateY(${(i + 1) * -10}px)`,
-              opacity: 1 - (i + 1) * 0.15,
-              zIndex: -(i + 1),
-            }}
-          >
-            {(nextItem.carouselImageUrl ?? nextItem.imageUrl) ? (
-              <Image
-                src={(nextItem.carouselImageUrl ?? nextItem.imageUrl) as string}
-                alt={nextItem.alt ?? nextItem.title}
-                fill
-                className="object-cover"
-                sizes="100vw"
-              />
-            ) : (
-              <div className="absolute inset-0" style={{ backgroundColor: "#2a2a2a" }} />
+      {pdfTab ? (
+        <>
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+            <MenuPdfView key={pdfTab.id} tab={pdfTab} textColor={textColor} mutedColor={mutedColor} layout="stack" />
+          </div>
+          <div className="shrink-0 flex items-center justify-center gap-4 py-2 pb-3">
+            <button
+              onClick={onToggleListView}
+              className="w-10 h-10 rounded-full flex items-center justify-center transition-opacity hover:opacity-80"
+              style={{ border: `1px solid ${textColor}30`, color: textColor }}
+              aria-label="List view"
+            >
+              <List size={18} />
+            </button>
+            {allItems.length > 0 && (
+              <button
+                onClick={() => setPdfTabId(null)}
+                className="h-10 px-5 rounded-full flex items-center gap-2 text-[11px] tracking-widest uppercase transition-opacity hover:opacity-80"
+                style={{ border: "1px solid rgba(201,125,90,0.5)", color: "#C97D5A" }}
+              >
+                <Martini size={15} /> Back to cocktails
+              </button>
             )}
           </div>
-        ))}
+        </>
+      ) : (
+        <>
+          {/* Card area — tighter padding to maximise card height */}
+          <div className="flex-1 relative px-4 py-2">
+            {/* Stacked preview cards behind the active card */}
+            {nextItems.slice(0, 2).map((nextItem, i) => (
+              <div
+                key={nextItem.id}
+                className="absolute inset-x-4 inset-y-2 rounded-2xl overflow-hidden pointer-events-none"
+                style={{
+                  transform: `scale(${1 - (i + 1) * 0.04}) translateY(${(i + 1) * -10}px)`,
+                  opacity: 1 - (i + 1) * 0.15,
+                  zIndex: -(i + 1),
+                }}
+              >
+                {(nextItem.carouselImageUrl ?? nextItem.imageUrl) ? (
+                  <Image
+                    src={(nextItem.carouselImageUrl ?? nextItem.imageUrl) as string}
+                    alt={nextItem.alt ?? nextItem.title}
+                    fill
+                    className="object-cover"
+                    sizes="100vw"
+                  />
+                ) : (
+                  <div className="absolute inset-0" style={{ backgroundColor: "#2a2a2a" }} />
+                )}
+              </div>
+            ))}
 
-        {/* Active swipe card */}
-        {currentItem && (
-          <SwipeCard
-            key={`${currentItem.id}-${wrappedIndex}`}
-            item={currentItem}
-            isFavorited={isFavorited}
-            onToggleFavorite={() => onToggleFavorite(currentItem.id)}
-            onSwipe={handleSwipe}
-            onTap={() => {
-              setEnlargedStartFlipped(hasBackContent(currentItem));
-              setEnlargedItem(currentItem);
-            }}
-            x={cardX}
-          />
-        )}
-      </div>
+            {/* Active swipe card */}
+            {currentItem && (
+              <SwipeCard
+                key={`${currentItem.id}-${wrappedIndex}`}
+                item={currentItem}
+                isFavorited={isFavorited}
+                onToggleFavorite={() => onToggleFavorite(currentItem.id)}
+                onSwipe={handleSwipe}
+                onTap={() => {
+                  setEnlargedStartFlipped(hasBackContent(currentItem));
+                  setEnlargedItem(currentItem);
+                }}
+                x={cardX}
+              />
+            )}
+          </div>
 
-      {/* Counter row */}
-      <div className="shrink-0 py-0.5 text-center flex items-center justify-center gap-3">
-        {progress.total > 0 && (
-          <p className="text-[11px] tracking-widest uppercase opacity-50" style={{ color: textColor }}>
-            {progress.current} of {progress.total} — {progress.label}
-          </p>
-        )}
-        {favorites.length > 0 && (
-          <button
-            onClick={onOpenFavorites}
-            className="flex items-center gap-1 text-[11px] tracking-widest uppercase opacity-60 hover:opacity-90 transition-opacity"
-            style={{ color: "#C97D5A" }}
-          >
-            <Heart size={10} fill="#C97D5A" />
-            {favorites.length}
-          </button>
-        )}
-      </div>
+          {/* Counter row */}
+          <div className="shrink-0 py-0.5 text-center flex items-center justify-center gap-3">
+            {progress.total > 0 && (
+              <p className="text-[11px] tracking-widest uppercase opacity-50" style={{ color: textColor }}>
+                {progress.current} of {progress.total} — {progress.label}
+              </p>
+            )}
+            {favorites.length > 0 && (
+              <button
+                onClick={onOpenFavorites}
+                className="flex items-center gap-1 text-[11px] tracking-widest uppercase opacity-60 hover:opacity-90 transition-opacity"
+                style={{ color: "#C97D5A" }}
+              >
+                <Heart size={10} fill="#C97D5A" />
+                {favorites.length}
+              </button>
+            )}
+          </div>
 
-      {/* Action bar */}
-      <div className="shrink-0 flex items-center justify-center gap-4 py-2 pb-3">
-        <button
-          onClick={onToggleListView}
-          className="w-10 h-10 rounded-full flex items-center justify-center transition-opacity hover:opacity-80"
-          style={{ border: `1px solid ${textColor}30`, color: textColor }}
-          aria-label="List view"
-        >
-          <List size={18} />
-        </button>
-        <button
-          onClick={handlePrev}
-          disabled={globalIndex === 0}
-          className="w-12 h-12 rounded-full flex items-center justify-center transition-opacity disabled:opacity-30"
-          style={{ border: "1px solid rgba(251,191,36,0.4)" }}
-          aria-label="Previous"
-        >
-          <Undo2 size={20} className="text-amber-400" />
-        </button>
-        <button
-          onClick={() => currentItem && onToggleFavorite(currentItem.id)}
-          disabled={!currentItem}
-          className="w-14 h-14 rounded-full flex items-center justify-center transition-opacity disabled:opacity-30"
-          style={{ border: "1px solid rgba(201,125,90,0.4)" }}
-          aria-label={isFavorited ? "Remove from favorites" : "Add to favorites"}
-        >
-          <Heart size={26} fill={isFavorited ? "#C97D5A" : "none"} stroke={isFavorited ? "#C97D5A" : textColor} />
-        </button>
-        <button
-          onClick={handleNext}
-          disabled={allItems.length === 0}
-          className="w-12 h-12 rounded-full flex items-center justify-center transition-opacity disabled:opacity-30"
-          style={{ border: "1px solid rgba(74,222,128,0.4)" }}
-          aria-label="Next"
-        >
-          <ArrowRight size={20} className="text-green-400" />
-        </button>
-      </div>
+          {/* Action bar */}
+          <div className="shrink-0 flex items-center justify-center gap-4 py-2 pb-3">
+            <button
+              onClick={onToggleListView}
+              className="w-10 h-10 rounded-full flex items-center justify-center transition-opacity hover:opacity-80"
+              style={{ border: `1px solid ${textColor}30`, color: textColor }}
+              aria-label="List view"
+            >
+              <List size={18} />
+            </button>
+            <button
+              onClick={handlePrev}
+              disabled={globalIndex === 0}
+              className="w-12 h-12 rounded-full flex items-center justify-center transition-opacity disabled:opacity-30"
+              style={{ border: "1px solid rgba(251,191,36,0.4)" }}
+              aria-label="Previous"
+            >
+              <Undo2 size={20} className="text-amber-400" />
+            </button>
+            <button
+              onClick={() => currentItem && onToggleFavorite(currentItem.id)}
+              disabled={!currentItem}
+              className="w-14 h-14 rounded-full flex items-center justify-center transition-opacity disabled:opacity-30"
+              style={{ border: "1px solid rgba(201,125,90,0.4)" }}
+              aria-label={isFavorited ? "Remove from favorites" : "Add to favorites"}
+            >
+              <Heart size={26} fill={isFavorited ? "#C97D5A" : "none"} stroke={isFavorited ? "#C97D5A" : textColor} />
+            </button>
+            <button
+              onClick={handleNext}
+              disabled={allItems.length === 0}
+              className="w-12 h-12 rounded-full flex items-center justify-center transition-opacity disabled:opacity-30"
+              style={{ border: "1px solid rgba(74,222,128,0.4)" }}
+              aria-label="Next"
+            >
+              <ArrowRight size={20} className="text-green-400" />
+            </button>
+          </div>
+        </>
+      )}
 
       {/* Enlarged overlay */}
       {enlargedItem && (

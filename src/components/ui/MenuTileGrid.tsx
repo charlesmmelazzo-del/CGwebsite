@@ -6,6 +6,7 @@ import { Heart } from "lucide-react";
 import type { MenuItem, MenuTab } from "@/types";
 import clsx from "clsx";
 import EnlargedTileOverlay from "./EnlargedTileOverlay";
+import MenuPdfView from "./MenuPdfView";
 
 interface Props {
   items: MenuItem[];
@@ -181,11 +182,13 @@ export default function MenuTileGrid({ items, tabs, textColor, mutedColor, bgCol
   const [activeTabId, setActiveTabId] = useState(tabs[0]?.id ?? "");
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Group items by tab — only tabs that have at least one item
+  // Group items by tab — only tabs that have something to show
   const sections = useMemo(
     () =>
       tabs
-        .filter((tab) => items.some((i) => i.tabId === tab.id))
+        .filter((tab) =>
+          tab.kind === "pdf" ? !!tab.pdfPages?.length : items.some((i) => i.tabId === tab.id)
+        )
         .map((tab) => ({
           tab,
           items: items.filter((i) => i.tabId === tab.id).sort((a, b) => a.order - b.order),
@@ -256,19 +259,25 @@ export default function MenuTileGrid({ items, tabs, textColor, mutedColor, bgCol
                 label={tab.label}
                 mutedColor={mutedColor}
               />
-              <div className="grid grid-cols-3 gap-[3px] mb-8">
-                {tabItems.map((item) => (
-                  <MenuTile
-                    key={item.id}
-                    item={item}
-                    onClick={() => setEnlargedId(item.id)}
-                    textColor={textColor}
-                    bgColor={bgColor}
-                    isFavorited={favorites.includes(item.id)}
-                    onToggleFavorite={() => onToggleFavorite(item.id)}
-                  />
-                ))}
-              </div>
+              {tab.kind === "pdf" ? (
+                <div className="mb-8">
+                  <MenuPdfView tab={tab} textColor={textColor} mutedColor={mutedColor} layout="spread" />
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-[3px] mb-8">
+                  {tabItems.map((item) => (
+                    <MenuTile
+                      key={item.id}
+                      item={item}
+                      onClick={() => setEnlargedId(item.id)}
+                      textColor={textColor}
+                      bgColor={bgColor}
+                      isFavorited={favorites.includes(item.id)}
+                      onToggleFavorite={() => onToggleFavorite(item.id)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>

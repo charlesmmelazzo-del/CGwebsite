@@ -20,6 +20,9 @@ export async function getMenuData(): Promise<MenuData> {
       label: r.label,
       order: r.order,
       active: r.active,
+      kind: r.kind ?? "cocktails",
+      pdfUrl: r.pdf_url ?? undefined,
+      pdfPages: r.pdf_pages ?? undefined,
     }));
     const items: MenuItem[] = (itemsRes.data ?? []).map((r) => ({
       id: r.id,

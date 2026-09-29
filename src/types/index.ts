@@ -166,6 +166,17 @@ export interface MenuTab {
   label: string;
   order: number;
   active: boolean;
+  // A "pdf" tab shows an uploaded printed menu (e.g. 4.25x11 cards) instead of
+  // individual cocktails. Missing kind = "cocktails" (every tab before PDFs).
+  kind?: "cocktails" | "pdf";
+  pdfUrl?: string;            // original PDF, offered as a download
+  pdfPages?: MenuPdfPage[];   // pages pre-rendered to images at upload time
+}
+
+export interface MenuPdfPage {
+  url: string;
+  width: number;   // rendered pixel size — keeps the page's aspect ratio
+  height: number;
 }
 
 export interface MenuItem {

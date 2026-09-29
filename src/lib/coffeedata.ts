@@ -1,5 +1,6 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { getSupabaseAdmin } from "./supabase";
+import type { MenuPdfPage } from "@/types";
 
 export interface CoffeeMenu {
   id: string;
@@ -8,6 +9,8 @@ export interface CoffeeMenu {
   alt: string;
   order: number;
   active: boolean;
+  pdfUrl?: string;            // a PDF menu, shown instead of the image
+  pdfPages?: MenuPdfPage[];
 }
 
 export async function getCoffeeMenus(): Promise<CoffeeMenu[]> {
@@ -29,6 +32,8 @@ export async function getCoffeeMenus(): Promise<CoffeeMenu[]> {
       alt: r.alt ?? "",
       order: r.order_num,
       active: r.active,
+      pdfUrl: r.pdf_url ?? undefined,
+      pdfPages: r.pdf_pages ?? undefined,
     }));
   } catch {
     return [];

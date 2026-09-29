@@ -6,6 +6,7 @@ import { Heart, Layers } from "lucide-react";
 import type { MenuItem, MenuTab } from "@/types";
 import clsx from "clsx";
 import EnlargedTileOverlay from "./EnlargedTileOverlay";
+import MenuPdfView from "./MenuPdfView";
 
 interface Props {
   items: MenuItem[];
@@ -167,6 +168,7 @@ export default function MenuListView({
 
   // Filter sections by active tab — if we want to show only the active tab
   const visibleSections = sections.filter((s) => s.tab.id === activeTabId);
+  const activePdfTab = tabs.find((t) => t.id === activeTabId && t.kind === "pdf");
 
   return (
     <div className="h-full flex flex-col">
@@ -197,7 +199,13 @@ export default function MenuListView({
             ))}
           </div>
         ))}
-        {visibleSections.length === 0 && (
+        {activePdfTab && (
+          <div>
+            <SectionDivider label={activePdfTab.label} mutedColor={mutedColor} />
+            <MenuPdfView tab={activePdfTab} textColor={textColor} mutedColor={mutedColor} layout="stack" />
+          </div>
+        )}
+        {visibleSections.length === 0 && !activePdfTab && (
           <div
             className="flex items-center justify-center h-32 text-xs tracking-widest uppercase opacity-40"
             style={{ color: textColor }}

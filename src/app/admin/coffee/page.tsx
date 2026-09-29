@@ -18,6 +18,8 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import ImagePicker from "@/components/ui/ImagePicker";
+import { PdfUploader } from "@/components/admin/PdfTabPanel";
+import type { MenuPdfPage } from "@/types";
 
 interface CoffeeMenu {
   id: string;
@@ -26,6 +28,8 @@ interface CoffeeMenu {
   alt: string;
   order: number;
   active: boolean;
+  pdfUrl?: string;            // a PDF menu, shown instead of the image
+  pdfPages?: MenuPdfPage[];
 }
 
 function newId() {
@@ -195,6 +199,9 @@ function SortableMenuCard({
     opacity: isDragging ? 0.4 : 1,
   };
 
+  const hasPdf = !!menu.pdfPages?.length;
+  const thumbUrl = hasPdf ? menu.pdfPages![0].url : menu.imageUrl;
+
   return (
     <div
       ref={setNodeRef}
@@ -213,10 +220,10 @@ function SortableMenuCard({
         </button>
 
         {/* Thumbnail */}
-        {menu.imageUrl ? (
+        {thumbUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={menu.imageUrl}
+            src={thumbUrl}
             alt=""
             className="w-12 h-12 object-cover rounded-sm shrink-0 border border-gray-200"
           />
@@ -230,7 +237,9 @@ function SortableMenuCard({
         <button onClick={onToggleExpand} className="flex-1 min-w-0 text-left">
           <p className="text-gray-700 text-sm tracking-wider">{menu.label}</p>
           <p className="text-gray-400 text-xs">
-            {menu.imageUrl ? "Image uploaded" : "No image yet"}
+            {hasPdf
+              ? `PDF · ${menu.pdfPages!.length} ${menu.pdfPages!.length === 1 ? "page" : "pages"}`
+              : menu.imageUrl ? "Image uploaded" : "No image yet"}
             {!menu.active && " · Hidden"}
           </p>
         </button>
@@ -277,6 +286,14 @@ function SortableMenuCard({
             value={menu.imageUrl ?? undefined}
             onChange={(url) => onUpdate({ imageUrl: url || null })}
           />
+
+          {/* PDF — takes the place of the image when present */}
+          <div className="border-t border-gray-100 pt-4">
+            <p className="block text-[10px] tracking-widest uppercase text-gray-400 mb-2">
+              Or a PDF Menu {menu.imageUrl && "(shown instead of the image)"}
+            </p>
+            <PdfUploader value={menu} onChange={onUpdate} />
+          </div>
 
           {/* Alt text */}
           <div>
