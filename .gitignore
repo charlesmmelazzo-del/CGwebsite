@@ -37,3 +37,6 @@ next-env.d.ts
 
 # duplicate lockfile artifacts
 *\ 2.json
+
+# pdf.js worker, copied from node_modules before dev/build
+/public/pdf.worker.min.mjs

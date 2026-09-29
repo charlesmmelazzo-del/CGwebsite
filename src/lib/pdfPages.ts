@@ -25,10 +25,8 @@ export async function uploadMenuPdf(
   onProgress("Reading PDF…");
   // Loaded on demand so pdf.js only ever ships to the admin, and only when used.
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-    "pdfjs-dist/legacy/build/pdf.worker.min.mjs",
-    import.meta.url
-  ).toString();
+  // Copied into public/ by scripts/copy-pdf-worker.mjs before dev and build.
+  pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
   const doc = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
   const baseName = file.name.replace(/\.pdf$/i, "");
