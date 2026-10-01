@@ -66,14 +66,20 @@ export function TextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement
   return <textarea rows={4} {...props} className={`cmp-input resize-y min-h-[110px] leading-relaxed ${props.className ?? ""}`} />;
 }
 
-/** Upload one photo through /api/compete/upload. */
+/**
+ * Upload one photo through /api/compete/upload.
+ *
+ * Keep `accept` generic ("image/*" or explicit JPG/PNG/WebP): if HEIC is
+ * listed, iPhones send their photos as HEIC, which the server can't decode.
+ * Otherwise Safari converts them to JPEG on the way out.
+ */
 export function PhotoUpload({
   value,
   onChange,
   kind,
   token,
   aspect = "aspect-[4/5]",
-  accept = "image/jpeg,image/png,image/webp,image/heic,image/heif",
+  accept = "image/*",
   fit = "cover",
   small,
 }: {

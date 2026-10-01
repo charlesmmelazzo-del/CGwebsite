@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { bustLiveCache, getCodes, getContestants, getEventById, getSponsors, slugify } from "@/lib/compete/data";
+import { bustLiveCache, getCodes, getContestants, getEventById, getSponsors, RESERVED_SLUGS, slugify } from "@/lib/compete/data";
 import { cleanUrl } from "@/lib/compete/submissions";
 import type { FieldDef, Recipe, ScoreCategory, Superlative, Tier } from "@/lib/compete/types";
 
@@ -78,6 +78,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if ("name" in b) u.name = s(b.name, 120) || ev.name;
   if ("slug" in b) {
     const slug = slugify(s(b.slug, 80));
+    if (RESERVED_SLUGS.includes(slug)) {
+      return NextResponse.json({ error: `“${slug}” is reserved — choose a different link.` }, { status: 400 });
+    }
     if (slug && slug !== ev.slug) {
       const { data } = await getSupabaseAdmin().from("comp_events").select("id").eq("slug", slug).maybeSingle();
       if (data) return NextResponse.json({ error: "Another competition already uses that link." }, { status: 409 });

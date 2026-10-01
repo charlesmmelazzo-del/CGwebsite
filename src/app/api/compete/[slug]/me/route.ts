@@ -24,10 +24,18 @@ export async function GET(_req: NextRequest, { params }: { params: { slug: strin
   });
 }
 
-/** DELETE — sign this phone out. The code stays claimed by this device. */
+/**
+ * DELETE — sign this phone out and release the code, so the guest can sign
+ * back in (here or on another phone). Their ballots stay with the code.
+ */
 export async function DELETE(_req: NextRequest, { params }: { params: { slug: string } }) {
   const ev = await getEventBySlug(params.slug);
   const res = NextResponse.json({ ok: true });
-  if (ev) res.cookies.delete(guestCookieName(ev.id));
+  if (!ev) return res;
+  const viewer = await getViewer(ev);
+  if (viewer) {
+    await getSupabaseAdmin().from("comp_codes").update({ device_secret: null, claimed_at: null }).eq("id", viewer.codeId);
+  }
+  res.cookies.delete(guestCookieName(ev.id));
   return res;
 }

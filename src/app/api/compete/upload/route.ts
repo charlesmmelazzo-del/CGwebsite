@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 const BUCKET = "images";
 const MAX_MB = 15;
-const RASTER = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif", "image/gif"];
+const RASTER = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
 
 /**
  * POST multipart { file, kind, token, eventId? } — photo uploads from the
@@ -57,7 +57,10 @@ export async function POST(req: NextRequest) {
 
   const isSvg = file.type === "image/svg+xml";
   if (isSvg ? kind === "contestant" : !RASTER.includes(file.type)) {
-    return NextResponse.json({ error: "Please upload a JPG, PNG, or WebP image." }, { status: 400 });
+    return NextResponse.json(
+      { error: /hei[cf]/i.test(file.type) ? "That’s an iPhone HEIC photo — please choose “Most Compatible” or send a JPG." : "Please upload a JPG, PNG, or WebP image." },
+      { status: 400 }
+    );
   }
 
   const input = Buffer.from(await file.arrayBuffer());
@@ -79,7 +82,7 @@ export async function POST(req: NextRequest) {
       ext = "webp";
     }
   } catch {
-    return NextResponse.json({ error: "We couldn’t read that image. Try a JPG or PNG." }, { status: 400 });
+    return NextResponse.json({ error: "We couldn’t read that image. Please try a JPG or PNG." }, { status: 400 });
   }
 
   const path = `compete/${eventId.replace(/[^a-z0-9-]/gi, "")}/${randomUUID()}.${ext}`;

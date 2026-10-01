@@ -20,7 +20,7 @@ function ipOf(req: NextRequest) {
  */
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
   const ev = await getEventBySlug(params.slug);
-  if (!ev || ev.status === "finished") {
+  if (!ev || ev.status === "finished" || ev.status === "draft") {
     return NextResponse.json({ error: "This event isn’t open for sign-in." }, { status: 404 });
   }
   const ip = ipOf(req);

@@ -271,7 +271,7 @@ function ViewerBadge({ viewer, slug }: { viewer: Viewer; slug: string }) {
               window.location.reload();
             }}
           >
-            <LogOut size={13} /> Sign out
+            <LogOut size={13} /> Sign out of this phone
           </button>
         </div>
       )}

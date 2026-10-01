@@ -197,7 +197,7 @@ export function AdminPhoto({
   eventId,
   aspect = "aspect-square",
   contain,
-  accept = "image/jpeg,image/png,image/webp,image/heic,image/heif,image/svg+xml",
+  accept = "image/*",
 }: {
   value?: string;
   onChange: (url: string) => void;

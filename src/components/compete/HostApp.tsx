@@ -19,11 +19,36 @@ export default function HostApp({ slug, hostKey, initial }: { slug: string; host
   const [d, setD] = useState<HostData>(initial);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [ticket, setTicket] = useState("");
+  const [ticketMsg, setTicketMsg] = useState("");
+  // Contestants whose guest voting was opened at some point tonight, so
+  // closing before guests ever voted gets a second look.
+  const [guestOpened, setGuestOpened] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (initial.state.guestVoting && initial.state.contestantId) setGuestOpened((g) => new Set(g).add(initial.state.contestantId!));
+  }, [initial.state.guestVoting, initial.state.contestantId]);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/compete/${slug}/host?key=${encodeURIComponent(hostKey)}`, { cache: "no-store" }).catch(() => null);
-    if (res?.ok) setD(await res.json());
+    if (res?.ok) {
+      const next: HostData = await res.json();
+      setD(next);
+      if (next.state.guestVoting && next.state.contestantId) setGuestOpened((g) => new Set(g).add(next.state.contestantId!));
+    }
   }, [slug, hostKey]);
+
+  async function releaseTicket(e: React.FormEvent) {
+    e.preventDefault();
+    setTicketMsg("");
+    const res = await fetch(`/api/compete/${slug}/host`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: hostKey, action: { type: "releaseCode", code: ticket } }),
+    }).catch(() => null);
+    const r = await res?.json().catch(() => null);
+    setTicketMsg(res?.ok ? `Ticket ${r.released} is free — the guest can sign in on any phone now.` : r?.error ?? "That didn’t work.");
+    if (res?.ok) setTicket("");
+  }
 
   useEffect(() => {
     const t = setInterval(() => document.visibilityState === "visible" && load(), 2000);
@@ -204,7 +229,14 @@ export default function HostApp({ slug, hostKey, initial }: { slug: string; host
                         <button
                           className="cmp-btn-ghost sm:col-span-2"
                           disabled={busy}
-                          onClick={() => act({ type: "closeVoting" }, `Close all voting for ${current.name}? Guests won’t be able to change their scores.`)}
+                          onClick={() =>
+                            act(
+                              { type: "closeVoting" },
+                              guestOpened.has(current.id) || s.guestVoting
+                                ? `Close all voting for ${current.name}? Guests won’t be able to change their scores.`
+                                : `Guest voting was never opened for ${current.name} — only the judges will count. Close voting anyway?`
+                            )
+                          }
                         >
                           <Lock size={14} /> Close Voting for {current.name.split(" ")[0]}
                         </button>
@@ -376,8 +408,29 @@ export default function HostApp({ slug, hostKey, initial }: { slug: string; host
           </section>
         )}
 
+        {/* Ticket help */}
+        <section className="mt-12 pt-6 border-t border-[var(--cmp-line)]">
+          <h3 className="cmp-label">Ticket Help</h3>
+          <p className="mt-2 text-sm cmp-muted">
+            Guest’s phone died, or their code says it’s in use elsewhere? Free their code here, then they can sign in again on any phone. Their votes are kept.
+          </p>
+          <form onSubmit={releaseTicket} className="mt-3 flex gap-2">
+            <input
+              value={ticket}
+              onChange={(e) => setTicket(e.target.value.toUpperCase())}
+              placeholder="Ticket code"
+              className="cmp-input !py-2 tracking-[0.2em] uppercase flex-1"
+              autoCapitalize="characters"
+            />
+            <button className="cmp-btn-ghost !min-h-0 !py-2" disabled={ticket.trim().length < 4}>
+              Free Code
+            </button>
+          </form>
+          {ticketMsg && <p className="mt-2 text-sm cmp-muted">{ticketMsg}</p>}
+        </section>
+
         {/* Utilities */}
-        <section className="mt-12 pt-6 border-t border-[var(--cmp-line)] flex flex-wrap gap-x-6 gap-y-3 text-xs tracking-[0.16em] uppercase cmp-faint">
+        <section className="mt-10 pt-6 border-t border-[var(--cmp-line)] flex flex-wrap gap-x-6 gap-y-3 text-xs tracking-[0.16em] uppercase cmp-faint">
           {s.phase !== "lobby" && (
             <button disabled={busy} onClick={() => act({ type: "lobby" })}>
               Return everyone to the lobby

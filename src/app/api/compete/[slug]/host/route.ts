@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getEventBySlug } from "@/lib/compete/data";
+import { getSupabaseAdmin } from "@/lib/supabase";
+import { getEventBySlug, normalizeCode } from "@/lib/compete/data";
 import { getHostData } from "@/lib/compete/host";
 import { applyHostAction, HostError, type HostAction } from "@/lib/compete/live";
 import { isHost } from "@/lib/compete/session";
@@ -31,6 +32,21 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     return NextResponse.json({ error: "This host link isn’t valid." }, { status: 403 });
   }
   if (!body.action?.type) return NextResponse.json({ error: "No action." }, { status: 400 });
+
+  // Ticket help: free a code from a lost, dead or cleared phone. Not part of
+  // the show's state, so it doesn't touch the live version.
+  if ((body.action as { type: string }).type === "releaseCode") {
+    const code = normalizeCode(String((body.action as { code?: string }).code ?? ""));
+    const { data } = await getSupabaseAdmin()
+      .from("comp_codes")
+      .update({ device_secret: null, claimed_at: null })
+      .eq("event_id", ev.id)
+      .eq("code", code)
+      .select("id")
+      .maybeSingle();
+    if (!data) return NextResponse.json({ error: `No ticket with code ${code || "—"} for this event.` }, { status: 404 });
+    return NextResponse.json({ ok: true, released: code });
+  }
 
   try {
     const saved = await applyHostAction(ev, body.action);

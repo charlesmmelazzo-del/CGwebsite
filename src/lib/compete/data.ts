@@ -134,6 +134,9 @@ export function normalizeCode(input: string): string {
   return input.toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
+/** Addresses under /compete that belong to the site, not to an event. */
+export const RESERVED_SLUGS = ["showcase", "contestant", "partner"];
+
 export function slugify(input: string): string {
   return input
     .toLowerCase()
@@ -168,7 +171,7 @@ export async function getEventBySlug(slug: string): Promise<CompEvent | null> {
 export async function createEvent(input: { name: string; isDemo?: boolean }): Promise<CompEvent> {
   const sb = getSupabaseAdmin();
   const base = slugify(input.name) || "competition";
-  let slug = base;
+  let slug = RESERVED_SLUGS.includes(base) ? `${base}-event` : base;
   for (let i = 2; i < 50; i++) {
     const { data } = await sb.from("comp_events").select("id").eq("slug", slug).maybeSingle();
     if (!data) break;
