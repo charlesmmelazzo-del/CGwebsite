@@ -391,15 +391,26 @@ export async function getEventCached(slug: string): Promise<CompEvent | null> {
   return ev;
 }
 
+/** Thrown when someone else changed the live state between our read and write. */
+export class LiveConflict extends Error {}
+
+/**
+ * Save the host's change — but only if nobody else changed the show since we
+ * read it. Two taps landing together (a double-tap, or host links open on two
+ * devices) used to overwrite each other and silently drop one action; now the
+ * loser gets a LiveConflict and applyHostAction re-applies it on fresh state.
+ */
 export async function saveLiveState(ev: CompEvent, next: LiveState, extra: Row = {}): Promise<CompEvent> {
   const sb = getSupabaseAdmin();
   const { data, error } = await sb
     .from("comp_events")
     .update({ live_state: next, live_version: ev.liveVersion + 1, updated_at: new Date().toISOString(), ...extra })
     .eq("id", ev.id)
+    .eq("live_version", ev.liveVersion)
     .select("*")
-    .single();
+    .maybeSingle();
   if (error) throw error;
+  if (!data) throw new LiveConflict();
   const saved = mapEvent(data);
   liveCache.set(saved.slug, { at: Date.now(), ev: saved });
   return saved;

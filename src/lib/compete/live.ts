@@ -10,7 +10,7 @@
 // Then superlatives (one pick each), then the host reveals winners one at a
 // time, picking a winner wherever there's a tie.
 
-import { computeResults, getContestants, judgeCards, saveLiveState } from "./data";
+import { computeResults, getContestants, getEventById, judgeCards, LiveConflict, saveLiveState } from "./data";
 import { EMPTY_LIVE_STATE, type CompEvent, type LiveState, type LiveStep } from "./types";
 
 export type HostAction =
@@ -34,6 +34,22 @@ export type HostAction =
 export class HostError extends Error {}
 
 export async function applyHostAction(ev: CompEvent, action: HostAction): Promise<CompEvent> {
+  let current = ev;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    try {
+      return await applyOnce(current, action);
+    } catch (e) {
+      if (!(e instanceof LiveConflict)) throw e;
+      // Someone else's tap landed first — redo ours on top of theirs.
+      const fresh = await getEventById(ev.id);
+      if (!fresh) throw e;
+      current = fresh;
+    }
+  }
+  throw new HostError("The show is busy — please tap again.");
+}
+
+async function applyOnce(ev: CompEvent, action: HostAction): Promise<CompEvent> {
   const s: LiveState = { ...EMPTY_LIVE_STATE, ...ev.liveState };
   const closed = new Set(s.closed ?? []);
   let status = ev.status;

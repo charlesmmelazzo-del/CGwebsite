@@ -10,7 +10,8 @@ export const dynamic = "force-dynamic";
  *
  * Only for the contestant on stage, only while the host has voting open for
  * this guest's tier (judges and guests open separately), and only until the
- * host closes it. Late arrivals can't score cocktails they never tasted.
+ * host closes it. Ballots pause if the host steps back to the bartender or
+ * cocktail page. Late arrivals can't score cocktails they never tasted.
  */
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
   const ev = await getEventBySlug(params.slug);
@@ -29,6 +30,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const open = viewer.isJudge ? s.judgeVoting : s.guestVoting;
   if (
     s.phase !== "contestant" ||
+    s.step !== "voting" ||
     !body.contestantId ||
     s.contestantId !== body.contestantId ||
     (s.closed ?? []).includes(body.contestantId) ||
