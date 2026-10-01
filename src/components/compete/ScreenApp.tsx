@@ -106,7 +106,7 @@ function BartenderSlide({ ev, c }: { ev: PublicEvent; c: PublicContestant }) {
         {c.bartender.photoUrl ? (
           <img src={c.bartender.photoUrl} alt="" className="w-full h-full object-cover" />
         ) : (
-          <Monogram name={name} className="w-full h-full !text-9xl" />
+          <Monogram name={name} className="w-full h-full" textClass="text-[12rem] opacity-80" />
         )}
       </div>
       <div className="flex-1 px-20 py-16 flex flex-col justify-center overflow-hidden">

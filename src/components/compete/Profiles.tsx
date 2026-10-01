@@ -48,7 +48,7 @@ export function brandLogos(sponsors: PublicSponsor[]): string[] {
 
 // ─── Placeholders (photos are optional everywhere) ──────────────────────────
 
-export function Monogram({ name, className = "" }: { name?: string; className?: string }) {
+export function Monogram({ name, className = "", textClass = "text-2xl" }: { name?: string; className?: string; textClass?: string }) {
   const initials = (name ?? "")
     .split(/\s+/)
     .filter(Boolean)
@@ -60,7 +60,7 @@ export function Monogram({ name, className = "" }: { name?: string; className?: 
       className={`flex items-center justify-center bg-[var(--cmp-raised)] border border-[var(--cmp-line)] ${className}`}
       aria-hidden
     >
-      <span className="cmp-display text-[var(--cmp-accent)]" style={{ fontSize: "clamp(1.5rem, 30%, 4rem)" }}>
+      <span className={`cmp-display text-[var(--cmp-accent)] tracking-wider ${textClass}`}>
         {initials || "—"}
       </span>
     </div>
@@ -152,7 +152,7 @@ export function BartenderView({
         {answers.photoUrl ? (
           <img src={answers.photoUrl} alt={name} className="w-full aspect-[4/5] object-cover" />
         ) : (
-          <Monogram name={name} className="w-full aspect-[4/5]" />
+          <Monogram name={name} className="w-full aspect-[4/5]" textClass="text-8xl opacity-80" />
         )}
         <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-[var(--cmp-bg)] to-transparent" />
         <div className="absolute inset-x-0 bottom-0 px-5 pb-5">

@@ -163,7 +163,7 @@ export function WinnerCard({
             {photo ? (
               <img src={photo} alt="" className="w-full h-full object-cover" />
             ) : contestant.bartender.name ? (
-              <Monogram name={name} className="w-full h-full rounded-full" />
+              <Monogram name={name} className="w-full h-full rounded-full" textClass={big ? "text-7xl" : "text-3xl"} />
             ) : (
               <CocktailPlaceholder className="w-full h-full rounded-full" />
             )}
