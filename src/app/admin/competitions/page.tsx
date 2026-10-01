@@ -13,6 +13,7 @@ type Row = {
   eventDate: string | null;
   status: CompStatus;
   isDemo: boolean;
+  listed: boolean;
   contestants: number;
   approved: number;
 };
@@ -136,6 +137,7 @@ export default function AdminCompetitionsPage() {
                   <div className="flex items-center gap-2.5">
                     <span className={`px-2 py-0.5 text-[10px] tracking-wider uppercase ${st.className}`}>{st.label}</span>
                     {r.isDemo && <span className="px-2 py-0.5 text-[10px] tracking-wider uppercase bg-purple-50 text-purple-600">Demo</span>}
+                    {r.status !== "draft" && !r.listed && <span className="px-2 py-0.5 text-[10px] tracking-wider uppercase bg-amber-50 text-amber-700">Link only</span>}
                     <span className="text-sm text-gray-800">{r.name}</span>
                   </div>
                   <p className="mt-1.5 text-[11px] text-gray-400">

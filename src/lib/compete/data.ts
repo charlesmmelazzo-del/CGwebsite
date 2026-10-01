@@ -49,6 +49,7 @@ export function mapEvent(r: Row): CompEvent {
     accentColor: str(r.accent_color) || DEFAULT_ACCENT,
     status: (str(r.status) || "draft") as CompEvent["status"],
     isDemo: Boolean(r.is_demo),
+    listed: r.listed === true,
     contestantDeadline: (r.contestant_deadline as string | null) ?? null,
     partnerDeadline: (r.partner_deadline as string | null) ?? null,
     rulesText: str(r.rules_text) || DEFAULT_RULES_TEXT,
@@ -327,8 +328,10 @@ export async function getEventsPageCompetitions(): Promise<{
       .from("comp_events")
       .select("*")
       .in("status", ["published", "live", "finished"])
-      // Demo events work by link but never appear to customers — staging and
-      // the live site share one database.
+      // Only events the admin has switched on for the Events page. Everything
+      // else — drafts' link-only testing, demos — works by link but never
+      // appears to customers (staging and the live site share one database).
+      .eq("listed", true)
       .eq("is_demo", false)
       .order("event_date", { ascending: false });
     const events = (data ?? []).map(mapEvent);

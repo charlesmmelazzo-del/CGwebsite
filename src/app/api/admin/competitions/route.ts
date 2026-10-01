@@ -23,6 +23,7 @@ export async function GET() {
           eventDate: e.eventDate,
           status: e.status,
           isDemo: e.isDemo,
+          listed: e.listed,
           contestants: mine.length,
           approved: mine.filter((c) => c.status === "approved").length,
         };

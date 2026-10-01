@@ -120,6 +120,11 @@ export default function Editor({ id }: { id: string }) {
           <div className="flex items-center gap-2.5">
             <Badge status={ev.status} />
             {ev.isDemo && <span className="px-2 py-0.5 text-[10px] tracking-wider uppercase bg-purple-50 text-purple-600">Demo</span>}
+            {ev.status !== "draft" && (
+              <span className={`px-2 py-0.5 text-[10px] tracking-wider uppercase ${ev.listed ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"}`}>
+                {ev.listed ? "On Events page" : "Link only"}
+              </span>
+            )}
           </div>
           <h1 className="mt-2 text-xl text-gray-800">{ev.name}</h1>
           <p className="mt-1 text-xs text-gray-400">{ev.featuredSpirit || "No featured spirit yet"}</p>
@@ -196,14 +201,32 @@ function Overview({ data, ev, origin, saveEvent, go }: Ctx & { go: (t: TabId) =>
     { ok: weights === 100, label: "Voting weights add to 100%", detail: `Currently ${weights}%`, tab: "voting" },
     { ok: codesOk && data.codes.length > 0, label: "Ticket codes generated", detail: `${data.codes.length} codes`, tab: "tickets" },
     { ok: ev.recipes.length > 0, label: "At-home recipes", detail: `${ev.recipes.length} recipe${ev.recipes.length === 1 ? "" : "s"}`, tab: "recipes" },
+    {
+      ok: ev.listed && ev.status !== "draft",
+      label: "Shown on the Events page",
+      detail: ev.status === "draft" ? "Draft — hidden" : ev.listed ? "Visible to the public" : "Link only — works by link, not on the website yet",
+      tab: "overview",
+    },
   ];
 
-  const statuses: { id: CompEvent["status"]; label: string; help: string }[] = [
-    { id: "draft", label: "Draft", help: "Hidden. Only you can preview it." },
-    { id: "published", label: "Published", help: "Listed on the Events page. Ticket-holders can sign in and browse." },
-    { id: "live", label: "Live", help: "The event is underway. Set automatically when the host begins." },
-    { id: "finished", label: "Finished", help: "Moves to Past Competitions as a public recap with the winners." },
+  const stage = ev.status === "draft" ? "draft" : ev.listed ? "listed" : "link";
+  const stages: { id: "draft" | "link" | "listed"; label: string; help: string; patch: Partial<CompEvent> }[] = [
+    { id: "draft", label: "Draft", help: "Hidden. Only you can preview it.", patch: { status: "draft", listed: false } },
+    {
+      id: "link",
+      label: "Link only",
+      help: "Works fully for anyone with the link — sign-in, voting, host controls. Not shown on the website. Use this to test.",
+      patch: { status: ev.status === "draft" ? "published" : ev.status, listed: false },
+    },
+    {
+      id: "listed",
+      label: "On the Events page",
+      help: "Everything above, plus the event appears on the Events page (and under Past Competitions once finished).",
+      patch: { status: ev.status === "draft" ? "published" : ev.status, listed: true },
+    },
   ];
+  const [clearing, setClearing] = useState(false);
+  const [cleared, setCleared] = useState(false);
 
   return (
     <div className="space-y-5">
@@ -226,18 +249,66 @@ function Overview({ data, ev, origin, saveEvent, go }: Ctx & { go: (t: TabId) =>
         </ul>
       </Card>
 
-      <Card title="Status" help="Who can see the event. The host screen moves it to Live and Finished on its own; you can also set it here.">
-        <div className="grid sm:grid-cols-4 gap-2">
-          {statuses.map((s) => (
+      <Card
+        title="Who can see it"
+        help={
+          <>
+            Test everything on “Link only”, then switch to “On the Events page” when you’re ready. The host screen moves the event to Live and
+            Finished on its own — currently <strong>{ev.status}</strong>.
+          </>
+        }
+      >
+        <div className="grid sm:grid-cols-3 gap-2">
+          {stages.map((st) => (
             <button
-              key={s.id}
-              onClick={() => s.id !== ev.status && saveEvent({ status: s.id })}
-              className={`text-left p-3 border ${ev.status === s.id ? "border-[#C97D5A] bg-[#C97D5A]/5" : "border-gray-200 hover:border-gray-300"}`}
+              key={st.id}
+              onClick={() => {
+                if (st.id === stage) return;
+                if (st.id === "listed" && !window.confirm("Show this event on the public Events page?")) return;
+                saveEvent(st.patch);
+              }}
+              className={`text-left p-3 border ${stage === st.id ? "border-[#C97D5A] bg-[#C97D5A]/5" : "border-gray-200 hover:border-gray-300"}`}
             >
-              <span className="text-xs tracking-wider uppercase text-gray-800">{s.label}</span>
-              <span className="block mt-1 text-[11px] text-gray-400 leading-snug">{s.help}</span>
+              <span className="text-xs tracking-wider uppercase text-gray-800">{st.label}</span>
+              <span className="block mt-1 text-[11px] text-gray-400 leading-snug">{st.help}</span>
             </button>
           ))}
+        </div>
+        {ev.isDemo && stage === "listed" && (
+          <p className="mt-3 text-[11px] text-amber-700">Demo events never appear on the Events page, even when switched on.</p>
+        )}
+        {ev.status !== "finished" && (
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <Btn small kind="ghost" onClick={() => saveEvent({ status: "finished" })}>Mark as Finished</Btn>
+            <span className="text-[11px] text-gray-400">Normally the host does this at the end of the night.</span>
+          </div>
+        )}
+      </Card>
+
+      <Card
+        title="Clear test activity"
+        help="Wipes every vote and superlative pick, frees every ticket code from the phones that used it, and resets the show to the lobby. Contestants, brand, recipes, codes and judges’ names stay exactly as they are. Do this after testing, before the real night."
+      >
+        <div className="flex items-center gap-3">
+          <Btn
+            kind="danger"
+            disabled={clearing}
+            onClick={async () => {
+              if (!window.confirm("Clear all votes, picks and ticket sign-ins for this event? This can’t be undone.")) return;
+              setClearing(true);
+              setCleared(false);
+              try {
+                await api(`/api/admin/competitions/${ev.id}/clear`, "POST");
+                await saveEvent({});
+                setCleared(true);
+              } finally {
+                setClearing(false);
+              }
+            }}
+          >
+            {clearing ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />} Clear Test Activity
+          </Btn>
+          {cleared && <span className="text-xs text-green-600 flex items-center gap-1"><Check size={13} /> Cleared — ready for the real night.</span>}
         </div>
       </Card>
 

@@ -169,6 +169,12 @@ create index if not exists comp_superlative_votes_event_idx
   on public.comp_superlative_votes (event_id, superlative_id);
 
 
+-- ─── Events-page visibility (added 2026-10-01) ─────────────────────────────
+-- An event can be fully usable by link (sign-in, voting, host) while hidden
+-- from the public Events page — for testing. Flip `listed` to show it.
+alter table public.comp_events add column if not exists listed boolean not null default false;
+
+
 -- ─── Lock it down (matches db/enable-rls.sql) ──────────────────────────────
 alter table public.comp_events            enable row level security;
 alter table public.comp_sponsors          enable row level security;

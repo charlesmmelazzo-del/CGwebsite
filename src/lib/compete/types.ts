@@ -91,6 +91,8 @@ export type CompEvent = {
   accentColor: string;
   status: CompStatus;
   isDemo: boolean;
+  /** Shown on the public Events page. Off = works by link only. */
+  listed: boolean;
   contestantDeadline: string | null;
   partnerDeadline: string | null;
   rulesText: string;
