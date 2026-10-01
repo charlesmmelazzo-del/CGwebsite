@@ -14,7 +14,7 @@ const POLL_MS = 1500;
  * moment a phone wakes up, so a guest who locked their screen during a
  * presentation lands on the right page when they look again.
  */
-export function useLive(slug: string, initial: { version: number; state: LiveState; status: string }) {
+export function useLive(slug: string, initial: { version: number; state: LiveState; status: string }, enabled = true) {
   const [live, setLive] = useState(initial);
   const versionRef = useRef(initial.version);
 
@@ -33,6 +33,7 @@ export function useLive(slug: string, initial: { version: number; state: LiveSta
   }, [slug]);
 
   useEffect(() => {
+    if (!enabled) return;
     const t = setInterval(() => {
       if (document.visibilityState === "visible") poll();
     }, POLL_MS);
@@ -44,7 +45,7 @@ export function useLive(slug: string, initial: { version: number; state: LiveSta
       document.removeEventListener("visibilitychange", wake);
       window.removeEventListener("focus", wake);
     };
-  }, [poll]);
+  }, [poll, enabled]);
 
   return { ...live, refresh: poll };
 }

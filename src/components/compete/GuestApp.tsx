@@ -5,8 +5,11 @@
 // Four tabs — Live, Lineup, Brand, At Home. "Live" follows the host: whenever
 // the host moves the show on, every phone jumps back to it. Guests can still
 // wander off to read about other contestants or the brand between moments.
+//
+// It also runs in "sim" mode for the partner showcase (/compete/showcase):
+// the showcase drives the state, nothing polls, and votes stay on the page.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Radio, Users, Sparkles, BookOpen, X, Check, Loader2, LogOut } from "lucide-react";
 import { formatEventDate } from "@/lib/compete/defaults";
 import { RichText } from "@/lib/compete/richtext";
@@ -27,21 +30,35 @@ import {
 } from "./Profiles";
 import { JudgeReveal, StarRow, useLive, WinnerCard } from "./live";
 
-type Tab = "live" | "lineup" | "brand" | "home";
+export type Tab = "live" | "lineup" | "brand" | "home";
+
+/** True inside the partner showcase: no network, nothing saved. */
+const SimContext = createContext(false);
+
+/** Scroll the guest app to the top — the window, or the showcase's phone frame. */
+function toTop(el: HTMLElement | null, smooth = false) {
+  const frame = el?.closest("[data-phone-scroller]");
+  if (frame) frame.scrollTo({ top: 0, behavior: smooth ? "smooth" : "auto" });
+  else window.scrollTo({ top: 0, behavior: smooth ? "smooth" : "auto" });
+}
 
 export default function GuestApp({
   ev,
   initialLive,
   viewer,
+  sim,
 }: {
   ev: PublicEvent;
   initialLive: { version: number; state: LiveState; status: string };
   /** Null on a finished event's public recap. */
   viewer: Viewer | null;
+  /** Showcase mode: the state and tab to show, set by the showcase. */
+  sim?: { state: LiveState; tab: Tab; step: number };
 }) {
   const recap = !viewer;
-  const live = useLive(ev.slug, initialLive);
-  const s = live.state;
+  const live = useLive(ev.slug, initialLive, !sim);
+  const s = sim ? sim.state : live.state;
+  const root = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<Tab>("live");
   const [detail, setDetail] = useState<string | null>(null);
   const [votes, setVotes] = useState<Record<string, Record<string, number>>>({});
@@ -53,7 +70,7 @@ export default function GuestApp({
 
   // My own ballots, so a changed mind starts from what I already gave.
   useEffect(() => {
-    if (recap) return;
+    if (recap || sim) return;
     fetch(`/api/compete/${ev.slug}/me`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
@@ -62,7 +79,17 @@ export default function GuestApp({
         setPicks(d.picks ?? {});
       })
       .catch(() => {});
-  }, [ev.slug, recap]);
+  }, [ev.slug, recap, sim]);
+
+  // Showcase: each step sets the tab and starts at the top.
+  const simStep = sim?.step;
+  const simTab = sim?.tab;
+  useEffect(() => {
+    if (simStep === undefined || !simTab) return;
+    setTab(simTab);
+    setDetail(null);
+    toTop(root.current);
+  }, [simStep, simTab]);
 
   // Follow the host: any move in the show brings everyone back to Live.
   const showKey = [
@@ -79,21 +106,23 @@ export default function GuestApp({
   useEffect(() => {
     if (showKey === firstKey.current) return;
     firstKey.current = showKey;
+    if (sim) return; // the showcase picks the tab itself
     setTab("live");
     setDetail(null);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [showKey]);
+    toTop(root.current, true);
+  }, [showKey, sim]);
 
   const go = (t: Tab) => {
     setTab(t);
     setDetail(null);
-    window.scrollTo({ top: 0 });
+    toTop(root.current);
   };
 
   const detailC = detail ? byId.get(detail) : undefined;
 
   return (
-    <div className="cmp" style={accentStyle(ev.accentColor)}>
+    <SimContext.Provider value={Boolean(sim)}>
+    <div ref={root} className="cmp" style={accentStyle(ev.accentColor)}>
       <div className="mx-auto max-w-md min-h-[100dvh] pb-24 border-x border-[var(--cmp-line)]/50">
         {/* Header */}
         <header className="sticky top-0 z-30 bg-[var(--cmp-bg)]/95 backdrop-blur border-b border-[var(--cmp-line)] px-4 h-14 flex items-center justify-between">
@@ -217,11 +246,13 @@ export default function GuestApp({
         </div>
       </nav>
     </div>
+    </SimContext.Provider>
   );
 }
 
 function ViewerBadge({ viewer, slug }: { viewer: Viewer; slug: string }) {
   const [open, setOpen] = useState(false);
+  const demo = useContext(SimContext);
   return (
     <div className="relative">
       <button onClick={() => setOpen((o) => !o)} className="text-[10px] tracking-[0.18em] uppercase cmp-muted border border-[var(--cmp-line)] px-2.5 py-1.5">
@@ -235,6 +266,7 @@ function ViewerBadge({ viewer, slug }: { viewer: Viewer; slug: string }) {
           <button
             className="mt-3 flex items-center gap-2 text-xs tracking-[0.16em] uppercase cmp-muted"
             onClick={async () => {
+              if (demo) return setOpen(false);
               await fetch(`/api/compete/${slug}/me`, { method: "DELETE" });
               window.location.reload();
             }}
@@ -427,7 +459,14 @@ function VotingScreen({
   const complete = ev.scoreCategories.every((cat) => draft[cat.id] >= 1);
   const changed = JSON.stringify(draft) !== JSON.stringify(mine ?? {});
 
+  const demo = useContext(SimContext);
+
   async function submit() {
+    if (demo) {
+      setVotes((v) => ({ ...v, [c.id]: draft }));
+      setMsg({ ok: true, text: "Your score is in. You can change it until voting closes." });
+      return;
+    }
     setSaving(true);
     setMsg(null);
     try {
@@ -538,10 +577,13 @@ function SuperlativesScreen({
   const [err, setErr] = useState("");
   const open = !!s.superlativesOpen;
 
+  const demo = useContext(SimContext);
+
   async function pick(superlativeId: string, contestantId: string) {
     const before = picks[superlativeId];
     setPicks((p) => ({ ...p, [superlativeId]: contestantId }));
     setErr("");
+    if (demo) return;
     const res = await fetch(`/api/compete/${ev.slug}/pick`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

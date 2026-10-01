@@ -15,7 +15,7 @@ import type { Answers, Recipe, SponsorProfile, Tier } from "./types";
 export const DEMO_SLUG = "cascahuin-cup-demo";
 const IMG = "/compete/demo";
 
-const PROFILE: SponsorProfile = {
+export const DEMO_PROFILE: SponsorProfile = {
   brandName: "Tequila Cascahuín",
   logoUrl: `${IMG}/logo.webp`,
   tagline: "Family-made tequila from El Arenal, Jalisco — since 1904.",
@@ -89,7 +89,7 @@ const PROFILE: SponsorProfile = {
 
 type DemoContestant = { bartender: Answers; cocktail: Answers; email: string; phone: string };
 
-const CONTESTANTS: DemoContestant[] = [
+export const DEMO_CONTESTANTS: DemoContestant[] = [
   {
     email: "maya.demo@example.com",
     phone: "630-555-0101",
@@ -196,7 +196,7 @@ const CONTESTANTS: DemoContestant[] = [
   },
 ];
 
-const RECIPES: Recipe[] = [
+export const DEMO_RECIPES: Recipe[] = [
   {
     id: "paloma",
     name: "Cascahuín Paloma",
@@ -256,7 +256,7 @@ export async function createDemoEvent(): Promise<{ id: string; slug: string }> {
       status: "published",
       contestant_deadline: "2026-10-15T23:59:00-05:00",
       partner_deadline: "2026-10-12T23:59:00-05:00",
-      recipes: RECIPES,
+      recipes: DEMO_RECIPES,
       tiers: TIERS,
       big_screen: true,
     })
@@ -271,7 +271,7 @@ export async function createDemoEvent(): Promise<{ id: string; slug: string }> {
       label: "Cascahuín",
       status: "approved",
       contact: { name: "Demo Contact", email: "partner.demo@example.com", phone: "" },
-      profile: PROFILE,
+      profile: DEMO_PROFILE,
       submitted_at: now,
       approved_at: now,
     },
@@ -286,7 +286,7 @@ export async function createDemoEvent(): Promise<{ id: string; slug: string }> {
   ]);
 
   await sb.from("comp_contestants").insert(
-    CONTESTANTS.map((c, i) => ({
+    DEMO_CONTESTANTS.map((c, i) => ({
       event_id: created.id,
       token: newToken(),
       sort: i,

@@ -7,13 +7,23 @@ import type { PublicEvent } from "@/lib/compete/types";
 import { accentStyle, brandLogos, LogoLockup } from "./Profiles";
 
 /** Sign in with the code printed on your ticket. A QR code pre-fills it. */
-export default function JoinScreen({ ev, initialCode }: { ev: PublicEvent; initialCode?: string }) {
+export default function JoinScreen({
+  ev,
+  initialCode,
+  onSimJoin,
+}: {
+  ev: PublicEvent;
+  initialCode?: string;
+  /** Showcase mode: "joining" just moves the walkthrough on. */
+  onSimJoin?: () => void;
+}) {
   const [code, setCode] = useState((initialCode ?? "").toUpperCase());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   async function join(e: React.FormEvent) {
     e.preventDefault();
+    if (onSimJoin) return onSimJoin();
     setBusy(true);
     setError("");
     try {
@@ -33,7 +43,7 @@ export default function JoinScreen({ ev, initialCode }: { ev: PublicEvent; initi
   }
 
   return (
-    <div className="cmp flex flex-col" style={accentStyle(ev.accentColor)}>
+    <div className="cmp flex flex-col min-h-full" style={accentStyle(ev.accentColor)}>
       <div className="mx-auto w-full max-w-md flex-1 flex flex-col justify-center px-6 py-16 text-center">
         <LogoLockup cgLogo={ev.commonGoodLogo} brandLogos={brandLogos(ev.sponsors).slice(0, 1)} size="lg" />
         <div className="cmp-label mt-14">Common Good Presents</div>
