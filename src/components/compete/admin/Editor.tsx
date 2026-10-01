@@ -126,9 +126,14 @@ export default function Editor({ id }: { id: string }) {
         </div>
         <div className="flex items-center gap-3">
           {flash && <span className="text-xs text-green-600 flex items-center gap-1"><Check size={13} /> {flash}</span>}
-          <a href={`/compete/${ev.slug}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-[11px] tracking-wider uppercase text-gray-500 hover:text-[#C97D5A]">
-            Guest page <ExternalLink size={11} />
+          <a href={`/compete/${ev.slug}/preview`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-2 border border-[#C97D5A] text-[#C97D5A] text-[11px] tracking-wider uppercase hover:bg-[#C97D5A]/5">
+            <Eye size={12} /> Preview (mobile)
           </a>
+          {ev.status !== "draft" && (
+            <a href={`/compete/${ev.slug}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-[11px] tracking-wider uppercase text-gray-500 hover:text-[#C97D5A]">
+              Guest page <ExternalLink size={11} />
+            </a>
+          )}
           <a href={`/compete/${ev.slug}/host?key=${ev.hostToken}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-900 text-white text-[11px] tracking-wider uppercase">
             Open Host Controls <ExternalLink size={11} />
           </a>
@@ -443,6 +448,9 @@ function Partners({ data, ev, origin, entry }: Ctx) {
             </div>
           </div>
           <div className="mt-4"><LinkBox label="Private submission link" url={`${origin}/compete/partner/${s.token}`} /></div>
+          <a href={`/compete/${ev.slug}/preview?partner=${s.token}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-[10px] tracking-wider uppercase text-[#C97D5A]">
+            <Eye size={11} /> Preview as this partner sees it
+          </a>
           {editing === s.id && <PartnerEditor sponsor={s} ev={ev} entry={entry} onDone={() => setEditing(null)} />}
           <ReviewBar kind="partner" item={s} entry={entry} deadline={ev.partnerDeadline} />
         </Card>

@@ -103,6 +103,23 @@ export default function PartnerWizard({ token, event: ev, partnerName, submissio
   }
 
   const stepNo = STEPS.indexOf(screen) + 1;
+  // Saved progress is what the preview shows, so save before opening it.
+  const previewUrl = `/compete/${ev.slug}/preview?partner=${token}`;
+  async function openPreview() {
+    const win = window.open("about:blank", "_blank");
+    try {
+      if (!locked && status !== "approved") await send("save");
+    } catch {
+      // Preview what's already saved.
+    }
+    if (win) win.location.href = previewUrl;
+    else window.location.href = previewUrl;
+  }
+  const previewButton = (
+    <button type="button" onClick={openPreview} className="cmp-btn-ghost w-full !mt-6">
+      Preview How Guests Will See It
+    </button>
+  );
   const err = error && <p className="mt-4 text-sm text-red-300">{error}</p>;
 
   return (
@@ -469,6 +486,8 @@ export default function PartnerWizard({ token, event: ev, partnerName, submissio
           <div className="mt-8 -mx-5 sm:mx-0 cmp-card overflow-hidden pb-8">
             <BrandView profile={profile} />
           </div>
+          <p className="mt-6 text-center text-sm cmp-muted">Want to see it in context? Open the full guest experience on a phone screen.</p>
+          {previewButton}
           {err}
           <NavButtons onBack={() => go("links")} onNext={submit} nextLabel="Submit for Review" busy={busy} />
         </div>
@@ -491,6 +510,7 @@ export default function PartnerWizard({ token, event: ev, partnerName, submissio
           <p className="!mt-8">
             <strong>We’re excited to share {ev.spirit} with our guests.</strong>
           </p>
+          {previewButton}
         </StatusPanel>
       )}
 
@@ -514,6 +534,7 @@ export default function PartnerWizard({ token, event: ev, partnerName, submissio
                 View Event Page
               </a>
             )}
+            {previewButton}
             <p>
               Need to change something? Email <strong>{email}</strong>.
             </p>
@@ -540,6 +561,7 @@ export default function PartnerWizard({ token, event: ev, partnerName, submissio
             <button className="cmp-btn w-full !mt-10" onClick={() => go("brand")}>
               Edit Submission
             </button>
+            {previewButton}
           </StatusPanel>
         ) : (
           <StatusPanel title="Welcome back.">
