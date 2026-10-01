@@ -569,6 +569,7 @@ export default function PartnerWizard({ token, event: ev, partnerName, submissio
             <button className="cmp-btn w-full !mt-10" onClick={() => go("welcome")}>
               Continue
             </button>
+            {previewButton}
           </StatusPanel>
         ))}
     </Shell>
