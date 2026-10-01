@@ -15,5 +15,9 @@ export function getSupabaseAdmin() {
   }
   return createClient(url, key, {
     auth: { persistSession: false },
+    // Next.js caches fetch() inside route handlers that never read the
+    // request, which froze the competition live-state feed on its first
+    // answer. Database reads must always be live.
+    global: { fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }) },
   });
 }

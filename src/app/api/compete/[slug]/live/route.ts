@@ -3,6 +3,7 @@ import { getEventCached } from "@/lib/compete/data";
 import { publicLiveState } from "@/lib/compete/types";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 /**
  * GET — the live state every guest phone (and the big screen) polls.
