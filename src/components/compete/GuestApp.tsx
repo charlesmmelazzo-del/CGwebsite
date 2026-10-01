@@ -488,6 +488,13 @@ function VotingScreen({
 
   const name = bartenderName(ev.bartenderFields, c.bartender);
   const drink = cocktailName(ev.cocktailFields, c.cocktail);
+  const ballotFirst = Boolean(open && viewer && !mine);
+  const judgesBlock = (
+    <section className="mt-10">
+      <h3 className="cmp-label text-center mb-4">The Judges’ Scores</h3>
+      <JudgeReveal judges={s.judgeReveal?.judges ?? []} categories={ev.scoreCategories} />
+    </section>
+  );
 
   return (
     <div className="px-5 pt-8 cmp-rise" key={`v-${c.id}`}>
@@ -504,12 +511,10 @@ function VotingScreen({
         </span>
       </button>
 
-      {showJudges && (
-        <section className="mt-10">
-          <h3 className="cmp-label text-center mb-4">The Judges’ Scores</h3>
-          <JudgeReveal judges={s.judgeReveal!.judges} categories={ev.scoreCategories} />
-        </section>
-      )}
+      {/* The judges' cards sit on top — until this guest's own ballot is
+          open and still empty, then the ballot comes first so nobody has to
+          scroll past three judges to find it. */}
+      {showJudges && !ballotFirst && judgesBlock}
 
       <section className="mt-10">
         {closed ? (
@@ -559,6 +564,8 @@ function VotingScreen({
           </div>
         )}
       </section>
+
+      {showJudges && ballotFirst && judgesBlock}
     </div>
   );
 }
