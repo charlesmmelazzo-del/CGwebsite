@@ -242,7 +242,9 @@ export function submissionLocked(
 
 export async function getCodes(eventId: string): Promise<CompCode[]> {
   const sb = getSupabaseAdmin();
-  const { data } = await sb.from("comp_codes").select("*").eq("event_id", eventId).order("created_at");
+  // Codes generated together share a timestamp, so add the code as a
+  // tie-breaker — otherwise judges reshuffle between host refreshes.
+  const { data } = await sb.from("comp_codes").select("*").eq("event_id", eventId).order("created_at").order("code");
   return (data ?? []).map(mapCode);
 }
 
