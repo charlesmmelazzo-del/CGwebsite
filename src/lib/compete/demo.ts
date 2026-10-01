@@ -321,7 +321,8 @@ export async function createDemoEvent(): Promise<{ id: string; slug: string }> {
       .select("id")
       .eq("event_id", ev.id)
       .eq("tier_id", "judges")
-      .order("created_at");
+      .order("created_at")
+      .order("code"); // same order as getCodes, so Elena is listed first
     await Promise.all(
       (judges ?? []).map((j, i) => sb.from("comp_codes").update({ name: JUDGE_NAMES[i] ?? `Judge ${i + 1}` }).eq("id", j.id))
     );
