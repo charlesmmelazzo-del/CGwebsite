@@ -76,7 +76,9 @@ export default async function RootLayout({
   // footer into /popup (or back out again), leaving the wrong chrome on screen.
   // The data-zone attribute below is correct on first paint (so there's no
   // flash), and ZoneWatcher keeps it in sync on every soft navigation after.
-  const standalone = (headers().get("x-pathname") ?? "").startsWith("/popup");
+  // Competitions (/compete) get the same treatment.
+  const path = headers().get("x-pathname") ?? "";
+  const zone = path.startsWith("/popup") ? "popup" : path.startsWith("/compete") ? "compete" : undefined;
 
   return (
     <html lang="en">
@@ -89,7 +91,7 @@ export default async function RootLayout({
         />
       </head>
       <body
-        data-zone={standalone ? "popup" : undefined}
+        data-zone={zone}
         className={`${korinthFallback.variable} ${futuraFallback.variable} antialiased`}
       >
         <ZoneWatcher />

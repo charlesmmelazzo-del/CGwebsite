@@ -24,6 +24,7 @@ import {
   Files,
   Sparkles,
   UserRound,
+  Trophy,
 } from "lucide-react";
 
 type NavItem = { href: string; label: string; icon: typeof Home; exact?: boolean };
@@ -78,6 +79,7 @@ const NAV: NavGroup[] = [
     group: "Events",
     items: [
       { href: "/admin/events", label: "Events", icon: Calendar },
+      { href: "/admin/competitions", label: "Competitions", icon: Trophy },
     ],
   },
 ];

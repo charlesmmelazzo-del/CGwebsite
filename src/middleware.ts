@@ -69,6 +69,15 @@ export async function middleware(req: NextRequest) {
     return pass(res);
   }
 
+  // ── Competitions (/compete/*) ──────────────────────────────────────────────
+  // Their own full-screen shell, like the Pop Up Zone: tag the path so the root
+  // layout hides the site header and footer on first paint.
+  if (pathname.startsWith("/compete")) {
+    const requestHeaders = new Headers(req.headers);
+    requestHeaders.set("x-pathname", pathname);
+    return pass(NextResponse.next({ request: { headers: requestHeaders } }));
+  }
+
   return pass(NextResponse.next());
 }
 

@@ -197,10 +197,125 @@ p, span, a, li, td, th, label, input, textarea, button {
    than conditional rendering is what makes it survive soft navigation in and
    back out of the zone — the root layout stays mounted and never re-decides. */
 body[data-zone="popup"] > header,
-body[data-zone="popup"] > footer {
+body[data-zone="popup"] > footer,
+body[data-zone="compete"] > header,
+body[data-zone="compete"] > footer {
   display: none;
 }
-body[data-zone="popup"] #cg-main {
+body[data-zone="popup"] #cg-main,
+body[data-zone="compete"] #cg-main {
   padding-top: 0;
   --header-h: 0px;
+}
+
+/* ─── Cocktail Competitions (/compete) ───────────────────────────────────── */
+/* A restrained, dark "evening" palette so phones don't glare in a dim bar.
+   --cmp-accent is set per event (admin → accent color) on the .cmp wrapper. */
+.cmp {
+  --cmp-bg: #12110e;
+  --cmp-surface: #1b1a16;
+  --cmp-raised: #24221d;
+  --cmp-line: rgba(242, 237, 227, 0.12);
+  --cmp-text: #f2ede3;
+  --cmp-muted: #a8a196;
+  --cmp-faint: #6f6a61;
+  background: var(--cmp-bg);
+  color: var(--cmp-text);
+  font-family: var(--font-body);
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+.cmp-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 1.1;
+}
+.cmp-label {
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--cmp-accent);
+}
+.cmp-muted { color: var(--cmp-muted); }
+.cmp-faint { color: var(--cmp-faint); }
+.cmp-rule { height: 1px; background: var(--cmp-line); border: 0; }
+.cmp-card {
+  background: var(--cmp-surface);
+  border: 1px solid var(--cmp-line);
+}
+.cmp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 48px;
+  padding: 0 1.5rem;
+  background: var(--cmp-accent);
+  color: #12110e;
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-weight: 500;
+  transition: opacity 150ms, transform 150ms;
+}
+.cmp-btn:hover { opacity: 0.9; }
+.cmp-btn:active { transform: scale(0.98); }
+.cmp-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.cmp-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 48px;
+  padding: 0 1.5rem;
+  border: 1px solid var(--cmp-line);
+  color: var(--cmp-text);
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  transition: border-color 150ms, background 150ms;
+}
+.cmp-btn-ghost:hover { border-color: var(--cmp-accent); }
+.cmp-btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
+.cmp-input {
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--cmp-line);
+  padding: 0.75rem 0.9rem;
+  color: var(--cmp-text);
+  font-size: 16px; /* 16px stops iOS zooming into the field */
+  outline: none;
+  transition: border-color 150ms;
+}
+.cmp-input:focus { border-color: var(--cmp-accent); }
+.cmp-prose { color: var(--cmp-muted); font-size: 15px; line-height: 1.7; }
+.cmp-prose p + p, .cmp-prose p + ul, .cmp-prose ul + p, .cmp-prose h3 + p, .cmp-prose h3 + ul { margin-top: 0.85em; }
+.cmp-prose h3 {
+  font-family: var(--font-display);
+  color: var(--cmp-text);
+  font-size: 1.35rem;
+  margin: 1.6em 0 0.5em;
+  line-height: 1.2;
+}
+.cmp-prose h3:first-child { margin-top: 0; }
+.cmp-prose strong { color: var(--cmp-text); font-weight: 500; }
+.cmp-prose ul { list-style: none; padding: 0; }
+.cmp-prose li { padding-left: 1.1em; position: relative; }
+.cmp-prose li + li { margin-top: 0.4em; }
+.cmp-prose li::before { content: "—"; position: absolute; left: 0; color: var(--cmp-accent); }
+.cmp-scroll-x { scrollbar-width: none; }
+.cmp-scroll-x::-webkit-scrollbar { display: none; }
+@keyframes cmp-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.cmp-rise { animation: cmp-rise 600ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@keyframes cmp-glow {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+.cmp-pulse { animation: cmp-glow 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .cmp-rise, .cmp-pulse { animation: none; }
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getEventsData } from "@/lib/eventsdata";
 import { getPageHeader } from "@/lib/pageheaders";
+import { getEventsPageCompetitions } from "@/lib/compete/data";
 import EventsPageClient from "./EventsPageClient";
 
 export const metadata: Metadata = {
@@ -11,9 +12,17 @@ export const metadata: Metadata = {
 };
 
 export default async function EventsPage() {
-  const [{ events, hasFutureEvents }, header] = await Promise.all([
+  const [{ events, hasFutureEvents }, header, competitions] = await Promise.all([
     getEventsData(),
     getPageHeader("events"),
+    getEventsPageCompetitions(),
   ]);
-  return <EventsPageClient initialEvents={events} header={header} hasFutureEvents={hasFutureEvents} />;
+  return (
+    <EventsPageClient
+      initialEvents={events}
+      header={header}
+      hasFutureEvents={hasFutureEvents}
+      competitions={competitions}
+    />
+  );
 }

@@ -8,8 +8,9 @@ import { resolveTheme } from "@/lib/themes";
 import type { ThemeName } from "@/lib/themes";
 import clsx from "clsx";
 import { Download, FileText, MapPin, ChevronDown, CalendarPlus } from "lucide-react";
+import { CurrentCompetitions, PastCompetitions, type CurrentCompetition, type PastCompetition } from "./CompetitionCards";
 
-type TabId = "upcoming" | "host";
+type TabId = "upcoming" | "past" | "host";
 
 const DEFAULT_HOST_SECTIONS: HostSection[] = [
   {
@@ -264,12 +265,16 @@ export default function EventsPageClient({
   initialEvents,
   header,
   hasFutureEvents,
+  competitions = { current: [], past: [] },
 }: {
   initialEvents: CalendarEvent[];
   header: PageHeaderData;
   hasFutureEvents: boolean;
+  competitions?: { current: CurrentCompetition[]; past: PastCompetition[] };
 }) {
-  const [activeTab, setActiveTab] = useState<TabId>(hasFutureEvents ? "upcoming" : "host");
+  // A published competition counts as something upcoming even with no calendar events.
+  const hasUpcoming = hasFutureEvents || competitions.current.length > 0;
+  const [activeTab, setActiveTab] = useState<TabId>(hasUpcoming ? "upcoming" : "host");
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -283,7 +288,8 @@ export default function EventsPageClient({
   const hostLabel = header.tabs?.find((t) => t.id === "host")?.label ?? "Host Your Event";
 
   const visibleTabs: { id: TabId; label: string }[] = [
-    ...(hasFutureEvents ? [{ id: "upcoming" as TabId, label: upcomingLabel }] : []),
+    ...(hasUpcoming ? [{ id: "upcoming" as TabId, label: upcomingLabel }] : []),
+    ...(competitions.past.length ? [{ id: "past" as TabId, label: "Past Competitions" }] : []),
     { id: "host" as TabId, label: hostLabel },
   ];
   const showTabBar = visibleTabs.length > 1;
@@ -359,11 +365,19 @@ export default function EventsPageClient({
         {/* Upcoming Events list */}
         {activeTab === "upcoming" && (
           <div className="animate-fade-in max-w-2xl mx-auto">
-            <div style={{ borderTop: `1px solid ${theme.muted}20` }}>
+            <CurrentCompetitions items={competitions.current} />
+            <div style={{ borderTop: initialEvents.length ? `1px solid ${theme.muted}20` : undefined }}>
               {initialEvents.map((event) => (
                 <EventCard key={event.id} event={event} theme={theme} />
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Past cocktail competitions — public recaps with the winners */}
+        {activeTab === "past" && (
+          <div className="animate-fade-in">
+            <PastCompetitions items={competitions.past} theme={theme} />
           </div>
         )}
 
