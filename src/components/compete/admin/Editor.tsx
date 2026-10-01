@@ -314,7 +314,16 @@ function Overview({ data, ev, origin, saveEvent, go }: Ctx & { go: (t: TabId) =>
 
       <Card title="Links">
         <div className="grid gap-4">
-          <LinkBox label="Guest link — also on the Events page" url={`${origin}/compete/${ev.slug}`} />
+          <LinkBox
+            label={
+              ev.status === "draft"
+                ? "Guest link — not working yet (draft)"
+                : ev.listed
+                  ? "Guest link — also on the Events page"
+                  : "Guest link — works for anyone who has it; not on the website"
+            }
+            url={`${origin}/compete/${ev.slug}`}
+          />
           <LinkBox label="Host link — whoever has this runs the show. Keep it private." url={`${origin}/compete/${ev.slug}/host?key=${ev.hostToken}`} />
           {ev.bigScreen && <LinkBox label="Big screen (TV / projector)" url={`${origin}/compete/${ev.slug}/screen`} />}
         </div>
