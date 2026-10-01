@@ -780,8 +780,15 @@ function Tickets({ data, ev, reload, setError }: Ctx) {
                       placeholder="Judge’s name"
                       value={names[c.id] ?? c.name}
                       onChange={(e) => setNames({ ...names, [c.id]: e.target.value })}
+                      onKeyDown={(e) => e.key === "Enter" && names[c.id] !== undefined && names[c.id] !== c.name && call("PATCH", { id: c.id, name: names[c.id] })}
                       onBlur={() => names[c.id] !== undefined && names[c.id] !== c.name && call("PATCH", { id: c.id, name: names[c.id] })}
                     />
+                    {/* Saves on its own when you click away; the button makes it obvious. */}
+                    {names[c.id] !== undefined && names[c.id] !== c.name ? (
+                      <Btn small disabled={busy} onClick={() => call("PATCH", { id: c.id, name: names[c.id] })}>Save</Btn>
+                    ) : (
+                      names[c.id] !== undefined && <span className="text-[10px] tracking-wider uppercase text-green-600 flex items-center gap-1"><Check size={11} /> Saved</span>
+                    )}
                     <span className={`text-[10px] tracking-wider uppercase ${c.claimed ? "text-green-600" : "text-gray-400"}`}>{c.claimed ? "In use" : "Unused"}</span>
                     {c.claimed && <button className="text-[10px] tracking-wider uppercase text-[#C97D5A]" onClick={() => window.confirm("Free this code so it can be used on a different phone?") && call("PATCH", { id: c.id, reset: true })}><RotateCcw size={11} className="inline" /> Reset phone</button>}
                   </div>
