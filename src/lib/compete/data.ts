@@ -327,6 +327,9 @@ export async function getEventsPageCompetitions(): Promise<{
       .from("comp_events")
       .select("*")
       .in("status", ["published", "live", "finished"])
+      // Demo events work by link but never appear to customers — staging and
+      // the live site share one database.
+      .eq("is_demo", false)
       .order("event_date", { ascending: false });
     const events = (data ?? []).map(mapEvent);
     const ids = events.map((e) => e.id);
