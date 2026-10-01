@@ -33,7 +33,7 @@ export default function AdminCompetitionsPage() {
   const router = useRouter();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<"" | "new" | "demo">("");
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -58,14 +58,14 @@ export default function AdminCompetitionsPage() {
   async function create() {
     const name = window.prompt("Name the competition (you can change it later):", "");
     if (!name?.trim()) return;
-    setBusy(true);
+    setBusy("new");
     const res = await fetch("/api/admin/competitions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
     });
     const d = await res.json();
-    setBusy(false);
+    setBusy("");
     if (!res.ok) return setError(d.error);
     router.push(`/admin/competitions/${d.id}`);
   }
@@ -73,10 +73,10 @@ export default function AdminCompetitionsPage() {
   async function demo() {
     const exists = rows.some((r) => r.isDemo);
     if (exists && !window.confirm("Reset the Cascahuín demo? Its votes, codes and any edits will be replaced with a fresh copy.")) return;
-    setBusy(true);
+    setBusy("demo");
     const res = await fetch("/api/admin/competitions/demo", { method: "POST" });
     const d = await res.json();
-    setBusy(false);
+    setBusy("");
     if (!res.ok) return setError(d.error);
     router.push(`/admin/competitions/${d.id}`);
   }
@@ -94,18 +94,18 @@ export default function AdminCompetitionsPage() {
         <div className="flex gap-2 shrink-0">
           <button
             onClick={demo}
-            disabled={busy}
+            disabled={!!busy}
             className="flex items-center gap-2 px-4 py-2.5 border border-gray-300 text-gray-600 text-xs tracking-wider uppercase hover:border-gray-400 disabled:opacity-50"
           >
-            <Sparkles size={14} />
+            {busy === "demo" ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
             {rows.some((r) => r.isDemo) ? "Reset Demo" : "Create Demo Event"}
           </button>
           <button
             onClick={create}
-            disabled={busy}
+            disabled={!!busy}
             className="flex items-center gap-2 px-4 py-2.5 bg-[#C97D5A] text-white text-xs tracking-wider uppercase hover:opacity-90 disabled:opacity-50"
           >
-            {busy ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+            {busy === "new" ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
             New Competition
           </button>
         </div>

@@ -242,7 +242,13 @@ export async function createDemoEvent(): Promise<{ id: string; slug: string }> {
   const created = await createEvent({ name: "The Cascahuín Cup", isDemo: true });
   const now = new Date().toISOString();
 
-  await sb
+  const must = <T extends { error: unknown }>(r: T, what: string): T => {
+    // A half-built demo is worse than none — stop and say what failed.
+    if (r.error) throw new Error(`Demo: couldn’t create ${what}: ${JSON.stringify(r.error)}`);
+    return r;
+  };
+
+  must(await sb
     .from("comp_events")
     .update({
       slug: DEMO_SLUG,
@@ -260,9 +266,11 @@ export async function createDemoEvent(): Promise<{ id: string; slug: string }> {
       tiers: TIERS,
       big_screen: true,
     })
-    .eq("id", created.id);
+    .eq("id", created.id), "the event details");
 
-  await sb.from("comp_sponsors").insert([
+  // Both rows carry every column: a bulk insert fills a missing key with
+  // null, which the NOT NULL columns reject — and the whole batch with it.
+  must(await sb.from("comp_sponsors").insert([
     {
       event_id: created.id,
       token: newToken(),
@@ -282,10 +290,14 @@ export async function createDemoEvent(): Promise<{ id: string; slug: string }> {
       is_primary: false,
       label: "Co-sponsor (demo — not submitted yet)",
       status: "invited",
+      contact: {},
+      profile: {},
+      submitted_at: null,
+      approved_at: null,
     },
-  ]);
+  ]), "the brand partners");
 
-  await sb.from("comp_contestants").insert(
+  must(await sb.from("comp_contestants").insert(
     DEMO_CONTESTANTS.map((c, i) => ({
       event_id: created.id,
       token: newToken(),
@@ -299,7 +311,7 @@ export async function createDemoEvent(): Promise<{ id: string; slug: string }> {
       submitted_at: now,
       approved_at: now,
     }))
-  );
+  ), "the contestants");
 
   const ev = await getEventById(created.id);
   if (ev) {
