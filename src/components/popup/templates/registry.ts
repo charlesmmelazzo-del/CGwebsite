@@ -15,6 +15,7 @@ import type { ComponentType } from "react";
 import type { PopupTemplateProps } from "@/lib/popup/types";
 import ClassicTemplate from "./ClassicTemplate";
 import HighScoresTemplate from "./HighScoresTemplate";
+import CreepypastasTemplate from "./CreepypastasTemplate";
 
 export interface PopupTemplate {
   key: string;
@@ -40,6 +41,14 @@ export const TEMPLATES: Record<string, PopupTemplate> = {
     description:
       "Golden-age arcade cabinets. Each cocktail opens to its full story plus a mini game with a high score board — top score wins a gift card.",
     component: HighScoresTemplate,
+    defaultConfig: {},
+  },
+  creepypastas: {
+    key: "creepypastas",
+    label: "Cocktail Creepypastas (Halloween)",
+    description:
+      "A smug gothic host and a choose-your-own-adventure story per cocktail. Black and white, pixel-art dialogue. The ticket from each drink unlocks its tale.",
+    component: CreepypastasTemplate,
     defaultConfig: {},
   },
 };
