@@ -4,7 +4,7 @@ Cocktail Creepypastas — cut the bartender and logo sprite sheets.
 The owner's ChatGPT sheets are white pixel art on pure black, with bright green
 (#00FF00) lines between equal cells (see the "Bartender & Logo Sprites" prompt):
 
-  1-logo.png          1 x 2: full logo, compact logo
+  1-logo.png          1 x 2: full logo (used), compact logo (ignored)
   2B-idle.png  2C-talking.png  2D-greeting.png  2E-thinking.png  2F-writing.png
                       2 x 2 each, frames left to right then top to bottom
 
@@ -16,7 +16,7 @@ all 20 frames of the first set.
 
   pip install pillow numpy
   python3 scripts/creepypastas-art.py <folder with the PNGs>
-Writes public/popup/creepypastas/{logo,logo-compact}.png and bartender/<pose>-<n>.png
+Writes public/popup/creepypastas/logo.png and bartender/<pose>-<n>.png
 """
 import os, sys
 import numpy as np
@@ -74,11 +74,12 @@ for sheet, pose in POSES.items():
 
 logos = cells(os.path.join(SRC, "1-logo.png"))
 assert len(logos) == 2, f"logo: expected 2 cells, found {len(logos)}"
-for cell, name in zip(logos, ["logo", "logo-compact"]):
+# Only the first (dripping) logo is used; the owner preferred it on phones too.
+for cell, name in zip(logos[:1], ["logo"]):
     g = np.array(clean(cell))
     ys, xs = np.where(g > 60)
     pad = 12
     crop = Image.fromarray(g[max(0, ys.min() - pad):ys.max() + pad, max(0, xs.min() - pad):xs.max() + pad])
     save(crop, os.path.join(OUT, name + ".png"), (1000, round(crop.height * 1000 / crop.width)))
 
-print("Cut 20 bartender frames and 2 logos into", OUT)
+print("Cut 20 bartender frames and the logo into", OUT)
