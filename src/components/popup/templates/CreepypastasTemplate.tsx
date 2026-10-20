@@ -23,7 +23,7 @@ import {
   type TaleCard,
   type TimeId,
 } from "../creepypastas/tales";
-import { ALL_FRAMES, Bartender, Choice, LOGO_COMPACT_SRC, LOGO_SRC, SpeechBubble, voiceFont, type Pose } from "../creepypastas/ui";
+import { ALL_FRAMES, Bartender, Choice, LOGO_SRC, SpeechBubble, voiceFont, type Pose } from "../creepypastas/ui";
 
 /**
  * COMMON GOOD PRESENTS: COCKTAIL CREEPYPASTAS
@@ -516,17 +516,14 @@ function Logo({ onEnter }: { onEnter: () => void }) {
   return (
     <div className="h-full flex flex-col items-center justify-center px-6 text-center">
       {LOGO_SRC ? (
-        <picture>
-          <source media="(max-width: 340px)" srcSet={LOGO_COMPACT_SRC} />
-          {/* eslint-disable-next-line @next/next/no-img-element -- pixel art, served as-is */}
-          <img
-            src={LOGO_SRC}
-            alt="Common Good Presents: Cocktail Creepypastas"
-            width={1000}
-            height={200}
-            className="w-full max-w-[560px] h-auto"
-          />
-        </picture>
+        // eslint-disable-next-line @next/next/no-img-element -- pixel art, served as-is
+        <img
+          src={LOGO_SRC}
+          alt="Common Good Presents: Cocktail Creepypastas"
+          width={1000}
+          height={200}
+          className="w-full max-w-[560px] h-auto"
+        />
       ) : (
         <h1 className={voiceFont.className}>
           <span className="block text-[13px] tracking-[0.35em] text-white/70">COMMON GOOD PRESENTS</span>

@@ -18,8 +18,6 @@ export const readFont = Lora({ subsets: ["latin"], display: "swap", style: ["nor
 
 /** The logo, cut from Sheet 1 by scripts/creepypastas-art.py. Null = set the title in type. */
 export const LOGO_SRC: string | null = "/popup/creepypastas/logo.png";
-/** The bolder version for the narrowest phones. */
-export const LOGO_COMPACT_SRC = "/popup/creepypastas/logo-compact.png";
 
 export type Pose = "idle" | "talking" | "greeting" | "thinking" | "writing";
 
