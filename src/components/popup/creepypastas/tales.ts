@@ -35,7 +35,12 @@ export interface TaleCard {
     callbackShort: string;
   };
   contentVersion: string;
+  /** A modern English retelling exists (scripts/creepypastas-modern.mjs). */
+  modern?: boolean;
 }
+
+/** Which telling a guest is reading: the author's words, or modern English. */
+export type TaleVersion = "original" | "modern";
 
 export interface TaleText {
   id: string;
@@ -71,9 +76,9 @@ export function loadCatalog(): Promise<TaleCard[]> {
   return catalogPromise;
 }
 
-export async function loadTale(id: string): Promise<TaleText> {
+export async function loadTale(id: string, version: TaleVersion = "original"): Promise<TaleText> {
   if (!/^H\d{3}$/.test(id)) throw new Error("bad tale id");
-  const r = await fetch(`${BASE}/tales/${id}.json`);
+  const r = await fetch(`${BASE}/${version === "modern" ? "modern" : "tales"}/${id}.json`);
   if (!r.ok) throw new Error(`tale ${r.status}`);
   return r.json();
 }

@@ -24,7 +24,7 @@
 // replace the corpus's moment by moment, and its per-story lines replace each
 // story's host fields. Story text always comes from the corpus.
 
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const [src, voicePath] = process.argv.slice(2);
@@ -92,6 +92,8 @@ for (const s of corpus.stories) {
       callbackShort: host.return_callback_short,
     },
     contentVersion: s.content_version,
+    // Loaded separately by scripts/creepypastas-modern.mjs; kept across re-imports.
+    modern: existsSync(join(out, "modern", `${s.id}.json`)),
   });
 
   writeFileSync(

@@ -51,7 +51,9 @@ export type Moment =
   | "recipe_writing"
   | "story_thinking"
   | "recipe_another"
-  | "recipe_no_pdf";
+  | "recipe_no_pdf"
+  | "version_choice_prompt"
+  | "modern_bridge";
 
 const one = (id: string, text: string): HostLine => ({ id, lines: [text] });
 
@@ -89,6 +91,13 @@ const FALLBACK: Partial<Record<Moment, HostLine[]>> = {
   ],
   recipe_no_pdf: [
     one("fb_recipe_no_pdf_01", "Blast. The printed card for that one isn't back from the printer yet. Ask at the bar and they'll walk you through it."),
+  ],
+  version_choice_prompt: [
+    one("fb_version_01", "This one I can give you in the author's own words, or retold in modern English. Same tale, same twists, every bone in place. Which would you like?"),
+    one("fb_version_02", "The original telling is a touch old-fashioned; I can also tell it in today's English, with nothing left out. Your choice."),
+  ],
+  modern_bridge: [
+    one("fb_modern_bridge_01", "Retold in today's English, not word for word, but every turn of the tale is here. Let's begin."),
   ],
   story_thinking: [
     one("fb_thinking_01", "Now then. Which tale… let me think."),
@@ -131,6 +140,8 @@ export const REPLIES = {
   done: "That's all for now",
   download: "Download the recipe",
   showCocktails: "Show me the cocktails",
+  original: "The original words",
+  modern: "Modern English",
   anotherRecipe: "Another recipe",
   noMoreRecipes: "No, that's all",
 };

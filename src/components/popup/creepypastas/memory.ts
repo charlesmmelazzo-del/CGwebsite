@@ -16,6 +16,14 @@ export interface Bookmark {
   contentVersion: string;
   /** How far through, 0–1, by scroll position. */
   progress: number;
+  /**
+   * The paragraph at the top of the screen. Both versions of a tale have the
+   * same paragraphs, so this lands in the same place in either; progress is
+   * the fallback for bookmarks saved before it existed.
+   */
+  para?: number;
+  /** The telling they were reading. */
+  version?: "original" | "modern";
   at: string;
 }
 

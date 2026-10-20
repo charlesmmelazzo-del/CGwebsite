@@ -11,7 +11,7 @@ import {
   updateMemory,
   type GuestMemory,
 } from "../creepypastas/memory";
-import Reader from "../creepypastas/Reader";
+import Reader, { type Place } from "../creepypastas/Reader";
 import Recipes, { recipePdf } from "../creepypastas/Recipes";
 import {
   loadCatalog,
@@ -21,6 +21,7 @@ import {
   TIME_CHOICES,
   type ScareId,
   type TaleCard,
+  type TaleVersion,
   type TimeId,
 } from "../creepypastas/tales";
 import { ALL_FRAMES, Bartender, Choice, ChoiceLink, DialogueBox, LOGO_SRC, voiceFont, type Pose } from "../creepypastas/ui";
@@ -82,7 +83,13 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
   const [mem, setMem] = useState<GuestMemory | null>(null);
   /** Which recipe card to open on (coming back for "another"). */
   const [cardIndex, setCardIndex] = useState(0);
-  const [reading, setReading] = useState<{ card: TaleCard; startAt: number } | null>(null);
+  const [reading, setReading] = useState<{
+    card: TaleCard;
+    startAt: number;
+    startPara?: number;
+    version: TaleVersion;
+    modernBridge: string;
+  } | null>(null);
 
   /** The current line has finished typing out; the replies appear after. */
   const [typed, setTyped] = useState(false);
@@ -207,7 +214,16 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
       speak({
         lines: [...line("returning_guest_welcome"), ...line("resume_unfinished_story")],
         replies: [
-          { label: REPLIES.resume, run: () => openTale(marked, mark.bookmark.progress) },
+          {
+            label: REPLIES.resume,
+            run: () =>
+              openTale(marked, {
+                startAt: mark.bookmark.progress,
+                startPara: mark.bookmark.para,
+                // Only trust a saved "modern" if that telling still exists.
+                version: mark.bookmark.version === "modern" && marked.modern ? "modern" : "original",
+              }),
+          },
           { label: REPLIES.somethingElse, run: () => speak({ lines: question, replies: mainReplies() }) },
         ],
         greet: true,
@@ -353,7 +369,7 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
           `${t.host.offerQuestion} (About ${t.readMinutes} minute${t.readMinutes === 1 ? "" : "s"} to read.)`,
         ],
         replies: [
-          { label: REPLIES.accept, run: () => openTale(t, 0) },
+          { label: REPLIES.accept, run: () => (t.modern ? chooseVersion(t) : openTale(t)) },
           { label: REPLIES.another, run: () => void pitch(line("decline_and_offer_another")) },
           changeChoice,
           { label: REPLIES.changedMind, run: changedMind, quiet: true },
@@ -396,22 +412,45 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
     });
   }
 
-  function openTale(card: TaleCard, startAt: number) {
+  /** For a tale with a modern retelling: which would they like? */
+  function chooseVersion(card: TaleCard) {
+    speak({
+      lines: line("version_choice_prompt"),
+      replies: [
+        { label: REPLIES.original, run: () => openTale(card, { version: "original" }) },
+        { label: REPLIES.modern, run: () => openTale(card, { version: "modern" }) },
+      ],
+    });
+  }
+
+  function openTale(
+    card: TaleCard,
+    { startAt = 0, startPara, version = "original" }: { startAt?: number; startPara?: number; version?: TaleVersion } = {}
+  ) {
     reachedEnd.current = false;
-    setReading({ card, startAt });
+    setReading({ card, startAt, startPara, version, modernBridge: line("modern_bridge")[0] });
     setPhase("wavy");
     const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     later(() => setPhase((p) => (p === "wavy" ? "reader" : p)), reduced ? 250 : WAVY_MS);
   }
 
   const saveProgress = useCallback(
-    (progress: number) => {
+    ({ progress, para }: Place) => {
       if (!reading) return false;
       if (reachedEnd.current) return true;
-      const { id, contentVersion } = reading.card;
+      const { card, version } = reading;
       return remember((m) => ({
         ...m,
-        bookmarks: { ...m.bookmarks, [id]: { contentVersion, progress, at: new Date().toISOString() } },
+        bookmarks: {
+          ...m.bookmarks,
+          [card.id]: {
+            contentVersion: card.contentVersion,
+            progress,
+            ...(para >= 0 ? { para } : {}),
+            version,
+            at: new Date().toISOString(),
+          },
+        },
       }));
     },
     [reading, remember]
@@ -429,7 +468,7 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
   }, [reading, remember]);
 
   const exitTale = useCallback(
-    (progress: number, done: boolean) => {
+    (place: Place, done: boolean) => {
       setReading(null);
       if (done) {
         const m = readMemory(menuId);
@@ -444,7 +483,7 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
         });
         return;
       }
-      saveProgress(progress);
+      saveProgress(place);
       backAtBar(line("story_left_early"));
     },
     // The helpers above are plain functions over refs and stable setters.
@@ -569,12 +608,16 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
         <div key="reader" className={`fixed inset-0 z-[70] ${leaving ? "creepy-leave" : "creepy-screen"}`}>
           <Reader
             card={reading.card}
+            version={reading.version}
+            onVersion={(version) => setReading((r) => (r ? { ...r, version } : r))}
             startAt={reading.startAt}
+            startPara={reading.startPara}
+            modernBridge={reading.modernBridge}
             textScale={mem.textScale}
             onTextScale={(textScale) => remember((m) => ({ ...m, textScale }))}
             onProgress={saveProgress}
             onFinished={finishedTale}
-            onExit={(progress, done) => fadeTo(() => exitTale(progress, done))}
+            onExit={(place, done) => fadeTo(() => exitTale(place, done))}
           />
         </div>
       )}
