@@ -20,13 +20,18 @@ const STATUS_LABEL: Record<string, string> = {
  * The sandbox: render any pop-up at any status, before the public can see it.
  *
  * Gated on the existing admin session cookie — the same one that protects
- * /admin. Scores set here are written with is_test = true and are excluded
+ * /admin — except on the staging site, where staff can open it from a link.
+ * Game scores and other sandbox writes still need the admin session. Scores set here are written with is_test = true and are excluded
  * from every public board, and no ticket is needed, so the owner can play
  * every game on an unpublished pop-up without polluting real results.
  */
 export default async function SandboxPage({ params }: { params: { slug: string } }) {
   const isAdmin = await verifySessionToken(cookies().get(SESSION_COOKIE)?.value);
-  if (!isAdmin) redirect(`/admin/login?from=/popup/preview/${params.slug}`);
+  // On the staging site (the only one with PREVIEW_PASSWORD set) anyone with
+  // the link can open the sandbox, so the owner can hand it to staff to test.
+  // On the live site it stays admin-only: drafts aren't public there.
+  const isStaging = Boolean(process.env.PREVIEW_PASSWORD);
+  if (!isAdmin && !isStaging) redirect(`/admin/login?from=/popup/preview/${params.slug}`);
 
   const menu = await getMenuBySlug(params.slug);
   if (!menu) notFound();
@@ -48,12 +53,14 @@ export default async function SandboxPage({ params }: { params: { slug: string }
                 Sign in as a guest to save test scores
               </Link>
             )}
-            <Link
-              href="/admin/popup"
-              className="text-[10px] tracking-[0.15em] uppercase underline whitespace-nowrap"
-            >
-              ← Admin
-            </Link>
+            {isAdmin && (
+              <Link
+                href="/admin/popup"
+                className="text-[10px] tracking-[0.15em] uppercase underline whitespace-nowrap"
+              >
+                ← Admin
+              </Link>
+            )}
           </div>
         </div>
       </div>
