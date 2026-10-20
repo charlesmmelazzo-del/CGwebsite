@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import type { PopupCocktail, PopupTemplateProps } from "@/lib/popup/types";
 import { REPLIES, say, type Moment } from "../creepypastas/hostDialogue";
 import {
@@ -23,7 +23,7 @@ import {
   type TaleCard,
   type TimeId,
 } from "../creepypastas/tales";
-import { ALL_FRAMES, Bartender, Choice, LOGO_SRC, SpeechBubble, voiceFont, type Pose } from "../creepypastas/ui";
+import { ALL_FRAMES, Bartender, BARTENDER_ASPECT, Choice, LOGO_SRC, SpeechBubble, voiceFont, type Pose } from "../creepypastas/ui";
 
 /**
  * COMMON GOOD PRESENTS: COCKTAIL CREEPYPASTAS
@@ -75,6 +75,29 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
   const [writingLine, setWritingLine] = useState("");
   const [recipeLine, setRecipeLine] = useState("");
   const [reading, setReading] = useState<{ card: TaleCard; startAt: number } | null>(null);
+
+  // The bubble sits right on his head, so he's sized to whatever room the
+  // bubble leaves: as big as fits, never wider than the screen. Measured, not
+  // left to CSS, because the bubble's height changes with every line.
+  const stage = useRef<HTMLDivElement>(null);
+  const bubble = useRef<HTMLDivElement>(null);
+  const [spriteHeight, setSpriteHeight] = useState(280);
+  useLayoutEffect(() => {
+    const st = stage.current;
+    const bu = bubble.current;
+    if (!st || !bu) return;
+    const fit = () => {
+      const room = st.clientHeight - bu.offsetHeight;
+      const widest = (st.clientWidth - 24) / BARTENDER_ASPECT;
+      setSpriteHeight(Math.max(90, Math.floor(Math.min(room, widest, 520))));
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(st);
+    ro.observe(bu);
+    return () => ro.disconnect();
+    // The stage only exists while the bar is showing; re-attach when it returns.
+  }, [phase]);
 
   // This visit's story choices. Refs: they steer picks, not rendering.
   const time = useRef<TimeId>("five_to_ten");
@@ -441,16 +464,18 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
           className={`h-full flex flex-col ${phase === "wavy" ? "creepy-wavy" : ""}`}
           aria-hidden={phase === "reader"}
         >
-          <div className="shrink-0 px-4 pt-4 pb-4 max-h-[46%] overflow-y-auto">
-            {phase === "writing" ? (
-              <SpeechBubble onNext={showRecipes}>{writingLine}</SpeechBubble>
-            ) : current ? (
-              <SpeechBubble onNext={lastStep ? undefined : () => setStep((s) => s + 1)}>{current}</SpeechBubble>
-            ) : null}
-          </div>
-
-          <div className="flex-1 min-h-[96px] pt-1 px-6">
-            <Bartender pose={pose} />
+          {/* He and his bubble sit together just above the replies. */}
+          <div ref={stage} className="flex-1 min-h-0 flex flex-col justify-end">
+            <div ref={bubble} className="shrink-0 px-4 pt-3 pb-[18px] max-h-[60%] overflow-y-auto">
+              {phase === "writing" ? (
+                <SpeechBubble onNext={showRecipes}>{writingLine}</SpeechBubble>
+              ) : current ? (
+                <SpeechBubble onNext={lastStep ? undefined : () => setStep((s) => s + 1)}>{current}</SpeechBubble>
+              ) : null}
+            </div>
+            <div className="shrink-0">
+              <Bartender pose={pose} height={spriteHeight} />
+            </div>
           </div>
 
           <div className="shrink-0 px-4 pb-4 pt-3 max-h-[46%] overflow-y-auto flex flex-col gap-2">
@@ -485,7 +510,8 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
         />
       )}
 
-      {isSandbox && (
+      {/* Only on the logo screen, where it can't cover a reply. Reloading returns here. */}
+      {isSandbox && phase === "logo" && (
         <button
           type="button"
           onClick={() => {
@@ -535,7 +561,7 @@ function Logo({ onEnter }: { onEnter: () => void }) {
         </h1>
       )}
       <div className="mt-12 w-full max-w-[300px]">
-        <Choice center onClick={onEnter}>
+        <Choice onClick={onEnter}>
           {REPLIES.enter}
         </Choice>
       </div>

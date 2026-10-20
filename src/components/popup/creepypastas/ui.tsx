@@ -113,11 +113,17 @@ function StandIn({ pose, frame }: { pose: Pose; frame: number }) {
   );
 }
 
-export function Bartender({ pose }: { pose: Pose }) {
+/** Frame width ÷ height, from scripts/creepypastas-art.py (384 × 432). */
+export const BARTENDER_ASPECT = 384 / 432;
+
+export function Bartender({ pose, height }: { pose: Pose; height: number }) {
   const frames = FRAMES[pose]?.length ? FRAMES[pose]! : FRAMES.idle ?? [];
   const frame = useFrame(pose, frames.length || (pose === "idle" ? 1 : 3));
   return (
-    <div className="h-full w-full flex items-end justify-center" style={{ imageRendering: "pixelated" }}>
+    <div
+      className="w-full flex items-end justify-center"
+      style={{ height, imageRendering: "pixelated" }}
+    >
       {frames.length ? (
         // eslint-disable-next-line @next/next/no-img-element -- pixel art at whole-number scale; the optimizer would smooth it
         <img
@@ -141,7 +147,7 @@ export function SpeechBubble({ children, onNext }: { children: ReactNode; onNext
     <div className="relative">
       <div
         aria-live="polite"
-        className={`${voiceFont.className} relative bg-black border-[3px] border-white rounded-[14px] px-4 py-3.5 text-[18px] leading-[1.45] text-white`}
+        className={`${voiceFont.className} relative bg-black border-[3px] border-white rounded-[14px] px-4 py-3.5 text-[clamp(19px,5.6vw,24px)] leading-[1.35] text-white`}
       >
         {children}
         {onNext && (
@@ -165,38 +171,33 @@ export function SpeechBubble({ children, onNext }: { children: ReactNode; onNext
 }
 
 /**
- * A reply the guest can tap. Real buttons, at least 48px tall, with a pointer
- * on keyboard focus — and on hover only where there's a mouse, so a tapped
- * button on a phone doesn't stay lit.
+ * A reply the guest can tap: a real button, centred, at least 52px tall. It
+ * inverts on keyboard focus — and on hover only where there's a mouse, so a
+ * tapped button on a phone doesn't stay lit.
  */
 export function Choice({
   children,
   onClick,
   quiet = false,
   disabled = false,
-  center = false,
 }: {
   children: ReactNode;
   onClick: () => void;
   quiet?: boolean;
   disabled?: boolean;
-  center?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`${voiceFont.className} group w-full min-h-[48px] flex items-center gap-2 ${center ? "justify-center text-center" : "text-left"} px-3 py-2 text-[17px] leading-snug rounded-[6px] border-2 transition-colors
+      className={`${voiceFont.className} w-full min-h-[52px] flex items-center justify-center text-center px-3 py-2 text-[clamp(18px,5vw,21px)] leading-snug rounded-[6px] border-2 transition-colors
         focus:outline-none focus-visible:bg-white focus-visible:text-black focus-visible:border-white
         [@media(hover:hover)]:hover:bg-white [@media(hover:hover)]:hover:text-black [@media(hover:hover)]:hover:border-white
         disabled:opacity-40 disabled:pointer-events-none
         ${quiet ? "border-white/30 text-white/75" : "border-white text-white"}`}
     >
-      <span aria-hidden className="w-3 shrink-0 opacity-0 [@media(hover:hover)]:group-hover:opacity-100 group-focus-visible:opacity-100">
-        ▸
-      </span>
-      <span>{children}</span>
+      {children}
     </button>
   );
 }

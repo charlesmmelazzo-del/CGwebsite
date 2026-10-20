@@ -9,7 +9,7 @@ The owner's ChatGPT sheets are white pixel art on pure black, with bright green
                       2 x 2 each, frames left to right then top to bottom
 
 The green bands are found by scanning for them, each cell is cut just inside
-them, any green fringe is blacked out, and frames are shrunk to 384x512 with
+them, any green fringe is blacked out, and frames are trimmed above his head and shrunk to 384x432 with
 8 grey levels (crisp and ~15 KB each). Every frame keeps its full cell, so the
 counter and his head stay where ChatGPT put them — measured identical across
 all 20 frames of the first set.
@@ -24,6 +24,12 @@ from PIL import Image
 
 SRC = sys.argv[1] if len(sys.argv) > 1 else "."
 OUT = os.path.join("public", "popup", "creepypastas")
+# Rows of each 1024-tall frame to keep: trims the empty black above his head
+# (content starts at row ~104 in every frame) so the speech bubble can sit
+# right on top of him. The same rows for every frame keeps him registered.
+KEEP_ROWS = (88, 952)
+FRAME_SIZE = (384, 432)
+
 POSES = {"2B-idle": "idle", "2C-talking": "talking", "2D-greeting": "greeting",
          "2E-thinking": "thinking", "2F-writing": "writing"}
 
@@ -70,7 +76,8 @@ for sheet, pose in POSES.items():
     frames = cells(os.path.join(SRC, sheet + ".png"))
     assert len(frames) == 4, f"{sheet}: expected 4 frames, found {len(frames)}"
     for i, f in enumerate(frames):
-        save(clean(f), os.path.join(OUT, "bartender", f"{pose}-{i + 1}.png"), (384, 512))
+        assert f.shape[0] >= KEEP_ROWS[1], f"{sheet}: frame shorter than expected"
+        save(clean(f[KEEP_ROWS[0]:KEEP_ROWS[1]]), os.path.join(OUT, "bartender", f"{pose}-{i + 1}.png"), FRAME_SIZE)
 
 logos = cells(os.path.join(SRC, "1-logo.png"))
 assert len(logos) == 2, f"logo: expected 2 cells, found {len(logos)}"
