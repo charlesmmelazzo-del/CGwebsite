@@ -1,409 +1,623 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import type { PopupCocktail, PopupTemplateProps } from "@/lib/popup/types";
+import { REPLIES, say, type Moment } from "../creepypastas/hostDialogue";
 import {
-  COPY,
-  INTRO_PANELS,
-  MAIN_QUESTION,
-  MAIN_QUESTION_SHORT,
-  type HostLine,
-} from "../creepypastas/hostDialogue";
-import { drawLine, hasVisited, markVisited } from "../creepypastas/lineRotation";
+  beginVisit,
+  forgetEverything,
+  latestBookmark,
+  readMemory,
+  updateMemory,
+  type GuestMemory,
+} from "../creepypastas/memory";
+import Reader from "../creepypastas/Reader";
+import Recipes from "../creepypastas/Recipes";
 import {
-  Choice,
-  DialogueBox,
-  HostSays,
-  LOGO_SRC,
-  QuietAction,
-  readFont,
-  titleFont,
-  voiceFont,
-} from "../creepypastas/ui";
+  loadCatalog,
+  pickAny,
+  pickTale,
+  SCARE_CHOICES,
+  TIME_CHOICES,
+  type ScareId,
+  type TaleCard,
+  type TimeId,
+} from "../creepypastas/tales";
+import { Bartender, Choice, LOGO_SRC, SpeechBubble, voiceFont, type Pose } from "../creepypastas/ui";
 
 /**
- * COCKTAIL CREEPYPASTAS — a Halloween anthology. Four cocktails, each with its
- * own choose-your-own-adventure story, introduced by a scripted host who is
- * magnificent and thinks rather less of you.
+ * COMMON GOOD PRESENTS: COCKTAIL CREEPYPASTAS
  *
- *   ENTRANCE  — the title and "Click here to enter… if you dare!"
- *   INTRO     — first visit only: three short panels, skippable.
- *   HOST      — "What did you order?" Returning guests get one short greeting.
- *   PICK      — the four cocktails, either to unlock (ordered) or to read about.
- *   ABOUT     — In the glass / In the tale. Browsing never unlocks anything.
- *   ORDERED   — one cocktail chosen to unlock with the ticket from the drink.
+ * A ghoulish bartender fills the screen and offers two things, over and over:
  *
- * The ticket step and the story reader come next; ORDERED holds their place.
+ *   A COCKTAIL RECIPE — he writes it down, then the four Halloween cocktails
+ *                       appear as cards to swipe, each with a PDF to keep.
+ *   A SPOOKY TALE     — how much time, how scary; he pitches one of 150
+ *                       public-domain tales that fits. Take it, ask for
+ *                       another, or change your mind. Taking it sends the
+ *                       screen wavy and opens a scrolling reader.
  *
- * The screens are local state rather than routes, so moving around inside the
- * pop-up never sends a guest back through the entrance — only a fresh arrival
- * (a new page load) does.
+ * Coming back on the same phone, he remembers: the last tale finished, the
+ * recipes taken, the story left half-read. After a first recipe or tale he
+ * offers to add them to the mailing list, once.
+ *
+ * No accounts, no tickets. Everything a guest does is remembered only in this
+ * browser (see creepypastas/memory.ts).
  */
 
-type Screen =
-  | { name: "entrance" }
-  | { name: "intro"; panel: number }
-  | { name: "host" }
-  | { name: "pick"; mode: "ordered" | "browse" }
-  | { name: "about"; cocktailId: string }
-  | { name: "ordered"; cocktailId: string };
+type Phase = "logo" | "bar" | "writing" | "recipes" | "thinking" | "wavy" | "reader";
 
-export default function CreepypastasTemplate({ menu, cocktails, isLive, isSandbox }: PopupTemplateProps) {
-  const [screen, setScreen] = useState<Screen>({ name: "entrance" });
+interface Reply {
+  label: string;
+  run: () => void;
+  quiet?: boolean;
+}
 
-  // What the Host is saying. Drawn when something happens, then held still
-  // while the guest reads — never re-picked on render.
-  const [greeting, setGreeting] = useState<HostLine | null>(null);
-  const [frame, setFrame] = useState<HostLine | null>(null);
+interface Scene {
+  /** Speech bubbles, shown one at a time. */
+  lines: string[];
+  replies: Reply[];
+  /** Show the email box under the last bubble. */
+  emailForm?: boolean;
+  /** Open with the greeting animation instead of plain talking. */
+  greet?: boolean;
+}
 
-  // Reaching the end of the introduction counts as having met him.
-  const introDone = screen.name === "intro" && screen.panel === INTRO_PANELS.length - 1;
-  useEffect(() => {
-    if (introDone) markVisited(menu.id);
-  }, [introDone, menu.id]);
+const WAVY_MS = 1100;
 
-  const find = (id: string) => cocktails.find((c) => c.id === id) ?? null;
+export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: PopupTemplateProps) {
+  const menuId = menu.id;
+  const [phase, setPhase] = useState<Phase>("logo");
+  const [scene, setScene] = useState<Scene>({ lines: [], replies: [] });
+  const [step, setStep] = useState(0);
+  const [pose, setPose] = useState<Pose>("idle");
+  const [mem, setMem] = useState<GuestMemory | null>(null);
+  const [writingLine, setWritingLine] = useState("");
+  const [recipeLine, setRecipeLine] = useState("");
+  const [reading, setReading] = useState<{ card: TaleCard; startAt: number } | null>(null);
 
-  function enter() {
-    if (hasVisited(menu.id)) {
-      setGreeting(drawLine(menu.id, "welcome.returning", "welcome.short"));
-      setScreen({ name: "host" });
-    } else {
-      setScreen({ name: "intro", panel: 0 });
-    }
-  }
+  // This visit's story choices. Refs: they steer picks, not rendering.
+  const time = useRef<TimeId>("five_to_ten");
+  const scare = useRef<ScareId>("gentle");
+  const offered = useRef(new Set<string>());
+  const askedSignup = useRef(false);
+  /** This reading reached THE END: stop saving a bookmark for it. */
+  const reachedEnd = useRef(false);
+  const timers = useRef<number[]>([]);
 
-  function finishIntro() {
-    markVisited(menu.id);
-    setGreeting(null);
-    setScreen({ name: "host" });
-  }
+  const later = (fn: () => void, ms: number) => {
+    timers.current.push(window.setTimeout(fn, ms));
+  };
+  useEffect(() => () => timers.current.forEach((t) => window.clearTimeout(t)), []);
 
-  function pick(mode: "ordered" | "browse") {
-    setFrame(drawLine(menu.id, mode === "ordered" ? "order.which" : "browse.entry"));
-    setScreen({ name: "pick", mode });
-  }
-
-  function chooseOrdered(c: PopupCocktail) {
-    setFrame(drawLine(menu.id, "cocktail.selected"));
-    setScreen({ name: "ordered", cocktailId: c.id });
-  }
-
-  const mainChoices = (
-    <>
-      <Choice primary onClick={() => pick("ordered")}>
-        {COPY.ordered}
-      </Choice>
-      <Choice primary onClick={() => pick("browse")}>
-        {COPY.notOrdered}
-      </Choice>
-    </>
+  const remember = useCallback(
+    (change: (m: GuestMemory) => GuestMemory) => {
+      const r = updateMemory(menuId, change);
+      setMem(r.memory);
+      return r.saved;
+    },
+    [menuId]
   );
 
-  let body: ReactNode;
-  switch (screen.name) {
-    case "entrance":
-      body = <Entrance onEnter={enter} />;
-      break;
+  const line = (m: Moment) => say(menuId, m).lines;
 
-    case "intro": {
-      const last = screen.panel === INTRO_PANELS.length - 1;
-      body = (
-        <Stage screenKey={`intro-${screen.panel}`}>
-          <HostSays line={INTRO_PANELS[screen.panel]} extra={last ? MAIN_QUESTION : undefined} />
-          <Choices>
-            {last ? (
-              mainChoices
-            ) : (
-              <Choice primary onClick={() => setScreen({ name: "intro", panel: screen.panel + 1 })}>
-                {COPY.next}
-              </Choice>
-            )}
-          </Choices>
-          {!last && (
-            <Footer>
-              <QuietAction onClick={finishIntro}>{COPY.skipIntro}</QuietAction>
-              <span className="text-[12px] text-white/35">
-                {screen.panel + 1} / {INTRO_PANELS.length}
-              </span>
-            </Footer>
-          )}
-        </Stage>
-      );
-      break;
-    }
-
-    case "host":
-      body = (
-        <Stage screenKey="host">
-          <HostSays
-            line={greeting}
-            extra={greeting ? MAIN_QUESTION_SHORT : MAIN_QUESTION}
-            expression={greeting?.expression ?? "appraising"}
-          />
-          <Choices>{mainChoices}</Choices>
-          <Footer>
-            <QuietAction onClick={() => setScreen({ name: "intro", panel: 0 })}>{COPY.hearIntro}</QuietAction>
-          </Footer>
-        </Stage>
-      );
-      break;
-
-    case "pick":
-      body = (
-        <Stage screenKey={`pick-${screen.mode}`}>
-          <HostSays line={frame} />
-          <Choices label={screen.mode === "ordered" ? "Which cocktail did you order?" : "Which cocktail?"}>
-            {cocktails.length === 0 && <p className={`${readFont.className} text-white/60`}>{COPY.noCocktails}</p>}
-            {cocktails.map((c) => (
-              <Choice
-                key={c.id}
-                primary
-                onClick={() =>
-                  screen.mode === "ordered" ? chooseOrdered(c) : setScreen({ name: "about", cocktailId: c.id })
-                }
-              >
-                {c.name || "Untitled cocktail"}
-              </Choice>
-            ))}
-            <Choice onClick={() => setScreen({ name: "host" })}>{COPY.backToHost}</Choice>
-          </Choices>
-          {screen.mode === "browse" && <ServiceNote />}
-        </Stage>
-      );
-      break;
-
-    case "about": {
-      const c = find(screen.cocktailId);
-      body = c ? (
-        <Stage screenKey={`about-${c.id}`}>
-          <HostSays line={frame} />
-          <CocktailFacts cocktail={c} />
-          <Choices>
-            <Choice primary onClick={() => setScreen({ name: "pick", mode: "browse" })}>
-              {COPY.anotherCocktail}
-            </Choice>
-            <Choice primary onClick={() => chooseOrdered(c)}>
-              {COPY.orderedThis}
-            </Choice>
-            <Choice onClick={() => setScreen({ name: "host" })}>{COPY.backToHost}</Choice>
-          </Choices>
-          <ServiceNote />
-        </Stage>
-      ) : (
-        <Missing onBack={() => setScreen({ name: "host" })} />
-      );
-      break;
-    }
-
-    case "ordered": {
-      const c = find(screen.cocktailId);
-      body = c ? (
-        <Stage screenKey={`ordered-${c.id}`}>
-          <HostSays line={frame} />
-          <section aria-labelledby="ordered-name" className="mt-6">
-            <h2 id="ordered-name" className={`${titleFont.className} text-[34px] leading-tight text-white`}>
-              {c.name}
-            </h2>
-            {c.tagline && <p className={`${readFont.className} italic text-white/65 mt-1`}>{c.tagline}</p>}
-            {/* Placeholder for the next build: the ticket form and the story. */}
-            <DialogueBox className="mt-4">
-              <p className={`${voiceFont.className} text-[13px] tracking-[0.15em] uppercase text-white/50`}>
-                Story · Locked
-              </p>
-              <p className={`${readFont.className} mt-2 text-[16px] leading-relaxed text-white/85`}>
-                Entering the ticket from your drink to unlock this story is coming in the next build.
-              </p>
-            </DialogueBox>
-          </section>
-          <Choices>
-            <Choice primary onClick={() => setScreen({ name: "about", cocktailId: c.id })}>
-              {COPY.readAbout}
-            </Choice>
-            <Choice onClick={() => pick("ordered")}>{COPY.differentCocktail}</Choice>
-            <Choice onClick={() => setScreen({ name: "host" })}>{COPY.backToHost}</Choice>
-          </Choices>
-        </Stage>
-      ) : (
-        <Missing onBack={() => setScreen({ name: "host" })} />
-      );
-      break;
-    }
+  function speak(next: Scene) {
+    setScene(next);
+    setStep(0);
+    setPhase("bar");
   }
 
+  // He talks while a bubble is fresh, then settles into idle.
+  const current = scene.lines[step] ?? "";
+  useEffect(() => {
+    if (phase !== "bar" || !current) return;
+    setPose(scene.greet && step === 0 ? "greeting" : "talking");
+    const words = current.split(/\s+/).length;
+    const t = window.setTimeout(() => setPose("idle"), Math.min(4200, 900 + words * 140));
+    return () => window.clearTimeout(t);
+  }, [phase, current, step, scene.greet]);
+
+  // ─── The main question ─────────────────────────────────────────────────────
+
+  const signupDue = (m: GuestMemory | null) =>
+    Boolean(m && !m.signup && !askedSignup.current && (m.recipes.length > 0 || m.finished.length > 0));
+
+  function mainReplies(): Reply[] {
+    return [
+      { label: REPLIES.recipe, run: startRecipes },
+      { label: REPLIES.tale, run: startTale },
+      { label: REPLIES.done, run: farewell, quiet: true },
+    ];
+  }
+
+  /** Back at the bar: ask about the mailing list if it's time, else what's next. */
+  function backAtBar(prefix: string[] = [], m: GuestMemory | null = readMemory(menuId)) {
+    if (signupDue(m)) return askSignup(prefix);
+    speak({ lines: [...prefix, ...line("same_visit_return_to_main")], replies: mainReplies() });
+  }
+
+  function farewell() {
+    speak({
+      lines: line("farewell"),
+      replies: [{ label: "Actually, one more thing", run: () => backAtBar() }],
+    });
+  }
+
+  // ─── Arriving ──────────────────────────────────────────────────────────────
+
+  async function enter() {
+    const prior = beginVisit(menuId);
+    setMem(readMemory(menuId));
+    const question = line("intent_prompt");
+
+    if (prior.visits === 0) {
+      speak({ lines: [...line("fresh_welcome"), ...question], replies: mainReplies(), greet: true });
+      return;
+    }
+
+    // A return visit. The catalog names their last tale; if it can't load,
+    // greet them without the callback rather than not at all.
+    setPhase("bar");
+    setScene({ lines: ["…"], replies: [] });
+    const catalog = await loadCatalog().catch(() => null);
+    const find = (id: string | null) => catalog?.find((t) => t.id === id) ?? null;
+
+    const mark = latestBookmark(prior);
+    const marked = mark && find(mark.id);
+    if (mark && marked) {
+      speak({
+        lines: [...line("returning_guest_welcome"), ...line("resume_unfinished_story")],
+        replies: [
+          { label: REPLIES.resume, run: () => openTale(marked, mark.bookmark.progress) },
+          { label: REPLIES.somethingElse, run: () => speak({ lines: question, replies: mainReplies() }) },
+        ],
+        greet: true,
+      });
+      return;
+    }
+
+    const last = find(prior.lastFinished);
+    const lines = last
+      ? [
+          ...line("returning_guest_welcome"),
+          last.host.callback,
+          ...(prior.recipes.length ? line("both_story_and_recipe_connective") : []),
+        ]
+      : prior.recipes.length
+        ? [...line("returning_guest_welcome"), ...line("recipe_shared_return_callback")]
+        : line("unknown_history_greeting");
+    speak({ lines: [...lines, ...question], replies: mainReplies(), greet: true });
+  }
+
+  // ─── Recipes ───────────────────────────────────────────────────────────────
+
+  function startRecipes() {
+    setWritingLine(line("recipe_writing")[0]);
+    setPhase("writing");
+    setPose("writing");
+    later(showRecipes, 2400);
+  }
+
+  function showRecipes() {
+    setRecipeLine(line("recipe_ready")[0]);
+    setPhase((p) => (p === "writing" ? "recipes" : p));
+    // Seeing the recipes counts as being given one, for "how did it turn out?" next visit.
+    remember((m) => ({ ...m, recipes: m.recipes.includes("*") ? m.recipes : [...m.recipes, "*"] }));
+  }
+
+  function downloaded(c: PopupCocktail) {
+    remember((m) => ({ ...m, recipes: m.recipes.includes(c.id) ? m.recipes : [...m.recipes, c.id] }));
+  }
+
+  // ─── Tales ─────────────────────────────────────────────────────────────────
+
+  function askTime(prefix: string[] = []) {
+    void loadCatalog().catch(() => null); // warm it while they choose
+    speak({
+      lines: [...prefix, ...line("time_prompt")],
+      replies: [
+        ...TIME_CHOICES.map((t) => ({ label: t.label, run: () => chooseTime(t.id) })),
+        { label: REPLIES.changedMind, run: changedMind, quiet: true },
+      ],
+    });
+  }
+
+  function startTale() {
+    askTime();
+  }
+
+  function chooseTime(t: TimeId) {
+    time.current = t;
+    askScare(t === "all_the_time" ? line("all_the_time_response") : []);
+  }
+
+  function askScare(prefix: string[] = []) {
+    speak({
+      lines: [...prefix, ...line("scare_prompt")],
+      replies: SCARE_CHOICES.map((s) => ({ label: s.label, run: () => chooseScare(s.id) })),
+    });
+  }
+
+  function chooseScare(s: ScareId) {
+    scare.current = s;
+    setScene({ lines: line("story_thinking"), replies: [] });
+    setStep(0);
+    setPhase("thinking");
+    setPose("thinking");
+    later(() => void pitch(), 1800);
+  }
+
+  function changedMind() {
+    backAtBar(line("story_changed_mind"));
+  }
+
+  const changeChoice: Reply = {
+    label: REPLIES.changeChoices,
+    run: () => askTime(line("new_search_transition")),
+    quiet: true,
+  };
+
+  async function pitch(prefix: string[] = [], tale?: TaleCard) {
+    let catalog: TaleCard[];
+    try {
+      catalog = await loadCatalog();
+    } catch {
+      speak({
+        lines: ["My collection seems to be stuck in the cellar. Check your connection and we'll try again."],
+        replies: [
+          { label: "Try again", run: () => void pitch(prefix) },
+          { label: REPLIES.backToBar, run: () => backAtBar(), quiet: true },
+        ],
+      });
+      return;
+    }
+
+    const finished = new Set(readMemory(menuId).finished);
+    const pick = tale ? { kind: "tale" as const, tale } : pickTale(catalog, time.current, scare.current, finished, offered.current);
+
+    if (pick.kind === "tale") {
+      const t = pick.tale;
+      offered.current.add(t.id);
+      speak({
+        lines: [
+          ...prefix,
+          ...(t.underFive && time.current === "five_to_ten" ? line("under_five_minutes_leadin") : []),
+          t.host.introduction,
+          t.host.teaser,
+          `${t.host.offerQuestion} (About ${t.readMinutes} minute${t.readMinutes === 1 ? "" : "s"} to read.)`,
+        ],
+        replies: [
+          { label: REPLIES.accept, run: () => openTale(t, 0) },
+          { label: REPLIES.another, run: () => void pitch(line("decline_and_offer_another")) },
+          changeChoice,
+          { label: REPLIES.changedMind, run: changedMind, quiet: true },
+        ],
+      });
+      return;
+    }
+
+    if (pick.kind === "none") {
+      speak({
+        lines: [...prefix, ...line("no_matching_story")],
+        replies: [
+          { label: "Change the time", run: () => askTime() },
+          { label: "Change the scare level", run: () => askScare() },
+          { label: REPLIES.backToBar, run: () => backAtBar(), quiet: true },
+        ],
+      });
+      return;
+    }
+
+    const revisit: Reply =
+      pick.kind === "allHeard"
+        ? {
+            label: REPLIES.revisit,
+            run: () => {
+              const again = pickAny(catalog, time.current, scare.current);
+              if (again) void pitch([], again);
+            },
+          }
+        : {
+            label: REPLIES.revisitOffered,
+            run: () => {
+              offered.current.clear();
+              void pitch();
+            },
+          };
+    speak({
+      lines: [...prefix, ...line(pick.kind === "allHeard" ? "all_matching_stories_heard" : "all_matching_stories_offered")],
+      replies: [revisit, changeChoice, { label: REPLIES.recipesInstead, run: startRecipes, quiet: true }],
+    });
+  }
+
+  function openTale(card: TaleCard, startAt: number) {
+    reachedEnd.current = false;
+    setReading({ card, startAt });
+    setPhase("wavy");
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    later(() => setPhase((p) => (p === "wavy" ? "reader" : p)), reduced ? 250 : WAVY_MS);
+  }
+
+  const saveProgress = useCallback(
+    (progress: number) => {
+      if (!reading) return false;
+      if (reachedEnd.current) return true;
+      const { id, contentVersion } = reading.card;
+      return remember((m) => ({
+        ...m,
+        bookmarks: { ...m.bookmarks, [id]: { contentVersion, progress, at: new Date().toISOString() } },
+      }));
+    },
+    [reading, remember]
+  );
+
+  const finishedTale = useCallback(() => {
+    if (!reading) return;
+    reachedEnd.current = true;
+    const id = reading.card.id;
+    remember((m) => {
+      const bookmarks = { ...m.bookmarks };
+      delete bookmarks[id];
+      return { ...m, bookmarks, lastFinished: id, finished: m.finished.includes(id) ? m.finished : [...m.finished, id] };
+    });
+  }, [reading, remember]);
+
+  const exitTale = useCallback(
+    (progress: number, done: boolean) => {
+      setReading(null);
+      if (done) {
+        const m = readMemory(menuId);
+        if (signupDue(m)) return askSignup(line("story_completion_outro").slice(0, 1));
+        speak({
+          lines: line("story_completion_outro"),
+          replies: [
+            { label: "Another spooky tale", run: () => askTime() },
+            { label: REPLIES.recipe, run: startRecipes },
+            { label: REPLIES.backToBar, run: () => backAtBar(), quiet: true },
+          ],
+        });
+        return;
+      }
+      saveProgress(progress);
+      backAtBar(line("story_left_early"));
+    },
+    // The helpers above are plain functions over refs and stable setters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [menuId, saveProgress]
+  );
+
+  // ─── The mailing list ──────────────────────────────────────────────────────
+
+  function askSignup(prefix: string[] = []) {
+    askedSignup.current = true;
+    speak({
+      lines: [...prefix, ...line("email_signup_ask")],
+      replies: [
+        { label: REPLIES.signupYes, run: () => speak({ lines: line("email_signup_ask_email"), replies: [], emailForm: true }) },
+        { label: REPLIES.signupNo, run: declineSignup, quiet: true },
+      ],
+    });
+  }
+
+  function declineSignup() {
+    remember((m) => ({ ...m, signup: "declined" }));
+    backAtBar(line("email_signup_declined"));
+  }
+
+  function joined() {
+    remember((m) => ({ ...m, signup: "joined" }));
+    speak({ lines: [...line("email_signup_thanks"), ...line("same_visit_return_to_main")], replies: mainReplies() });
+  }
+
+  // ─── Rendering ─────────────────────────────────────────────────────────────
+
+  const lastStep = step >= scene.lines.length - 1;
+  const showBar = phase === "bar" || phase === "thinking" || phase === "writing" || phase === "wavy" || phase === "reader";
+
   return (
-    <div className="relative min-h-[calc(100dvh-49px)] bg-black text-white overflow-x-hidden">
-      {/* A faint vignette, so pure black doesn't read as a page that failed to load. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{ background: "radial-gradient(120% 80% at 50% 0%, #1c1c1c 0%, #000 70%)" }}
-      />
-      <div className="relative">
-        {!isLive && !isSandbox && (
-          <p className={`${voiceFont.className} pt-4 text-center text-[12px] tracking-[0.2em] uppercase text-white/45`}>
-            This pop-up has ended
-          </p>
-        )}
-        {body}
-      </div>
+    <div className="relative h-[calc(100dvh-49px)] bg-black text-white overflow-hidden">
+      <WavyFilter />
+
+      {phase === "logo" && <Logo onEnter={() => void enter()} />}
+
+      {phase === "recipes" && (
+        <Recipes
+          cocktails={cocktails}
+          line={recipeLine}
+          onDownload={downloaded}
+          onBack={() => backAtBar()}
+        />
+      )}
+
+      {showBar && (
+        <div
+          className={`h-full flex flex-col ${phase === "wavy" ? "creepy-wavy" : ""}`}
+          aria-hidden={phase === "reader"}
+        >
+          <div className="shrink-0 px-4 pt-4 pb-4 max-h-[46%] overflow-y-auto">
+            {phase === "writing" ? (
+              <SpeechBubble onNext={showRecipes}>{writingLine}</SpeechBubble>
+            ) : current ? (
+              <SpeechBubble onNext={lastStep ? undefined : () => setStep((s) => s + 1)}>{current}</SpeechBubble>
+            ) : null}
+          </div>
+
+          <div className="flex-1 min-h-[96px] pt-1 px-6">
+            <Bartender pose={pose} />
+          </div>
+
+          <div className="shrink-0 px-4 pb-4 pt-3 max-h-[46%] overflow-y-auto flex flex-col gap-2">
+            {phase === "bar" && !lastStep && (
+              <Choice quiet onClick={() => setStep((s) => s + 1)}>
+                {REPLIES.next}
+              </Choice>
+            )}
+            {phase === "bar" && lastStep && scene.emailForm && (
+              <EmailForm menuId={menuId} onJoined={joined} onCancel={declineSignup} />
+            )}
+            {phase === "bar" &&
+              lastStep &&
+              scene.replies.map((r) => (
+                <Choice key={r.label} quiet={r.quiet} onClick={r.run}>
+                  {r.label}
+                </Choice>
+              ))}
+          </div>
+        </div>
+      )}
+
+      {phase === "reader" && reading && mem && (
+        <Reader
+          card={reading.card}
+          startAt={reading.startAt}
+          textScale={mem.textScale}
+          onTextScale={(textScale) => remember((m) => ({ ...m, textScale }))}
+          onProgress={saveProgress}
+          onFinished={finishedTale}
+          onExit={exitTale}
+        />
+      )}
+
+      {isSandbox && (
+        <button
+          type="button"
+          onClick={() => {
+            forgetEverything(menuId);
+            window.location.reload();
+          }}
+          className={`${voiceFont.className} absolute left-2 bottom-2 z-[80] bg-amber-400 text-black text-[11px] px-2 py-1 rounded`}
+        >
+          Sandbox: forget this phone
+        </button>
+      )}
     </div>
   );
 }
 
-// ─── Screens and pieces ──────────────────────────────────────────────────────
+// ─── Pieces ──────────────────────────────────────────────────────────────────
 
-function Entrance({ onEnter }: { onEnter: () => void }) {
+function Logo({ onEnter }: { onEnter: () => void }) {
   return (
-    <div className="min-h-[calc(100dvh-49px)] flex flex-col items-center justify-center px-5 py-12 text-center">
+    <div className="h-full flex flex-col items-center justify-center px-6 text-center">
       {LOGO_SRC ? (
-        // eslint-disable-next-line @next/next/no-img-element -- pixel art, served as-is (see StartScreen)
+        // eslint-disable-next-line @next/next/no-img-element -- pixel art, served as-is
         <img
           src={LOGO_SRC}
-          alt="Cocktail Creepypastas"
+          alt="Common Good Presents: Cocktail Creepypastas"
           className="w-full max-w-[520px] h-auto"
           style={{ imageRendering: "pixelated" }}
         />
       ) : (
-        <h1
-          className={`${titleFont.className} text-[56px] sm:text-[76px] leading-[0.95] text-white`}
-          style={{ textShadow: "4px 4px 0 #3b3b3b" }}
-        >
-          Cocktail
-          <br />
-          Creepypastas
+        <h1 className={voiceFont.className}>
+          <span className="block text-[13px] tracking-[0.35em] text-white/70">COMMON GOOD PRESENTS</span>
+          <span className="block mt-3 text-[44px] sm:text-[60px] leading-[0.95]">
+            COCKTAIL
+            <br />
+            CREEPYPASTAS
+          </span>
         </h1>
       )}
-      <p className={`${voiceFont.className} mt-5 text-[15px] text-white/60`}>{COPY.enterNote}</p>
-
-      <div className="mt-10 w-full max-w-[360px]">
-        <button
-          type="button"
-          onClick={onEnter}
-          autoFocus
-          className={`${voiceFont.className} w-full min-h-[64px] px-5 py-4 text-[20px] leading-snug bg-black text-white border-[3px] border-white rounded-[6px]
-            [@media(hover:hover)]:hover:bg-white [@media(hover:hover)]:hover:text-black focus:outline-none focus-visible:bg-white focus-visible:text-black transition-colors`}
-          style={{ boxShadow: "0 0 0 3px #000, 0 0 0 5px rgba(255,255,255,0.35)" }}
-        >
-          {COPY.enter}
-        </button>
+      <div className="mt-12 w-full max-w-[300px]">
+        <Choice onClick={onEnter}>
+          <span className="block w-full text-center">{REPLIES.enter}</span>
+        </Choice>
       </div>
     </div>
   );
 }
 
 /**
- * One screen of the conversation. When it appears, focus moves to it so a
- * keyboard or screen-reader user starts at the new text, not wherever the
- * button they pressed used to be. No fade or typewriter: each passage shows
- * at once (the brief asks for that, and an animation starting at opacity 0
- * stays invisible in a tab the browser has paused).
+ * The screen ripples and blurs as he starts the tale. An SVG displacement
+ * filter does the ripple; the CSS animation adds blur and dims to black.
+ * Skipped for reduced motion. The reader replaces it on a timer, never on an
+ * animation event, so a paused background tab can't strand anyone here.
  */
-function Stage({ screenKey, children }: { screenKey: string; children: ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    ref.current?.focus({ preventScroll: true });
-    window.scrollTo({ top: 0 });
-  }, [screenKey]);
-
+function WavyFilter() {
   return (
-    <div
-      ref={ref}
-      tabIndex={-1}
-      className="mx-auto w-full max-w-[540px] px-4 pt-6 pb-12 focus:outline-none"
-    >
-      {children}
-    </div>
+    <>
+      <svg width="0" height="0" className="absolute" aria-hidden>
+        <filter id="creepy-wave">
+          <feTurbulence type="fractalNoise" baseFrequency="0.012 0.06" numOctaves="2" seed="7">
+            <animate attributeName="baseFrequency" dur="1.1s" values="0.012 0.06;0.02 0.12;0.012 0.06" repeatCount="indefinite" />
+          </feTurbulence>
+          <feDisplacementMap in="SourceGraphic" scale="0">
+            <animate attributeName="scale" dur="1.1s" values="0;60" fill="freeze" />
+          </feDisplacementMap>
+        </filter>
+      </svg>
+      <style>{`
+        .creepy-wavy { animation: creepy-wavy ${WAVY_MS}ms ease-in forwards; }
+        @keyframes creepy-wavy {
+          0%   { filter: url(#creepy-wave) blur(0); opacity: 1; }
+          100% { filter: url(#creepy-wave) blur(10px); opacity: 0; }
+        }
+        @media (prefers-reduced-motion: reduce) { .creepy-wavy { animation: none; opacity: 0; } }
+      `}</style>
+    </>
   );
 }
 
-function Choices({ children, label }: { children: ReactNode; label?: string }) {
+function EmailForm({ menuId, onJoined, onCancel }: { menuId: string; onJoined: () => void; onCancel: () => void }) {
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/popup/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, menuId, website: "" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "That didn't go through. Please try again.");
+      onJoined();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "That didn't go through. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
-    <div role="group" aria-label={label ?? "Your response"} className="mt-6 flex flex-col gap-2.5">
-      {children}
-    </div>
-  );
-}
-
-function Footer({ children }: { children: ReactNode }) {
-  return <div className="mt-4 flex items-center justify-between gap-3">{children}</div>;
-}
-
-/** "In the glass" and "In the tale": the drink's facts and the story's pitch, kept apart. */
-function CocktailFacts({ cocktail: c }: { cocktail: PopupCocktail }) {
-  const glass = [c.description, c.ingredients].filter((s): s is string => Boolean(s?.trim()));
-  const tale = c.story?.trim();
-
-  return (
-    <section aria-labelledby="about-name" className="mt-6">
-      <h2 id="about-name" className={`${titleFont.className} text-[34px] leading-tight text-white`}>
-        {c.name}
-      </h2>
-      {c.tagline && <p className={`${readFont.className} italic text-white/65 mt-1`}>{c.tagline}</p>}
-
-      <div className="mt-4 grid gap-3">
-        <FactBlock title={COPY.inTheGlass}>
-          {glass.length ? (
-            <>
-              {c.description?.trim() && <Paragraphs text={c.description} />}
-              {c.ingredients?.trim() && (
-                <p className="mt-2 text-white/70 text-[15px]">
-                  <span className="sr-only">Ingredients: </span>
-                  {c.ingredients}
-                </p>
-              )}
-            </>
-          ) : (
-            <p className="text-white/50 italic">{COPY.glassPending}</p>
-          )}
-        </FactBlock>
-        <FactBlock title={COPY.inTheTale}>
-          {tale ? <Paragraphs text={tale} /> : <p className="text-white/50 italic">{COPY.talePending}</p>}
-        </FactBlock>
-      </div>
-    </section>
-  );
-}
-
-function FactBlock({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <div className="border-2 border-white/35 rounded-[4px] px-4 py-3.5">
-      <h3 className={`${voiceFont.className} text-[13px] tracking-[0.18em] uppercase text-white/60`}>{title}</h3>
-      <div className={`${readFont.className} mt-2 text-[16px] leading-relaxed text-white/90`}>{children}</div>
-    </div>
-  );
-}
-
-/** Blank lines in the admin start a new paragraph, as everywhere else in the zone. */
-function Paragraphs({ text }: { text: string }) {
-  return (
-    <div className="space-y-2">
-      {text
-        .split(/\n\s*\n/)
-        .map((p) => p.trim())
-        .filter(Boolean)
-        .map((p, i) => (
-          <p key={i}>{p}</p>
-        ))}
-    </div>
-  );
-}
-
-function ServiceNote() {
-  return <p className={`${readFont.className} mt-6 text-[13px] leading-relaxed text-white/45`}>{COPY.serviceNote}</p>;
-}
-
-function Missing({ onBack }: { onBack: () => void }) {
-  return (
-    <Stage screenKey="missing">
-      <DialogueBox>
-        <p className={`${readFont.className} text-white/85`}>That cocktail isn&apos;t on the menu any more.</p>
-      </DialogueBox>
-      <Choices>
-        <Choice primary onClick={onBack}>
-          {COPY.backToHost}
-        </Choice>
-      </Choices>
-    </Stage>
+    <form onSubmit={submit} className="flex flex-col gap-2" noValidate>
+      <label htmlFor="creepy-email" className={`${voiceFont.className} text-[14px] text-white/70`}>
+        Your email
+      </label>
+      <input
+        id="creepy-email"
+        type="email"
+        inputMode="email"
+        autoComplete="email"
+        required
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? "creepy-email-error" : undefined}
+        className="w-full min-h-[48px] px-3 bg-black border-2 border-white rounded-[6px] text-[17px] text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+      />
+      {error && (
+        <p id="creepy-email-error" className={`${voiceFont.className} text-[14px] text-white`} role="alert">
+          {error}
+        </p>
+      )}
+      <button
+        type="submit"
+        disabled={busy || !email.trim()}
+        className={`${voiceFont.className} min-h-[48px] rounded-[6px] bg-white text-black text-[17px] disabled:opacity-40`}
+      >
+        {busy ? "Adding you…" : "Add me to the ledger"}
+      </button>
+      <Choice quiet onClick={onCancel}>
+        Never mind
+      </Choice>
+      <p className="text-[12px] text-white/45">
+        Just news about Common Good pop-ups and events. Unsubscribe anytime.
+      </p>
+    </form>
   );
 }

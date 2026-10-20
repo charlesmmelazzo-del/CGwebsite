@@ -1,168 +1,123 @@
-// ─── Cocktail Creepypastas — everything the Host says ────────────────────────
+// ─── Cocktail Creepypastas — everything the bartender says ───────────────────
 //
-// ALL of his dialogue lives here, as content, so it can be rewritten without
-// touching a component. This is first-draft copy from the design handoff —
-// editable, not final. "The Host" is a placeholder until he has a name.
+// His lines come from dialogue.json, which scripts/creepypastas-import.mjs
+// writes from ChatGPT's corpus. Each moment has a few alternatives; one is
+// drawn per occasion (see lineRotation.ts).
 //
-// Every line has a stable id. Ids are what the rotation remembers, so reword a
-// line freely but don't reuse an old id for a different line.
-//
-// Voice rules (from the handoff): grand and velvet-voiced, then a cheap shot.
-// Tease bravery and taste, never appearance, identity or drinking. "Spoopy" is
-// a promise as well as an insult — nothing here may get genuinely scary.
-// No souls, possession, ghosts, summoning or anything spiritual.
+// FALLBACK covers moments the corpus doesn't have yet. When ChatGPT's next
+// pass supplies a moment with the same key, its lines win automatically.
 
-export const HOST_NAME = "The Host";
-
-/** Portrait slots. Any of them may be missing art — the box still works. */
-export type Expression =
-  | "neutral"
-  | "appraising"
-  | "smug"
-  | "mockConcern"
-  | "unamused"
-  | "quietWarning";
-
-/**
- * One beat of a passage. `say` is his speech; `direction` is an italic stage
- * direction. Wrap a word in **double asterisks** to emphasise it.
- */
-export type Beat = { say: string } | { direction: string };
+import DIALOGUE from "./dialogue.json";
+import { drawFrom } from "./lineRotation";
 
 export interface HostLine {
   id: string;
-  expression?: Expression;
-  beats: Beat[];
+  /** One speech bubble each, shown in order. */
+  lines: string[];
+  /** The guest's replies the corpus suggests. The UI may use its own. */
+  choices?: string[];
 }
 
-const line = (id: string, text: string, expression?: Expression): HostLine => ({
-  id,
-  expression,
-  beats: [{ say: text }],
-});
+export type Moment =
+  | "fresh_welcome"
+  | "intent_prompt"
+  | "time_prompt"
+  | "scare_prompt"
+  | "returning_guest_welcome"
+  | "recipe_shared_return_callback"
+  | "both_story_and_recipe_connective"
+  | "resume_unfinished_story"
+  | "decline_and_offer_another"
+  | "new_search_transition"
+  | "no_matching_story"
+  | "all_matching_stories_heard"
+  | "story_completion_outro"
+  | "all_the_time_response"
+  | "under_five_minutes_leadin"
+  | "unknown_history_greeting"
+  | "same_visit_return_to_main"
+  | "farewell"
+  | "recipe_menu_intro"
+  | "recipe_ready"
+  | "recipe_download_started"
+  | "all_matching_stories_offered"
+  // Not in the corpus yet — FALLBACK until ChatGPT's pass adds them.
+  | "email_signup_ask"
+  | "email_signup_ask_email"
+  | "email_signup_thanks"
+  | "email_signup_declined"
+  | "story_left_early"
+  | "story_changed_mind"
+  | "recipe_writing"
+  | "story_thinking";
 
-// ─── First visit: the three-panel introduction ───────────────────────────────
+const one = (id: string, text: string): HostLine => ({ id, lines: [text] });
 
-export const INTRO_PANELS: HostLine[] = [
-  {
-    id: "intro.1",
-    expression: "appraising",
-    beats: [
-      { direction: "He lowers his book and studies you for a moment." },
-      { say: "Ah. There you are." },
-      { say: "Yes. We'll use the lighter material." },
-    ],
-  },
-  {
-    id: "intro.2",
-    expression: "smug",
-    beats: [
-      {
-        say: "Welcome to Cocktail Creepypastas. Four cocktails. Four tales. Ordinarily, I would warn you that what follows is not for the faint of heart.",
-      },
-      { say: "Fortunately, I've made accommodations." },
-    ],
-  },
-  {
-    id: "intro.3",
-    expression: "mockConcern",
-    beats: [
-      { say: "Tonight's selection never ventures into horror. Not even spooky." },
-      { say: "**Spoopy.**" },
-      { direction: "He looks faintly offended by the word." },
-      {
-        say: "I don't want you crying into a perfectly good cocktail. The dilution alone would be unforgivable.",
-      },
-    ],
-  },
-];
-
-/** Closes the introduction, and follows every greeting. */
-export const MAIN_QUESTION = "Now. What did you order?";
-export const MAIN_QUESTION_SHORT = "What did you order?";
-
-// ─── Rotating pools ──────────────────────────────────────────────────────────
-// One line is drawn per meaningful event, without repeats until a pool runs
-// out (see lineRotation.ts).
-
-export const POOLS = {
-  /** A generic welcome — safe for anyone. */
-  "welcome.short": [
-    line("welcome.short.1", "Come in. I had higher expectations, but you've arrived, so we shall proceed."),
-    line("welcome.short.2", "Welcome. Please leave your disbelief at the door. Your confidence can go beside it.", "smug"),
-    line("welcome.short.3", "Ah, an audience. That explains the sudden pressure to simplify.", "appraising"),
-    line("welcome.short.4", "There you are. I've selected something appropriate to your apparent level of preparedness."),
-    line("welcome.short.5", "Make yourself comfortable. I see you've already made yourself optimistic.", "smug"),
-    line("welcome.short.6", "Four tales await. Do take your time. Choosing is the last part that happens entirely on your terms.", "quietWarning"),
-    line("welcome.short.7", "Welcome to Cocktail Creepypastas. I've done the difficult part. Let's see how you handle selecting a drink."),
-    line("welcome.short.8", "Step closer. I prefer to see the confidence before it leaves.", "quietWarning"),
-    line("welcome.short.9", "You look ready. Fortunately, looks have never been a requirement.", "smug"),
-    line("welcome.short.10", "A little suspense. A few poor decisions. I've every confidence you'll contribute."),
-    line("welcome.short.11", "I've prepared an evening of restrained dread. For this audience, restraint seemed prudent.", "appraising"),
-    line("welcome.short.12", "Come in. Nothing tonight exceeds spoopy. I know my audience, champ.", "smug"),
+/** Stand-in lines, written to match the corpus voice. Replace freely. */
+const FALLBACK: Partial<Record<Moment, HostLine[]>> = {
+  email_signup_ask: [
+    one("fb_signup_ask_01", "Before you wander off: shall I send word when Common Good opens its next pop-up? I keep a ledger for friends of the bar."),
+    one("fb_signup_ask_02", "I do enjoy a returning face. Would you like to hear about our next pop-ups and the odd bit of Common Good news?"),
   ],
-  /** Only for someone who has been here before on this browser. */
-  "welcome.returning": [
-    line("welcome.returning.1", "Back again. Either you enjoyed yourself or you're determined to prove something. Both are excellent for attendance.", "smug"),
-    line("welcome.returning.2", "Ah. A returning reader. We shall put that under progress."),
-    line("welcome.returning.3", "You again. Wonderful. I was beginning to miss having my expectations tested.", "unamused"),
-    line("welcome.returning.4", "Still spoopy. I haven't raised the difficulty behind your back. You seem quite capable of doing that yourself."),
-    line("welcome.returning.5", "Welcome back. Shall we try a different tale, or a different standard of judgment?", "appraising"),
-    line("welcome.returning.6", "Another visit. Your curiosity remains in excellent health."),
-    line("welcome.returning.7", "There you are. I've kept the material at your level.", "smug"),
-    line("welcome.returning.8", "Ah, a familiar face. We can dispense with the optimistic first impression.", "unamused"),
+  email_signup_ask_email: [
+    one("fb_signup_email_01", "Splendid. Write your email in my ledger and I'll see the word reaches you."),
   ],
-  /** "I haven't ordered yet." */
-  "browse.entry": [
-    line("browse.entry.1", "Still deciding? Of course. Four options. A brutal little gauntlet. Pick one that interests you.", "mockConcern"),
-    line("browse.entry.2", "An informed decision. How refreshing. Which drink shall we discuss?", "appraising"),
-    line("browse.entry.3", "I can explain what is in the glass and what awaits in the tale. The rest will depend on you. An imperfect arrangement, but there it is."),
-    line("browse.entry.4", "Take your time. It's rather touching to see someone investigate before getting involved.", "smug"),
+  email_signup_thanks: [
+    one("fb_signup_thanks_01", "There. You're in the ledger now. Rather better company than most of its pages."),
+    one("fb_signup_thanks_02", "Noted, in my very best handwriting. You'll hear from us."),
   ],
-  /** "I've ordered a cocktail." — DRAFT lines, not from the handoff. */
-  "order.which": [
-    line("order.which.1", "Splendid. And which one did you settle on?"),
-    line("order.which.2", "A decision has already been made. Remarkable. Which was it?", "appraising"),
-    line("order.which.3", "Name your drink. I'll try to look surprised.", "smug"),
+  email_signup_declined: [
+    one("fb_signup_declined_01", "No matter at all. The bar will be here either way. It always is."),
+    one("fb_signup_declined_02", "Of course. Some guests prefer to simply turn up. I admire that."),
   ],
-  /** A cocktail picked from the "ordered" list. */
-  "cocktail.selected": [
-    line("cocktail.selected.1", "An interesting choice. I'll reserve judgment until I see what you do with it.", "appraising"),
-    line("cocktail.selected.2", "Very well. Let's find out whether your confidence travels."),
-    line("cocktail.selected.3", "That one? Certainly. I admire a decision made with so little visible hesitation.", "smug"),
-    line("cocktail.selected.4", "A promising beginning. Do try not to make it the high point.", "smug"),
+  story_left_early: [
+    one("fb_left_early_01", "I've marked your place. The tale will keep; they always do."),
+    one("fb_left_early_02", "Stepping away mid-story? Wise, sometimes. Your page is saved for when you're ready."),
   ],
-  /** Asides about the tone, for quiet moments. */
-  "tone.spoopy": [
-    line("tone.spoopy.1", "Spoopy. I've practically put little socks on the monsters.", "smug"),
-    line("tone.spoopy.2", "Not horror. Not even spooky. I refuse to have this evening complicated by whimpering.", "unamused"),
-    line("tone.spoopy.3", "You're quite safe from anything genuinely dreadful. Your own judgment remains an exception.", "quietWarning"),
+  story_changed_mind: [
+    one("fb_changed_mind_01", "Perfectly all right. Some stories are better saved for another night."),
   ],
-} satisfies Record<string, HostLine[]>;
+  recipe_writing: [
+    one("fb_recipe_writing_01", "Let me write that down for you. My handwriting has survived worse than a busy bar."),
+    one("fb_recipe_writing_02", "One moment. A good recipe deserves to be written out properly."),
+  ],
+  story_thinking: [
+    one("fb_thinking_01", "Now then. Which tale… let me think."),
+    one("fb_thinking_02", "Hmm. I know just the one. Or I will, in a moment."),
+  ],
+};
 
-export type PoolKey = keyof typeof POOLS;
+const CORPUS = DIALOGUE as unknown as Partial<Record<Moment, HostLine[]>>;
 
-// ─── Plain-language interface copy ───────────────────────────────────────────
-// The performance sits on top; these say what's actually going on.
+export function linesFor(moment: Moment): HostLine[] {
+  const fromCorpus = CORPUS[moment];
+  return fromCorpus?.length ? fromCorpus : FALLBACK[moment] ?? [];
+}
 
-export const COPY = {
-  enter: "Click here to enter… if you dare!",
-  enterNote: "Four cocktails. Four tales. A Common Good pop-up.",
-  skipIntro: "Skip introduction",
-  hearIntro: "Hear the introduction",
+/** Draw one alternative for a moment — call when it happens, not on render. */
+export function say(menuId: string, moment: Moment): HostLine {
+  return drawFrom(menuId, moment, linesFor(moment));
+}
+
+// ─── The guest's side ────────────────────────────────────────────────────────
+// Plain wording, so a tap target always says exactly what it does.
+
+export const REPLIES = {
+  enter: "Tap to enter",
   next: "Next",
-  ordered: "I've ordered a cocktail.",
-  notOrdered: "I haven't ordered yet.",
-  backToHost: "Back to the host",
-  differentCocktail: "Choose a different cocktail",
-  readAbout: "Read about this cocktail",
-  anotherCocktail: "Tell me about another.",
-  orderedThis: "I've ordered this — enter my ticket.",
-  inTheGlass: "In the glass",
-  inTheTale: "In the tale",
-  glassPending: "The drink description is still being finalized. Ask your bartender what's in it.",
-  talePending: "This story is still being written.",
-  serviceNote:
-    "Order your drink at the bar as usual. It comes with a ticket that unlocks its story. This website does not place drink orders.",
-  noCocktails: "The cocktails haven't been announced yet. Check back soon.",
+  recipe: "A cocktail recipe",
+  tale: "A spooky tale",
+  accept: "Yes, I'd love to hear it",
+  another: "Tell me a different tale",
+  changeChoices: "Change time or scare level",
+  changedMind: "I changed my mind",
+  resume: "Pick up where I left off",
+  somethingElse: "Choose something else",
+  revisit: "Hear a favourite again",
+  revisitOffered: "Show me those again",
+  recipesInstead: "A recipe instead",
+  backToBar: "Back to the bar",
+  signupYes: "Yes, keep me posted",
+  signupNo: "No thanks",
+  done: "That's all for now",
 };

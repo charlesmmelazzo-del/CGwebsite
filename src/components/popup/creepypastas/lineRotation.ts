@@ -1,14 +1,12 @@
-// ─── Cocktail Creepypastas — choosing what the Host says ─────────────────────
+// ─── Cocktail Creepypastas — rotating the bartender's lines ──────────────────
 //
-// Each pool is a shuffled deck: lines are drawn without repeats until the deck
-// runs out, then it's reshuffled — never starting on the line that just ended
-// the last deck. The deck is kept in localStorage per browser, so a reload
-// moves on to a new line rather than repeating the first one.
+// Each moment has several alternative lines. They're dealt like a shuffled
+// deck: no repeats until the deck runs out, then a reshuffle that never starts
+// on the line that just ended the last one. The deck is kept in localStorage,
+// so a reload or a return visit moves on to a new line.
 //
-// Call drawLine() when something HAPPENS (arriving, choosing to browse), never
-// during render — the line on screen has to stay put while the guest reads it.
-
-import { POOLS, type HostLine, type PoolKey } from "./hostDialogue";
+// Draw a line when something HAPPENS (arriving, choosing), never during render:
+// the line on screen has to stay put while the guest reads it.
 
 const NS = "creepypastas:v1";
 
@@ -37,9 +35,8 @@ export const store = {
 };
 
 interface Deck {
-  /** Line ids still to come, next one last. */
+  /** Ids still to come, next one last. */
   left: string[];
-  /** The line most recently drawn. */
   last: string | null;
 }
 
@@ -55,18 +52,18 @@ function shuffle<T>(items: T[]): T[] {
   return a;
 }
 
-/** Draw the next line from one or more pools, treated as a single deck. */
-export function drawLine(menuId: string, ...pools: PoolKey[]): HostLine {
-  const lines = pools.flatMap((p) => POOLS[p]);
-  const byId = new Map(lines.map((l) => [l.id, l]));
-  const key = `${menuId}:deck:${pools.join("+")}`;
+/** Draw the next of `options` for the moment called `deckName`. */
+export function drawFrom<T extends { id: string }>(menuId: string, deckName: string, options: T[]): T {
+  if (options.length === 0) throw new Error(`No lines for ${deckName}`);
+  const byId = new Map(options.map((o) => [o.id, o]));
+  const k = `${menuId}:deck:${deckName}`;
 
-  let deck = store.get<Deck>(key) ?? memory.get(key) ?? { left: [], last: null };
-  // Drop ids for lines that have since been edited out of the pool.
+  let deck = store.get<Deck>(k) ?? memory.get(k) ?? { left: [], last: null };
+  // Lines since edited out of the pool are dropped.
   deck = { ...deck, left: deck.left.filter((id) => byId.has(id)) };
 
   if (deck.left.length === 0) {
-    const fresh = shuffle(lines.map((l) => l.id));
+    const fresh = shuffle(options.map((o) => o.id));
     // The next draw is the END of the array: keep it off the last line seen.
     if (fresh.length > 1 && fresh[fresh.length - 1] === deck.last) {
       [fresh[0], fresh[fresh.length - 1]] = [fresh[fresh.length - 1], fresh[0]];
@@ -76,16 +73,7 @@ export function drawLine(menuId: string, ...pools: PoolKey[]): HostLine {
 
   const id = deck.left.pop()!;
   deck.last = id;
-  memory.set(key, deck);
-  store.set(key, deck);
+  memory.set(k, deck);
+  store.set(k, deck);
   return byId.get(id)!;
-}
-
-/** Has this browser met the Host before? */
-export function hasVisited(menuId: string): boolean {
-  return store.get<boolean>(`${menuId}:visited`) === true;
-}
-
-export function markVisited(menuId: string): void {
-  store.set(`${menuId}:visited`, true);
 }

@@ -12,6 +12,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test:creepypastas": "tsx src/components/popup/creepypastas/__tests__/tales.test.ts",
     "test:games": "tsx src/components/popup/games/__tests__/sprites.test.ts && tsx src/components/popup/games/__tests__/behindTheStick.test.ts && tsx src/components/popup/games/__tests__/topShelf.test.ts && tsx src/components/popup/games/__tests__/game.test.ts && tsx src/components/popup/games/tiki/__tests__/tiki.test.ts && tsx src/components/popup/games/shots/__tests__/shots.test.ts && tsx src/components/popup/games/tater/__tests__/tater.test.ts && tsx src/components/popup/games/stick/__tests__/stick.test.ts"
   },
   "dependencies": {

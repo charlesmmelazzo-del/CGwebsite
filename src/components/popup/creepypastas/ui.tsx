@@ -2,186 +2,172 @@
 
 // ─── Cocktail Creepypastas — the look ────────────────────────────────────────
 //
-// Black and white only: a gothic anthology dressed like an old RPG's dialogue
-// screens. The boxes, buttons and borders are drawn here in CSS, so no art is
-// needed for the page to work. Portraits and the logo are optional slots that
-// fill in as the owner's sprite sheets arrive.
+// Black and white only, Undertale-simple: white outlines on black, a pixel
+// face for anything the bartender says or the guest taps, and a plain book
+// face for the stories themselves, because pixel lettering is tiring over
+// thousands of words on a phone.
 //
-// Three faces: Pirata One for the title, Pixelify Sans for the Host's voice and
-// the controls, and Lora for anything read at length (cocktail facts, and later
-// the stories), because pixel lettering is tiring over a paragraph on a phone.
+// The logo and bartender are art slots. Until the owner's sprite sheets are
+// cut in, a drawn stand-in takes their place — nothing waits on the art.
 
-import { Lora, Pirata_One, Pixelify_Sans } from "next/font/google";
-import { Fragment, type ReactNode } from "react";
-import { HOST_NAME, type Beat, type Expression, type HostLine } from "./hostDialogue";
+import { Lora, Pixelify_Sans } from "next/font/google";
+import { useEffect, useState, type ReactNode } from "react";
 
-export const titleFont = Pirata_One({ weight: "400", subsets: ["latin"], display: "swap" });
 export const voiceFont = Pixelify_Sans({ subsets: ["latin"], display: "swap" });
 export const readFont = Lora({ subsets: ["latin"], display: "swap", style: ["normal", "italic"] });
 
-/**
- * The real logo, once it's cut from the owner's sheet. Null = set the title in
- * type instead, which is also what shows if the image fails.
- */
+/** The logo, once it's cut from Sheet 1. Null = set the title in type. */
 export const LOGO_SRC: string | null = null;
 
+export type Pose = "idle" | "talking" | "greeting" | "thinking" | "writing";
+
 /**
- * Host portrait art per expression. Empty until the sprite sheet arrives;
- * anything missing falls back to `neutral`, then to the drawn placeholder.
+ * Bartender animation frames per pose, from Sheets 2B–2F, in order.
+ * Empty until the art is cut in; any pose without frames falls back to idle,
+ * then to the drawn stand-in.
  */
-const PORTRAITS: Partial<Record<Expression, string>> = {};
+const FRAMES: Partial<Record<Pose, string[]>> = {};
 
-// ─── Text ────────────────────────────────────────────────────────────────────
+/** Milliseconds per frame. */
+const FRAME_MS: Record<Pose, number> = { idle: 600, talking: 160, greeting: 260, thinking: 420, writing: 220 };
 
-/** Turns **this** into emphasis. Content never carries raw HTML. */
-export function Rich({ text }: { text: string }) {
-  const parts = text.split("**");
+function useFrame(pose: Pose, count: number) {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    setI(0);
+    if (count < 2) return;
+    const t = window.setInterval(() => setI((n) => (n + 1) % count), FRAME_MS[pose]);
+    return () => window.clearInterval(t);
+  }, [pose, count]);
+  return i;
+}
+
+// ─── The bartender ───────────────────────────────────────────────────────────
+
+/**
+ * A stand-in ghoul behind a bar: hollow eyes, a grin, a bow tie. Says nothing
+ * about the real character's look — it only proves the poses work.
+ * # outline · + shadow · o eye glow · b bow tie · = counter
+ */
+const STAND_IN = [
+  "......######......",
+  "....##++++++##....",
+  "...#++++++++++#...",
+  "..#++++++++++++#..",
+  "..#++..++++..++#..",
+  "..#++.o++++o.++#..",
+  "..#++..++++..++#..",
+  "..#++++++##++++#..",
+  "..#++++++++++++#..",
+  "MOUTH",
+  "...#++++++++++#...",
+  "....##++++++##....",
+  "......#++++#......",
+  "...####+bb+####...",
+  "..#+++++#bb#+++++#",
+  ".#++++++++++++++#.",
+  ".#++++++++++++++#.",
+  "==================",
+  "#................#",
+  "==================",
+];
+const MOUTHS = {
+  closed: "..#++########++#..",
+  open: "..#++#.#.#.#.++#..",
+};
+
+function StandIn({ pose, frame }: { pose: Pose; frame: number }) {
+  const talking = pose === "talking" || pose === "greeting";
+  const mouth = talking && frame % 2 === 1 ? MOUTHS.open : MOUTHS.closed;
+  const rows = STAND_IN.map((r) => (r === "MOUTH" ? mouth : r));
+  const fill: Record<string, string> = { "#": "#fff", "+": "#1f1f1f", o: "#fff", b: "#fff", "=": "#fff" };
   return (
-    <>
-      {parts.map((part, i) =>
-        i % 2 === 1 ? (
-          <strong key={i} className="font-bold tracking-wide">
-            {part}
-          </strong>
-        ) : (
-          <Fragment key={i}>{part}</Fragment>
+    <svg viewBox="0 0 18 20" className="h-full w-auto max-w-full" shapeRendering="crispEdges" aria-hidden>
+      {rows.flatMap((row, y) =>
+        row.split("").map((ch, x) =>
+          fill[ch] ? <rect key={`${x}-${y}`} x={x} y={y} width={1.02} height={1.02} fill={fill[ch]} /> : null
         )
       )}
-    </>
-  );
-}
-
-function BeatView({ beat }: { beat: Beat }) {
-  if ("direction" in beat) {
-    return (
-      <p className={`${readFont.className} italic text-[15px] leading-relaxed text-white/60`}>
-        <Rich text={beat.direction} />
-      </p>
-    );
-  }
-  return (
-    <p className="text-[18px] leading-[1.45] text-white">
-      &ldquo;<Rich text={beat.say} />&rdquo;
-    </p>
-  );
-}
-
-// ─── The Host ────────────────────────────────────────────────────────────────
-
-/**
- * A stand-in until his portraits exist: a shadowy bust with two pale eyes.
- * Deliberately says nothing about what he'll look like.
- */
-const PLACEHOLDER = [
-  "................",
-  ".....######.....",
-  "....########....",
-  "...##########...",
-  "...##########...",
-  "...##W####W##...",
-  "...##########...",
-  "....########....",
-  ".....######.....",
-  "......####......",
-  "...##########...",
-  "..############..",
-  ".##############.",
-  ".##############.",
-  ".##############.",
-  ".##############.",
-];
-
-function PlaceholderBust() {
-  return (
-    <svg viewBox="0 0 16 16" className="w-full h-full" shapeRendering="crispEdges" aria-hidden>
-      {PLACEHOLDER.flatMap((row, y) =>
-        row.split("").map((ch, x) =>
-          ch === "." ? null : (
-            <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill={ch === "W" ? "#fff" : "#3b3b3b"} />
-          )
-        )
+      {pose === "thinking" && (
+        <text x="14.5" y="2.6" fontSize="2.6" fill="#fff" className={voiceFont.className}>
+          {".".repeat((frame % 3) + 1)}
+        </text>
+      )}
+      {pose === "writing" && (
+        <g>
+          <rect x="11" y="13" width="5" height="4" fill="#fff" />
+          <rect x={11.5 + (frame % 3)} y="14.5" width="1.5" height="0.5" fill="#000" />
+        </g>
       )}
     </svg>
   );
 }
 
-export function HostPortrait({ expression = "neutral" }: { expression?: Expression }) {
-  const src = PORTRAITS[expression] ?? PORTRAITS.neutral;
+export function Bartender({ pose }: { pose: Pose }) {
+  const frames = FRAMES[pose]?.length ? FRAMES[pose]! : FRAMES.idle ?? [];
+  const frame = useFrame(pose, frames.length || (pose === "idle" ? 1 : 3));
   return (
-    <div
-      className="shrink-0 w-[72px] h-[72px] sm:w-24 sm:h-24 bg-black border-[3px] border-white rounded-[4px] overflow-hidden"
-      style={{ imageRendering: "pixelated" }}
-    >
-      {src ? (
-        // eslint-disable-next-line @next/next/no-img-element -- pixel art at a whole-number scale; the optimizer would smooth it
-        <img src={src} alt="" className="w-full h-full object-cover" style={{ imageRendering: "pixelated" }} />
+    <div className="h-full w-full flex items-end justify-center" style={{ imageRendering: "pixelated" }}>
+      {frames.length ? (
+        // eslint-disable-next-line @next/next/no-img-element -- pixel art at whole-number scale; the optimizer would smooth it
+        <img
+          src={frames[frame % frames.length]}
+          alt=""
+          className="h-full w-auto max-w-full object-contain object-bottom"
+          style={{ imageRendering: "pixelated" }}
+        />
       ) : (
-        <PlaceholderBust />
+        <StandIn pose={pose} frame={frame} />
       )}
     </div>
   );
 }
 
-/**
- * The Host speaking: portrait and name above a dialogue box.
- *
- * `extra` is plain speech appended after the line (the main question, say),
- * so a greeting and its question read as one breath.
- */
-export function HostSays({
-  line,
-  extra,
-  expression,
-}: {
-  line: HostLine | null;
-  extra?: string;
-  expression?: Expression;
-}) {
-  const beats: Beat[] = [...(line?.beats ?? []), ...(extra ? [{ say: extra }] : [])];
+// ─── Speech and replies ──────────────────────────────────────────────────────
+
+/** His words: a white-ruled bubble with a tail pointing down at him. */
+export function SpeechBubble({ children, onNext }: { children: ReactNode; onNext?: () => void }) {
   return (
-    <div className={voiceFont.className}>
-      <div className="flex items-end gap-3 mb-3">
-        <HostPortrait expression={expression ?? line?.expression} />
-        <p className="pb-1 text-[13px] tracking-[0.18em] uppercase text-white/70">{HOST_NAME}</p>
+    <div className="relative">
+      <div
+        aria-live="polite"
+        className={`${voiceFont.className} relative bg-black border-[3px] border-white rounded-[14px] px-4 py-3.5 text-[18px] leading-[1.45] text-white`}
+      >
+        {children}
+        {onNext && (
+          <button
+            type="button"
+            onClick={onNext}
+            className="absolute inset-0 w-full h-full rounded-[12px] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+            aria-label="Next"
+          >
+            <span aria-hidden className="absolute right-3 bottom-1.5 text-[14px] motion-safe:animate-pulse">
+              ▼
+            </span>
+          </button>
+        )}
       </div>
-      <DialogueBox>
-        <div className="space-y-3">
-          {beats.map((b, i) => (
-            <BeatView key={i} beat={b} />
-          ))}
-        </div>
-      </DialogueBox>
-    </div>
-  );
-}
-
-// ─── Frames and controls ─────────────────────────────────────────────────────
-
-/** The black box with a doubled white rule, as on an old RPG's text window. */
-export function DialogueBox({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return (
-    <div
-      className={`relative bg-black border-[3px] border-white rounded-[6px] px-4 py-4 sm:px-5 ${className}`}
-      style={{ boxShadow: "0 0 0 3px #000, 0 0 0 5px rgba(255,255,255,0.35)" }}
-    >
-      {children}
+      {/* The tail: a white triangle with a black one inset, so it reads as a continuation of the rule. */}
+      <span aria-hidden className="absolute left-1/2 -bottom-[13px] -translate-x-1/2 w-0 h-0 border-x-[12px] border-x-transparent border-t-[13px] border-t-white" />
+      <span aria-hidden className="absolute left-1/2 -bottom-[8px] -translate-x-1/2 w-0 h-0 border-x-[8px] border-x-transparent border-t-[9px] border-t-black" />
     </div>
   );
 }
 
 /**
- * A response the guest can pick. Real buttons, at least 48px tall, with a
- * pointer that appears on hover and keyboard focus.
+ * A reply the guest can tap. Real buttons, at least 48px tall, with a pointer
+ * on keyboard focus — and on hover only where there's a mouse, so a tapped
+ * button on a phone doesn't stay lit.
  */
 export function Choice({
   children,
   onClick,
-  primary = false,
+  quiet = false,
   disabled = false,
 }: {
   children: ReactNode;
   onClick: () => void;
-  primary?: boolean;
+  quiet?: boolean;
   disabled?: boolean;
 }) {
   return (
@@ -189,28 +175,16 @@ export function Choice({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`${voiceFont.className} group w-full min-h-[48px] flex items-center gap-2 text-left px-3 py-2.5 text-[17px] leading-snug rounded-[4px] border-2 transition-colors
+      className={`${voiceFont.className} group w-full min-h-[48px] flex items-center gap-2 text-left px-3 py-2 text-[17px] leading-snug rounded-[6px] border-2 transition-colors
         focus:outline-none focus-visible:bg-white focus-visible:text-black focus-visible:border-white
-        [@media(hover:hover)]:hover:bg-white [@media(hover:hover)]:hover:text-black [@media(hover:hover)]:hover:border-white disabled:opacity-40 disabled:pointer-events-none
-        ${primary ? "border-white text-white" : "border-white/35 text-white/90"}`}
+        [@media(hover:hover)]:hover:bg-white [@media(hover:hover)]:hover:text-black [@media(hover:hover)]:hover:border-white
+        disabled:opacity-40 disabled:pointer-events-none
+        ${quiet ? "border-white/30 text-white/75" : "border-white text-white"}`}
     >
       <span aria-hidden className="w-3 shrink-0 opacity-0 [@media(hover:hover)]:group-hover:opacity-100 group-focus-visible:opacity-100">
         ▸
       </span>
       <span>{children}</span>
-    </button>
-  );
-}
-
-/** A quiet text-only action, for secondary routes like "Skip introduction". */
-export function QuietAction({ children, onClick }: { children: ReactNode; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`${voiceFont.className} min-h-[44px] px-2 text-[14px] tracking-wide text-white/55 underline underline-offset-4 decoration-white/25 hover:text-white focus:outline-none focus-visible:text-white focus-visible:decoration-white`}
-    >
-      {children}
     </button>
   );
 }

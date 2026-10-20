@@ -287,7 +287,7 @@ export default function PopupEditorPage({ params }: { params: { id: string } }) 
 
       {/* ── Cocktails ────────────────────────────────────────────────────── */}
       <Section title={`Cocktails (${cocktails.length})`} defaultOpen>
-        <CocktailList cocktails={cocktails} onChange={setCocktails} />
+        <CocktailList cocktails={cocktails} onChange={setCocktails} templateKey={menu.templateKey ?? "classic"} />
       </Section>
 
       {/* ── Raffle tickets ───────────────────────────────────────────────── */}
@@ -418,9 +418,11 @@ function StatusPanel({
 function CocktailList({
   cocktails,
   onChange,
+  templateKey,
 }: {
   cocktails: EditableCocktail[];
   onChange: (next: EditableCocktail[]) => void;
+  templateKey: string;
 }) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -446,6 +448,7 @@ function CocktailList({
               <CocktailCard
                 key={c.id}
                 cocktail={c}
+                templateKey={templateKey}
                 onUpdate={(patch) => update(c.id, patch)}
                 onRemove={() => onChange(cocktails.filter((x) => x.id !== c.id))}
               />
@@ -471,10 +474,12 @@ function CocktailList({
 
 function CocktailCard({
   cocktail,
+  templateKey,
   onUpdate,
   onRemove,
 }: {
   cocktail: EditableCocktail;
+  templateKey: string;
   onUpdate: (patch: Partial<PopupCocktail>) => void;
   onRemove: () => void;
 }) {
@@ -542,6 +547,7 @@ function CocktailCard({
             onChange={(v) => onUpdate({ ingredients: v })}
             multiline
           />
+          {templateKey !== "creepypastas" && (
           <TextField
             label="The story"
             value={cocktail.story ?? ""}
@@ -550,12 +556,23 @@ function CocktailCard({
             rows={6}
             hint="A paragraph or more. Blank lines start a new paragraph."
           />
+          )}
           <ImagePicker
             label="Image"
             value={cocktail.imageUrl}
             onChange={(url) => onUpdate({ imageUrl: url })}
           />
 
+          {templateKey === "creepypastas" && (
+            <RecipePdfField
+              value={typeof cocktail.meta?.recipePdfUrl === "string" ? cocktail.meta.recipePdfUrl : ""}
+              onChange={(url) =>
+                onUpdate({ meta: { ...(cocktail.meta ?? {}), recipePdfUrl: url || undefined } })
+              }
+            />
+          )}
+
+          {templateKey !== "creepypastas" && (
           <label className="block mb-3">
             <span className="block text-[10px] tracking-widest uppercase text-gray-400 mb-1.5">
               Mini game
@@ -576,6 +593,7 @@ function CocktailCard({
               Only used by arcade-style templates. New games appear here as we build them.
             </span>
           </label>
+          )}
           <label className="flex items-center gap-2.5">
             <input
               type="checkbox"
@@ -1031,6 +1049,71 @@ function Section({
       </button>
       {open && <div className="px-5 pb-5">{children}</div>}
     </section>
+  );
+}
+
+/**
+ * The recipe card guests can download from pop-ups that hand out recipes.
+ * Uses the same PDF upload as the events page.
+ */
+function RecipePdfField({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function upload(file: File) {
+    setBusy(true);
+    setError(null);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/admin/pdfs/upload", { method: "POST", body: form });
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error ?? "Upload failed.");
+      onChange(String(data.url));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Upload failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mb-3">
+      <span className="block text-[10px] tracking-widest uppercase text-gray-400 mb-1.5">
+        Recipe PDF
+      </span>
+      {value ? (
+        <div className="flex items-center gap-3 text-xs">
+          <a href={value} target="_blank" rel="noreferrer" className="text-gray-700 underline">
+            View PDF
+          </a>
+          <button onClick={() => onChange("")} className="text-gray-400 hover:text-red-500">
+            Remove
+          </button>
+        </div>
+      ) : (
+        <label className="inline-flex items-center gap-2 px-3 py-2 border border-dashed border-gray-300 text-[11px] tracking-wider uppercase text-gray-500 hover:border-gray-400 cursor-pointer">
+          {busy ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+          {busy ? "Uploading…" : "Upload PDF"}
+          <input
+            type="file"
+            accept="application/pdf"
+            className="hidden"
+            disabled={busy}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void upload(f);
+              e.target.value = "";
+            }}
+          />
+        </label>
+      )}
+      {error && <span className="block mt-1 text-[11px] text-red-600">{error}</span>}
+      <span className="block mt-1 text-[10px] text-gray-400">
+        Guests download this from the recipe card. Name, description and ingredients above show on
+        the card itself.
+      </span>
+    </div>
   );
 }
 

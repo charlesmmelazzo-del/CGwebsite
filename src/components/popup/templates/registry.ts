@@ -47,7 +47,7 @@ export const TEMPLATES: Record<string, PopupTemplate> = {
     key: "creepypastas",
     label: "Cocktail Creepypastas (Halloween)",
     description:
-      "A smug gothic host and a choose-your-own-adventure story per cocktail. Black and white, pixel-art dialogue. The ticket from each drink unlocks its tale.",
+      "A ghoulish bartender offers the Halloween cocktail recipes (PDFs to download) or one of 150 classic spooky tales to read. Black and white, Undertale-style. No sign-in or tickets.",
     component: CreepypastasTemplate,
     defaultConfig: {},
   },

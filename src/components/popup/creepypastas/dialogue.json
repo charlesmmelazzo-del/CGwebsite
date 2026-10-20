@@ -1,0 +1,482 @@
+{
+ "fresh_welcome": [
+  {
+   "id": "welcome_fresh_01",
+   "lines": [
+    "Welcome to Common Good during the spooky season. Come in, settle yourself, and keep a little room in the evening for something unexpected.",
+    "I hope you’re enjoying the company, and that our Halloween pop-up cocktails have been treating you very well.",
+    "I can share a recipe to make at home, or a spooky tale left behind by one of my old patrons. I’ve had rather a few."
+   ]
+  },
+  {
+   "id": "welcome_fresh_02",
+   "lines": [
+    "Welcome to Common Good during the spooky season. A fine evening for good company, curious cocktails, and just a little less certainty than usual.",
+    "I hope you’ve been enjoying our Halloween pop-up and its cocktails. We’ve put a good deal of care into making the evening memorable.",
+    "There are recipes you can take home, and tales I’ve collected from bar guests over the years. How many years? The ledgers become rather untidy."
+   ]
+  },
+  {
+   "id": "welcome_fresh_03",
+   "lines": [
+    "Welcome to Common Good during the spooky season. I hope the room, the company, and our Halloween pop-up cocktails have put you in an agreeable mood.",
+    "If a cocktail has caught your fancy, I can give you its recipe to keep and make at home when the evening calls for it.",
+    "Or I can tell you a spooky tale an old patron shared across the bar. I’ve been listening a while. Long enough to recognize a good opening."
+   ]
+  }
+ ],
+ "intent_prompt": [
+  {
+   "id": "intent_01",
+   "lines": [
+    "What shall I put before you: a recipe for your home bar, or a spooky tale from one of my old guests?"
+   ],
+   "choices": [
+    "A cocktail recipe",
+    "A spooky tale"
+   ]
+  },
+  {
+   "id": "intent_02",
+   "lines": [
+    "Would you like to take a little of tonight’s cocktail magic home, or hear what the guests have been telling me after dark?"
+   ],
+   "choices": [
+    "A cocktail recipe",
+    "A spooky tale"
+   ]
+  }
+ ],
+ "time_prompt": [
+  {
+   "id": "time_01",
+   "lines": [
+    "How much time have you brought with you tonight? I can fit a tale to it. I’ve had plenty of practice making an evening last."
+   ],
+   "choices": [
+    "5–10 minutes",
+    "10–20 minutes",
+    "I've got all the time in the world"
+   ]
+  },
+  {
+   "id": "time_02",
+   "lines": [
+    "How long would you like to linger? A few minutes will do nicely, though some of my older guests were in no hurry to finish."
+   ],
+   "choices": [
+    "5–10 minutes",
+    "10–20 minutes",
+    "I've got all the time in the world"
+   ]
+  },
+  {
+   "id": "time_03",
+   "lines": [
+    "Before I choose a tale, tell me how long you have to listen. I keep an eye on the clock for the guests’ benefit, mostly."
+   ],
+   "choices": [
+    "5–10 minutes",
+    "10–20 minutes",
+    "I've got all the time in the world"
+   ]
+  }
+ ],
+ "scare_prompt": [
+  {
+   "id": "scare_01",
+   "lines": [
+    "How deep shall we let the shadows get? I have a gentle shiver, a proper chill, and a few tales best heard with the lights nearby."
+   ],
+   "choices": [
+    "A gentle shiver",
+    "A proper chill",
+    "The darkest tales"
+   ]
+  },
+  {
+   "id": "scare_02",
+   "lines": [
+    "And what sort of company would you like from the dark: something lightly spooky, something that lingers, or something with a rather firmer grip?"
+   ],
+   "choices": [
+    "A gentle shiver",
+    "A proper chill",
+    "The darkest tales"
+   ]
+  },
+  {
+   "id": "scare_03",
+   "lines": [
+    "Shall we keep the evening gently haunted, make it properly eerie, or open the drawer I usually leave until the room has grown quiet?"
+   ],
+   "choices": [
+    "A gentle shiver",
+    "A proper chill",
+    "The darkest tales"
+   ]
+  }
+ ],
+ "returning_guest_welcome": [
+  {
+   "id": "welcome_return_01",
+   "lines": [
+    "Ah, welcome back to Common Good. It’s good to see you again. I had a feeling our little conversation might have another chapter."
+   ]
+  },
+  {
+   "id": "welcome_return_02",
+   "lines": [
+    "Welcome back. The spooky season has been keeping me occupied, but I haven’t forgotten you. I tend to remember good company."
+   ]
+  },
+  {
+   "id": "welcome_return_03",
+   "lines": [
+    "There you are. Welcome back to Common Good. An evening can pick up quite comfortably where another one left off; I’ve seen it happen often enough."
+   ]
+  },
+  {
+   "id": "welcome_return_04",
+   "lines": [
+    "Good to see you again. Welcome back to our corner of the spooky season. Familiar company has a way of making the evening more interesting."
+   ]
+  }
+ ],
+ "recipe_shared_return_callback": [
+  {
+   "id": "recipe_callback_01",
+   "lines": [
+    "I remember sharing a cocktail recipe with you. If you’ve had a chance to make it, I hope it treated you well."
+   ]
+  },
+  {
+   "id": "recipe_callback_02",
+   "lines": [
+    "I shared a recipe with you before. I hope it proves useful whenever you feel like bringing a little of the spooky season home."
+   ]
+  },
+  {
+   "id": "recipe_callback_03",
+   "lines": [
+    "I remember the recipe I shared with you. I hope it has given you something pleasant to look forward to on an evening at home."
+   ]
+  }
+ ],
+ "both_story_and_recipe_connective": [
+  {
+   "id": "both_callback_01",
+   "lines": [
+    "And I remember sharing a recipe with you, too. I hope it’s useful whenever the mood strikes at home. Good evenings deserve the occasional encore."
+   ]
+  },
+  {
+   "id": "both_callback_02",
+   "lines": [
+    "There was a cocktail recipe as well. If you’ve had a chance to try it, I hope it added a little character to the evening."
+   ]
+  },
+  {
+   "id": "both_callback_03",
+   "lines": [
+    "And the recipe I shared is another little piece of the evening to take with you. I hope it comes in handy when the occasion presents itself."
+   ]
+  }
+ ],
+ "resume_unfinished_story": [
+  {
+   "id": "resume_01",
+   "lines": [
+    "We left a tale unfinished. I’ve kept your place, if you’d like to return to it. The shadows have been remarkably patient."
+   ],
+   "choices": [
+    "Pick up where I left off",
+    "Choose something else"
+   ]
+  },
+  {
+   "id": "resume_02",
+   "lines": [
+    "There’s a story waiting at the point where you left it. Shall we carry on from there, or choose a different corner of the collection?"
+   ],
+   "choices": [
+    "Continue my story",
+    "Find a different tale"
+   ]
+  }
+ ],
+ "decline_and_offer_another": [
+  {
+   "id": "decline_01",
+   "lines": [
+    "Very well. A story ought to suit its listener. Let me see what else the guests have left in my keeping."
+   ]
+  },
+  {
+   "id": "decline_02",
+   "lines": [
+    "Of course. We needn’t invite that particular trouble in tonight. I have another tale that may be more to your taste."
+   ]
+  }
+ ],
+ "new_search_transition": [
+  {
+   "id": "new_search_01",
+   "lines": [
+    "Let’s choose again. A different amount of time, a different degree of darkness; there are several ways to spend an evening in this collection."
+   ]
+  },
+  {
+   "id": "new_search_02",
+   "lines": [
+    "We can rearrange the evening. Tell me what you’re in the mood for now, and I’ll have another look among the stories."
+   ]
+  }
+ ],
+ "no_matching_story": [
+  {
+   "id": "no_match_01",
+   "lines": [
+    "Nothing in my collection fits that particular combination just now. We can change the time or the level of fright, and give the shelves another chance."
+   ],
+   "choices": [
+    "Change the time",
+    "Change the scare level",
+    "Back to the bar"
+   ]
+  },
+  {
+   "id": "no_match_02",
+   "lines": [
+    "A small gap in my collection. Even a long career leaves a few. Shall we adjust the length, choose a different sort of chill, or return to the bar?"
+   ],
+   "choices": [
+    "Choose another length",
+    "Choose another level of fright",
+    "Back to the bar"
+   ]
+  }
+ ],
+ "all_matching_stories_heard": [
+  {
+   "id": "all_heard_01",
+   "lines": [
+    "You’ve heard every tale in this part of the collection. We can revisit one, try another length or level of fright, or turn our attention to a recipe."
+   ],
+   "choices": [
+    "Revisit a tale",
+    "Change my selection",
+    "See cocktail recipes"
+   ]
+  },
+  {
+   "id": "all_heard_02",
+   "lines": [
+    "For that length and degree of darkness, we’ve reached the end of the tales you haven’t heard. An old favorite can bear another telling, if you’d like."
+   ],
+   "choices": [
+    "Hear a favorite again",
+    "Look elsewhere in the collection",
+    "A recipe instead"
+   ]
+  }
+ ],
+ "story_completion_outro": [
+  {
+   "id": "complete_01",
+   "lines": [
+    "And that is how it was told to me. I’ve kept the words; you may keep whatever follows you home. Shall we find another tale, or look at the recipes?"
+   ],
+   "choices": [
+    "Another spooky tale",
+    "A cocktail recipe",
+    "Back to the bar"
+   ]
+  },
+  {
+   "id": "complete_02",
+   "lines": [
+    "There we are. Another old guest’s story safely passed along. I can offer you another, or something rather more practical for the home bar."
+   ],
+   "choices": [
+    "Tell me another",
+    "Show me the recipes",
+    "Back to the bar"
+   ]
+  }
+ ],
+ "all_the_time_response": [
+  {
+   "id": "all_time_01",
+   "lines": [
+    "All the time in the world? A generous offer. I’ve heard it made before. Let’s choose something worth staying for."
+   ]
+  },
+  {
+   "id": "all_time_02",
+   "lines": [
+    "Then we needn’t hurry. I’ve never cared for watching a clock while a good story is opening a door."
+   ]
+  }
+ ],
+ "under_five_minutes_leadin": [
+  {
+   "id": "under_five_01",
+   "lines": [
+    "This one is a little shorter than your window. A small haunting, neatly contained; there will still be time to look over your shoulder afterward."
+   ]
+  },
+  {
+   "id": "under_five_02",
+   "lines": [
+    "I have a brief one that comes in under five minutes. Some guests need very few words to leave the room feeling different."
+   ]
+  }
+ ],
+ "unknown_history_greeting": [
+  {
+   "id": "welcome_unknown_01",
+   "lines": [
+    "Welcome to Common Good. I hope the spooky season is treating you well. There are cocktail recipes to take home and a few curious stories to keep you company."
+   ]
+  },
+  {
+   "id": "welcome_unknown_02",
+   "lines": [
+    "Good evening, and welcome to our little corner of the spooky season. Settle in; I have something for the home bar and something for the imagination."
+   ]
+  }
+ ],
+ "same_visit_return_to_main": [
+  {
+   "id": "main_same_visit_01",
+   "lines": [
+    "Back at the bar. Shall we open the recipe cabinet, or let another one of the old guests have a word?"
+   ],
+   "choices": [
+    "A cocktail recipe",
+    "A spooky tale"
+   ]
+  },
+  {
+   "id": "main_same_visit_02",
+   "lines": [
+    "What takes your fancy now: a cocktail recipe to keep, or a tale to carry with you a little less conveniently?"
+   ],
+   "choices": [
+    "A cocktail recipe",
+    "A spooky tale"
+   ]
+  }
+ ],
+ "farewell": [
+  {
+   "id": "farewell_01",
+   "lines": [
+    "Enjoy the rest of your evening at Common Good. I’ll be here if you need anything else. I generally am."
+   ]
+  },
+  {
+   "id": "farewell_02",
+   "lines": [
+    "Thank you for the company. Take a good evening home with you, and leave a little room for another visit. I’m seldom in a hurry."
+   ]
+  }
+ ],
+ "recipe_menu_intro": [
+  {
+   "id": "recipe_menu_01",
+   "lines": [
+    "Which of our four Halloween cocktails would you like the recipe for? I can put the details in your keeping for an evening at home."
+   ]
+  },
+  {
+   "id": "recipe_menu_02",
+   "lines": [
+    "Let’s find the recipe that caught your interest. Choose a cocktail, and I’ll share what you need to make it at home."
+   ]
+  }
+ ],
+ "recipe_ready": [
+  {
+   "id": "recipe_ready_01",
+   "lines": [
+    "Here is the recipe. You can read it now or keep a copy for the home bar. A useful souvenir of a slightly unusual evening."
+   ]
+  },
+  {
+   "id": "recipe_ready_02",
+   "lines": [
+    "There we are. The recipe is ready whenever your own evening calls for it. You can take a copy using the button below."
+   ]
+  }
+ ],
+ "recipe_save_success": [
+  {
+   "id": "recipe_saved_01",
+   "lines": [
+    "There we are—the recipe is saved. I hope it comes in handy when you feel like bringing a little of Common Good home."
+   ]
+  },
+  {
+   "id": "recipe_saved_02",
+   "lines": [
+    "Safely saved. A small piece of the evening for another occasion. I find the better recipes deserve more than one night."
+   ]
+  }
+ ],
+ "recipe_download_started": [
+  {
+   "id": "recipe_download_started_01",
+   "lines": [
+    "Your recipe download has started. I’ll keep the recipe here while you collect it; there’s no need to hurry on my account."
+   ]
+  }
+ ],
+ "recipe_save_failure": [
+  {
+   "id": "recipe_save_failed_01",
+   "lines": [
+    "The recipe hasn’t made it into your keeping just yet. Let’s try that again; occasionally even the paperwork develops a little character."
+   ],
+   "choices": [
+    "Try again",
+    "View the recipe"
+   ]
+  },
+  {
+   "id": "recipe_save_failed_02",
+   "lines": [
+    "That copy didn’t go through. The recipe is still here to read, and we can try making you another copy when you’re ready."
+   ],
+   "choices": [
+    "Try again",
+    "Keep reading here"
+   ]
+  }
+ ],
+ "all_matching_stories_offered": [
+  {
+   "id": "all_offered_01",
+   "lines": [
+    "I’ve shown you every tale that fits those choices for now. We can look back over this visit’s suggestions, choose a different sort of story, or turn to the recipes."
+   ],
+   "choices": [
+    "Revisit this visit’s suggestions",
+    "Change my selection",
+    "See cocktail recipes"
+   ]
+  },
+  {
+   "id": "all_offered_02",
+   "lines": [
+    "That brings us to the end of my suggestions for this particular mood. One may deserve another look, or we can change the selection. The cocktail recipes are available too."
+   ],
+   "choices": [
+    "Revisit this visit’s suggestions",
+    "Change my selection",
+    "See cocktail recipes"
+   ]
+  }
+ ]
+}
