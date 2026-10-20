@@ -130,6 +130,7 @@ export const REPLIES = {
   signupNo: "No thanks",
   done: "That's all for now",
   download: "Download the recipe",
+  showCocktails: "Show me the cocktails",
   anotherRecipe: "Another recipe",
   noMoreRecipes: "No, that's all",
 };

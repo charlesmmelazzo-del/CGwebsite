@@ -45,7 +45,7 @@ import { ALL_FRAMES, Bartender, Choice, ChoiceLink, DialogueBox, LOGO_SRC, voice
  * browser (see creepypastas/memory.ts).
  */
 
-type Phase = "logo" | "bar" | "writing" | "recipes" | "thinking" | "wavy" | "reader";
+type Phase = "logo" | "bar" | "recipes" | "wavy" | "reader";
 
 interface Reply {
   label: string;
@@ -63,8 +63,12 @@ interface Scene {
   emailForm?: boolean;
   /** Open with the greeting animation instead of plain talking. */
   greet?: boolean;
-  /** No replies: once the last line has typed out, carry on with this. */
-  then?: () => void;
+  /**
+   * Hold this pose for the whole scene (writing out a recipe, thinking of a
+   * tale) instead of talking. Every scene still waits for the guest's tap —
+   * nothing moves on by itself, since everyone reads at their own pace.
+   */
+  pose?: "writing" | "thinking";
 }
 
 const WAVY_MS = 1100;
@@ -76,7 +80,6 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
   const [step, setStep] = useState(0);
   const [pose, setPose] = useState<Pose>("idle");
   const [mem, setMem] = useState<GuestMemory | null>(null);
-  const [writingLine, setWritingLine] = useState("");
   /** Which recipe card to open on (coming back for "another"). */
   const [cardIndex, setCardIndex] = useState(0);
   const [reading, setReading] = useState<{ card: TaleCard; startAt: number } | null>(null);
@@ -135,30 +138,15 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
     }, 240);
   }
 
-  const current = phase === "writing" ? writingLine : (scene.lines[step] ?? "");
+  const current = scene.lines[step] ?? "";
 
   // A new line starts typing from scratch.
   useEffect(() => setTyped(false), [current, step, phase]);
 
-  // A scene with no replies carries on by itself once its last line is read —
-  // or at once, if they tap. Either way, only once.
-  const carriedOn = useRef<Scene | null>(null);
-  const carryOn = useCallback(() => {
-    if (!scene.then || carriedOn.current === scene) return;
-    carriedOn.current = scene;
-    scene.then();
-  }, [scene]);
-  useEffect(() => {
-    if (phase !== "bar" || !typed || !scene.then || step < scene.lines.length - 1) return;
-    const t = window.setTimeout(carryOn, 1400);
-    return () => window.clearTimeout(t);
-  }, [phase, typed, step, scene, carryOn]);
-
   // He moves his mouth while the line types out, then settles into idle.
   useEffect(() => {
-    if (phase === "writing") return setPose("writing");
-    if (phase === "thinking") return setPose("thinking");
     if (phase !== "bar" || !current) return;
+    if (scene.pose) return setPose(scene.pose);
     if (typed) return setPose("idle");
     // A greeting is one raised glass (4 frames), then he talks as usual.
     const greeting = scene.greet && step === 0;
@@ -166,7 +154,7 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
     if (!greeting) return;
     const t = window.setTimeout(() => setPose("talking"), 1040);
     return () => window.clearTimeout(t);
-  }, [phase, current, step, scene.greet, typed]);
+  }, [phase, current, step, scene.greet, scene.pose, typed]);
 
   // ─── The main question ─────────────────────────────────────────────────────
 
@@ -242,9 +230,9 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
 
   // ─── Recipes ───────────────────────────────────────────────────────────────
 
-  /** "A cocktail recipe": he asks which, then the cards fade in. */
+  /** "A cocktail recipe": he asks which; the cards fade in when they're ready. */
   function startRecipes() {
-    speak({ lines: line("recipe_menu_intro"), replies: [], then: () => fadeTo(showCards) });
+    speak({ lines: line("recipe_menu_intro"), replies: [{ label: REPLIES.showCocktails, run: () => fadeTo(showCards) }] });
   }
 
   function showCards() {
@@ -255,11 +243,13 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
   function pickRecipe(c: PopupCocktail, index: number) {
     setCardIndex(index);
     writingFor.current = c;
-    fadeTo(() => {
-      setWritingLine(line("recipe_writing")[0]);
-      setPhase("writing");
-      later(handOver, 2600);
-    });
+    fadeTo(() =>
+      speak({
+        lines: line("recipe_writing").slice(0, 1),
+        replies: [{ label: REPLIES.next, run: handOver }],
+        pose: "writing",
+      })
+    );
   }
 
   /** The recipe's written: the download button, then "another?". */
@@ -280,7 +270,7 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
 
     const pdf = recipePdf(c);
     if (!pdf) {
-      speak({ lines: line("recipe_no_pdf"), replies: [], then: another });
+      speak({ lines: line("recipe_no_pdf"), replies: [{ label: REPLIES.next, run: another }] });
       return;
     }
     speak({
@@ -320,11 +310,7 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
 
   function chooseScare(s: ScareId) {
     scare.current = s;
-    setScene({ lines: line("story_thinking"), replies: [] });
-    setStep(0);
-    setPhase("thinking");
-    setPose("thinking");
-    later(() => void pitch(), 1800);
+    speak({ lines: line("story_thinking"), replies: [{ label: REPLIES.next, run: () => void pitch() }], pose: "thinking" });
   }
 
   function changedMind() {
@@ -492,7 +478,7 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
   // ─── Rendering ─────────────────────────────────────────────────────────────
 
   const lastStep = step >= scene.lines.length - 1;
-  const atBar = phase === "bar" || phase === "thinking" || phase === "writing" || phase === "wavy";
+  const atBar = phase === "bar" || phase === "wavy";
   // Each screen fades in when it mounts; `leaving` fades the current one out.
   const screen = (extra = "") => `absolute inset-0 ${leaving ? "creepy-leave" : "creepy-screen"} ${extra}`;
 
@@ -535,15 +521,7 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
                 text={current}
                 typed={typed}
                 onTyped={() => setTyped(true)}
-                onTap={
-                  phase === "writing"
-                    ? handOver
-                    : !lastStep
-                      ? () => setStep((n) => n + 1)
-                      : scene.then
-                        ? carryOn
-                        : undefined
-                }
+                onTap={!lastStep ? () => setStep((n) => n + 1) : undefined}
                 more={phase === "bar" && !lastStep}
               />
 
