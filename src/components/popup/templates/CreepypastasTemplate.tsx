@@ -12,7 +12,7 @@ import {
   type GuestMemory,
 } from "../creepypastas/memory";
 import Reader from "../creepypastas/Reader";
-import Recipes from "../creepypastas/Recipes";
+import Recipes, { recipePdf } from "../creepypastas/Recipes";
 import {
   loadCatalog,
   pickAny,
@@ -23,7 +23,7 @@ import {
   type TaleCard,
   type TimeId,
 } from "../creepypastas/tales";
-import { ALL_FRAMES, Bartender, Choice, DialogueBox, LOGO_SRC, voiceFont, type Pose } from "../creepypastas/ui";
+import { ALL_FRAMES, Bartender, Choice, ChoiceLink, DialogueBox, LOGO_SRC, voiceFont, type Pose } from "../creepypastas/ui";
 
 /**
  * COMMON GOOD PRESENTS: COCKTAIL CREEPYPASTAS
@@ -51,6 +51,8 @@ interface Reply {
   label: string;
   run: () => void;
   quiet?: boolean;
+  /** Make it a link to this file (the recipe PDF); `run` fires as it opens. */
+  href?: string;
 }
 
 interface Scene {
@@ -61,6 +63,8 @@ interface Scene {
   emailForm?: boolean;
   /** Open with the greeting animation instead of plain talking. */
   greet?: boolean;
+  /** No replies: once the last line has typed out, carry on with this. */
+  then?: () => void;
 }
 
 const WAVY_MS = 1100;
@@ -73,7 +77,8 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
   const [pose, setPose] = useState<Pose>("idle");
   const [mem, setMem] = useState<GuestMemory | null>(null);
   const [writingLine, setWritingLine] = useState("");
-  const [recipeLine, setRecipeLine] = useState("");
+  /** Which recipe card to open on (coming back for "another"). */
+  const [cardIndex, setCardIndex] = useState(0);
   const [reading, setReading] = useState<{ card: TaleCard; startAt: number } | null>(null);
 
   /** The current line has finished typing out; the replies appear after. */
@@ -86,8 +91,8 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
   const scare = useRef<ScareId>("gentle");
   const offered = useRef(new Set<string>());
   const askedSignup = useRef(false);
-  /** The writing pause ended (by its timer or a tap): show the recipes once. */
-  const recipesShown = useRef(false);
+  /** The recipe being written out. Guards the hand-over so a tap and the timer can't both run it. */
+  const writingFor = useRef<PopupCocktail | null>(null);
   /** This reading reached THE END: stop saving a bookmark for it. */
   const reachedEnd = useRef(false);
   const timers = useRef<number[]>([]);
@@ -134,6 +139,20 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
 
   // A new line starts typing from scratch.
   useEffect(() => setTyped(false), [current, step, phase]);
+
+  // A scene with no replies carries on by itself once its last line is read —
+  // or at once, if they tap. Either way, only once.
+  const carriedOn = useRef<Scene | null>(null);
+  const carryOn = useCallback(() => {
+    if (!scene.then || carriedOn.current === scene) return;
+    carriedOn.current = scene;
+    scene.then();
+  }, [scene]);
+  useEffect(() => {
+    if (phase !== "bar" || !typed || !scene.then || step < scene.lines.length - 1) return;
+    const t = window.setTimeout(carryOn, 1400);
+    return () => window.clearTimeout(t);
+  }, [phase, typed, step, scene, carryOn]);
 
   // He moves his mouth while the line types out, then settles into idle.
   useEffect(() => {
@@ -223,25 +242,51 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
 
   // ─── Recipes ───────────────────────────────────────────────────────────────
 
+  /** "A cocktail recipe": he asks which, then the cards fade in. */
   function startRecipes() {
-    recipesShown.current = false;
-    setWritingLine(line("recipe_writing")[0]);
-    setPhase("writing");
-    setPose("writing");
-    later(showRecipes, 2400);
+    speak({ lines: line("recipe_menu_intro"), replies: [], then: () => fadeTo(showCards) });
   }
 
-  function showRecipes() {
-    if (recipesShown.current) return;
-    recipesShown.current = true;
-    setRecipeLine(line("recipe_ready")[0]);
-    fadeTo(() => setPhase((p) => (p === "writing" ? "recipes" : p)));
-    // Seeing the recipes counts as being given one, for "how did it turn out?" next visit.
-    remember((m) => ({ ...m, recipes: m.recipes.includes("*") ? m.recipes : [...m.recipes, "*"] }));
+  function showCards() {
+    setPhase("recipes");
   }
 
-  function downloaded(c: PopupCocktail) {
+  /** "Give me the recipe": back to him while he writes it out. */
+  function pickRecipe(c: PopupCocktail, index: number) {
+    setCardIndex(index);
+    writingFor.current = c;
+    fadeTo(() => {
+      setWritingLine(line("recipe_writing")[0]);
+      setPhase("writing");
+      later(handOver, 2600);
+    });
+  }
+
+  /** The recipe's written: the download button, then "another?". */
+  function handOver() {
+    const c = writingFor.current;
+    if (!c) return;
+    writingFor.current = null;
     remember((m) => ({ ...m, recipes: m.recipes.includes(c.id) ? m.recipes : [...m.recipes, c.id] }));
+
+    const another = () =>
+      speak({
+        lines: line("recipe_another"),
+        replies: [
+          { label: REPLIES.anotherRecipe, run: () => fadeTo(showCards) },
+          { label: REPLIES.noMoreRecipes, run: () => backAtBar(), quiet: true },
+        ],
+      });
+
+    const pdf = recipePdf(c);
+    if (!pdf) {
+      speak({ lines: line("recipe_no_pdf"), replies: [], then: another });
+      return;
+    }
+    speak({
+      lines: line("recipe_ready"),
+      replies: [{ label: `${REPLIES.download}: ${c.name}`, href: pdf, run: () => later(another, 600) }],
+    });
   }
 
   // ─── Tales ─────────────────────────────────────────────────────────────────
@@ -466,8 +511,8 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
         <div key="recipes" className={screen()}>
           <Recipes
             cocktails={cocktails}
-            line={recipeLine}
-            onDownload={downloaded}
+            startAt={cardIndex}
+            onPick={pickRecipe}
             onBack={() => fadeTo(() => backAtBar())}
           />
         </div>
@@ -490,7 +535,15 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
                 text={current}
                 typed={typed}
                 onTyped={() => setTyped(true)}
-                onTap={phase === "writing" ? showRecipes : lastStep ? undefined : () => setStep((n) => n + 1)}
+                onTap={
+                  phase === "writing"
+                    ? handOver
+                    : !lastStep
+                      ? () => setStep((n) => n + 1)
+                      : scene.then
+                        ? carryOn
+                        : undefined
+                }
                 more={phase === "bar" && !lastStep}
               />
 
@@ -516,9 +569,15 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
                       className={`creepy-in ${replies.length % 2 === 1 && i === replies.length - 1 ? "col-span-2" : ""}`}
                       style={{ "--i": i } as CSSProperties}
                     >
-                      <Choice small quiet={r.quiet} onClick={r.run}>
-                        {r.label}
-                      </Choice>
+                      {r.href ? (
+                        <ChoiceLink href={r.href} onClick={r.run}>
+                          {r.label}
+                        </ChoiceLink>
+                      ) : (
+                        <Choice small quiet={r.quiet} onClick={r.run}>
+                          {r.label}
+                        </Choice>
+                      )}
                     </div>
                   ))}
                 </div>

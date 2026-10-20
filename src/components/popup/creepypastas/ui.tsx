@@ -222,6 +222,28 @@ export function DialogueBox({
   );
 }
 
+/**
+ * A reply that opens a file — the recipe PDF — styled as the main reply on
+ * screen. Opens in a new tab, where phones show the PDF with their own
+ * save/share controls.
+ */
+export function ChoiceLink({ href, children, onClick }: { href: string; children: ReactNode; onClick?: () => void }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      download
+      onClick={onClick}
+      className={`${voiceFont.className} w-full h-full min-h-[52px] flex items-center justify-center text-center px-3 py-2 leading-snug rounded-[6px]
+        bg-white text-black border-2 border-white text-[clamp(18px,5vw,21px)]
+        focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black`}
+    >
+      {children}
+    </a>
+  );
+}
+
 /** His words over the recipe cards: a white-ruled bubble with a tail. */
 export function SpeechBubble({ children, onNext }: { children: ReactNode; onNext?: () => void }) {
   return (

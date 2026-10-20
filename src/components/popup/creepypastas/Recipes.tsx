@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type CSSProperties } from "react";
 import type { PopupCocktail } from "@/lib/popup/types";
-import { Choice, readFont, SpeechBubble, voiceFont } from "./ui";
+import { Choice, readFont, voiceFont } from "./ui";
 
 /** The recipe PDF the owner uploaded for a cocktail in the admin. */
 export function recipePdf(c: PopupCocktail): string | null {
@@ -11,143 +11,153 @@ export function recipePdf(c: PopupCocktail): string | null {
 }
 
 /**
- * The four Halloween cocktails as cards to swipe between: name, description,
- * ingredients from the admin, and the recipe PDF to keep. The website only
- * shares recipes — it never takes an order.
+ * The Halloween cocktails as cards to swipe between: picture, name, tagline,
+ * ingredients — all from the admin. "Give me the recipe" takes whichever card
+ * is showing back to the bartender, who writes it out. The website only
+ * shares recipes; it never takes an order.
  */
 export default function Recipes({
   cocktails,
-  line,
-  onDownload,
+  startAt = 0,
+  onPick,
   onBack,
 }: {
   cocktails: PopupCocktail[];
-  /** What the bartender says over the cards. */
-  line: string;
-  onDownload: (c: PopupCocktail) => void;
+  /** Open on this card (coming back for "another recipe"). */
+  startAt?: number;
+  onPick: (c: PopupCocktail, index: number) => void;
   onBack: () => void;
 }) {
-  const track = useRef<HTMLDivElement>(null);
-  const [index, setIndex] = useState(0);
-  const [saved, setSaved] = useState<string | null>(null);
+  const track = useRef<HTMLDivElement | null>(null);
+  const [index, setIndex] = useState(Math.min(startAt, Math.max(0, cocktails.length - 1)));
 
-  const go = (i: number) => {
-    const el = track.current?.children[i] as HTMLElement | undefined;
-    el?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  const cardAt = (i: number) => track.current?.children[i] as HTMLElement | undefined;
+
+  const go = (i: number) => cardAt(i)?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+
+  // Land on the starting card without an animated scroll.
+  const placed = useRef(false);
+  const place = (el: HTMLDivElement | null) => {
+    track.current = el;
+    if (!el || placed.current) return;
+    placed.current = true;
+    const card = el.children[index] as HTMLElement | undefined;
+    if (card) el.scrollLeft = card.offsetLeft - (el.clientWidth - card.offsetWidth) / 2;
   };
 
   const onScroll = () => {
     const el = track.current;
     if (!el) return;
-    const card = el.children[0] as HTMLElement | undefined;
-    if (!card) return;
-    setIndex(Math.round(el.scrollLeft / (card.offsetWidth + 16)));
+    const middle = el.scrollLeft + el.clientWidth / 2;
+    let best = 0;
+    let bestDist = Infinity;
+    Array.from(el.children).forEach((c, i) => {
+      const card = c as HTMLElement;
+      const d = Math.abs(card.offsetLeft + card.offsetWidth / 2 - middle);
+      if (d < bestDist) {
+        bestDist = d;
+        best = i;
+      }
+    });
+    setIndex(best);
   };
+
+  const current = cocktails[index];
 
   return (
     <div className="h-full flex flex-col">
-      <div className="px-4 pt-4 pb-5">
-        <SpeechBubble>{saved ?? line}</SpeechBubble>
-      </div>
+      <p className={`${voiceFont.className} shrink-0 pt-4 pb-3 text-center text-[15px] text-white/60`}>
+        {cocktails.length > 1 ? "Swipe to browse our Halloween cocktails" : "Our Halloween cocktail"}
+      </p>
 
       {cocktails.length === 0 ? (
-        <p className={`${readFont.className} flex-1 px-6 text-white/70`}>
+        <p className={`${readFont.className} flex-1 px-6 text-white/70 text-center`}>
           The recipes are still being written up. Ask your bartender in the meantime.
         </p>
       ) : (
-        <>
-          <div
-            ref={track}
-            onScroll={onScroll}
-            className="flex-1 min-h-0 flex gap-4 overflow-x-auto snap-x snap-mandatory px-[8vw] pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            role="region"
-            aria-roledescription="carousel"
-            aria-label="Cocktail recipes"
-          >
-            {cocktails.map((c, i) => {
-              const pdf = recipePdf(c);
-              return (
-                <section
-                  key={c.id}
-                  aria-label={`${i + 1} of ${cocktails.length}: ${c.name}`}
-                  className="snap-center shrink-0 w-[84vw] max-w-[400px] border-[3px] border-white rounded-[14px] px-5 py-5 flex flex-col overflow-y-auto"
-                >
-                  <h2 className={`${voiceFont.className} text-[24px] leading-tight`}>{c.name || "Untitled cocktail"}</h2>
-                  {c.tagline && <p className={`${readFont.className} italic text-white/60 mt-1`}>{c.tagline}</p>}
-
-                  <div className={`${readFont.className} mt-4 text-[16px] leading-relaxed text-white/90 space-y-4 flex-1`}>
-                    {c.description?.trim() ? (
-                      <p className="whitespace-pre-line">{c.description}</p>
-                    ) : (
-                      <p className="text-white/50 italic">Description coming soon.</p>
-                    )}
-                    {c.ingredients?.trim() && (
-                      <div>
-                        <h3 className={`${voiceFont.className} text-[13px] tracking-[0.18em] uppercase text-white/55 mb-1`}>
-                          Ingredients
-                        </h3>
-                        <p className="whitespace-pre-line">{c.ingredients}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {pdf ? (
-                    <a
-                      href={pdf}
-                      target="_blank"
-                      rel="noreferrer"
-                      download
-                      onClick={() => {
-                        onDownload(c);
-                        setSaved(`Your ${c.name} recipe is on its way. On a phone it opens as a PDF: use Share to save it.`);
-                      }}
-                      className={`${voiceFont.className} mt-5 min-h-[48px] flex items-center justify-center rounded-[6px] bg-white text-black text-[17px]
-                        focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black`}
-                    >
-                      Download the recipe (PDF)
-                    </a>
-                  ) : (
-                    <p className={`${voiceFont.className} mt-5 text-[14px] text-white/45 text-center`}>
-                      Printable recipe coming soon
-                    </p>
-                  )}
-                </section>
-              );
-            })}
-          </div>
-
-          {cocktails.length > 1 && (
-            <div className="flex items-center justify-center gap-4 py-3">
-              <button
-                type="button"
-                onClick={() => go(Math.max(0, index - 1))}
-                disabled={index === 0}
-                aria-label="Previous recipe"
-                className={`${voiceFont.className} min-w-[44px] min-h-[44px] text-[20px] disabled:opacity-25`}
-              >
-                ◀
-              </button>
-              <p className={`${voiceFont.className} text-[14px] text-white/60`} aria-live="polite">
-                {Math.min(index, cocktails.length - 1) + 1} / {cocktails.length}
-              </p>
-              <button
-                type="button"
-                onClick={() => go(Math.min(cocktails.length - 1, index + 1))}
-                disabled={index >= cocktails.length - 1}
-                aria-label="Next recipe"
-                className={`${voiceFont.className} min-w-[44px] min-h-[44px] text-[20px] disabled:opacity-25`}
-              >
-                ▶
-              </button>
-            </div>
-          )}
-        </>
+        <div
+          ref={place}
+          onScroll={onScroll}
+          className="flex-1 min-h-0 flex gap-4 overflow-x-auto snap-x snap-mandatory px-[8vw] pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          role="region"
+          aria-roledescription="carousel"
+          aria-label="Halloween cocktails"
+        >
+          {cocktails.map((c, i) => (
+            <section
+              key={c.id}
+              aria-label={`${i + 1} of ${cocktails.length}: ${c.name}`}
+              aria-current={i === index ? "true" : undefined}
+              className="creepy-in snap-center shrink-0 w-[84vw] max-w-[400px] border-[3px] border-white rounded-[10px] px-5 py-5 flex flex-col items-center text-center overflow-y-auto"
+              style={{ "--i": i } as CSSProperties}
+            >
+              {c.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- pixel art, served as-is
+                <img
+                  src={c.imageUrl}
+                  alt=""
+                  className="w-[62%] max-w-[220px] aspect-square object-contain shrink-0"
+                  style={{ imageRendering: "pixelated" }}
+                />
+              ) : (
+                <div aria-hidden className="w-[62%] max-w-[220px] aspect-square shrink-0 border-2 border-dashed border-white/25 rounded" />
+              )}
+              <h2 className={`${voiceFont.className} mt-4 text-[clamp(22px,6.4vw,28px)] leading-tight`}>
+                {c.name || "Untitled cocktail"}
+              </h2>
+              {c.tagline && (
+                <p className={`${readFont.className} mt-1 italic text-[16px] text-white/70`}>{c.tagline}</p>
+              )}
+              {c.ingredients?.trim() && (
+                <div className={`${readFont.className} mt-4 text-[16px] leading-relaxed text-white/90`}>
+                  <h3 className={`${voiceFont.className} text-[12px] tracking-[0.2em] uppercase text-white/50 mb-1`}>
+                    Ingredients
+                  </h3>
+                  <p className="whitespace-pre-line">{c.ingredients}</p>
+                </div>
+              )}
+            </section>
+          ))}
+        </div>
       )}
 
-      <div className="px-4 pb-4">
-        <Choice quiet onClick={onBack}>
-          Back to the bar
-        </Choice>
+      {cocktails.length > 1 && (
+        <div className="shrink-0 flex items-center justify-center gap-4 pt-2">
+          <button
+            type="button"
+            onClick={() => go(Math.max(0, index - 1))}
+            disabled={index === 0}
+            aria-label="Previous cocktail"
+            className={`${voiceFont.className} min-w-[44px] min-h-[44px] text-[20px] disabled:opacity-25`}
+          >
+            ◀
+          </button>
+          <p className={`${voiceFont.className} text-[14px] text-white/60`} aria-live="polite">
+            {index + 1} / {cocktails.length}
+          </p>
+          <button
+            type="button"
+            onClick={() => go(Math.min(cocktails.length - 1, index + 1))}
+            disabled={index >= cocktails.length - 1}
+            aria-label="Next cocktail"
+            className={`${voiceFont.className} min-w-[44px] min-h-[44px] text-[20px] disabled:opacity-25`}
+          >
+            ▶
+          </button>
+        </div>
+      )}
+
+      <div className="shrink-0 px-4 pt-2 pb-4 grid grid-cols-2 gap-2">
+        {current && (
+          <div className="col-span-2">
+            <Choice onClick={() => onPick(current, index)}>Give me the recipe</Choice>
+          </div>
+        )}
+        <div className="col-span-2">
+          <Choice quiet small onClick={onBack}>
+            Back to the bar
+          </Choice>
+        </div>
       </div>
     </div>
   );

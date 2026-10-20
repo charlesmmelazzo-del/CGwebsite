@@ -49,7 +49,9 @@ export type Moment =
   | "story_left_early"
   | "story_changed_mind"
   | "recipe_writing"
-  | "story_thinking";
+  | "story_thinking"
+  | "recipe_another"
+  | "recipe_no_pdf";
 
 const one = (id: string, text: string): HostLine => ({ id, lines: [text] });
 
@@ -80,6 +82,13 @@ const FALLBACK: Partial<Record<Moment, HostLine[]>> = {
   recipe_writing: [
     one("fb_recipe_writing_01", "Let me write that down for you. My handwriting has survived worse than a busy bar."),
     one("fb_recipe_writing_02", "One moment. A good recipe deserves to be written out properly."),
+  ],
+  recipe_another: [
+    one("fb_recipe_another_01", "Shall I scribble down another? I've ink to spare and no pulse to slow me down."),
+    one("fb_recipe_another_02", "Another recipe for the road? My quill hasn't had this much exercise since the Victorian era."),
+  ],
+  recipe_no_pdf: [
+    one("fb_recipe_no_pdf_01", "Blast. The printed card for that one isn't back from the printer yet. Ask at the bar and they'll walk you through it."),
   ],
   story_thinking: [
     one("fb_thinking_01", "Now then. Which tale… let me think."),
@@ -120,4 +129,7 @@ export const REPLIES = {
   signupYes: "Yes, keep me posted",
   signupNo: "No thanks",
   done: "That's all for now",
+  download: "Download the recipe",
+  anotherRecipe: "Another recipe",
+  noMoreRecipes: "No, that's all",
 };
