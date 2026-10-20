@@ -2,6 +2,7 @@
 
 import { useRef, useState, type CSSProperties } from "react";
 import type { PopupCocktail } from "@/lib/popup/types";
+import { ingredientNames } from "./ingredients";
 import { Choice, readFont, voiceFont } from "./ui";
 
 /** The recipe PDF the owner uploaded for a cocktail in the admin. */
@@ -88,7 +89,7 @@ export default function Recipes({
               key={c.id}
               aria-label={`${i + 1} of ${cocktails.length}: ${c.name}`}
               aria-current={i === index ? "true" : undefined}
-              className="creepy-in snap-center shrink-0 w-[84vw] max-w-[400px] border-[3px] border-white rounded-[10px] px-5 py-5 flex flex-col items-center text-center overflow-y-auto"
+              className="creepy-in snap-center shrink-0 w-[84vw] max-w-[400px] border-[3px] border-white rounded-[10px] px-5 py-4 flex flex-col items-center text-center overflow-y-auto"
               style={{ "--i": i } as CSSProperties}
             >
               {c.imageUrl ? (
@@ -96,24 +97,28 @@ export default function Recipes({
                 <img
                   src={c.imageUrl}
                   alt=""
-                  className="w-[62%] max-w-[220px] aspect-square object-contain shrink-0"
+                  className="w-[78%] max-w-[280px] aspect-square object-contain shrink-0"
                   style={{ imageRendering: "pixelated" }}
                 />
               ) : (
-                <div aria-hidden className="w-[62%] max-w-[220px] aspect-square shrink-0 border-2 border-dashed border-white/25 rounded" />
+                <div aria-hidden className="w-[78%] max-w-[280px] aspect-square shrink-0 border-2 border-dashed border-white/25 rounded" />
               )}
-              <h2 className={`${voiceFont.className} mt-4 text-[clamp(22px,6.4vw,28px)] leading-tight`}>
+              <h2 className={`${voiceFont.className} mt-3 text-[clamp(22px,6.4vw,28px)] leading-tight`}>
                 {c.name || "Untitled cocktail"}
               </h2>
               {c.tagline && (
                 <p className={`${readFont.className} mt-1 italic text-[16px] text-white/70`}>{c.tagline}</p>
               )}
-              {c.ingredients?.trim() && (
-                <div className={`${readFont.className} mt-4 text-[16px] leading-relaxed text-white/90`}>
+              {ingredientNames(c.ingredients).length > 0 && (
+                <div className={`${readFont.className} mt-3 text-[15px] leading-snug text-white/90`}>
                   <h3 className={`${voiceFont.className} text-[12px] tracking-[0.2em] uppercase text-white/50 mb-1`}>
                     Ingredients
                   </h3>
-                  <p className="whitespace-pre-line">{c.ingredients}</p>
+                  <ul>
+                    {ingredientNames(c.ingredients).map((name) => (
+                      <li key={name}>{name}</li>
+                    ))}
+                  </ul>
                 </div>
               )}
             </section>

@@ -546,6 +546,11 @@ function CocktailCard({
             value={cocktail.ingredients ?? ""}
             onChange={(v) => onUpdate({ ingredients: v })}
             multiline
+            hint={
+              templateKey === "creepypastas"
+                ? "One per line. Amounts are fine here: the recipe cards show just the names (\u201c2 oz bourbon\u201d shows as \u201cBourbon\u201d); the full recipe lives in the PDF."
+                : undefined
+            }
           />
           {templateKey !== "creepypastas" && (
           <TextField
