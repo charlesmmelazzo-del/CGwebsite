@@ -53,7 +53,9 @@ export type Moment =
   | "recipe_another"
   | "recipe_no_pdf"
   | "version_choice_prompt"
-  | "modern_bridge";
+  | "modern_bridge"
+  | "story_new_or_resume"
+  | "story_resume_list";
 
 const one = (id: string, text: string): HostLine => ({ id, lines: [text] });
 
@@ -99,6 +101,14 @@ const FALLBACK: Partial<Record<Moment, HostLine[]>> = {
   modern_bridge: [
     one("fb_modern_bridge_01", "Retold in today's English, not word for word, but every turn of the tale is here. Let's begin."),
   ],
+  story_new_or_resume: [
+    one("fb_new_or_resume_01", "A fresh tale, or shall we go back to one I'd already started for you? I kept your place in each."),
+    one("fb_new_or_resume_02", "I've a few of your tales still half-told. Pick one back up, or shall I find you something new?"),
+  ],
+  story_resume_list: [
+    one("fb_resume_list_01", "Here are the ones we left unfinished. Choose, and I'll open to your page."),
+    one("fb_resume_list_02", "Your half-told tales, most recent first. Which one?"),
+  ],
   story_thinking: [
     one("fb_thinking_01", "Now then. Which tale… let me think."),
     one("fb_thinking_02", "Hmm. I know just the one. Or I will, in a moment."),
@@ -130,6 +140,9 @@ export const REPLIES = {
   changeChoices: "Change time or scare level",
   changedMind: "I changed my mind",
   resume: "Pick up where I left off",
+  newTale: "A new tale",
+  returnToTale: "Return to a tale I started",
+  olderTales: "Older ones",
   somethingElse: "Choose something else",
   revisit: "Hear a favourite again",
   revisitOffered: "Show me those again",

@@ -9,6 +9,7 @@ import {
   latestBookmark,
   readMemory,
   updateMemory,
+  type Bookmark,
   type GuestMemory,
 } from "../creepypastas/memory";
 import Reader, { type Place } from "../creepypastas/Reader";
@@ -171,7 +172,7 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
   function mainReplies(): Reply[] {
     return [
       { label: REPLIES.recipe, run: startRecipes },
-      { label: REPLIES.tale, run: startTale },
+      { label: REPLIES.tale, run: () => void startTale() },
       { label: REPLIES.done, run: farewell, quiet: true },
     ];
   }
@@ -216,13 +217,7 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
         replies: [
           {
             label: REPLIES.resume,
-            run: () =>
-              openTale(marked, {
-                startAt: mark.bookmark.progress,
-                startPara: mark.bookmark.para,
-                // Only trust a saved "modern" if that telling still exists.
-                version: mark.bookmark.version === "modern" && marked.modern ? "modern" : "original",
-              }),
+            run: () => resumeTale(marked, mark.bookmark),
           },
           { label: REPLIES.somethingElse, run: () => speak({ lines: question, replies: mainReplies() }) },
         ],
@@ -308,8 +303,58 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
     });
   }
 
-  function startTale() {
-    askTime();
+  /** Their unfinished tales that still exist, most recent first. */
+  async function startedTales(): Promise<{ card: TaleCard; bookmark: Bookmark }[]> {
+    const catalog = await loadCatalog().catch(() => null);
+    if (!catalog) return [];
+    return Object.entries(readMemory(menuId).bookmarks)
+      .sort(([, a], [, b]) => (a.at < b.at ? 1 : -1))
+      .flatMap(([id, bookmark]) => {
+        const card = catalog.find((t) => t.id === id);
+        return card ? [{ card, bookmark }] : [];
+      });
+  }
+
+  function resumeTale(card: TaleCard, bookmark: Bookmark) {
+    openTale(card, {
+      startAt: bookmark.progress,
+      startPara: bookmark.para,
+      // Only trust a saved "modern" if that telling still exists.
+      version: bookmark.version === "modern" && card.modern ? "modern" : "original",
+    });
+  }
+
+  /** "A spooky tale": a first-timer goes straight to the questions; anyone with a
+   *  half-read tale is offered it back first. */
+  async function startTale() {
+    const started = await startedTales();
+    if (started.length === 0) return askTime();
+    speak({
+      lines: line("story_new_or_resume"),
+      replies: [
+        { label: REPLIES.newTale, run: () => askTime() },
+        { label: REPLIES.returnToTale, run: () => listStarted(started) },
+        { label: REPLIES.changedMind, run: changedMind, quiet: true },
+      ],
+    });
+  }
+
+  /** Four to a page so the buttons fit the panel on a small phone. */
+  function listStarted(started: { card: TaleCard; bookmark: Bookmark }[], from = 0) {
+    const page = started.slice(from, from + 4);
+    const more = from + 4 < started.length;
+    speak({
+      lines: from === 0 ? line("story_resume_list") : ["And a few from further back."],
+      replies: [
+        ...page.map(({ card, bookmark }) => ({
+          label: `${card.title} · ${Math.max(1, Math.round(bookmark.progress * 100))}%`,
+          run: () => resumeTale(card, bookmark),
+        })),
+        more
+          ? { label: REPLIES.olderTales, run: () => listStarted(started, from + 4), quiet: true }
+          : { label: REPLIES.newTale, run: () => askTime(), quiet: true },
+      ],
+    });
   }
 
   function chooseTime(t: TimeId) {
@@ -476,7 +521,7 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
         speak({
           lines: line("story_completion_outro"),
           replies: [
-            { label: "Another spooky tale", run: () => askTime() },
+            { label: "Another spooky tale", run: () => void startTale() },
             { label: REPLIES.recipe, run: startRecipes },
             { label: REPLIES.backToBar, run: () => backAtBar(), quiet: true },
           ],
