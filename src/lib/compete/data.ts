@@ -49,6 +49,7 @@ export function mapEvent(r: Row): CompEvent {
     accentColor: str(r.accent_color) || DEFAULT_ACCENT,
     status: (str(r.status) || "draft") as CompEvent["status"],
     isDemo: Boolean(r.is_demo),
+    listed: r.listed === true,
     contestantDeadline: (r.contestant_deadline as string | null) ?? null,
     partnerDeadline: (r.partner_deadline as string | null) ?? null,
     rulesText: str(r.rules_text) || DEFAULT_RULES_TEXT,
@@ -327,8 +328,10 @@ export async function getEventsPageCompetitions(): Promise<{
       .from("comp_events")
       .select("*")
       .in("status", ["published", "live", "finished"])
-      // Demo events work by link but never appear to customers — staging and
-      // the live site share one database.
+      // Only events the admin has switched on for the Events page. Everything
+      // else — drafts' link-only testing, demos — works by link but never
+      // appears to customers (staging and the live site share one database).
+      .eq("listed", true)
       .eq("is_demo", false)
       .order("event_date", { ascending: false });
     const events = (data ?? []).map(mapEvent);
@@ -514,4 +517,49 @@ export async function judgeCards(ev: CompEvent, contestantId: string) {
       return v ? { name: j.name || `Judge ${i + 1}`, scores: v.scores ?? {} } : null;
     })
     .filter((x): x is { name: string; scores: Record<string, number> } => x !== null);
+}
+
+// ─── Pre-publish preview ─────────────────────────────────────────────────────
+
+export type PreviewAudience = { kind: "admin" } | { kind: "partner"; sponsorId: string };
+
+/**
+ * The guest view as it WILL look, for checking before anything is published.
+ *
+ *   * admin   — every brand partner and contestant that has content, approved
+ *               or not, so submissions can be checked before approving them.
+ *   * partner — their own profile (whatever its status) plus the approved
+ *               brand partners and the contestants who have submitted.
+ */
+export async function getPreviewEvent(ev: CompEvent, audience: PreviewAudience): Promise<PublicEvent> {
+  const base = await getPublicEvent(ev);
+  const [sponsors, contestants] = await Promise.all([getSponsors(ev.id), getContestants(ev.id)]);
+  const hasBrand = (s: Sponsor) => Boolean(s.profile.brandName || s.profile.logoUrl);
+  const showSponsor = (s: Sponsor) =>
+    audience.kind === "admin" ? hasBrand(s) : s.id === audience.sponsorId ? hasBrand(s) : s.status === "approved";
+  const showContestant = (c: Contestant) =>
+    Boolean(c.bartender.name || c.cocktail.name) &&
+    (audience.kind === "admin" ? true : c.status === "approved" || c.status === "submitted");
+  return {
+    ...base,
+    sponsors: sponsors
+      .filter(showSponsor)
+      .sort(
+        (a, b) =>
+          Number(audience.kind === "partner" && b.id === audience.sponsorId) -
+            Number(audience.kind === "partner" && a.id === audience.sponsorId) ||
+          Number(b.isPrimary) - Number(a.isPrimary) ||
+          a.sort - b.sort
+      )
+      .map((s) => ({ id: s.id, isPrimary: s.isPrimary, profile: s.profile })),
+    contestants: contestants
+      .filter(showContestant)
+      .map((c) => ({ id: c.id, sort: c.sort, bartender: c.bartender, cocktail: c.cocktail })),
+  };
+}
+
+/** Judges' names for the example reveal in a preview. */
+export async function judgeNames(ev: CompEvent): Promise<string[]> {
+  const judgeTiers = new Set(ev.tiers.filter((t) => t.isJudge).map((t) => t.id));
+  return (await getCodes(ev.id)).filter((c) => judgeTiers.has(c.tierId)).map((c, i) => c.name || `Judge ${i + 1}`);
 }

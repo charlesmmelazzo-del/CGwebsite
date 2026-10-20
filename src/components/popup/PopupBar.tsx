@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import type { PopupViewer } from "@/lib/popup/types";
 
@@ -22,6 +22,9 @@ export default function PopupBar({
 }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
+  // The admin's sandbox preview of an unpublished pop-up. Flagged here, in the
+  // bar, rather than with a banner that would push the pop-up down the screen.
+  const inSandbox = usePathname()?.startsWith("/popup/preview/") ?? false;
 
   async function signOut() {
     await fetch("/api/popup/session", { method: "DELETE" });
@@ -43,6 +46,17 @@ export default function PopupBar({
         >
           Pop Up Zone
         </Link>
+
+        {inSandbox && (
+          <Link
+            href="/admin/popup"
+            title="Sandbox preview: not public. Tap to go back to the admin."
+            aria-label="Sandbox preview, not public. Back to the admin."
+            className="ml-auto sm:ml-0 shrink-0 rounded-full bg-amber-400 text-black px-3 py-1 text-[10px] tracking-[0.2em] uppercase font-semibold hover:bg-amber-300"
+          >
+            Sandbox
+          </Link>
+        )}
 
         {/* Desktop links */}
         <nav className="hidden sm:flex items-center gap-6">

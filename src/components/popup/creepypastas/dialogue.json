@@ -1,0 +1,650 @@
+{
+ "fresh_welcome": [
+  {
+   "id": "welcome_fresh_01",
+   "lines": [
+    "Welcome to Common Good during the spooky season! Pull up a chair; I’ve been dying for company, and I’m very thorough about it.",
+    "Have a look at our Halloween pop-up cocktails. I hope you’re having a lovely evening; a little life around here does my old bones good.",
+    "I’ve recipes for your home bar and spooky tales from my old patrons. Heh-heh! Some guests leave a tip; others leave a haunting."
+   ]
+  },
+  {
+   "id": "welcome_fresh_02",
+   "lines": [
+    "Welcome to Common Good during the spooky season! Make yourself comfortable; the bar has far more elbow room than my coffin.",
+    "Do enjoy our Halloween pop-up cocktails if one takes your fancy. I like an evening with good spirits and very little resting in peace.",
+    "Take a recipe home, or settle in for a spooky tale from an old bar patron. I remember every word; my embalmer called it a troublesome habit."
+   ]
+  },
+  {
+   "id": "welcome_fresh_03",
+   "lines": [
+    "Welcome to Common Good during the spooky season! Come in; the graveyard shift gets much cheerier with company.",
+    "I hope you enjoy our Halloween pop-up cocktails. They’re much better company than the spirits in my family plot.",
+    "I can scribble down a cocktail recipe, or share a spooky tale an old patron told me. I’ve collected quite a few; retirement keeps failing to take."
+   ]
+  }
+ ],
+ "intent_prompt": [
+  {
+   "id": "intent_01",
+   "lines": [
+    "A cocktail recipe for your home bar, or a spooky tale from an old patron? I’m dying to share either; fortunately, I’ve already done the difficult part."
+   ],
+   "choices": [
+    "A cocktail recipe",
+    "A spooky tale"
+   ]
+  },
+  {
+   "id": "intent_02",
+   "lines": [
+    "Shall I write down a cocktail recipe, or unearth a spooky tale for you? Both go beautifully with good company, and neither requires you to bring a shovel."
+   ],
+   "choices": [
+    "A cocktail recipe",
+    "A spooky tale"
+   ]
+  }
+ ],
+ "time_prompt": [
+  {
+   "id": "time_01",
+   "lines": [
+    "How long have you got for a tale? I can work around your schedule; death rather cleared mine."
+   ],
+   "choices": [
+    "5–10 minutes",
+    "10–20 minutes",
+    "I've got all the time in the world"
+   ]
+  },
+  {
+   "id": "time_02",
+   "lines": [
+    "How much time would you like to spend with me? A brief chill or a longer haunting both suit these old bones."
+   ],
+   "choices": [
+    "5–10 minutes",
+    "10–20 minutes",
+    "I've got all the time in the world"
+   ]
+  },
+  {
+   "id": "time_03",
+   "lines": [
+    "Choose how long you’d like to listen. I’ll mind the clock; it’s the only ticking that still concerns me."
+   ],
+   "choices": [
+    "5–10 minutes",
+    "10–20 minutes",
+    "I've got all the time in the world"
+   ]
+  }
+ ],
+ "scare_prompt": [
+  {
+   "id": "scare_01",
+   "lines": [
+    "How much fright suits you: a gentle shiver, a proper chill, or the darkest tales? I’ll open the appropriate drawer; it’s terribly rude to spring the wrong corpse on company."
+   ],
+   "choices": [
+    "A gentle shiver",
+    "A proper chill",
+    "The darkest tales"
+   ]
+  },
+  {
+   "id": "scare_02",
+   "lines": [
+    "Shall we keep it gently spooky, raise a proper chill, or let the darkest tales loose? Choose what feels comfortable; I want your visit pleasantly haunted."
+   ],
+   "choices": [
+    "A gentle shiver",
+    "A proper chill",
+    "The darkest tales"
+   ]
+  },
+  {
+   "id": "scare_03",
+   "lines": [
+    "You choose the fright: gentle, spooky, or intense. I’ll keep the nightmare to your taste; hospitality is the one thing I refuse to bury."
+   ],
+   "choices": [
+    "A gentle shiver",
+    "A proper chill",
+    "The darkest tales"
+   ]
+  }
+ ],
+ "returning_guest_welcome": [
+  {
+   "id": "welcome_return_01",
+   "lines": [
+    "Welcome back to Common Good for the spooky season and our Halloween pop-up cocktails! Another visit makes these old bones rattle with delight."
+   ]
+  },
+  {
+   "id": "welcome_return_02",
+   "lines": [
+    "Welcome back to Common Good’s spooky season and Halloween pop-up cocktails! Heh-heh, I may misplace a finger, but I remember a guest."
+   ]
+  },
+  {
+   "id": "welcome_return_03",
+   "lines": [
+    "I’m delighted you’ve returned to Common Good for the spooky season and our Halloween pop-up cocktails. You bring the company; I’ll supply the creaking joints."
+   ]
+  },
+  {
+   "id": "welcome_return_04",
+   "lines": [
+    "Welcome back to Common Good’s spooky season and Halloween pop-up cocktails! Pull up a seat; I’ve kept my hospitality alive through several personal setbacks, including my burial."
+   ]
+  }
+ ],
+ "recipe_shared_return_callback": [
+  {
+   "id": "recipe_callback_01",
+   "lines": [
+    "I remember sharing a recipe with you. If you’ve tried it at home, I hope it raised your spirits; I’m still working on raising my left eyebrow."
+   ]
+  },
+  {
+   "id": "recipe_callback_02",
+   "lines": [
+    "I shared a cocktail recipe with you on an earlier visit. A little Common Good for your home bar, with no exhumation required."
+   ]
+  },
+  {
+   "id": "recipe_callback_03",
+   "lines": [
+    "I remember the cocktail recipe I shared with you. Whenever you give it a try, I hope it brings the evening to life; one of us ought to manage that."
+   ]
+  }
+ ],
+ "both_story_and_recipe_connective": [
+  {
+   "id": "both_callback_01",
+   "lines": [
+    "And I shared a cocktail recipe with you, too. I hope it comes in handy at home; my own hands are mostly handy for rattling."
+   ]
+  },
+  {
+   "id": "both_callback_02",
+   "lines": [
+    "There was a recipe I shared as well. If you’ve tried it, I hope it raised the evening’s spirits; mine tend to rise without an invitation."
+   ]
+  },
+  {
+   "id": "both_callback_03",
+   "lines": [
+    "I also remember sharing a recipe with you. I hope it earns a place at your home bar; good recipes deserve preservation, and I’m practically an exhibit."
+   ]
+  }
+ ],
+ "resume_unfinished_story": [
+  {
+   "id": "resume_01",
+   "lines": [
+    "I’ve kept your place in the unfinished tale. Shall we pick up there, or choose something else? The suspense is wonderfully preserved; I wish I could say the same for my knees."
+   ],
+   "choices": [
+    "Pick up where I left off",
+    "Choose something else"
+   ]
+  },
+  {
+   "id": "resume_02",
+   "lines": [
+    "Your unfinished story has a bookmark waiting. Continue from that spot, or find a different tale? I’m happy to reopen either the book or the crypt."
+   ],
+   "choices": [
+    "Continue my story",
+    "Find a different tale"
+   ]
+  }
+ ],
+ "decline_and_offer_another": [
+  {
+   "id": "decline_01",
+   "lines": [
+    "Of course; we can leave that coffin closed. I have another tale to offer, and I’m delighted to keep digging for one that suits you."
+   ]
+  },
+  {
+   "id": "decline_02",
+   "lines": [
+    "No trouble at all! That tale can rest its bones while I bring out another. A good host knows when to change the haunting."
+   ]
+  }
+ ],
+ "new_search_transition": [
+  {
+   "id": "new_search_01",
+   "lines": [
+    "Let’s choose your story preferences again. A different length or fright level may wake something promising; I do love a little disturbance among the remains."
+   ]
+  },
+  {
+   "id": "new_search_02",
+   "lines": [
+    "We can choose a different length or degree of fright. I’ll search again; there’s plenty of enthusiasm left in this old carcass."
+   ]
+  }
+ ],
+ "no_matching_story": [
+  {
+   "id": "no_match_01",
+   "lines": [
+    "No tale fits that time and scare level. A grave disappointment, but easily remedied: change either choice, or come back to the bar."
+   ],
+   "choices": [
+    "Change the time",
+    "Change the scare level",
+    "Back to the bar"
+   ]
+  },
+  {
+   "id": "no_match_02",
+   "lines": [
+    "My shelves have a gap for that combination; even a corpse can come up short. Try another length or scare level, or return to the bar."
+   ],
+   "choices": [
+    "Choose another length",
+    "Choose another level of fright",
+    "Back to the bar"
+   ]
+  }
+ ],
+ "all_matching_stories_heard": [
+  {
+   "id": "all_heard_01",
+   "lines": [
+    "You’ve finished every tale matching these choices. Shall we resurrect one, change the selection, or look at cocktail recipes? I adore giving a good story another pulse."
+   ],
+   "choices": [
+    "Revisit a tale",
+    "Change my selection",
+    "See cocktail recipes"
+   ]
+  },
+  {
+   "id": "all_heard_02",
+   "lines": [
+    "You’ve completed all the tales in this selection. Bring one back, explore another selection, or choose a recipe; there’s no need to bury the evening yet."
+   ],
+   "choices": [
+    "Hear a favorite again",
+    "Look elsewhere in the collection",
+    "A recipe instead"
+   ]
+  }
+ ],
+ "story_completion_outro": [
+  {
+   "id": "complete_01",
+   "lines": [
+    "And that’s the final nail in that tale’s coffin! Another story, a cocktail recipe, or back to the bar? I do love keeping you company."
+   ],
+   "choices": [
+    "Another spooky tale",
+    "A cocktail recipe",
+    "Back to the bar"
+   ]
+  },
+  {
+   "id": "complete_02",
+   "lines": [
+    "That’s the tale, right down to its last breath. Shall I unearth another, show you a recipe, or take you back to the bar?"
+   ],
+   "choices": [
+    "Tell me another",
+    "Show me the recipes",
+    "Back to the bar"
+   ]
+  }
+ ],
+ "all_the_time_response": [
+  {
+   "id": "all_time_01",
+   "lines": [
+    "All the time in the world? A generous offer; I’ll try not to spend the next century deciding. These old bones are positively quivering with possibilities."
+   ]
+  },
+  {
+   "id": "all_time_02",
+   "lines": [
+    "Then we needn’t rush the telling. Splendid; I’ve polished my patience to a lovely bone-white finish, and I’m delighted to spend some of it with you."
+   ]
+  }
+ ],
+ "under_five_minutes_leadin": [
+  {
+   "id": "under_five_01",
+   "lines": [
+    "This one’s estimated at under five minutes. A pocket-sized haunting; some of my best company fits in a very small coffin."
+   ]
+  },
+  {
+   "id": "under_five_02",
+   "lines": [
+    "I have a tale estimated at under five minutes. Barely time for my joints to seize up, but quite enough for a little company from the dark."
+   ]
+  }
+ ],
+ "unknown_history_greeting": [
+  {
+   "id": "welcome_unknown_01",
+   "lines": [
+    "Welcome to Common Good during the spooky season, with our Halloween pop-up cocktails! Recipes, tales, and a bartender with more bones than sense await your pleasure."
+   ]
+  },
+  {
+   "id": "welcome_unknown_02",
+   "lines": [
+    "Welcome to Common Good for the spooky season and our Halloween pop-up cocktails. Settle in for a recipe or a tale; this old corpse is delighted to have company."
+   ]
+  }
+ ],
+ "same_visit_return_to_main": [
+  {
+   "id": "main_same_visit_01",
+   "lines": [
+    "Back at the bar! Shall I fetch a cocktail recipe or unearth a spooky tale? My digging arm is positively itching for something to do."
+   ],
+   "choices": [
+    "A cocktail recipe",
+    "A spooky tale"
+   ]
+  },
+  {
+   "id": "main_same_visit_02",
+   "lines": [
+    "A cocktail recipe, or a spooky tale? Pick what suits you; I’m happy to keep the evening alive, even if I’m something of a cautionary example."
+   ],
+   "choices": [
+    "A cocktail recipe",
+    "A spooky tale"
+   ]
+  }
+ ],
+ "farewell": [
+  {
+   "id": "farewell_01",
+   "lines": [
+    "Enjoy the rest of your evening, and thank you for keeping me company. I’ll be here when you fancy another visit; dead reliable, that’s me."
+   ]
+  },
+  {
+   "id": "farewell_02",
+   "lines": [
+    "Off you go, with my thanks and warmest regards. I keep those warm myself; the rest of me is a lost cause. Come back whenever you fancy a little company."
+   ]
+  }
+ ],
+ "recipe_menu_intro": [
+  {
+   "id": "recipe_menu_01",
+   "lines": [
+    "Which of our four Halloween cocktails would you like the recipe for? I’ll share the details for your home bar; these bony fingers still know their measures."
+   ]
+  },
+  {
+   "id": "recipe_menu_02",
+   "lines": [
+    "Choose a cocktail, and I’ll share its recipe for making at home. I keep the instructions better preserved than my face, which is saying regrettably little."
+   ]
+  }
+ ],
+ "recipe_ready": [
+  {
+   "id": "recipe_ready_01",
+   "lines": [
+    "Here’s your recipe, ready to read or download for your home bar. A little Common Good to keep; I’m always pleased when something leaves here without needing a pallbearer."
+   ]
+  },
+  {
+   "id": "recipe_ready_02",
+   "lines": [
+    "Your recipe is ready to read, and a copy is available to download. Heh-heh, my penmanship has survived the rest of me remarkably well."
+   ]
+  }
+ ],
+ "recipe_save_success": [
+  {
+   "id": "recipe_saved_01",
+   "lines": [
+    "Your recipe is saved! I hope it comes in handy at home; a well-preserved recipe is a beautiful thing, speaking as a poorly preserved bartender."
+   ]
+  },
+  {
+   "id": "recipe_saved_02",
+   "lines": [
+    "The recipe is safely saved. There’s a little Common Good for another evening; I always encourage good spirits to make a return appearance."
+   ]
+  }
+ ],
+ "recipe_download_started": [
+  {
+   "id": "recipe_download_started_01",
+   "lines": [
+    "Your recipe download has started. Give it a moment; even the dead appreciate a little time to get moving."
+   ]
+  }
+ ],
+ "recipe_save_failure": [
+  {
+   "id": "recipe_save_failed_01",
+   "lines": [
+    "The save or download failed, but you can try again. A minor hitch in the paperwork; I’ve come back from considerably worse."
+   ],
+   "choices": [
+    "Try again",
+    "View the recipe"
+   ]
+  },
+  {
+   "id": "recipe_save_failed_02",
+   "lines": [
+    "The save or download failed; the recipe is still here to read. A brief stumble in the paperwork; I’ve seen plenty of things enjoy a second life."
+   ],
+   "choices": [
+    "Try again",
+    "Keep reading here"
+   ]
+  }
+ ],
+ "all_matching_stories_offered": [
+  {
+   "id": "all_offered_01",
+   "lines": [
+    "We’ve reached the end of the available suggestions for these choices this visit. Revisit them, change your preferences, or browse recipes; I’m always happy to dig around some more."
+   ],
+   "choices": [
+    "Revisit this visit’s suggestions",
+    "Change my selection",
+    "See cocktail recipes"
+   ]
+  },
+  {
+   "id": "all_offered_02",
+   "lines": [
+    "That’s all the available suggestions for this selection, for now. We can revisit this visit’s suggestions, change the selection, or turn to recipes; there’s no need to bury the evening."
+   ],
+   "choices": [
+    "Revisit this visit’s suggestions",
+    "Change my selection",
+    "See cocktail recipes"
+   ]
+  }
+ ],
+ "email_signup_ask": [
+  {
+   "id": "email_signup_ask_01",
+   "lines": [
+    "Before you slip back into the mist, would you like emails about future Common Good pop-ups and news? I’d be delighted to haunt your inbox, strictly by invitation."
+   ],
+   "choices": [
+    "Yes, keep me posted",
+    "No thanks"
+   ]
+  },
+  {
+   "id": "email_signup_ask_02",
+   "lines": [
+    "May I keep you posted by email about future Common Good pop-ups and news? I enjoy staying in touch; most of my oldest friends require a séance."
+   ],
+   "choices": [
+    "Yes, keep me posted",
+    "No thanks"
+   ]
+  },
+  {
+   "id": "email_signup_ask_03",
+   "lines": [
+    "Would you like emails about future Common Good pop-ups and news? There’s room in my ledger for another friend; the previous owner only used it for obituaries."
+   ],
+   "choices": [
+    "Yes, keep me posted",
+    "No thanks"
+   ]
+  }
+ ],
+ "email_signup_ask_email": [
+  {
+   "id": "email_signup_ask_email_01",
+   "lines": [
+    "Lovely! Write your email address in my ledger. The quill and I both get a little scratchy after midnight."
+   ]
+  },
+  {
+   "id": "email_signup_ask_email_02",
+   "lines": [
+    "Excellent company deserves a line in my ledger. Enter your email address, and I’ll put this bony hand to work."
+   ]
+  }
+ ],
+ "email_signup_thanks": [
+  {
+   "id": "email_signup_thanks_01",
+   "lines": [
+    "Your email is saved for future Common Good pop-ups and news. Welcome to the ledger! It’s lovely to add an address without chiselling it into stone."
+   ]
+  },
+  {
+   "id": "email_signup_thanks_02",
+   "lines": [
+    "All saved! You’re on the list for Common Good pop-ups and news. Heh-heh, a new entry that doesn’t require a death certificate."
+   ]
+  },
+  {
+   "id": "email_signup_thanks_03",
+   "lines": [
+    "Your email is safely in the ledger for Common Good pop-ups and news. Thank you for keeping this old corpse company; I do enjoy a growing social afterlife."
+   ]
+  }
+ ],
+ "email_signup_declined": [
+  {
+   "id": "email_signup_declined_01",
+   "lines": [
+    "No trouble! Your company is quite enough; I don’t need your email to keep the bar warm. Back to the bar we go."
+   ]
+  },
+  {
+   "id": "email_signup_declined_02",
+   "lines": [
+    "No hard feelings! I mislaid those in a mausoleum years ago. Back to the bar; I’m delighted to have you here."
+   ]
+  },
+  {
+   "id": "email_signup_declined_03",
+   "lines": [
+    "Not a problem. I’ll put the ledger away; hospitality never needed a mailing list. Back to the bar, with my warmest welcome and my coldest hands."
+   ]
+  }
+ ],
+ "story_left_early": [
+  {
+   "id": "story_left_early_01",
+   "lines": [
+    "Off we go; I’ve saved your place in the story. It’ll be waiting right there, with one bony finger between the pages."
+   ]
+  },
+  {
+   "id": "story_left_early_02",
+   "lines": [
+    "Your bookmark is safely tucked in. We can return to that very spot another time; I’m excellent at keeping things from moving on."
+   ]
+  },
+  {
+   "id": "story_left_early_03",
+   "lines": [
+    "I’ve kept your place, so we can pick up there later. No need to finish tonight; even a good haunting deserves an intermission."
+   ]
+  }
+ ],
+ "story_changed_mind": [
+  {
+   "id": "story_changed_mind_01",
+   "lines": [
+    "Changed your mind? Splendid; I like a mind that still has options. Would you prefer a cocktail recipe or a different spooky tale?"
+   ],
+   "choices": [
+    "A cocktail recipe",
+    "A spooky tale"
+   ]
+  },
+  {
+   "id": "story_changed_mind_02",
+   "lines": [
+    "We can leave that coffin closed. Would you like a cocktail recipe or another spooky tale? I’ve plenty of welcome left in these bones."
+   ],
+   "choices": [
+    "A cocktail recipe",
+    "A spooky tale"
+   ]
+  }
+ ],
+ "recipe_writing": [
+  {
+   "id": "recipe_writing_01",
+   "lines": [
+    "One moment while I scribble down your recipe. The fingers are bony, but the measurements will be precise."
+   ]
+  },
+  {
+   "id": "recipe_writing_02",
+   "lines": [
+    "I’m writing out your recipe now. This quill has outlived several hands; happily, these fingers still know the job."
+   ]
+  },
+  {
+   "id": "recipe_writing_03",
+   "lines": [
+    "Let me get that recipe onto paper for you. My handwriting has improved enormously since I stopped having a pulse."
+   ]
+  }
+ ],
+ "story_thinking": [
+  {
+   "id": "story_thinking_01",
+   "lines": [
+    "Let me rattle through the old memories. Somewhere between the cobwebs and the skull fractures is a tale worth bringing to the bar."
+   ]
+  },
+  {
+   "id": "story_thinking_02",
+   "lines": [
+    "Hmm, which guest left me a good chill? Give me a moment; I’m sorting through the remains of a very long social life."
+   ]
+  },
+  {
+   "id": "story_thinking_03",
+   "lines": [
+    "A moment while I dig through my collection. Some tales are buried deeper than others, and I do hate to leave a good one underground."
+   ]
+  }
+ ]
+}

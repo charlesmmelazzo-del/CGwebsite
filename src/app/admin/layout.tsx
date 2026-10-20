@@ -25,6 +25,7 @@ import {
   Sparkles,
   UserRound,
   Trophy,
+  Mail,
 } from "lucide-react";
 
 type NavItem = { href: string; label: string; icon: typeof Home; exact?: boolean };
@@ -58,6 +59,12 @@ const NAV: NavGroup[] = [
     items: [
       { href: "/admin/popup", label: "Pop Ups", icon: Sparkles },
       { href: "/admin/popup/guests", label: "Guest Accounts", icon: UserRound },
+    ],
+  },
+  {
+    group: "Marketing",
+    items: [
+      { href: "/admin/marketing", label: "Email List", icon: Mail },
     ],
   },
   {

@@ -100,6 +100,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if ("partnerDeadline" in b) u.partner_deadline = s(b.partnerDeadline, 40) || null;
   if ("rulesText" in b) u.rules_text = s(b.rulesText, 20000);
   if ("bigScreen" in b) u.big_screen = Boolean(b.bigScreen);
+  if ("listed" in b) u.listed = Boolean(b.listed);
   if ("bartenderFields" in b) u.bartender_fields = fields(b.bartenderFields, ev.bartenderFields);
   if ("cocktailFields" in b) u.cocktail_fields = fields(b.cocktailFields, ev.cocktailFields);
   if ("scoreCategories" in b) u.score_categories = labelled<ScoreCategory>(b.scoreCategories, ev.scoreCategories);
