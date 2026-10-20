@@ -16,17 +16,29 @@ import { useEffect, useState, type ReactNode } from "react";
 export const voiceFont = Pixelify_Sans({ subsets: ["latin"], display: "swap" });
 export const readFont = Lora({ subsets: ["latin"], display: "swap", style: ["normal", "italic"] });
 
-/** The logo, once it's cut from Sheet 1. Null = set the title in type. */
-export const LOGO_SRC: string | null = null;
+/** The logo, cut from Sheet 1 by scripts/creepypastas-art.py. Null = set the title in type. */
+export const LOGO_SRC: string | null = "/popup/creepypastas/logo.png";
+/** The bolder version for the narrowest phones. */
+export const LOGO_COMPACT_SRC = "/popup/creepypastas/logo-compact.png";
 
 export type Pose = "idle" | "talking" | "greeting" | "thinking" | "writing";
 
 /**
- * Bartender animation frames per pose, from Sheets 2B–2F, in order.
- * Empty until the art is cut in; any pose without frames falls back to idle,
+ * Bartender animation frames per pose, from Sheets 2B–2F, cut by
+ * scripts/creepypastas-art.py. A pose without frames falls back to idle,
  * then to the drawn stand-in.
  */
-const FRAMES: Partial<Record<Pose, string[]>> = {};
+const frames = (pose: Pose) => [1, 2, 3, 4].map((n) => `/popup/creepypastas/bartender/${pose}-${n}.png`);
+const FRAMES: Partial<Record<Pose, string[]>> = {
+  idle: frames("idle"),
+  talking: frames("talking"),
+  greeting: frames("greeting"),
+  thinking: frames("thinking"),
+  writing: frames("writing"),
+};
+
+/** Every frame, so the browser can fetch them before he first moves. */
+export const ALL_FRAMES = Object.values(FRAMES).flat() as string[];
 
 /** Milliseconds per frame. */
 const FRAME_MS: Record<Pose, number> = { idle: 600, talking: 160, greeting: 260, thinking: 420, writing: 220 };
@@ -164,18 +176,20 @@ export function Choice({
   onClick,
   quiet = false,
   disabled = false,
+  center = false,
 }: {
   children: ReactNode;
   onClick: () => void;
   quiet?: boolean;
   disabled?: boolean;
+  center?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`${voiceFont.className} group w-full min-h-[48px] flex items-center gap-2 text-left px-3 py-2 text-[17px] leading-snug rounded-[6px] border-2 transition-colors
+      className={`${voiceFont.className} group w-full min-h-[48px] flex items-center gap-2 ${center ? "justify-center text-center" : "text-left"} px-3 py-2 text-[17px] leading-snug rounded-[6px] border-2 transition-colors
         focus:outline-none focus-visible:bg-white focus-visible:text-black focus-visible:border-white
         [@media(hover:hover)]:hover:bg-white [@media(hover:hover)]:hover:text-black [@media(hover:hover)]:hover:border-white
         disabled:opacity-40 disabled:pointer-events-none

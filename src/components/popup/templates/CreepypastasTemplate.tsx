@@ -23,7 +23,7 @@ import {
   type TaleCard,
   type TimeId,
 } from "../creepypastas/tales";
-import { Bartender, Choice, LOGO_SRC, SpeechBubble, voiceFont, type Pose } from "../creepypastas/ui";
+import { ALL_FRAMES, Bartender, Choice, LOGO_COMPACT_SRC, LOGO_SRC, SpeechBubble, voiceFont, type Pose } from "../creepypastas/ui";
 
 /**
  * COMMON GOOD PRESENTS: COCKTAIL CREEPYPASTAS
@@ -111,10 +111,17 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
   const current = scene.lines[step] ?? "";
   useEffect(() => {
     if (phase !== "bar" || !current) return;
-    setPose(scene.greet && step === 0 ? "greeting" : "talking");
+    // A greeting is one raised glass (4 frames), then he talks as usual.
+    const greeting = scene.greet && step === 0;
+    setPose(greeting ? "greeting" : "talking");
     const words = current.split(/\s+/).length;
-    const t = window.setTimeout(() => setPose("idle"), Math.min(4200, 900 + words * 140));
-    return () => window.clearTimeout(t);
+    const talk = Math.min(4200, 900 + words * 140);
+    const toTalk = greeting ? window.setTimeout(() => setPose("talking"), 1040) : 0;
+    const toIdle = window.setTimeout(() => setPose("idle"), talk + (greeting ? 1040 : 0));
+    return () => {
+      window.clearTimeout(toTalk);
+      window.clearTimeout(toIdle);
+    };
   }, [phase, current, step, scene.greet]);
 
   // ─── The main question ─────────────────────────────────────────────────────
@@ -497,16 +504,29 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
 // ─── Pieces ──────────────────────────────────────────────────────────────────
 
 function Logo({ onEnter }: { onEnter: () => void }) {
+  // Fetch his frames while the guest looks at the logo, so he never flickers
+  // in frame by frame the first time he talks.
+  useEffect(() => {
+    for (const src of ALL_FRAMES) {
+      const img = new Image();
+      img.src = src;
+    }
+  }, []);
+
   return (
     <div className="h-full flex flex-col items-center justify-center px-6 text-center">
       {LOGO_SRC ? (
-        // eslint-disable-next-line @next/next/no-img-element -- pixel art, served as-is
-        <img
-          src={LOGO_SRC}
-          alt="Common Good Presents: Cocktail Creepypastas"
-          className="w-full max-w-[520px] h-auto"
-          style={{ imageRendering: "pixelated" }}
-        />
+        <picture>
+          <source media="(max-width: 340px)" srcSet={LOGO_COMPACT_SRC} />
+          {/* eslint-disable-next-line @next/next/no-img-element -- pixel art, served as-is */}
+          <img
+            src={LOGO_SRC}
+            alt="Common Good Presents: Cocktail Creepypastas"
+            width={1000}
+            height={200}
+            className="w-full max-w-[560px] h-auto"
+          />
+        </picture>
       ) : (
         <h1 className={voiceFont.className}>
           <span className="block text-[13px] tracking-[0.35em] text-white/70">COMMON GOOD PRESENTS</span>
@@ -518,8 +538,8 @@ function Logo({ onEnter }: { onEnter: () => void }) {
         </h1>
       )}
       <div className="mt-12 w-full max-w-[300px]">
-        <Choice onClick={onEnter}>
-          <span className="block w-full text-center">{REPLIES.enter}</span>
+        <Choice center onClick={onEnter}>
+          {REPLIES.enter}
         </Choice>
       </div>
     </div>

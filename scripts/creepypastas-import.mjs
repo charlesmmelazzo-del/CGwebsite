@@ -17,18 +17,34 @@
 // Only guest-facing content is kept. Screening notes, exclusions and rights
 // records stay in the corpus file, which is the record of where it all came from.
 //
-//   node scripts/creepypastas-import.mjs ~/Downloads/Common_Good_Spooky_Tales_Corpus.json
+//   node scripts/creepypastas-import.mjs <corpus.json> [<voice-pass.json>]
+//
+// The optional voice pass is ChatGPT's rewrite of the bartender's lines in his
+// ghoulish voice: { host_dialogue, story_host_lines }. Its general lines
+// replace the corpus's moment by moment, and its per-story lines replace each
+// story's host fields. Story text always comes from the corpus.
 
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const src = process.argv[2];
+const [src, voicePath] = process.argv.slice(2);
 if (!src) {
-  console.error("Usage: node scripts/creepypastas-import.mjs <corpus.json>");
+  console.error("Usage: node scripts/creepypastas-import.mjs <corpus.json> [<voice-pass.json>]");
   process.exit(1);
 }
 
 const corpus = JSON.parse(readFileSync(src, "utf8"));
+const voice = voicePath ? JSON.parse(readFileSync(voicePath, "utf8")) : null;
+const HOST_FIELDS = [
+  "patron_introduction",
+  "teaser",
+  "offer_question",
+  "accept_label",
+  "decline_label",
+  "narration_bridge",
+  "returning_guest_callback",
+  "return_callback_short",
+];
 const out = join("public", "popup", "creepypastas");
 rmSync(join(out, "tales"), { recursive: true, force: true });
 mkdirSync(join(out, "tales"), { recursive: true });
@@ -45,6 +61,12 @@ for (const s of corpus.stories) {
   }
 
   const words = s.timing.story_word_count;
+  const host = { ...s.host };
+  const rewrite = voice?.story_host_lines?.[s.id];
+  if (voice && !rewrite) throw new Error(`Voice pass has no lines for ${s.id}`);
+  for (const f of HOST_FIELDS) {
+    if (rewrite?.[f] && String(rewrite[f]).trim()) host[f] = rewrite[f];
+  }
   index.push({
     id: s.id,
     title: s.title,
@@ -60,14 +82,14 @@ for (const s of corpus.stories) {
     advisories: s.content_advisories ?? [],
     premise: s.premise,
     host: {
-      introduction: s.host.patron_introduction,
-      teaser: s.host.teaser,
-      offerQuestion: s.host.offer_question,
-      acceptLabel: s.host.accept_label,
-      declineLabel: s.host.decline_label,
-      bridge: s.host.narration_bridge,
-      callback: s.host.returning_guest_callback,
-      callbackShort: s.host.return_callback_short,
+      introduction: host.patron_introduction,
+      teaser: host.teaser,
+      offerQuestion: host.offer_question,
+      acceptLabel: host.accept_label,
+      declineLabel: host.decline_label,
+      bridge: host.narration_bridge,
+      callback: host.returning_guest_callback,
+      callbackShort: host.return_callback_short,
     },
     contentVersion: s.content_version,
   });
@@ -80,7 +102,8 @@ for (const s of corpus.stories) {
 
 // The bartender's general lines: one array of alternatives per moment.
 const dialogue = {};
-for (const [key, value] of Object.entries(corpus.host_dialogue)) {
+const allDialogue = { ...corpus.host_dialogue, ...(voice?.host_dialogue ?? {}) };
+for (const [key, value] of Object.entries(allDialogue)) {
   if (!Array.isArray(value)) continue;
   dialogue[key] = value.map((d) => ({
     id: d.dialogue_id,
@@ -97,4 +120,9 @@ writeFileSync(
 );
 
 const byTime = index.reduce((m, s) => ((m[s.time] = (m[s.time] ?? 0) + 1), m), {});
-console.log(`${index.length} stories`, byTime, `· ${Object.keys(dialogue).length} dialogue moments`);
+console.log(
+  `${index.length} stories`,
+  byTime,
+  `· ${Object.keys(dialogue).length} dialogue moments`,
+  voice ? "· voice pass applied" : ""
+);
