@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import type { PopupCocktail, PopupTemplateProps } from "@/lib/popup/types";
 import { REPLIES, say, type Moment } from "../creepypastas/hostDialogue";
 import {
@@ -23,7 +23,7 @@ import {
   type TaleCard,
   type TimeId,
 } from "../creepypastas/tales";
-import { ALL_FRAMES, Bartender, BARTENDER_ASPECT, Choice, LOGO_SRC, SpeechBubble, voiceFont, type Pose } from "../creepypastas/ui";
+import { ALL_FRAMES, Bartender, Choice, DialogueBox, LOGO_SRC, voiceFont, type Pose } from "../creepypastas/ui";
 
 /**
  * COMMON GOOD PRESENTS: COCKTAIL CREEPYPASTAS
@@ -76,34 +76,18 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
   const [recipeLine, setRecipeLine] = useState("");
   const [reading, setReading] = useState<{ card: TaleCard; startAt: number } | null>(null);
 
-  // The bubble sits right on his head, so he's sized to whatever room the
-  // bubble leaves: as big as fits, never wider than the screen. Measured, not
-  // left to CSS, because the bubble's height changes with every line.
-  const stage = useRef<HTMLDivElement>(null);
-  const bubble = useRef<HTMLDivElement>(null);
-  const [spriteHeight, setSpriteHeight] = useState(280);
-  useLayoutEffect(() => {
-    const st = stage.current;
-    const bu = bubble.current;
-    if (!st || !bu) return;
-    const fit = () => {
-      const room = st.clientHeight - bu.offsetHeight;
-      const widest = (st.clientWidth - 24) / BARTENDER_ASPECT;
-      setSpriteHeight(Math.max(90, Math.floor(Math.min(room, widest, 520))));
-    };
-    fit();
-    const ro = new ResizeObserver(fit);
-    ro.observe(st);
-    ro.observe(bu);
-    return () => ro.disconnect();
-    // The stage only exists while the bar is showing; re-attach when it returns.
-  }, [phase]);
+  /** The current line has finished typing out; the replies appear after. */
+  const [typed, setTyped] = useState(false);
+  /** The screen is fading out before the next one fades in. */
+  const [leaving, setLeaving] = useState(false);
 
   // This visit's story choices. Refs: they steer picks, not rendering.
   const time = useRef<TimeId>("five_to_ten");
   const scare = useRef<ScareId>("gentle");
   const offered = useRef(new Set<string>());
   const askedSignup = useRef(false);
+  /** The writing pause ended (by its timer or a tap): show the recipes once. */
+  const recipesShown = useRef(false);
   /** This reading reached THE END: stop saving a bookmark for it. */
   const reachedEnd = useRef(false);
   const timers = useRef<number[]>([]);
@@ -127,25 +111,43 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
   function speak(next: Scene) {
     setScene(next);
     setStep(0);
+    setTyped(false);
     setPhase("bar");
   }
 
-  // He talks while a bubble is fresh, then settles into idle.
-  const current = scene.lines[step] ?? "";
+  /**
+   * Fade the current screen out, then switch. The next screen fades itself
+   * in as it mounts. Driven by a timer, not an animation event, so a paused
+   * background tab can never strand anyone mid-fade.
+   */
+  function fadeTo(change: () => void) {
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) return change();
+    setLeaving(true);
+    later(() => {
+      setLeaving(false);
+      change();
+    }, 240);
+  }
+
+  const current = phase === "writing" ? writingLine : (scene.lines[step] ?? "");
+
+  // A new line starts typing from scratch.
+  useEffect(() => setTyped(false), [current, step, phase]);
+
+  // He moves his mouth while the line types out, then settles into idle.
   useEffect(() => {
+    if (phase === "writing") return setPose("writing");
+    if (phase === "thinking") return setPose("thinking");
     if (phase !== "bar" || !current) return;
+    if (typed) return setPose("idle");
     // A greeting is one raised glass (4 frames), then he talks as usual.
     const greeting = scene.greet && step === 0;
     setPose(greeting ? "greeting" : "talking");
-    const words = current.split(/\s+/).length;
-    const talk = Math.min(4200, 900 + words * 140);
-    const toTalk = greeting ? window.setTimeout(() => setPose("talking"), 1040) : 0;
-    const toIdle = window.setTimeout(() => setPose("idle"), talk + (greeting ? 1040 : 0));
-    return () => {
-      window.clearTimeout(toTalk);
-      window.clearTimeout(toIdle);
-    };
-  }, [phase, current, step, scene.greet]);
+    if (!greeting) return;
+    const t = window.setTimeout(() => setPose("talking"), 1040);
+    return () => window.clearTimeout(t);
+  }, [phase, current, step, scene.greet, typed]);
 
   // ─── The main question ─────────────────────────────────────────────────────
 
@@ -222,6 +224,7 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
   // ─── Recipes ───────────────────────────────────────────────────────────────
 
   function startRecipes() {
+    recipesShown.current = false;
     setWritingLine(line("recipe_writing")[0]);
     setPhase("writing");
     setPose("writing");
@@ -229,8 +232,10 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
   }
 
   function showRecipes() {
+    if (recipesShown.current) return;
+    recipesShown.current = true;
     setRecipeLine(line("recipe_ready")[0]);
-    setPhase((p) => (p === "writing" ? "recipes" : p));
+    fadeTo(() => setPhase((p) => (p === "writing" ? "recipes" : p)));
     // Seeing the recipes counts as being given one, for "how did it turn out?" next visit.
     remember((m) => ({ ...m, recipes: m.recipes.includes("*") ? m.recipes : [...m.recipes, "*"] }));
   }
@@ -442,72 +447,99 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
   // ─── Rendering ─────────────────────────────────────────────────────────────
 
   const lastStep = step >= scene.lines.length - 1;
-  const showBar = phase === "bar" || phase === "thinking" || phase === "writing" || phase === "wavy" || phase === "reader";
+  const atBar = phase === "bar" || phase === "thinking" || phase === "writing" || phase === "wavy";
+  // Each screen fades in when it mounts; `leaving` fades the current one out.
+  const screen = (extra = "") => `absolute inset-0 ${leaving ? "creepy-leave" : "creepy-screen"} ${extra}`;
 
+  const replies = scene.replies;
   return (
     <div className="relative h-[calc(100dvh-49px)] bg-black text-white overflow-hidden">
       <WavyFilter />
 
-      {phase === "logo" && <Logo onEnter={() => void enter()} />}
-
-      {phase === "recipes" && (
-        <Recipes
-          cocktails={cocktails}
-          line={recipeLine}
-          onDownload={downloaded}
-          onBack={() => backAtBar()}
-        />
+      {phase === "logo" && (
+        <div key="logo" className={screen()}>
+          <Logo onEnter={() => fadeTo(() => void enter())} />
+        </div>
       )}
 
-      {showBar && (
-        <div
-          className={`h-full flex flex-col ${phase === "wavy" ? "creepy-wavy" : ""}`}
-          aria-hidden={phase === "reader"}
-        >
-          {/* He and his bubble sit together just above the replies. */}
-          <div ref={stage} className="flex-1 min-h-0 flex flex-col justify-end">
-            <div ref={bubble} className="shrink-0 px-4 pt-3 pb-[18px] max-h-[60%] overflow-y-auto">
-              {phase === "writing" ? (
-                <SpeechBubble onNext={showRecipes}>{writingLine}</SpeechBubble>
-              ) : current ? (
-                <SpeechBubble onNext={lastStep ? undefined : () => setStep((s) => s + 1)}>{current}</SpeechBubble>
-              ) : null}
-            </div>
-            <div className="shrink-0">
-              <Bartender pose={pose} height={spriteHeight} />
-            </div>
-          </div>
+      {phase === "recipes" && (
+        <div key="recipes" className={screen()}>
+          <Recipes
+            cocktails={cocktails}
+            line={recipeLine}
+            onDownload={downloaded}
+            onBack={() => fadeTo(() => backAtBar())}
+          />
+        </div>
+      )}
 
-          <div className="shrink-0 px-4 pb-4 pt-3 max-h-[46%] overflow-y-auto flex flex-col gap-2">
-            {phase === "bar" && !lastStep && (
-              <Choice quiet onClick={() => setStep((s) => s + 1)}>
-                {REPLIES.next}
-              </Choice>
-            )}
-            {phase === "bar" && lastStep && scene.emailForm && (
-              <EmailForm menuId={menuId} onJoined={joined} onCancel={declineSignup} />
-            )}
-            {phase === "bar" &&
-              lastStep &&
-              scene.replies.map((r) => (
-                <Choice key={r.label} quiet={r.quiet} onClick={r.run}>
-                  {r.label}
-                </Choice>
-              ))}
+      {atBar && (
+        <div
+          key="bar"
+          className={phase === "wavy" ? "absolute inset-0 creepy-wavy" : screen()}
+        >
+          <div className="h-full flex flex-col">
+            {/* He keeps a fixed share of the screen, so nothing below can resize him. */}
+            <div className="flex-1 min-h-0 px-4 pt-3">
+              <Bartender pose={pose} />
+            </div>
+
+            {/* His words and the guest's replies share one fixed panel at the bottom. */}
+            <div className="shrink-0 h-[50%] min-h-[250px] max-h-[420px] px-4 pt-3 pb-4 flex flex-col gap-3">
+              <DialogueBox
+                text={current}
+                typed={typed}
+                onTyped={() => setTyped(true)}
+                onTap={phase === "writing" ? showRecipes : lastStep ? undefined : () => setStep((n) => n + 1)}
+                more={phase === "bar" && !lastStep}
+              />
+
+              {phase === "bar" && typed && !lastStep && (
+                <div key={`next-${step}`} className="shrink-0 creepy-in">
+                  <Choice quiet onClick={() => setStep((n) => n + 1)}>
+                    {REPLIES.next}
+                  </Choice>
+                </div>
+              )}
+
+              {phase === "bar" && typed && lastStep && scene.emailForm && (
+                <div className="shrink-0 creepy-in">
+                  <EmailForm menuId={menuId} onJoined={joined} onCancel={declineSignup} />
+                </div>
+              )}
+
+              {phase === "bar" && typed && lastStep && replies.length > 0 && (
+                <div key={`replies-${replies.map((r) => r.label).join("|")}`} className="shrink-0 grid grid-cols-2 gap-2">
+                  {replies.map((r, i) => (
+                    <div
+                      key={r.label}
+                      className={`creepy-in ${replies.length % 2 === 1 && i === replies.length - 1 ? "col-span-2" : ""}`}
+                      style={{ "--i": i } as CSSProperties}
+                    >
+                      <Choice small quiet={r.quiet} onClick={r.run}>
+                        {r.label}
+                      </Choice>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
 
       {phase === "reader" && reading && mem && (
-        <Reader
-          card={reading.card}
-          startAt={reading.startAt}
-          textScale={mem.textScale}
-          onTextScale={(textScale) => remember((m) => ({ ...m, textScale }))}
-          onProgress={saveProgress}
-          onFinished={finishedTale}
-          onExit={exitTale}
-        />
+        <div key="reader" className={`fixed inset-0 z-[70] ${leaving ? "creepy-leave" : "creepy-screen"}`}>
+          <Reader
+            card={reading.card}
+            startAt={reading.startAt}
+            textScale={mem.textScale}
+            onTextScale={(textScale) => remember((m) => ({ ...m, textScale }))}
+            onProgress={saveProgress}
+            onFinished={finishedTale}
+            onExit={(progress, done) => fadeTo(() => exitTale(progress, done))}
+          />
+        </div>
       )}
 
       {/* Only on the logo screen, where it can't cover a reply. Reloading returns here. */}
@@ -594,7 +626,22 @@ function WavyFilter() {
           0%   { filter: url(#creepy-wave) blur(0); opacity: 1; }
           100% { filter: url(#creepy-wave) blur(10px); opacity: 0; }
         }
-        @media (prefers-reduced-motion: reduce) { .creepy-wavy { animation: none; opacity: 0; } }
+        .creepy-screen { animation: creepy-screen-in 420ms ease-out both; }
+        @keyframes creepy-screen-in {
+          from { opacity: 0; filter: blur(6px); transform: scale(0.985); }
+          to   { opacity: 1; filter: none; transform: none; }
+        }
+        .creepy-leave { animation: creepy-screen-out 240ms ease-in both; }
+        @keyframes creepy-screen-out { to { opacity: 0; filter: blur(6px); } }
+        .creepy-in { animation: creepy-in 320ms cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: calc(var(--i, 0) * 80ms); }
+        @keyframes creepy-in {
+          from { opacity: 0; transform: translateY(12px); }
+          to   { opacity: 1; transform: none; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .creepy-wavy { animation: none; opacity: 0; }
+          .creepy-screen, .creepy-leave, .creepy-in { animation: none; }
+        }
       `}</style>
     </>
   );

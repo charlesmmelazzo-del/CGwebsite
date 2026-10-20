@@ -113,17 +113,12 @@ function StandIn({ pose, frame }: { pose: Pose; frame: number }) {
   );
 }
 
-/** Frame width ÷ height, from scripts/creepypastas-art.py (384 × 432). */
-export const BARTENDER_ASPECT = 384 / 432;
-
-export function Bartender({ pose, height }: { pose: Pose; height: number }) {
+/** Fills the room it's given — a fixed share of the screen, so he never resizes mid-conversation. */
+export function Bartender({ pose }: { pose: Pose }) {
   const frames = FRAMES[pose]?.length ? FRAMES[pose]! : FRAMES.idle ?? [];
   const frame = useFrame(pose, frames.length || (pose === "idle" ? 1 : 3));
   return (
-    <div
-      className="w-full flex items-end justify-center"
-      style={{ height, imageRendering: "pixelated" }}
-    >
+    <div className="h-full w-full flex items-end justify-center" style={{ imageRendering: "pixelated" }}>
       {frames.length ? (
         // eslint-disable-next-line @next/next/no-img-element -- pixel art at whole-number scale; the optimizer would smooth it
         <img
@@ -141,7 +136,93 @@ export function Bartender({ pose, height }: { pose: Pose; height: number }) {
 
 // ─── Speech and replies ──────────────────────────────────────────────────────
 
-/** His words: a white-ruled bubble with a tail pointing down at him. */
+// ─── His dialogue box ────────────────────────────────────────────────────────
+
+const prefersReducedMotion = () =>
+  typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+/** Milliseconds per character as a line types out. */
+const TYPE_MS = 24;
+
+/**
+ * His words, typed out a letter at a time like an old RPG, in a box at the
+ * bottom of the screen. Tapping finishes the line at once; tapping a finished
+ * line moves on (when there's more).
+ *
+ * The rest of the line is laid out invisibly while it types, so the box never
+ * grows or rewraps mid-sentence. Screen readers get the whole line at once.
+ * Reduced motion: the line simply appears.
+ */
+export function DialogueBox({
+  text,
+  typed,
+  onTyped,
+  onTap,
+  more,
+}: {
+  text: string;
+  /** Finished typing (or skipped). Owned by the caller, who shows replies after. */
+  typed: boolean;
+  onTyped: () => void;
+  /** A tap on a finished line. */
+  onTap?: () => void;
+  /** There's another line after this one: show the ▼. */
+  more: boolean;
+}) {
+  const [shown, setShown] = useState(0);
+
+  useEffect(() => {
+    setShown(0);
+    if (!text) return;
+    if (prefersReducedMotion()) {
+      setShown(text.length);
+      onTyped();
+      return;
+    }
+    // Long lines type a little faster so nobody waits more than a few seconds.
+    const step = text.length > 160 ? 2 : 1;
+    let n = 0;
+    const t = window.setInterval(() => {
+      n = Math.min(text.length, n + step);
+      setShown(n);
+      if (n >= text.length) {
+        window.clearInterval(t);
+        onTyped();
+      }
+    }, TYPE_MS);
+    return () => window.clearInterval(t);
+    // onTyped is a fresh closure each render; the line is what matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text]);
+
+  // Skipped from outside, or by a tap.
+  const visible = typed ? text.length : shown;
+
+  return (
+    <button
+      type="button"
+      onClick={() => (typed ? onTap?.() : onTyped())}
+      className={`${voiceFont.className} relative w-full flex-1 min-h-0 overflow-y-auto flex flex-col items-start justify-start text-left bg-black border-[3px] border-white rounded-[6px] px-4 py-3
+        text-[clamp(19px,5.4vw,23px)] leading-[1.38] text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70`}
+      aria-label={typed && more ? "Next" : undefined}
+    >
+      <span className="sr-only" aria-live="polite">
+        {text}
+      </span>
+      <span aria-hidden>
+        {text.slice(0, visible)}
+        <span className="invisible">{text.slice(visible)}</span>
+      </span>
+      {typed && more && (
+        <span aria-hidden className="absolute right-3 bottom-2 text-[14px] motion-safe:animate-bounce">
+          ▼
+        </span>
+      )}
+    </button>
+  );
+}
+
+/** His words over the recipe cards: a white-ruled bubble with a tail. */
 export function SpeechBubble({ children, onNext }: { children: ReactNode; onNext?: () => void }) {
   return (
     <div className="relative">
@@ -180,18 +261,22 @@ export function Choice({
   onClick,
   quiet = false,
   disabled = false,
+  small = false,
 }: {
   children: ReactNode;
   onClick: () => void;
   quiet?: boolean;
   disabled?: boolean;
+  /** Smaller text, for two-across grids. */
+  small?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`${voiceFont.className} w-full min-h-[52px] flex items-center justify-center text-center px-3 py-2 text-[clamp(18px,5vw,21px)] leading-snug rounded-[6px] border-2 transition-colors
+      className={`${voiceFont.className} w-full h-full min-h-[52px] flex items-center justify-center text-center py-2 leading-snug
+        ${small ? "px-2 text-[clamp(15px,4.3vw,18px)]" : "px-3 text-[clamp(18px,5vw,21px)]"} rounded-[6px] border-2 transition-colors
         focus:outline-none focus-visible:bg-white focus-visible:text-black focus-visible:border-white
         [@media(hover:hover)]:hover:bg-white [@media(hover:hover)]:hover:text-black [@media(hover:hover)]:hover:border-white
         disabled:opacity-40 disabled:pointer-events-none
