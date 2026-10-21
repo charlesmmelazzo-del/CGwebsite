@@ -29,6 +29,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
+import QRCode from "qrcode";
 import ColorPicker from "@/components/ui/ColorPicker";
 import ImagePicker from "@/components/ui/ImagePicker";
 import { listTemplates } from "@/components/popup/templates/registry";
@@ -289,6 +290,13 @@ export default function PopupEditorPage({ params }: { params: { id: string } }) 
       <Section title={`Cocktails (${cocktails.length})`} defaultOpen>
         <CocktailList cocktails={cocktails} onChange={setCocktails} templateKey={menu.templateKey ?? "classic"} />
       </Section>
+
+      {/* ── QR code for printed menus ────────────────────────────────────── */}
+      {!isNew && menu.id && (
+        <Section title="QR code for printed menus">
+          <QrPanel menuId={menu.id} slug={menu.slug ?? "popup"} status={menu.status ?? "draft"} />
+        </Section>
+      )}
 
       {/* ── Raffle tickets ───────────────────────────────────────────────── */}
       {!isNew && menu.id && cocktails.some((c) => c.gameKey) && (
@@ -1024,6 +1032,98 @@ function WinnersPanel({
         </div>
       )}
     </Section>
+  );
+}
+
+// ─── QR code ─────────────────────────────────────────────────────────────────
+
+/** Printed codes always point at the live site, even when made on staging. */
+const PUBLIC_SITE = "https://commongoodcocktailhouse.com";
+
+/**
+ * A code for the physical menus, ready before launch. It points at
+ * /popup/q/<id>, which follows the pop-up wherever it is: "opening soon"
+ * while it's a draft, the menu once it's live, the archive afterwards.
+ * Keyed by id, so renaming the pop-up never breaks a printed code.
+ */
+function QrPanel({ menuId, slug, status }: { menuId: string; slug: string; status: PopupStatus }) {
+  const url = `${PUBLIC_SITE}/popup/q/${menuId}`;
+  const [preview, setPreview] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    QRCode.toDataURL(url, { margin: 2, width: 480, errorCorrectionLevel: "M" }).then(setPreview).catch(() => {});
+  }, [url]);
+
+  function save(href: string, name: string) {
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = name;
+    a.click();
+  }
+
+  async function downloadPng() {
+    // Big enough to print sharp on a full page.
+    save(await QRCode.toDataURL(url, { margin: 2, width: 2048, errorCorrectionLevel: "M" }), `${slug}-qr.png`);
+  }
+
+  async function downloadSvg() {
+    const svg = await QRCode.toString(url, { type: "svg", margin: 2, errorCorrectionLevel: "M" });
+    const href = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+    save(href, `${slug}-qr.svg`);
+    setTimeout(() => URL.revokeObjectURL(href), 1000);
+  }
+
+  const now =
+    status === "live"
+      ? "This pop-up is live: scanning opens its menu."
+      : status === "archived"
+        ? "This pop-up is archived: scanning opens its archive page."
+        : "Until this pop-up goes live, scanning shows an “opening soon” page. The moment it goes live, the same code opens the menu, so you can print now.";
+
+  return (
+    <div className="flex flex-col sm:flex-row gap-5 items-start">
+      <div className="w-40 h-40 shrink-0 border border-gray-200 bg-white flex items-center justify-center">
+        {preview ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={preview} alt="QR code for this pop-up" className="w-full h-full" />
+        ) : (
+          <Loader2 size={16} className="animate-spin text-gray-300" />
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm text-gray-600 mb-2">{now}</p>
+        <p className="text-xs text-gray-400 mb-4">
+          It keeps working if you rename the pop-up or change its link. It always points at the live site.
+        </p>
+        <p className="text-xs font-mono text-gray-500 break-all mb-4">{url}</p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={downloadPng}
+            className="flex items-center gap-2 px-4 py-2 text-[11px] tracking-wider uppercase bg-gray-900 text-white hover:bg-gray-700"
+          >
+            <Download size={13} /> PNG
+          </button>
+          <button
+            onClick={downloadSvg}
+            className="flex items-center gap-2 px-4 py-2 text-[11px] tracking-wider uppercase border border-gray-300 text-gray-700 hover:border-gray-500"
+          >
+            <Download size={13} /> SVG (for designers)
+          </button>
+          <button
+            onClick={() => {
+              navigator.clipboard?.writeText(url).then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              });
+            }}
+            className="px-4 py-2 text-[11px] tracking-wider uppercase border border-gray-300 text-gray-700 hover:border-gray-500"
+          >
+            {copied ? "Copied" : "Copy link"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
