@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkRateLimit, getIp } from "@/lib/popup/access";
+import { getIp } from "@/lib/popup/access";
 import { cleanName, normalizeCode, viewFor, type RoomOp } from "@/lib/holidays/rooms";
 import { joinRoom, playerFor, pollRoom, runOp } from "@/lib/holidays/roomStore";
-import { failure } from "@/lib/holidays/http";
+import { failure, noteWrongCode, tooManyWrongCodes } from "@/lib/holidays/http";
+import { GameError } from "@/lib/holidays/types";
 
 export const dynamic = "force-dynamic";
 
@@ -44,13 +45,18 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
 
   try {
     if (body.op === "join") {
-      // Guessing codes: a few wrong ones are typos, dozens are a script.
-      const limit = checkRateLimit(`holiday-join:${getIp(req)}`, 40, 10 * 60 * 1000);
-      if (limit.blocked) return NextResponse.json({ error: "Too many tries. Wait a few minutes." }, { status: 429 });
+      // Guessing codes: only wrong codes count, so a busy bar on one Wi-Fi never trips it.
+      const ip = getIp(req);
+      if (tooManyWrongCodes(ip)) return NextResponse.json({ error: "Too many wrong codes. Wait a few minutes." }, { status: 429 });
       const name = cleanName(body.name);
       if (!name) return NextResponse.json({ error: "Enter your name." }, { status: 400 });
-      const { room, playerId, token: t } = await joinRoom(code, name);
-      return NextResponse.json({ token: t, room: viewFor(room, playerId, Date.now()) });
+      try {
+        const { room, playerId, token: t } = await joinRoom(code, name);
+        return NextResponse.json({ token: t, room: viewFor(room, playerId, Date.now()) });
+      } catch (e) {
+        if (e instanceof GameError && /No game with that code/.test(e.message)) noteWrongCode(ip);
+        throw e;
+      }
     }
 
     const t = token(req);
