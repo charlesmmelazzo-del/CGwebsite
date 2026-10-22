@@ -13,10 +13,13 @@ import { at, COLORS, HandBox, HandButton, handFont, readFont, sketchPath } from 
 // ─── Dominoes ────────────────────────────────────────────────────────────────
 
 /**
- * Finished domino art: (a, b) → image path, drawn with `a` on the left/top.
- * Null = draw the tiles. See the design prompt.
+ * Finished domino art: half-faces 0–12 (open edge at the bottom) plus a
+ * divider, cut by scripts/holidays-art.py. A tile is built from two halves —
+ * the lower one turned 180° — with the divider over the seam. Set to null to
+ * go back to drawn tiles.
  */
-export const DOMINO_ART: ((a: number, b: number) => string) | null = null;
+export const DOMINO_ART: ((n: number) => string) | null = (n) => `/popup/holidays/dominoes/half-${n}.webp`;
+const DOMINO_DIVIDER = "/popup/holidays/dominoes/divider.webp";
 
 /** Pip positions on a 3×3 grid for 0–9; 10–12 add a middle column (double-twelve). */
 const PIPS: Record<number, [number, number][]> = {
@@ -73,8 +76,22 @@ export function Domino({
   const w = vertical ? size : size * 2;
   const h = vertical ? size * 2 : size;
   if (DOMINO_ART) {
-    // eslint-disable-next-line @next/next/no-img-element -- static tile art
-    return <img src={DOMINO_ART(a, b)} alt={`${a}–${b}`} width={w} height={h} className={`${vertical ? "rotate-90" : ""} ${dim ? "opacity-40" : ""}`} />;
+    // Built upright (a on top), then turned for horizontal tiles (a on the left).
+    return (
+      <div role="img" aria-label={`Domino ${a}–${b}`} className={`relative shrink-0 transition-transform ${selected ? "-translate-y-1.5" : ""} ${dim ? "opacity-40" : ""}`} style={{ width: w, height: h }}>
+        <div
+          className="absolute left-1/2 top-1/2 flex flex-col"
+          style={{ width: size, height: size * 2, transform: `translate(-50%, -50%) ${vertical ? "" : "rotate(-90deg)"}`, filter: selected ? "drop-shadow(0 0 2px #D63A2F) drop-shadow(0 0 1px #D63A2F)" : "drop-shadow(0 1px 0 rgba(0,0,0,0.25))" }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- static tile art */}
+          <img src={DOMINO_ART(a)} alt="" width={size} height={size} draggable={false} className="block select-none" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={DOMINO_ART(b)} alt="" width={size} height={size} draggable={false} className="block select-none rotate-180" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={DOMINO_DIVIDER} alt="" draggable={false} className="absolute left-[6%] w-[88%] select-none" style={{ top: size - size * 0.09, height: size * 0.18 }} />
+        </div>
+      </div>
+    );
   }
   return (
     <svg
@@ -96,7 +113,7 @@ export function Domino({
   );
 }
 
-export function TileButton({ tile, onClick, selected, dim, size = 24, i = 0 }: { tile: string; onClick?: () => void; selected?: boolean; dim?: boolean; size?: number; i?: number }) {
+export function TileButton({ tile, onClick, selected, dim, size = 32, i = 0 }: { tile: string; onClick?: () => void; selected?: boolean; dim?: boolean; size?: number; i?: number }) {
   const [a, b] = ends(tile);
   return (
     <button type="button" onClick={onClick} disabled={!onClick} aria-pressed={selected} aria-label={`Domino ${a}–${b}`} className="hh-deal p-0.5" style={at(i)}>
@@ -119,13 +136,13 @@ export function TileHand({ tiles, legal, selected, onPick, size }: { tiles: stri
 
 // ─── Dice ────────────────────────────────────────────────────────────────────
 
-/** Finished die art per face (1–6). Null = draw them. */
-export const DIE_ART: ((face: number) => string) | null = null;
+/** Finished die art per face (1–6), normal and "kept". Null = draw them. */
+export const DIE_ART: ((face: number, kept: boolean) => string) | null = (face, kept) => `/popup/holidays/dice/${kept ? "kept" : "normal"}-${face}.webp`;
 
 export function Die({ value, size = 52, held, onClick, label, i = 0, rolling }: { value: number; size?: number; held?: boolean; onClick?: () => void; label?: string; i?: number; rolling?: boolean }) {
   const face = DIE_ART ? (
     // eslint-disable-next-line @next/next/no-img-element -- static die art
-    <img src={DIE_ART(value)} alt="" width={size} height={size} />
+    <img src={DIE_ART(value, !!held)} alt="" width={size} height={size} draggable={false} className="select-none" />
   ) : (
     <svg width={size} height={size} className="overflow-visible" aria-hidden>
       <path d={sketchPath(size, size, value + i * 3)} fill={held ? COLORS.ink : COLORS.cardFace} stroke={held ? COLORS.star : COLORS.cardInk} strokeWidth={held ? 2.6 : 1.4} />

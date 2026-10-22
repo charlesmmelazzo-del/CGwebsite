@@ -2,18 +2,17 @@
 
 // ─── A playing card in the pop-up's own hand ─────────────────────────────────
 //
-// Cream stock, a pen-drawn border, hand-lettered rank and suit — the same
-// handwriting as the rest of the pop-up. Art slot: drop finished card faces
-// into CARD_ART (see the design prompt) and they replace the drawn ones.
+// The owner's illustrated deck (cream stock, hand-lettered corners, winter
+// court cards). The drawn version below is the fallback if CARD_ART is null.
 
 import { isRed, rankOf, suitOf, SUIT_NAMES, SUIT_SYMBOLS } from "@/lib/holidays/cards";
 import { COLORS, handFont, sketchPath } from "./ui";
 
 /**
- * Finished card art, keyed "AS", "10H", … plus "back". Null = draw the cards.
- * e.g. (c) => `/popup/holidays/cards/${c}.png`
+ * Finished card art, keyed "AS", "10H", … plus "back" — cut from the owner's
+ * sheets by scripts/holidays-art.py. Set to null to go back to drawn cards.
  */
-export const CARD_ART: ((card: string) => string) | null = null;
+export const CARD_ART: ((card: string) => string) | null = (c) => `/popup/holidays/cards/${c}.webp`;
 
 const RANK_WORDS: Record<string, string> = { A: "Ace", J: "Jack", Q: "Queen", K: "King" };
 
@@ -42,8 +41,18 @@ export default function PlayingCard({
   const back = faceDown || !card;
 
   if (CARD_ART) {
-    // eslint-disable-next-line @next/next/no-img-element -- static card art
-    return <img src={CARD_ART(back ? "back" : card!)} alt={back ? "Face-down card" : cardName(card!)} width={w} height={h} className={`${dim ? "opacity-45" : ""}`} />;
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- static card art
+      <img
+        src={CARD_ART(back ? "back" : card!)}
+        alt={back ? "Face-down card" : cardName(card!)}
+        width={w}
+        height={h}
+        draggable={false}
+        className={`shrink-0 select-none transition-transform duration-150 ${lifted ? "-translate-y-3 [filter:drop-shadow(0_0_2px_#D63A2F)_drop-shadow(0_0_1px_#D63A2F)]" : ""} ${dim ? "opacity-45" : ""}`}
+        style={{ width: w, height: h }}
+      />
+    );
   }
 
   const ink = !back && isRed(card!) ? COLORS.cardRed : COLORS.cardInk;

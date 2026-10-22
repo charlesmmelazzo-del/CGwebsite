@@ -12,7 +12,7 @@ import { Big, Board, Buttons, Domino, NextButton, Note, Seats, TeamScores, TileH
 import type { BoardProps } from "./types";
 
 /** A row of laid tiles that scrolls sideways, newest end kept in view. */
-function Line({ tiles, size = 22 }: { tiles: [number, number][]; size?: number }) {
+function Line({ tiles, size = 28 }: { tiles: [number, number][]; size?: number }) {
   return (
     <div className="w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <div className="flex items-center justify-center gap-0.5 min-w-max px-4 py-2 mx-auto">
@@ -103,7 +103,7 @@ function ArmView({ links, vertical, reverse }: { links: Layout["arms"][Arm]; ver
   const tiles = shown.map((l, i) => {
     const pair: [number, number] = reverse ? [l.far, l.near] : [l.near, l.far];
     const dbl = l.near === l.far;
-    return <Domino key={i} a={pair[0]} b={pair[1]} size={18} vertical={vertical ? !dbl : dbl} seed={i + 40} />;
+    return <Domino key={i} a={pair[0]} b={pair[1]} size={24} vertical={vertical ? !dbl : dbl} seed={i + 40} />;
   });
   return (
     <div className={`flex items-center gap-0.5 ${vertical ? "flex-col" : ""} ${reverse ? (vertical ? "flex-col-reverse" : "flex-row-reverse") : ""}`}>
@@ -137,7 +137,7 @@ export function AllFivesBoard({ view: v, you, send, preview }: BoardProps<FivesV
           <div className="grid grid-cols-[1fr_auto_1fr] grid-rows-[auto_auto_auto] items-center justify-items-center gap-1">
             <div className="col-start-2 row-start-1"><ArmView links={L.arms.N} vertical reverse /></div>
             <div className="col-start-1 row-start-2 justify-self-end"><ArmView links={L.arms.W} reverse /></div>
-            <div className="col-start-2 row-start-2"><Domino a={L.spinner} b={L.spinner} size={22} vertical seed={99} /></div>
+            <div className="col-start-2 row-start-2"><Domino a={L.spinner} b={L.spinner} size={28} vertical seed={99} /></div>
             <div className="col-start-3 row-start-2 justify-self-start"><ArmView links={L.arms.E} /></div>
             <div className="col-start-2 row-start-3"><ArmView links={L.arms.S} vertical /></div>
           </div>
@@ -225,7 +225,7 @@ export function Texas42Board({ view: v, you, send, preview }: BoardProps<FortyTw
                 const [a, b] = ends(t.tile);
                 return (
                   <div key={t.tile} className="hh-deal flex flex-col items-center" style={{ "--i": i } as React.CSSProperties}>
-                    <Domino a={b} b={a} size={22} vertical seed={i} />
+                    <Domino a={b} b={a} size={28} vertical seed={i} />
                     <span className={`${readFont.className} text-[13px] ${v.trick.length === 0 && v.lastTrick?.winner === t.seat ? "text-[#F5EFE2]" : "text-[#F5EFE2]/60"}`}>{v.seats[t.seat].id === you ? "You" : v.seats[t.seat].name}</span>
                   </div>
                 );
@@ -329,7 +329,7 @@ export function TrainBoard({ view: v, send, preview }: BoardProps<TrainView>) {
                 <span className="flex-1 flex items-center justify-end gap-0.5 overflow-hidden">
                   {t.tiles.length > 3 && <span className={`${handFont.className} text-[14px] font-bold text-[#F5EFE2]/50`}>+{t.tiles.length - 3}</span>}
                   {t.tiles.slice(-3).map((x, k) => (
-                    <Domino key={k} a={x.near} b={x.far} size={15} vertical={x.near === x.far} seed={k + i} />
+                    <Domino key={k} a={x.near} b={x.far} size={18} vertical={x.near === x.far} seed={k + i} />
                   ))}
                   <span className={`${handFont.className} w-7 text-center text-[20px] font-bold`}>{t.end}</span>
                 </span>
@@ -347,7 +347,7 @@ export function TrainBoard({ view: v, send, preview }: BoardProps<TrainView>) {
       {mine && sel && <Note>Tap a highlighted train for {sel}</Note>}
       {mine && v.legal.length === 0 && <NextButton onClick={() => act({ type: "draw" })}>{v.boneyard ? "Nothing plays — draw one" : "Nothing plays — pass"}</NextButton>}
       <p className={`${handFont.className} text-center text-[19px] font-bold text-[#F5EFE2]/60`}>{mine ? (v.drawn ? `Play the tile you drew (${v.drawn})` : v.legal.length ? "Tap a tile" : "No tile plays") : "Your tiles"}</p>
-      <TileHand tiles={v.hand} selected={sel} size={20} legal={mine ? (t) => trainsFor(t).length > 0 : undefined} onPick={mine ? pickTile : undefined} />
+      <TileHand tiles={v.hand} selected={sel} size={26} legal={mine ? (t) => trainsFor(t).length > 0 : undefined} onPick={mine ? pickTile : undefined} />
     </Board>
   );
 }

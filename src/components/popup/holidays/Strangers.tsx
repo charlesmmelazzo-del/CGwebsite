@@ -197,7 +197,9 @@ export function DailyWinners({ onBack, startOn }: { onBack: () => void; startOn?
       <div className="pt-2">
         <BackLink onClick={onBack} />
       </div>
-      <ScriptTitle size="clamp(40px, 11vw, 54px)">Daily winners</ScriptTitle>
+      {/* eslint-disable-next-line @next/next/no-img-element -- drawn wreath */}
+      <img src="/popup/holidays/extras/wreath.webp" alt="" className="hh-pop mx-auto h-[90px] w-auto select-none" draggable={false} />
+      <ScriptTitle star={false} size="clamp(40px, 11vw, 54px)">Daily winners</ScriptTitle>
       <div className="mt-3 flex justify-center gap-2" role="tablist">
         {(games ?? []).map((x) => (
           <button

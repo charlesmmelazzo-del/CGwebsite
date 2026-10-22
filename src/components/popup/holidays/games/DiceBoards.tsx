@@ -121,17 +121,17 @@ export function FiveDiceBoard({ view: v, you, send, preview }: BoardProps<FiveDi
   useEffect(() => {
     setHeld(v.held);
     setConfirm(null);
-  }, [v.turn, v.rolls, v.held]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only when a new roll lands
+  }, [v.turn, v.rolls]);
   const showing = v.seats[v.turn];
-  const [rollKey, setRollKey] = useState(0);
-  useEffect(() => setRollKey((k) => k + 1), [v.dice]);
+  const rollKey = `${v.turn}-${v.rolls}-${v.dice.join("")}`;
 
   return (
     <Board>
       <Seats seats={v.seats} turn={v.turn} you={you} note={(i) => `${v.seats[i].total}`} />
       <div className="flex justify-center gap-2 pt-4 pb-6" key={rollKey}>
         {v.dice.map((d, i) => (
-          <Die key={i} i={i} value={d} held={v.rolls > 0 && held[i]} rolling={v.rolls > 0 && !held[i]} onClick={mine && v.rolls > 0 && v.rolls < 3 ? () => setHeld(held.map((h, k) => (k === i ? !h : h))) : undefined} />
+          <Die key={i} i={i} value={d} held={v.rolls > 0 && held[i]} rolling={v.rolls > 0 && !held[i]} onClick={mine && v.rolls > 0 && v.rolls < 3 ? () => setHeld((cur) => cur.map((h, k) => (k === i ? !h : h))) : undefined} />
         ))}
       </div>
       <Note tone={error ? "error" : undefined}>
@@ -191,13 +191,13 @@ export function FarkleBoard({ view: v, you, send, preview }: BoardProps<FarkleVi
   const { error, act } = useAct(send, preview);
   const [keep, setKeep] = useState<number[]>([]);
   const mine = v.turn === v.you;
-  useEffect(() => setKeep([]), [v.dice, v.turn]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- reset when a new roll lands
+  useEffect(() => setKeep([]), [v.dice.join(""), v.turn, v.turnTotal]);
   const picked = keep.map((i) => v.dice[i]);
   const keepScore = keep.length ? scoreDice(picked) : 0;
   const running = v.turnTotal + Math.max(0, keepScore);
   const canBank = keepScore > 0 && running >= v.canBankFrom;
-  const [rollKey, setRollKey] = useState(0);
-  useEffect(() => setRollKey((k) => k + 1), [v.dice]);
+  const rollKey = `${v.turn}-${v.turnTotal}-${v.dice.join("")}`;
 
   return (
     <Board>
@@ -279,12 +279,10 @@ export function ShutTheBoxBoard({ view: v, you, send, preview }: BoardProps<BoxV
               aria-label={`Tile ${n}${open ? "" : ", shut"}`}
               aria-pressed={on}
               className="relative w-[36px] h-[64px] transition-transform"
-              style={{ transform: open ? (on ? "translateY(-6px)" : "none") : "perspective(200px) rotateX(70deg) translateY(16px)" }}
+              style={{ transform: open ? (on ? "translateY(-6px)" : "none") : "translateY(6px) scale(0.94)" }}
             >
-              <svg width={36} height={64} className="absolute inset-0 overflow-visible" aria-hidden>
-                <path d={sketchPath(36, 64, n)} fill={open ? (on ? COLORS.ink : COLORS.cardFace) : COLORS.paperDark} stroke={on ? COLORS.star : COLORS.cardInk} strokeWidth={on ? 2.6 : 1.4} />
-              </svg>
-              <span className={`${handFont.className} relative text-[30px] font-bold`} style={{ color: open ? COLORS.cardInk : COLORS.inkFaint }}>{n}</span>
+              {/* eslint-disable-next-line @next/next/no-img-element -- static tile art */}
+              <img src={`/popup/holidays/box/${open ? "open" : "shut"}-${n}.webp`} alt="" width={36} height={60} draggable={false} className="absolute inset-0 w-full h-full object-contain select-none" style={on ? { filter: "drop-shadow(0 0 2px #D63A2F) drop-shadow(0 0 1px #D63A2F)" } : undefined} />
             </button>
           );
         })}

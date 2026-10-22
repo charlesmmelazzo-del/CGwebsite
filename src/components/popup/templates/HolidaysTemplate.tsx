@@ -20,7 +20,7 @@ import Room from "../holidays/Room";
 import { DailyWinners, PublicRoom, StrangersHub } from "../holidays/Strangers";
 import { getPublicGame } from "@/lib/holidays/public";
 import { hostRoom, joinRoom, savedRoom, saveRoom, type Saved } from "../holidays/useRoom";
-import { BackLink, HandBox, HandButton, handFont, HolidayStyles, Label, readFont, ScriptTitle, Squiggle, Write } from "../holidays/ui";
+import { at, BackLink, HandBox, HandButton, handFont, HolidayStyles, Label, readFont, ScriptTitle, Write } from "../holidays/ui";
 
 type Screen = "home" | "recipes" | "play" | "pick" | "join" | "room" | "strangers" | "public" | "winners";
 
@@ -122,25 +122,31 @@ export default function HolidaysTemplate({ menu, cocktails, recordInteraction, i
   );
 }
 
+const ART = "/popup/holidays/extras";
+
 function Home({ onRecipes, onPlay }: { onRecipes: () => void; onPlay: () => void }) {
+  const tiles = [
+    { label: "Holiday cocktail recipes", img: `${ART}/recipes-button.webp`, run: onRecipes },
+    { label: "Play a game", img: `${ART}/games-button.webp`, run: onPlay },
+  ];
   return (
-    <div className="h-full flex flex-col items-center justify-center px-6 gap-2">
+    <div className="h-full flex flex-col items-center justify-center px-5 gap-2 overflow-y-auto">
       <Label i={0} className="text-center">
         Common Good presents
       </Label>
-      <ScriptTitle i={1} size="clamp(54px, 17vw, 84px)">
-        Home for
-        <br />
-        the Holidays
-      </ScriptTitle>
-      <Squiggle i={4} width={190} />
-      <div className="w-full max-w-[340px] mt-8 space-y-3">
-        <HandButton i={5} onClick={onRecipes}>
-          Holiday cocktail recipes
-        </HandButton>
-        <HandButton i={6} primary onClick={onPlay}>
-          Play a game
-        </HandButton>
+      <h1 className="sr-only">Home for the Holidays</h1>
+      {/* eslint-disable-next-line @next/next/no-img-element -- hand-lettered title art */}
+      <img src={`${ART}/title-home-for-the-holidays.webp`} alt="" className="hh-write hh-slow w-[min(88vw,400px)] select-none" style={at(1)} draggable={false} />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={`${ART}/flourish-divider.webp`} alt="" className="hh-write w-[min(56vw,240px)] -mt-4 select-none" style={at(4)} draggable={false} />
+      <div className="w-full max-w-[380px] mt-6 grid grid-cols-2 gap-3">
+        {tiles.map((t, n) => (
+          <HandBox key={t.label} i={5 + n} onClick={t.run} label={t.label} className="px-2 pt-3 pb-3 text-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={t.img} alt="" className="mx-auto h-[96px] w-auto object-contain select-none" draggable={false} />
+            <p className={`${handFont.className} mt-2 text-[24px] font-bold leading-tight`}>{t.label}</p>
+          </HandBox>
+        ))}
       </div>
     </div>
   );
