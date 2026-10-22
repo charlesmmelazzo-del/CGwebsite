@@ -12,3 +12,23 @@ export function failure(e: unknown) {
   console.error("[holidays]", e);
   return NextResponse.json({ error: "Something went wrong. Please try again." }, { status: 500 });
 }
+
+// ─── Guess limiting ──────────────────────────────────────────────────────────
+// A whole bar shares one internet address on its Wi-Fi, so limits must never
+// trip on normal play. Only WRONG room codes count (that's what guessing
+// looks like); joining a real game is never limited.
+const wrongCodes = new Map<string, { count: number; resetAt: number }>();
+const WRONG_MAX = 120;
+const WRONG_WINDOW_MS = 10 * 60 * 1000;
+
+export function tooManyWrongCodes(ip: string): boolean {
+  const e = wrongCodes.get(ip);
+  return !!e && Date.now() < e.resetAt && e.count >= WRONG_MAX;
+}
+
+export function noteWrongCode(ip: string) {
+  const now = Date.now();
+  const e = wrongCodes.get(ip);
+  if (!e || now > e.resetAt) wrongCodes.set(ip, { count: 1, resetAt: now + WRONG_WINDOW_MS });
+  else e.count++;
+}

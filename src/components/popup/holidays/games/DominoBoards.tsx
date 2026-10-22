@@ -11,13 +11,21 @@ import { HandButton, handFont, readFont } from "../ui";
 import { Big, Board, Buttons, Domino, NextButton, Note, Seats, TeamScores, TileHand, useAct } from "./kit";
 import type { BoardProps } from "./types";
 
-/** A row of laid tiles that scrolls sideways, newest end kept in view. */
-function Line({ tiles, size = 28 }: { tiles: [number, number][]; size?: number }) {
+/**
+ * The line of laid tiles. On a phone it wraps onto as many rows as it needs —
+ * read it left to right, row by row — so both open ends are always on screen,
+ * and the two end numbers are spelled out underneath.
+ */
+function Line({ tiles, size = 26 }: { tiles: [number, number][]; size?: number }) {
+  if (!tiles.length) return null;
   return (
-    <div className="w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      <div className="flex items-center justify-center gap-0.5 min-w-max px-4 py-2 mx-auto">
+    <div className="w-full px-3">
+      <div className="flex flex-wrap items-center justify-center gap-x-0.5 gap-y-2 py-1">
         {tiles.map(([a, b], i) => (a === b ? <Domino key={i} a={a} b={b} size={size} vertical seed={i} /> : <Domino key={i} a={a} b={b} size={size} seed={i} />))}
       </div>
+      <p className={`${handFont.className} text-center text-[20px] font-bold text-[#F5EFE2]/80`}>
+        Left end {tiles[0][0]} · right end {tiles[tiles.length - 1][1]}
+      </p>
     </div>
   );
 }
@@ -327,9 +335,9 @@ export function TrainBoard({ view: v, send, preview }: BoardProps<TrainView>) {
                   {t.owner !== null && <span className="text-[#F5EFE2]/45"> ({v.seats[t.owner].tiles})</span>}
                 </span>
                 <span className="flex-1 flex items-center justify-end gap-0.5 overflow-hidden">
-                  {t.tiles.length > 3 && <span className={`${handFont.className} text-[14px] font-bold text-[#F5EFE2]/50`}>+{t.tiles.length - 3}</span>}
-                  {t.tiles.slice(-3).map((x, k) => (
-                    <Domino key={k} a={x.near} b={x.far} size={18} vertical={x.near === x.far} seed={k + i} />
+                  {t.tiles.length > 2 && <span className={`${handFont.className} text-[14px] font-bold text-[#F5EFE2]/50`}>+{t.tiles.length - 2}</span>}
+                  {t.tiles.slice(-2).map((x, k) => (
+                    <Domino key={k} a={x.near} b={x.far} size={22} vertical={x.near === x.far} seed={k + i} />
                   ))}
                   <span className={`${handFont.className} w-7 text-center text-[20px] font-bold`}>{t.end}</span>
                 </span>

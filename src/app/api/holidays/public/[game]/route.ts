@@ -27,7 +27,8 @@ export async function POST(req: NextRequest, { params }: { params: { game: strin
   }
   try {
     if (body.op === "join") {
-      const limit = checkRateLimit(`holiday-public-join:${getIp(req)}`, 30, 10 * 60 * 1000);
+      // Generous: the whole bar may share one Wi-Fi address.
+      const limit = checkRateLimit(`holiday-public-join:${getIp(req)}`, 600, 10 * 60 * 1000);
       if (limit.blocked) return NextResponse.json({ error: "Too many tries. Wait a few minutes." }, { status: 429 });
       return NextResponse.json(await joinPublic(params.game, token(req), String(body.name ?? "")));
     }

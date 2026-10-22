@@ -12,7 +12,8 @@ export const dynamic = "force-dynamic";
  * phone keeps for this room, and a 4-digit code to hand to friends.
  */
 export async function POST(req: NextRequest) {
-  const limit = checkRateLimit(`holiday-host:${getIp(req)}`, 30, 60 * 60 * 1000);
+  // Generous: the whole bar may share one Wi-Fi address. This only stops a runaway script.
+  const limit = checkRateLimit(`holiday-host:${getIp(req)}`, 400, 60 * 60 * 1000);
   if (limit.blocked) {
     return NextResponse.json({ error: "Too many games hosted from here. Try again later." }, { status: 429 });
   }
