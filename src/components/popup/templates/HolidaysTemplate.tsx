@@ -17,16 +17,20 @@ import type { RoomView } from "@/lib/holidays/types";
 import GamePicker from "../holidays/GamePicker";
 import Recipes from "../holidays/Recipes";
 import Room from "../holidays/Room";
+import { DailyWinners, PublicRoom, StrangersHub } from "../holidays/Strangers";
+import { getPublicGame } from "@/lib/holidays/public";
 import { hostRoom, joinRoom, savedRoom, saveRoom, type Saved } from "../holidays/useRoom";
 import { BackLink, HandBox, HandButton, handFont, HolidayStyles, Label, readFont, ScriptTitle, Squiggle, Write } from "../holidays/ui";
 
-type Screen = "home" | "recipes" | "play" | "pick" | "join" | "room";
+type Screen = "home" | "recipes" | "play" | "pick" | "join" | "room" | "strangers" | "public" | "winners";
 
 export default function HolidaysTemplate({ menu, cocktails, recordInteraction, isSandbox }: PopupTemplateProps) {
   const [screen, setScreen] = useState<Screen>("home");
   const [saved, setSaved] = useState<Saved | null>(null);
   const [initial, setInitial] = useState<RoomView | null>(null);
   const [busy, setBusy] = useState(false);
+  const [publicGame, setPublicGame] = useState("word-grid");
+  const [winnersFrom, setWinnersFrom] = useState<Screen>("strangers");
   const [error, setError] = useState<string | null>(null);
 
   // Back in a game after a refresh or a locked phone.
@@ -93,7 +97,23 @@ export default function HolidaysTemplate({ menu, cocktails, recordInteraction, i
         {screen === "recipes" && (
           <Recipes cocktails={cocktails} onBack={() => go("home")} onDownload={(c) => void recordInteraction("recipe_download", { name: c.name }, c.id)} />
         )}
-        {screen === "play" && <HostOrJoin onBack={() => go("home")} onHost={() => go("pick")} onJoin={() => go("join")} />}
+        {screen === "play" && <HostOrJoin onBack={() => go("home")} onHost={() => go("pick")} onJoin={() => go("join")} onStrangers={() => go("strangers")} />}
+        {screen === "strangers" && (
+          <StrangersHub
+            onBack={() => go("play")}
+            onPlay={(g) => (setPublicGame(g), go("public"))}
+            onWinners={() => (setWinnersFrom("strangers"), go("winners"))}
+          />
+        )}
+        {screen === "public" && (
+          <PublicRoom
+            game={publicGame}
+            rules={getPublicGame(publicGame)?.rules ?? []}
+            onLeave={() => go("strangers")}
+            onWinners={() => (setWinnersFrom("public"), go("winners"))}
+          />
+        )}
+        {screen === "winners" && <DailyWinners startOn={publicGame} onBack={() => go(winnersFrom)} />}
         {screen === "pick" && <GamePicker onBack={() => go("play")} onHost={(g) => host(g.key)} busy={busy} error={error} />}
         {screen === "join" && <JoinForm onBack={() => go("play")} onJoin={join} busy={busy} error={error} />}
         {screen === "room" && saved && <Room key={saved.code + saved.token} saved={saved} initial={initial} onLeave={leaveRoom} />}
@@ -126,34 +146,33 @@ function Home({ onRecipes, onPlay }: { onRecipes: () => void; onPlay: () => void
   );
 }
 
-function HostOrJoin({ onBack, onHost, onJoin }: { onBack: () => void; onHost: () => void; onJoin: () => void }) {
+function HostOrJoin({ onBack, onHost, onJoin, onStrangers }: { onBack: () => void; onHost: () => void; onJoin: () => void; onStrangers: () => void }) {
+  const choices = [
+    { label: "Host a game for your friends", note: "Pick a game and get a code for your table", run: onHost, primary: true },
+    { label: "Join a friend's game", note: "Someone at your table is hosting and has a code", run: onJoin },
+    { label: "Play with strangers", note: "Here on your own? Join the bar-wide game and chase today's high score", run: onStrangers },
+  ];
   return (
-    <div className="h-full flex flex-col px-6">
+    <div className="h-full flex flex-col px-6 overflow-y-auto">
       <div className="pt-2 -mx-2">
         <BackLink onClick={onBack} />
       </div>
-      <div className="flex-1 flex flex-col items-center justify-center gap-2">
+      <div className="flex-1 flex flex-col items-center justify-center gap-2 pb-6">
         <ScriptTitle>Let&rsquo;s play</ScriptTitle>
         <Write i={2} as="p" className={`${readFont.className} text-[19px] text-center text-[#F5EFE2]/80 max-w-[300px]`}>
-          Everyone plays on their own phone. One person hosts and the rest join with a code.
+          Everyone plays on their own phone.
         </Write>
-        <div className="w-full max-w-[340px] mt-6 space-y-4">
-          <div>
-            <HandButton i={3} primary onClick={onHost}>
-              Host a game
-            </HandButton>
-            <Write i={4} as="p" className={`${readFont.className} text-center text-[16px] text-[#F5EFE2]/65 mt-1`}>
-              Pick a game and get a code for your table
-            </Write>
-          </div>
-          <div>
-            <HandButton i={5} onClick={onJoin}>
-              Join a game
-            </HandButton>
-            <Write i={6} as="p" className={`${readFont.className} text-center text-[16px] text-[#F5EFE2]/65 mt-1`}>
-              Someone else is hosting and has a code
-            </Write>
-          </div>
+        <div className="w-full max-w-[340px] mt-5 space-y-4">
+          {choices.map((c, n) => (
+            <div key={c.label}>
+              <HandButton i={3 + n * 2} primary={c.primary} onClick={c.run}>
+                {c.label}
+              </HandButton>
+              <Write i={4 + n * 2} as="p" className={`${readFont.className} text-center text-[16px] text-[#F5EFE2]/65 mt-1`}>
+                {c.note}
+              </Write>
+            </div>
+          ))}
         </div>
       </div>
     </div>

@@ -5,6 +5,7 @@
 // saves the result only if nobody else changed the room in between.
 
 import { getGame } from "./games";
+import { isOffensiveName, NAME_REFUSED } from "./nameFilter";
 import { GameError, type GameCtx, type RoomPlayer, type RoomStatus, type RoomView, type Seat } from "./types";
 
 export interface Room {
@@ -85,6 +86,7 @@ export function addPlayer(room: Room, player: { id: string; token: string; name:
   if (room.players.length >= game.maxPlayers) throw new GameError(`That game is full (${game.maxPlayers} players).`);
   const name = player.name ? uniqueName(room.players, player.name) : "";
   if (!player.host && !name) throw new GameError("Enter your name.");
+  if (name && isOffensiveName(name)) throw new GameError(NAME_REFUSED);
   return { ...room, players: [...room.players, { ...player, name, joinedAt: now }] };
 }
 
@@ -102,6 +104,7 @@ export function applyOp(room: Room, playerId: string, op: RoomOp, ctx: GameCtx):
       if (room.status !== "lobby") throw new GameError("Names are locked once the game starts.");
       const name = cleanName(op.name);
       if (!name) throw new GameError("Enter your name.");
+      if (isOffensiveName(name)) throw new GameError(NAME_REFUSED);
       return { ...room, players: room.players.map((p) => (p.id === playerId ? { ...p, name: uniqueName(room.players, name, playerId) } : p)) };
     }
     case "team": {
