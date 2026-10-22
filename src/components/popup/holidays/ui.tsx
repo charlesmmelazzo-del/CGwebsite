@@ -284,15 +284,21 @@ export function BackLink({ onClick, children = "Back" }: { onClick: () => void; 
   );
 }
 
-/** Animations, scoped by class name. Rendered once by the template. */
+/**
+ * Animations, scoped by class name. Rendered once by the template.
+ * hh-write uses fill-mode "backwards": hidden until its turn, and once written
+ * the clip mask is gone completely, so script swashes and tall letters are
+ * never trimmed. (Keep quote marks out of this CSS text — they render
+ * differently on the server and in the browser and break hydration.)
+ */
 export function HolidayStyles() {
   return (
     <style>{`
-      .hh-write { animation: hh-write 520ms cubic-bezier(0.55, 0.1, 0.35, 1) both; animation-delay: calc(var(--i, 0) * 90ms); }
+      .hh-write { animation: hh-write 520ms cubic-bezier(0.55, 0.1, 0.35, 1) backwards; animation-delay: calc(var(--i, 0) * 90ms); }
       .hh-slow { animation-duration: 1100ms; }
       @keyframes hh-write {
-        from { clip-path: inset(-20% 100% -20% 0); opacity: 0.3; transform: translateX(-2px) rotate(-0.4deg); }
-        to   { clip-path: inset(-20% -2% -20% 0); transform: none; }
+        from { clip-path: inset(-60% 100% -60% -15%); opacity: 0.3; transform: translateX(-2px) rotate(-0.4deg); }
+        to   { clip-path: inset(-60% -15% -60% -15%); opacity: 1; transform: none; }
       }
       .hh-draw { stroke-dasharray: 1 1; animation: hh-draw 620ms cubic-bezier(0.6, 0.05, 0.3, 1) both; }
       @keyframes hh-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }

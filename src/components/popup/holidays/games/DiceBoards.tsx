@@ -5,8 +5,8 @@
 import { useEffect, useState } from "react";
 import { CATEGORIES, type Category } from "@/lib/holidays/games/fiveDice";
 import { scoreDice } from "@/lib/holidays/games/farkle";
-import { adjacent } from "@/lib/holidays/games/wordGrid";
-import { COLORS, HandBox, HandButton, handFont, readFont, sketchPath } from "../ui";
+import LetterGrid from "../LetterGrid";
+import { HandBox, HandButton, handFont, readFont } from "../ui";
 import { Big, Board, Buttons, Countdown, Die, NextButton, Note, Seats, useAct } from "./kit";
 import type { BoardProps } from "./types";
 
@@ -25,24 +25,7 @@ interface GridView {
 }
 
 export function WordGridBoard({ view: v, you, send, skew, preview }: BoardProps<GridView>) {
-  const { error, act, clear } = useAct(send, preview);
-  const [path, setPath] = useState<number[]>([]);
-  useEffect(() => setPath([]), [v.round, v.phase]);
-  const word = path.map((i) => v.board[i]).join("").toLowerCase();
-
-  function tap(i: number) {
-    clear();
-    if (path[path.length - 1] === i) return setPath(path.slice(0, -1)); // tap the last letter again to undo it
-    if (path.includes(i)) return;
-    if (path.length && !adjacent(path[path.length - 1], i)) return setPath([i]); // start a new word
-    setPath([...path, i]);
-  }
-
-  async function add() {
-    if (word.length < 3) return;
-    await act({ type: "word", path });
-    setPath([]);
-  }
+  const { error, act } = useAct(send, preview);
 
   if (v.phase !== "live" && v.results) {
     return (
@@ -65,31 +48,13 @@ export function WordGridBoard({ view: v, you, send, skew, preview }: BoardProps<
     );
   }
 
-  const cell = 74;
   return (
     <Board>
       <Note>Round {v.round + 1} of {v.rounds}</Note>
       <Countdown endsAt={v.endsAt} skew={skew} size={46} />
-      <div className="mx-auto grid grid-cols-4 gap-1.5 py-2 touch-manipulation select-none">
-        {v.board.map((l, i) => {
-          const on = path.includes(i);
-          const last = path[path.length - 1] === i;
-          return (
-            <button key={i} type="button" onClick={() => tap(i)} aria-label={`Letter ${l}`} aria-pressed={on} className="relative" style={{ width: cell, height: cell }}>
-              <svg width={cell} height={cell} className="absolute inset-0 overflow-visible" aria-hidden>
-                <path d={sketchPath(cell, cell, i + 3)} fill={on ? COLORS.ink : COLORS.cardFace} stroke={last ? COLORS.star : COLORS.cardInk} strokeWidth={last ? 3 : 1.4} />
-              </svg>
-              <span className={`${handFont.className} relative text-[40px] font-bold`} style={{ color: COLORS.cardInk }}>{l}</span>
-            </button>
-          );
-        })}
+      <div className="py-2">
+        <LetterGrid board={v.board} error={error} onWord={async (path) => void (await act({ type: "word", path }))} />
       </div>
-      <p className={`${handFont.className} text-center text-[36px] font-bold min-h-[44px] tracking-[0.08em] uppercase`}>{word || " "}</p>
-      <Note tone={error ? "error" : undefined}>{error ?? "Tap touching letters. Tap the last one again to undo."}</Note>
-      <Buttons>
-        <HandButton small onClick={() => setPath([])}>Clear</HandButton>
-        <HandButton small primary i={1} disabled={word.length < 3} onClick={add}>Add word</HandButton>
-      </Buttons>
       <p className={`${readFont.className} px-4 text-[16px] text-center`}>
         <span className={`${handFont.className} font-bold text-[19px]`}>Your words ({v.found.length}): </span>
         {v.found.join(", ") || "none yet"}

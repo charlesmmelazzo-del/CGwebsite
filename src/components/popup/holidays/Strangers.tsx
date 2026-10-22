@@ -5,10 +5,10 @@
 // Daily Winners board (a tab per game), and the live game screens.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { adjacent } from "@/lib/holidays/games/wordGrid";
 import type { RulesSection } from "@/lib/holidays/types";
+import LetterGrid from "./LetterGrid";
 import { useCountdown } from "./useRoom";
-import { BackLink, COLORS, HandBox, HandButton, handFont, Label, readFont, ScriptTitle, scriptFont, sketchPath, Squiggle, Star, Write } from "./ui";
+import { BackLink, COLORS, HandBox, HandButton, handFont, Label, readFont, ScriptTitle, scriptFont, Squiggle, Star, Write } from "./ui";
 
 // ─── Talking to the server ───────────────────────────────────────────────────
 
@@ -338,7 +338,7 @@ export function PublicRoom({ game, onLeave, onWinners, rules }: { game: string; 
   return (
     <div className="h-full flex flex-col">
       <div className="shrink-0 flex items-center gap-2 px-3 pt-2 pb-1 border-b border-[#F5EFE2]/10">
-        <p className={`${handFont.className} flex-1 text-[22px] font-bold leading-tight truncate`}>
+        <p className={`${handFont.className} flex-1 min-w-0 text-[21px] font-bold leading-tight break-words`}>
           {you.name} · {you.score} today{you.rank ? ` · #${you.rank}` : ""}
         </p>
         <TopButton onClick={() => setSheet("scores")}>Today</TopButton>
@@ -466,10 +466,8 @@ interface GridView {
 }
 
 function PublicGrid({ v, skew, act }: { v: GridView; skew: number; act: (a: unknown) => Promise<string | null> }) {
-  const [path, setPath] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => setPath([]), [v.round, v.phase]);
-  const word = path.map((i) => v.board[i]).join("").toLowerCase();
+  useEffect(() => setError(null), [v.round, v.phase]);
 
   if (v.phase === "results" && v.last) {
     return (
@@ -503,55 +501,14 @@ function PublicGrid({ v, skew, act }: { v: GridView; skew: number; act: (a: unkn
     );
   }
 
-  function tap(i: number) {
-    setError(null);
-    if (path[path.length - 1] === i) return setPath(path.slice(0, -1));
-    if (path.includes(i)) return;
-    if (path.length && !adjacent(path[path.length - 1], i)) return setPath([i]);
-    setPath([...path, i]);
-  }
-
-  const cell = 74;
   return (
     <div className="h-full overflow-y-auto flex flex-col pb-3">
       <Note>
         Round {v.round} · {v.inThisRound} playing{v.waiting ? ` · ${v.waiting} waiting for the next` : ""}
       </Note>
       <Clock until={v.endsAt} skew={skew} />
-      <div className="mx-auto grid grid-cols-4 gap-1.5 py-2 touch-manipulation select-none">
-        {v.board.map((l, i) => {
-          const on = path.includes(i);
-          const last = path[path.length - 1] === i;
-          return (
-            <button key={i} type="button" onClick={() => tap(i)} aria-label={`Letter ${l}`} aria-pressed={on} className="relative" style={{ width: cell, height: cell }}>
-              <svg width={cell} height={cell} className="absolute inset-0 overflow-visible" aria-hidden>
-                <path d={sketchPath(cell, cell, i + 3)} fill={on ? COLORS.ink : COLORS.cardFace} stroke={last ? COLORS.star : COLORS.cardInk} strokeWidth={last ? 3 : 1.4} />
-              </svg>
-              <span className={`${handFont.className} relative text-[40px] font-bold`} style={{ color: COLORS.cardInk }}>
-                {l}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-      <p className={`${handFont.className} text-center text-[36px] font-bold min-h-[44px] tracking-[0.08em] uppercase`}>{word || " "}</p>
-      <Note tone={error ? "error" : undefined}>{error ?? "Tap touching letters. Tap the last one again to undo."}</Note>
-      <div className="px-4 pt-2 grid grid-cols-2 gap-2">
-        <HandButton small onClick={() => setPath([])}>
-          Clear
-        </HandButton>
-        <HandButton
-          small
-          primary
-          i={1}
-          disabled={word.length < 3}
-          onClick={async () => {
-            setError(await act({ type: "word", path }));
-            setPath([]);
-          }}
-        >
-          Add word
-        </HandButton>
+      <div className="py-2">
+        <LetterGrid board={v.board} error={error} onWord={async (path) => setError(await act({ type: "word", path }))} />
       </div>
       <p className={`${readFont.className} px-4 pt-2 text-[16px] text-center`}>
         <span className={`${handFont.className} font-bold text-[19px]`}>Your words ({v.found.length}): </span>
