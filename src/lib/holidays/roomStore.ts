@@ -53,7 +53,8 @@ async function closeIdleRooms() {
   if (memory) return;
   const sb = getSupabaseAdmin();
   const cutoff = new Date(Date.now() - IDLE_MS).toISOString();
-  await sb.from("holiday_rooms").update({ status: "ended" }).neq("status", "ended").lt("updated_at", cutoff);
+  // The bar-wide rooms (PUB-…) are permanent and never time out.
+  await sb.from("holiday_rooms").update({ status: "ended" }).neq("status", "ended").lt("updated_at", cutoff).not("code", "like", "PUB-%");
 }
 
 // ─── Local testing without the table ─────────────────────────────────────────
@@ -80,7 +81,7 @@ export async function getRoom(code: string): Promise<Room | null> {
   return data ? toRoom(data as Row) : null;
 }
 
-class Conflict extends Error {}
+export class Conflict extends Error {}
 
 async function save(before: Room, after: Room): Promise<Room> {
   if (memory) {
@@ -110,7 +111,7 @@ async function save(before: Room, after: Room): Promise<Room> {
 }
 
 /** Load → change → save, retrying when another phone's change landed first. */
-async function mutate(code: string, change: (room: Room) => Room | null): Promise<Room> {
+export async function mutate(code: string, change: (room: Room) => Room | null): Promise<Room> {
   for (let attempt = 0; attempt < 8; attempt++) {
     const room = await getRoom(code);
     if (!room) throw new GameError("No game with that code. Check the number with your host.");
@@ -181,4 +182,39 @@ export async function pollRoom(code: string): Promise<Room | null> {
   if (!room) return null;
   if (!tickRoom(room, ctxNow())) return room;
   return mutate(code, (r) => tickRoom(r, ctxNow()));
+}
+
+// ─── Bar-wide rooms (Play with strangers) ────────────────────────────────────
+
+/** Fetch a permanent room, creating it the first time anyone asks. */
+export async function ensureRoom(code: string, gameKey: string, init: () => unknown): Promise<Room> {
+  const found = await getRoom(code);
+  if (found) return found;
+  if (memory) {
+    const row: Row = { id: newToken(), code, game_key: gameKey, status: "playing", players: [], state: init(), version: 0 };
+    memory.set(code, structuredClone(row));
+    return toRoom(row);
+  }
+  const sb = getSupabaseAdmin();
+  const { error } = await sb.from("holiday_rooms").insert({ code, game_key: gameKey, status: "playing", state: init() });
+  // 23505: someone else created it a moment ago — fine.
+  if (error && error.code !== "23505") check(error);
+  const room = await getRoom(code);
+  if (!room) throw new Error(`Couldn't create ${code}`);
+  return room;
+}
+
+/**
+ * Save a "still here" heartbeat WITHOUT bumping the version, so it doesn't
+ * make every phone re-download the room. Only lands if nothing else changed
+ * since we read it; a heartbeat lost to a race is simply sent again later.
+ */
+export async function quietSave(before: Room, state: unknown): Promise<void> {
+  if (memory) {
+    const row = memory.get(before.code);
+    if (row && row.version === before.version) memory.set(before.code, structuredClone({ ...row, state }));
+    return;
+  }
+  const sb = getSupabaseAdmin();
+  await sb.from("holiday_rooms").update({ state }).eq("id", before.id).eq("version", before.version);
 }
