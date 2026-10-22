@@ -115,7 +115,8 @@ export function EuchreBoard({ view: v, you, send, preview }: BoardProps<EuchreVi
               <HandButton small onClick={() => act({ type: "pass" })}>Pass</HandButton>
               {SUITS.filter((s) => s !== v.turnedDown).map((s, i) => (
                 <HandButton key={s} small i={i + 1} onClick={() => act({ type: "name", suit: s, alone })} aria-label={`Name ${SUIT_NAMES[s]}`}>
-                  <span style={{ color: suitColor(s) }}>{SUIT_SYMBOLS[s]}</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element -- drawn suit */}
+                  <img src={`/popup/holidays/suits/${SUIT_NAMES[s].toLowerCase()}.webp`} alt="" className="h-[30px] w-auto mx-auto" draggable={false} />
                 </HandButton>
               ))}
             </div>

@@ -312,7 +312,10 @@ export function HolidayStyles() {
         background-color: ${COLORS.paper};
         background-image:
           radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.07), transparent 60%),
-          radial-gradient(ellipse at 50% 110%, rgba(0,0,0,0.22), transparent 60%);
+          radial-gradient(ellipse at 50% 110%, rgba(0,0,0,0.22), transparent 60%),
+          url(/popup/holidays/paper.webp);
+        background-size: auto, auto, cover;
+        background-position: center;
       }
       @media (prefers-reduced-motion: reduce) {
         .hh-write, .hh-draw, .hh-fill, .hh-pop, .hh-screen, .hh-sheet, .hh-deal, .hh-roll { animation: none; }

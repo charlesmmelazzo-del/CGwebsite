@@ -21,7 +21,9 @@ export default function Recipes({ cocktails, onBack, onDownload }: { cocktails: 
       <div className="pt-2">
         <BackLink onClick={onBack} />
       </div>
-      <ScriptTitle size="clamp(40px, 11vw, 56px)">Holiday cocktails</ScriptTitle>
+      {/* eslint-disable-next-line @next/next/no-img-element -- drawn coupe */}
+      <img src="/popup/holidays/extras/coupe-with-pine.webp" alt="" className="hh-pop mx-auto h-[84px] w-auto select-none" draggable={false} />
+      <ScriptTitle star={false} size="clamp(40px, 11vw, 56px)">Holiday cocktails</ScriptTitle>
       <Squiggle i={2} />
       <Write i={2} as="p" className={`${readFont.className} mt-2 text-center text-[18px] text-[#F5EFE2]/75`}>
         Take a recipe home and mix one for the family.

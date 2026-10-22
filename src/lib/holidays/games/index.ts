@@ -46,6 +46,9 @@ export const GAMES: GameDef<any, any, any>[] = [
   shutTheBox,
 ];
 
+// The owner's illustration for each game's detail page (scripts/holidays-art.py).
+for (const g of GAMES) g.image ??= `/popup/holidays/games/${g.key}.webp`;
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function getGame(key: string): GameDef<any, any, any> | null {
   return GAMES.find((g) => g.key === key) ?? null;
