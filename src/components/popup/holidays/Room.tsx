@@ -304,7 +304,7 @@ function Playing({ room, send, skew, onLeave, error }: { room: RoomView; send: S
     <div className="h-full flex flex-col">
       {/* Top strip: whose turn, and the menu. */}
       <div className="shrink-0 flex items-center gap-2 px-3 pt-2 pb-1 border-b border-[#F5EFE2]/10">
-        <p key={room.gameStatus?.message} className={`${handFont.className} hh-write flex-1 text-[23px] font-bold leading-tight truncate`} aria-live="polite">
+        <p key={room.gameStatus?.message} className={`${handFont.className} hh-write flex-1 min-w-0 text-[21px] font-bold leading-tight break-words`} aria-live="polite">
           {yourTurn && <span style={{ color: COLORS.star }}>★ </span>}
           {room.gameStatus?.message}
         </p>
@@ -442,7 +442,7 @@ export function Scoreboard({ lines, you, startAt = 0, low = false }: { lines: Sc
       {sorted.map((l, n) => (
         <Write key={l.label} as="li" i={startAt + n * 0.5} className={`${handFont.className} flex items-baseline gap-2 text-[26px] font-bold`}>
           <span className="w-6 text-[#F5EFE2]/50">{n + 1}</span>
-          <span className="flex-1 truncate">
+          <span className="flex-1 min-w-0 break-words">
             {l.label}
             {l.playerIds.includes(you) && <span className="text-[#F5EFE2]/55 text-[20px]"> (you)</span>}
           </span>
