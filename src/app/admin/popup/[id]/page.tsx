@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import ColorPicker from "@/components/ui/ColorPicker";
 import ImagePicker from "@/components/ui/ImagePicker";
-import { listTemplates } from "@/components/popup/templates/registry";
+import { listTemplates, RECIPE_TEMPLATES } from "@/components/popup/templates/registry";
 import { listGames } from "@/lib/popup/games";
 import type { PopupCocktail, PopupMenu, PopupStatus } from "@/lib/popup/types";
 
@@ -547,12 +547,12 @@ function CocktailCard({
             onChange={(v) => onUpdate({ ingredients: v })}
             multiline
             hint={
-              templateKey === "creepypastas"
+              RECIPE_TEMPLATES.includes(templateKey)
                 ? "One per line. Amounts are fine here: the recipe cards show just the names (\u201c2 oz bourbon\u201d shows as \u201cBourbon\u201d); the full recipe lives in the PDF."
                 : undefined
             }
           />
-          {templateKey !== "creepypastas" && (
+          {!RECIPE_TEMPLATES.includes(templateKey) && (
           <TextField
             label="The story"
             value={cocktail.story ?? ""}
@@ -568,7 +568,7 @@ function CocktailCard({
             onChange={(url) => onUpdate({ imageUrl: url })}
           />
 
-          {templateKey === "creepypastas" && (
+          {RECIPE_TEMPLATES.includes(templateKey) && (
             <RecipePdfField
               value={typeof cocktail.meta?.recipePdfUrl === "string" ? cocktail.meta.recipePdfUrl : ""}
               onChange={(url) =>
@@ -577,7 +577,7 @@ function CocktailCard({
             />
           )}
 
-          {templateKey !== "creepypastas" && (
+          {!RECIPE_TEMPLATES.includes(templateKey) && (
           <label className="block mb-3">
             <span className="block text-[10px] tracking-widest uppercase text-gray-400 mb-1.5">
               Mini game

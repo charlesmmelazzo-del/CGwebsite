@@ -16,6 +16,7 @@ import type { PopupTemplateProps } from "@/lib/popup/types";
 import ClassicTemplate from "./ClassicTemplate";
 import HighScoresTemplate from "./HighScoresTemplate";
 import CreepypastasTemplate from "./CreepypastasTemplate";
+import HolidaysTemplate from "./HolidaysTemplate";
 
 export interface PopupTemplate {
   key: string;
@@ -51,7 +52,18 @@ export const TEMPLATES: Record<string, PopupTemplate> = {
     component: CreepypastasTemplate,
     defaultConfig: {},
   },
+  holidays: {
+    key: "holidays",
+    label: "Home for the Holidays (Winter)",
+    description:
+      "A simple handwritten page: download the holiday cocktail recipes (PDFs), or host and join group card, board and party games played together on everyone's phones with a 4-digit code. No sign-in.",
+    component: HolidaysTemplate,
+    defaultConfig: {},
+  },
 };
+
+/** Templates where each cocktail carries a downloadable recipe PDF instead of a game or story. */
+export const RECIPE_TEMPLATES = ["creepypastas", "holidays"];
 
 export const FALLBACK_TEMPLATE_KEY = "classic";
 
