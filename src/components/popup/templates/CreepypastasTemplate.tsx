@@ -329,6 +329,19 @@ export default function CreepypastasTemplate({ menu, cocktails, isSandbox }: Pop
   async function startTale() {
     const started = await startedTales();
     if (started.length === 0) return askTime();
+    if (started.length === 1) {
+      // Just the one: name it and offer it back directly.
+      const [{ card, bookmark }] = started;
+      speak({
+        lines: [`I still have \u201c${card.title}\u201d half-told for you. Shall we pick it back up, or would you like something new?`],
+        replies: [
+          { label: REPLIES.newTale, run: () => askTime() },
+          { label: `Finish \u201c${card.title}\u201d`, run: () => resumeTale(card, bookmark) },
+          { label: REPLIES.changedMind, run: changedMind, quiet: true },
+        ],
+      });
+      return;
+    }
     speak({
       lines: line("story_new_or_resume"),
       replies: [
