@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getMenuById, resolveLiveMenu } from "@/lib/popup/menus";
+import { siteOrigin } from "@/lib/compete/urls";
 
 export const dynamic = "force-dynamic";
 
@@ -12,8 +13,10 @@ export const dynamic = "force-dynamic";
  *   archived        → /popup/m/<slug>, the archive page
  *   unknown         → /popup
  */
-export async function GET(req: Request, { params }: { params: { id: string } }) {
-  const to = (path: string) => NextResponse.redirect(new URL(path, req.url), 307);
+export async function GET(_req: Request, { params }: { params: { id: string } }) {
+  // Not req.url: behind Railway's proxy that's the internal localhost:8080.
+  const origin = siteOrigin();
+  const to = (path: string) => NextResponse.redirect(new URL(path, origin), 307);
   if (!/^[0-9a-f-]{36}$/i.test(params.id)) return to("/popup");
 
   const [menu, live] = await Promise.all([getMenuById(params.id), resolveLiveMenu()]);
