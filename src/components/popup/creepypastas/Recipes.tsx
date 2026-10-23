@@ -89,34 +89,45 @@ export default function Recipes({
               key={c.id}
               aria-label={`${i + 1} of ${cocktails.length}: ${c.name}`}
               aria-current={i === index ? "true" : undefined}
-              className="creepy-in snap-center shrink-0 w-[84vw] max-w-[400px] border-[3px] border-white rounded-[10px] px-5 py-4 flex flex-col items-center text-center overflow-y-auto"
+              className="creepy-in snap-center shrink-0 w-[84vw] max-w-[400px] border-[3px] border-white rounded-[10px] px-5 py-4 [@media(max-height:760px)]:py-3 flex flex-col items-center text-center overflow-y-auto"
               style={{ "--i": i } as CSSProperties}
             >
-              {c.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element -- pixel art, served as-is
-                <img
-                  src={c.imageUrl}
-                  alt=""
-                  className="w-[78%] max-w-[280px] aspect-square object-contain shrink-0"
-                  style={{ imageRendering: "pixelated" }}
-                />
-              ) : (
-                <div aria-hidden className="w-[78%] max-w-[280px] aspect-square shrink-0 border-2 border-dashed border-white/25 rounded" />
-              )}
-              <h2 className={`${voiceFont.className} mt-3 text-[clamp(22px,6.4vw,28px)] leading-tight`}>
+              {/* The picture takes whatever height the words leave, so the whole
+                  ingredient list stays on screen on short phones. */}
+              <div className="flex-1 min-h-[80px] w-full flex items-center justify-center">
+                {c.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- pixel art, served as-is
+                  <img
+                    src={c.imageUrl}
+                    alt={c.name}
+                    className="h-full max-h-[280px] max-w-[78%] aspect-square object-contain"
+                    style={{ imageRendering: "pixelated" }}
+                  />
+                ) : (
+                  <div aria-hidden className="h-full max-h-[280px] max-w-[78%] aspect-square border-2 border-dashed border-white/25 rounded" />
+                )}
+              </div>
+              <h2 className={`${voiceFont.className} shrink-0 mt-3 [@media(max-height:760px)]:mt-2 text-[clamp(22px,6.4vw,28px)] leading-tight`}>
                 {c.name || "Untitled cocktail"}
               </h2>
               {c.tagline && (
-                <p className={`${readFont.className} mt-1 italic text-[16px] text-white/70`}>{c.tagline}</p>
+                <p className={`${readFont.className} shrink-0 mt-1 italic text-[16px] text-white/70`}>{c.tagline}</p>
               )}
               {ingredientNames(c.ingredients).length > 0 && (
-                <div className={`${readFont.className} mt-3 text-[15px] leading-snug text-white/90`}>
+                <div className={`${readFont.className} shrink-0 mt-3 [@media(max-height:760px)]:mt-2 text-[15px] leading-snug text-white/90`}>
                   <h3 className={`${voiceFont.className} text-[12px] tracking-[0.2em] uppercase text-white/50 mb-1`}>
                     Ingredients
                   </h3>
+                  {/* One per line where there's room; on short phones they run
+                      together with dots so the whole list still fits. */}
                   <ul>
                     {ingredientNames(c.ingredients).map((name) => (
-                      <li key={name}>{name}</li>
+                      <li
+                        key={name}
+                        className="[@media(max-height:760px)]:inline [@media(max-height:760px)]:after:content-['_·_'] [@media(max-height:760px)]:last:after:content-none"
+                      >
+                        {name}
+                      </li>
                     ))}
                   </ul>
                 </div>
