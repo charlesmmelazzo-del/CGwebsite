@@ -67,10 +67,14 @@ def solid_box(im: Image.Image):
     return (int(cols[0]), int(rows[0]), int(cols[-1]) + 1, int(rows[-1]) + 1)
 
 
-def fit(im: Image.Image, w: int, h: int, trim=True, pad=0.0) -> Image.Image:
-    """Trim transparent edges, then centre on a w×h transparent canvas without stretching."""
+def fit(im: Image.Image, w: int, h: int, trim=True, pad=0.0, gentle=False) -> Image.Image:
+    """Trim transparent edges, then centre on a w×h transparent canvas without stretching.
+
+    `gentle` keeps every pixel of art (plain alpha bounds): use it for line art and
+    lettering, whose thin tails the speck-proof trim would otherwise cut off.
+    """
     if trim:
-        box = solid_box(im)
+        box = im.getchannel("A").point(lambda v: 255 if v > 24 else 0).getbbox() if gentle else solid_box(im)
         if box:
             im = im.crop(box)
     inner_w, inner_h = w * (1 - 2 * pad), h * (1 - 2 * pad)
@@ -171,7 +175,7 @@ def main(folder: Path):
     sizes7 = {"title-home-for-the-holidays": (900, 600), "flourish-divider": (600, 200)}
     for aid, crop in pieces(7):
         w, h = sizes7.get(aid, (360, 240))
-        save(fit(key_out(crop), w, h), f"extras/{aid}.webp")
+        save(fit(key_out(crop), w, h, gentle=True, pad=0.02), f"extras/{aid}.webp")
         counts["extras"] = counts.get("extras", 0) + 1
 
     # 8 — paper texture: used with background-size: cover, so no seam to fix.
