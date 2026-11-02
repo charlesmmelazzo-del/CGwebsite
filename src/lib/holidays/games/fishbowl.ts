@@ -187,7 +187,7 @@ export const fishbowl: GameDef<FishState, FishAction> = {
       const [a, b] = s.scores;
       return { over: true, message: a === b ? "A shared win!" : `${TEAM_NAMES[a > b ? 0 : 1]} wins!`, turn: [] };
     }
-    if (s.phase === "submit") return { over: false, message: `Writing prompts — ${s.submitted.length} of ${s.seats.length} done`, turn: s.seats.filter((p) => !s.submitted.includes(p.id)).map((p) => p.id) };
+    if (s.phase === "submit") return { over: false, message: `Writing prompts · ${s.submitted.length}/${s.seats.length} done`, turn: s.seats.filter((p) => !s.submitted.includes(p.id)).map((p) => p.id) };
     const g = nameOf(s.seats, s.giver);
     return { over: false, message: `Stage ${s.stage + 1}: ${STAGES[s.stage].name} · ${g}${s.phase === "ready" ? " is up" : " is giving clues"}`, turn: [s.giver] };
   },
