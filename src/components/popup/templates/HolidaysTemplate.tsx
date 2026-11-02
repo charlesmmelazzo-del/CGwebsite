@@ -11,7 +11,7 @@
 // The games themselves are pure rules in src/lib/holidays/games; the server
 // referees every move, and phones stay in sync by polling the room.
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { PopupTemplateProps } from "@/lib/popup/types";
 import type { RoomView } from "@/lib/holidays/types";
 import GamePicker from "../holidays/GamePicker";
@@ -30,8 +30,27 @@ export default function HolidaysTemplate({ menu, cocktails, recordInteraction, i
   const [initial, setInitial] = useState<RoomView | null>(null);
   const [busy, setBusy] = useState(false);
   const [publicGame, setPublicGame] = useState("word-grid");
-  const [winnersFrom, setWinnersFrom] = useState<Screen>("strangers");
   const [error, setError] = useState<string | null>(null);
+
+  const savedRef = useRef<Saved | null>(null);
+  savedRef.current = saved;
+
+  /**
+   * Screens are browser history entries, so the phone's back button (or an
+   * iPhone swipe from the left edge) goes to the previous screen instead of
+   * leaving the pop-up. Next.js keeps its own router state alongside ours.
+   */
+  const go = useCallback((next: Screen, replace = false) => {
+    setError(null);
+    setScreen(next);
+    // Keep whatever Next.js stored on the entry (it needs it to restore on back).
+    const state = { ...(window.history.state ?? {}), hh: next };
+    if (replace) window.history.replaceState(state, "");
+    else window.history.pushState(state, "");
+  }, []);
+
+  /** A "← Back" tap is the same as the phone's back button. */
+  const back = useCallback(() => window.history.back(), []);
 
   // Back in a game after a refresh or a locked phone.
   useEffect(() => {
@@ -40,26 +59,29 @@ export default function HolidaysTemplate({ menu, cocktails, recordInteraction, i
       setSaved(s);
       setScreen("room");
     }
+    window.history.replaceState({ ...(window.history.state ?? {}), hh: s ? "room" : "home" }, "");
+    const onPop = (e: PopStateEvent) => {
+      const hh = (e.state as { hh?: Screen } | null)?.hh ?? "home";
+      setError(null);
+      setScreen(hh === "room" && !savedRef.current ? "home" : hh);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
   }, []);
-
-  function go(next: Screen) {
-    setError(null);
-    setScreen(next);
-  }
 
   function enterRoom(token: string, room: RoomView) {
     const s = { code: room.code, token };
     saveRoom(s);
     setSaved(s);
     setInitial(room);
-    go("room");
+    go("room", true);
   }
 
   function leaveRoom() {
     saveRoom(null);
     setSaved(null);
     setInitial(null);
-    go("home");
+    go("home", true);
   }
 
   async function host(gameKey: string) {
@@ -92,30 +114,48 @@ export default function HolidaysTemplate({ menu, cocktails, recordInteraction, i
   return (
     <div className={`relative h-[calc(100dvh-49px)] overflow-hidden hh-paper text-[#F5EFE2] ${readFont.className}`}>
       <HolidayStyles />
-      <div key={screen} className="absolute inset-0 hh-screen max-w-[560px] mx-auto">
+      {/* Backed out of a running game with the phone's back button: the way back in. */}
+      {saved && screen !== "room" && (
+        <div className="absolute top-0 inset-x-0 z-20 px-3 pt-2 max-w-[560px] mx-auto">
+          <HandBox className="bg-[#4E4D42]/90">
+            <div className="px-3 py-1.5 flex items-center gap-2">
+              <p className={`${handFont.className} flex-1 min-w-0 text-[20px] font-bold leading-tight`}>Still in game {saved.code}</p>
+              <button type="button" onClick={leaveRoom} className={`${handFont.className} shrink-0 min-h-[40px] px-2 text-[18px] font-bold text-[#F5EFE2]/65`}>
+                Leave it
+              </button>
+              <div className="shrink-0 w-[116px]">
+                <HandButton small primary onClick={() => go("room")}>
+                  Back to it
+                </HandButton>
+              </div>
+            </div>
+          </HandBox>
+        </div>
+      )}
+      <div key={screen} className={`absolute inset-0 hh-screen max-w-[560px] mx-auto ${saved && screen !== "room" ? "pt-[64px]" : ""}`}>
         {screen === "home" && <Home onRecipes={() => go("recipes")} onPlay={() => go("play")} />}
         {screen === "recipes" && (
-          <Recipes cocktails={cocktails} onBack={() => go("home")} onDownload={(c) => void recordInteraction("recipe_download", { name: c.name }, c.id)} />
+          <Recipes cocktails={cocktails} onBack={back} onDownload={(c) => void recordInteraction("recipe_download", { name: c.name }, c.id)} />
         )}
-        {screen === "play" && <HostOrJoin onBack={() => go("home")} onHost={() => go("pick")} onJoin={() => go("join")} onStrangers={() => go("strangers")} />}
+        {screen === "play" && <HostOrJoin onBack={back} onHost={() => go("pick")} onJoin={() => go("join")} onStrangers={() => go("strangers")} />}
         {screen === "strangers" && (
           <StrangersHub
-            onBack={() => go("play")}
+            onBack={back}
             onPlay={(g) => (setPublicGame(g), go("public"))}
-            onWinners={() => (setWinnersFrom("strangers"), go("winners"))}
+            onWinners={() => go("winners")}
           />
         )}
         {screen === "public" && (
           <PublicRoom
             game={publicGame}
             rules={getPublicGame(publicGame)?.rules ?? []}
-            onLeave={() => go("strangers")}
-            onWinners={() => (setWinnersFrom("public"), go("winners"))}
+            onLeave={() => go("strangers", true)}
+            onWinners={() => go("winners")}
           />
         )}
-        {screen === "winners" && <DailyWinners startOn={publicGame} onBack={() => go(winnersFrom)} />}
-        {screen === "pick" && <GamePicker onBack={() => go("play")} onHost={(g) => host(g.key)} busy={busy} error={error} />}
-        {screen === "join" && <JoinForm onBack={() => go("play")} onJoin={join} busy={busy} error={error} />}
+        {screen === "winners" && <DailyWinners startOn={publicGame} onBack={back} />}
+        {screen === "pick" && <GamePicker onBack={back} onHost={(g) => host(g.key)} busy={busy} error={error} />}
+        {screen === "join" && <JoinForm onBack={back} onJoin={join} busy={busy} error={error} />}
         {screen === "room" && saved && <Room key={saved.code + saved.token} saved={saved} initial={initial} onLeave={leaveRoom} />}
       </div>
     </div>

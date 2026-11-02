@@ -13,8 +13,23 @@ import { at, BackLink, COLORS, HandBox, HandButton, handFont, Label, readFont, S
 
 export default function Room({ saved, initial, onLeave }: { saved: Saved; initial: RoomView | null; onLeave: () => void }) {
   const { room, error, gone, skew, send } = useRoom(saved, initial);
-  // Rules are offered once per game; "Play again" doesn't re-show them.
-  const [rulesDone, setRulesDone] = useState(false);
+  // Rules are offered once per game (remembered across a refresh); "Play again" doesn't re-show them.
+  const rulesKey = `hh-rules-${saved.code}`;
+  const [rulesDone, setRulesDone] = useState(() => {
+    try {
+      return sessionStorage.getItem(rulesKey) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const finishRules = () => {
+    try {
+      sessionStorage.setItem(rulesKey, "1");
+    } catch {
+      // Private browsing: the rules just show again after a refresh.
+    }
+    setRulesDone(true);
+  };
 
   if (gone) {
     return (
@@ -57,7 +72,7 @@ export default function Room({ saved, initial, onLeave }: { saved: Saved; initia
 
   if (room.status === "lobby") return <Lobby room={room} send={send} onLeave={onLeave} error={error} />;
   if (room.status === "ended") return <Ended room={room} onLeave={onLeave} />;
-  if (!rulesDone) return <RulesIntro gameKey={room.gameKey} onDone={() => setRulesDone(true)} />;
+  if (!rulesDone) return <RulesIntro gameKey={room.gameKey} onDone={finishRules} />;
   return <Playing room={room} send={send} skew={skew} onLeave={onLeave} error={error} />;
 }
 
@@ -77,6 +92,16 @@ function Lobby({ room, send, onLeave, error }: { room: RoomView; send: Send; onL
   const [problem, setProblem] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const notReady = startProblem({ ...room, id: "", players: room.players.map((p) => ({ ...p, token: "", joinedAt: "" })), state: null });
+  const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+
+  async function shareCode() {
+    const url = `${window.location.origin}${window.location.pathname}`;
+    try {
+      await navigator.share({ title: "Home for the Holidays", text: `Join my ${game.name} game — code ${room.code}. Open ${url}, tap Play a game → Join a friend's game.` });
+    } catch {
+      // They closed the share sheet.
+    }
+  }
 
   async function saveName() {
     const clean = name.trim();
@@ -110,8 +135,15 @@ function Lobby({ room, send, onLeave, error }: { room: RoomView; send: Send; onL
           </p>
           {host && (
             <Write i={3} as="p" className={`${readFont.className} text-[16px] text-[#F5EFE2]/70`}>
-              They tap <em>Play a game</em> → <em>Join a game</em> and type it in.
+              They tap <em>Play a game</em> → <em>Join a friend&rsquo;s game</em> and type it in.
             </Write>
+          )}
+          {host && canShare && (
+            <div className="mt-2 mx-auto max-w-[240px]">
+              <HandButton small i={4} onClick={shareCode}>
+                Share the code
+              </HandButton>
+            </div>
           )}
         </div>
 
