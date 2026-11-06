@@ -43,8 +43,11 @@ export default function Recipes({ cocktails, onBack, onDownload }: { cocktails: 
             <li key={c.id}>
               <HandBox i={3 + n} className="px-4 py-4 text-center">
                 {c.imageUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element -- admin-uploaded art
-                  <img src={c.imageUrl} alt="" className="mx-auto w-[70%] max-w-[260px] aspect-square object-contain" />
+                  // A cream card behind the drawing, so black line art stands off the olive paper.
+                  <div className="mx-auto w-[74%] max-w-[270px] rounded-[14px] bg-[#F7F2E6] p-3 shadow-[0_2px_0_rgba(47,46,40,0.35)] -rotate-1">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- admin-uploaded art */}
+                    <img src={c.imageUrl} alt="" className="w-full aspect-square object-contain" />
+                  </div>
                 )}
                 <h2 className={`${handFont.className} mt-2 text-[34px] font-bold leading-tight`}>{c.name || "Untitled cocktail"}</h2>
                 {c.tagline && <p className={`${readFont.className} text-[18px] text-[#F5EFE2]/75`}>{c.tagline}</p>}
