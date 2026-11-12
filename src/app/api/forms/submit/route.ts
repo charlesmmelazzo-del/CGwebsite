@@ -2,36 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { sendFormNotification } from "@/lib/email";
 import { randomUUID } from "crypto";
-
-// ─── Simple in-memory rate limiter — limits form spam per IP ─────────────────
-const submits = new Map<string, { count: number; resetAt: number }>();
-const MAX_SUBMISSIONS = 5;
-const WINDOW_MS       = 60 * 60 * 1000; // 1 hour
-
-function getIp(req: NextRequest): string {
-  return (
-    req.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
-    req.headers.get("x-real-ip") ??
-    "unknown"
-  );
-}
-
-function checkSpam(ip: string): boolean {
-  const now = Date.now();
-  const entry = submits.get(ip);
-  if (!entry || now > entry.resetAt) {
-    submits.set(ip, { count: 1, resetAt: now + WINDOW_MS });
-    return false; // not spam
-  }
-  if (entry.count >= MAX_SUBMISSIONS) return true; // blocked
-  entry.count++;
-  return false;
-}
+import { getIp, isRateLimited } from "@/lib/rateLimit";
 
 // POST — accept a form submission from a public visitor
 export async function POST(req: NextRequest) {
   const ip = getIp(req);
-  if (checkSpam(ip)) {
+  if (isRateLimited("forms", ip)) {
     return NextResponse.json({ error: "Too many submissions. Try again later." }, { status: 429 });
   }
 

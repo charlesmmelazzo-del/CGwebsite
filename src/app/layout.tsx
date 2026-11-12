@@ -8,6 +8,8 @@ import ZoneWatcher from "@/components/layout/ZoneWatcher";
 import { getSiteConfig, getSiteSettings, getFontCSS } from "@/lib/siteconfig";
 import { SITE_URL } from "@/lib/constants";
 import { buildBusinessJsonLd } from "@/lib/structuredData";
+import { reserveEnabled } from "@/lib/reserve/enabled";
+import { withoutReserveLink } from "@/lib/reserve/nav";
 
 const korinthFallback = Cormorant_Garamond({
   subsets: ["latin"],
@@ -57,11 +59,15 @@ export default async function RootLayout({
 }) {
   // Fetch live config on every request — changes in admin appear immediately.
   // Falls back to hardcoded defaults if Supabase env vars are missing.
-  const [{ header, footer }, settings, fontCss] = await Promise.all([
+  const [{ header: savedHeader, footer }, settings, fontCss] = await Promise.all([
     getSiteConfig(),
     getSiteSettings(),
     getFontCSS(),
   ]);
+
+  // Reservations stay off the live site until RESERVE_ENABLED=1 there.
+  const showReserve = reserveEnabled();
+  const header = showReserve ? savedHeader : withoutReserveLink(savedHeader);
 
   const desktopPad = header.headerHeight       ?? 72;
   const mobilePad  = header.mobileHeaderHeight ?? 52;
@@ -105,7 +111,7 @@ export default async function RootLayout({
           @media (min-width: 768px) { #cg-main { padding-top: ${desktopPad}px; --header-h: ${desktopPad}px; } }
         `}</style>
         <main id="cg-main">{children}</main>
-        <Footer config={footer} settings={settings} logoUrl={header.logoUrl} />
+        <Footer config={footer} settings={settings} logoUrl={header.logoUrl} showReserve={showReserve} />
       </body>
     </html>
   );

@@ -33,9 +33,10 @@ const DEFAULT_CONFIG: SiteConfig = {
       { id: "nav-menu",   label: "Menu",   href: "/menu",   visible: true, order: 0 },
       { id: "nav-coffee", label: "Coffee", href: "/coffee", visible: true, order: 1 },
       { id: "nav-events", label: "Events", href: "/events", visible: true, order: 2 },
-      { id: "nav-club",   label: "Club",   href: "/club",   visible: true, order: 3 },
-      { id: "nav-shop",   label: "Shop",   href: "/shop",   visible: true, order: 4 },
-      { id: "nav-about",  label: "About",  href: "/about",  visible: true, order: 5 },
+      { id: "nav-reserve", label: "Reserve", href: "/reserve", visible: true, order: 3 },
+      { id: "nav-club",   label: "Club",   href: "/club",   visible: true, order: 4 },
+      { id: "nav-shop",   label: "Shop",   href: "/shop",   visible: true, order: 5 },
+      { id: "nav-about",  label: "About",  href: "/about",  visible: true, order: 6 },
     ],
   },
   footer: {

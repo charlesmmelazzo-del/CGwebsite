@@ -4,7 +4,7 @@ import { SITE_SETTINGS } from "@/lib/constants";
 import { Phone, Mail, MapPin } from "lucide-react";
 import type { FooterConfig, SiteSettings } from "@/types";
 
-export default function Footer({ config, settings, logoUrl }: { config: FooterConfig; settings?: SiteSettings; logoUrl?: string }) {
+export default function Footer({ config, settings, logoUrl, showReserve = false }: { config: FooterConfig; settings?: SiteSettings; logoUrl?: string; showReserve?: boolean }) {
   // Use live settings from Supabase if available, fall back to hardcoded constants
   const s = settings ?? SITE_SETTINGS;
   const bg     = config.bgColor    ?? "#1A1F17";
@@ -46,7 +46,7 @@ export default function Footer({ config, settings, logoUrl }: { config: FooterCo
               </div>
             </Link>
             <nav className="flex flex-wrap justify-center gap-x-5 gap-y-2">
-              {["About", "Club", "Shop", "Events", "Menu", "Coffee"].map((label) => (
+              {["About", "Club", "Shop", "Events", ...(showReserve ? ["Reserve"] : []), "Menu", "Coffee"].map((label) => (
                 <Link
                   key={label}
                   href={`/${label.toLowerCase()}`}
