@@ -319,3 +319,137 @@ body[data-zone="compete"] #cg-main {
 @media (prefers-reduced-motion: reduce) {
   .cmp-rise, .cmp-pulse { animation: none; }
 }
+
+/* ─── Reservations (/reserve, /reserve/r/[token]) ────────────────────────────
+   Colours come from the page theme through --rv-bg / --rv-text / --rv-muted,
+   set on the .rv root (and on each portalled dialog). */
+
+.rv {
+  --rv-accent: #C97D5A;
+  --rv-accent-hover: #b86d4a;
+  --rv-ok: #6FAE7B;
+  --rv-warn: #D9A441;
+  --rv-line: color-mix(in srgb, var(--rv-muted) 45%, transparent);
+  --rv-soft: color-mix(in srgb, var(--rv-text) 7%, transparent);
+  color: var(--rv-text);
+}
+.rv-label {
+  font-family: var(--font-label, inherit);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--rv-text) 72%, var(--rv-muted));
+}
+.rv-h2 {
+  font-family: var(--font-display);
+  letter-spacing: 0.06em;
+  font-size: 1.45rem;
+  line-height: 1.2;
+}
+.rv-choice {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 8px 10px;
+  white-space: nowrap;
+  border: 1px solid var(--rv-line);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--rv-text);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  transition: background-color .15s, border-color .15s, color .15s;
+}
+.rv-choice:hover:not(:disabled) { border-color: var(--rv-text); }
+.rv-choice[aria-pressed="true"] {
+  background: var(--rv-accent);
+  border-color: var(--rv-accent);
+  color: #fff;
+  font-weight: 500;
+}
+.rv-choice:disabled { opacity: .45; cursor: not-allowed; }
+.rv :focus-visible, .rv-dialog :focus-visible {
+  outline: 2px solid var(--rv-accent);
+  outline-offset: 2px;
+}
+.rv-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 22px;
+  background: var(--rv-accent);
+  color: #fff;
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  border-radius: 2px;
+  transition: background-color .15s, opacity .15s;
+}
+.rv-btn:hover:not(:disabled) { background: var(--rv-accent-hover); }
+.rv-btn:disabled { opacity: .45; cursor: not-allowed; }
+.rv-btn-ghost {
+  background: transparent;
+  color: var(--rv-text);
+  border: 1px solid var(--rv-line);
+}
+.rv-btn-ghost:hover:not(:disabled) { background: var(--rv-soft); border-color: var(--rv-text); }
+.rv-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--rv-bg) 70%, #000 30%);
+  border: 1px solid var(--rv-line);
+  border-radius: 2px;
+  color: var(--rv-text);
+  font-size: 16px; /* keeps iOS from zooming on focus */
+}
+.rv-input::placeholder { color: color-mix(in srgb, var(--rv-text) 45%, transparent); }
+.rv-input:focus { outline: none; border-color: var(--rv-accent); }
+.rv-input[aria-invalid="true"] { border-color: #E07B6A; }
+.rv-link { text-decoration: underline; text-underline-offset: 3px; }
+.rv-link:hover { color: var(--rv-accent); }
+.rv-skel {
+  background: linear-gradient(90deg, var(--rv-soft) 25%, color-mix(in srgb, var(--rv-text) 14%, transparent) 50%, var(--rv-soft) 75%);
+  background-size: 200% 100%;
+  animation: rv-shimmer 1.2s linear infinite;
+  border-radius: 2px;
+}
+@keyframes rv-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .rv-skel { animation: none; } }
+.rv-step { animation: rv-rise .35s ease-out; }
+@keyframes rv-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.rv-day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 1;
+  min-height: 40px;
+  width: 100%;
+  border: 1px solid var(--rv-line);
+  border-radius: 2px;
+  color: var(--rv-text);
+  font-size: 15px;
+  line-height: 1.1;
+  transition: background-color .15s, border-color .15s;
+}
+.rv-day:hover { border-color: var(--rv-text); }
+.rv-day[data-status="unavailable"], .rv-day[data-status="event"] {
+  color: color-mix(in srgb, var(--rv-text) 40%, transparent);
+  border-style: dashed;
+}
+.rv-day[data-status="unavailable"] .rv-day-num { text-decoration: line-through; }
+.rv-day[aria-pressed="true"] { background: var(--rv-accent); border-color: var(--rv-accent); color: #fff; border-style: solid; }
+.rv-dialog {
+  --rv-accent: #C97D5A;
+  --rv-accent-hover: #b86d4a;
+  --rv-line: color-mix(in srgb, var(--rv-muted) 45%, transparent);
+  --rv-soft: color-mix(in srgb, var(--rv-text) 7%, transparent);
+  color: var(--rv-text);
+}

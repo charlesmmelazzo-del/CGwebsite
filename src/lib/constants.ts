@@ -37,6 +37,7 @@ export const NAV_LINKS = [
   { label: "CLUB", href: "/club" },
   { label: "SHOP", href: "/shop" },
   { label: "EVENTS", href: "/events" },
+  { label: "RESERVE", href: "/reserve" },
   { label: "MENU", href: "/menu" },
   { label: "COFFEE", href: "/coffee" },
 ];
