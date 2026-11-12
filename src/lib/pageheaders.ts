@@ -5,7 +5,7 @@ import { PAGE_DEFAULTS, getPageDefault } from "./pagedefaults";
 
 export { getPageDefault };
 
-export const PAGE_IDS = ["menu", "coffee", "events", "club", "about", "shop"] as const;
+export const PAGE_IDS = ["menu", "coffee", "events", "club", "about", "shop", "reserve"] as const;
 export type PageId = typeof PAGE_IDS[number];
 
 /**

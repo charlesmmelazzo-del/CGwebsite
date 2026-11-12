@@ -34,6 +34,11 @@ export const PAGE_DEFAULTS: Record<string, PageHeaderData> = {
     titleSize: 72,
     theme: "blue",
   },
+  reserve: {
+    title: "Reserve",
+    titleSize: 72,
+    theme: "green",
+  },
   shop: {
     title: "Shop",
     titleSize: 72,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import PageThemeWrapper from "@/components/layout/PageThemeWrapper";
 import type { CalendarEvent, FormField, PageHeaderData, HostSection } from "@/types";
@@ -294,6 +294,25 @@ export default function EventsPageClient({
   ];
   const showTabBar = visibleTabs.length > 1;
 
+  // Deep links: /events?tab=host#inquiry opens the Host tab and scrolls to the
+  // inquiry form (the Reserve page sends private-event questions here).
+  // Read on mount rather than via useSearchParams so the page needs no Suspense boundary.
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    const valid = visibleTabs.some((t) => t.id === tab);
+    if (valid) setActiveTab(tab as TabId);
+    if (window.location.hash === "#inquiry" && (valid ? tab === "host" : activeTab === "host")) {
+      // Wait a frame so the Host tab has rendered before scrolling.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          document.getElementById("inquiry")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      });
+    }
+    // Only on first load.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function handleHostSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -391,7 +410,7 @@ export default function EventsPageClient({
             )}
 
             {/* Inquiry Form */}
-            <div className="max-w-lg mx-auto px-4 md:px-6 pb-16 pt-8">
+            <div id="inquiry" className="max-w-lg mx-auto px-4 md:px-6 pb-16 pt-8" style={{ scrollMarginTop: "calc(var(--header-h, 72px) + 16px)" }}>
               <h3
                 className="text-2xl text-center mb-6 tracking-wider"
                 style={{ fontFamily: "var(--font-display)", color: theme.text }}
