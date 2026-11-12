@@ -8,6 +8,8 @@
 //     before it will show anything, via the browser's own sign-in box.
 //   * Not set (production)                → this does nothing at all, and the
 //     request continues exactly as it did before.
+//   * Set together with PREVIEW_OPEN=1     → no password prompt, but the site is
+//     still treated as a preview (noindex, staging-only features stay on).
 //
 // HTTP Basic auth on purpose: no login page to build, no cookie to manage, and
 // the browser remembers it for the session. It is a "keep the public out of the
@@ -49,6 +51,13 @@ export function previewGate(req: NextRequest): NextResponse | null {
   const expected = process.env.PREVIEW_PASSWORD;
   // Production has no PREVIEW_PASSWORD, so this is a single env read and out.
   if (!expected) return null;
+
+  // PREVIEW_OPEN=1 drops the password prompt but keeps this a preview in every
+  // other way: PREVIEW_PASSWORD stays set, so pages are still marked noindex and
+  // the Pop Up preview sandbox still treats this deployment as staging. Use it
+  // when testers need to browse the staging copy without signing in. The admin
+  // panel keeps its own login either way.
+  if (process.env.PREVIEW_OPEN === "1") return null;
 
   if (isOpenPath(req.nextUrl.pathname)) return null;
 
