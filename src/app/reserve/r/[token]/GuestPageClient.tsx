@@ -154,10 +154,21 @@ function OpenView({
   }
 
   const dayOf = isDayOf(view);
+  const [notice, setNotice] = useState("");
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(""), 8000);
+    return () => clearTimeout(t);
+  }, [notice]);
 
   return (
     <div className="rv-step">
       <StatusBanner status={view.status} />
+      {notice && (
+        <p className="mt-3 p-3 text-sm" role="status" style={{ border: "1px solid var(--rv-ok)", background: "var(--rv-soft)" }}>
+          {notice}.
+        </p>
+      )}
 
       {/* ── Details ── */}
       <section className="mt-6 mb-8" aria-label="Reservation details">
@@ -211,7 +222,9 @@ function OpenView({
         <div className="flex flex-wrap gap-2">
           {dayOf && <LateButton onSend={(m) => act("late", { minutes: m })} busy={busy === "late"} />}
           <PartyButton view={view} base={base} partyMax={partyMax} setView={setView} />
-          {!view.change_request && <ChangeTimeButton view={view} base={base} phone={phone} setView={setView} />}
+          {!view.change_request && (
+            <ChangeTimeButton view={view} base={base} phone={phone} setView={setView} onChanged={() => setNotice("Your time has been changed")} />
+          )}
           <CancelButton onCancel={(reason) => act("cancel", { reason })} busy={busy === "cancel"} />
         </div>
         <ErrorNote>{actionError}</ErrorNote>
@@ -440,12 +453,17 @@ function ChangeTimeButton({
   base,
   phone,
   setView,
+  onChanged,
 }: {
   view: OpenReservation;
   base: string;
   phone: string;
   setView: (v: GuestReservation) => void;
+  /** Event bookings change at once (no staff step). */
+  onChanged?: () => void;
 }) {
+  // Event reservations stay on the event's date and apply immediately.
+  const isEvent = !!view.event_id;
   const [open, setOpen] = useState(false);
   const [sel, setSel] = useState<Selection | null>(null);
   const [busy, setBusy] = useState(false);
@@ -468,6 +486,7 @@ function ChangeTimeButton({
         }),
       );
       setOpen(false);
+      if (isEvent) onChanged?.();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : GENERIC_ERROR);
       if (e instanceof ApiError && e.status === 409) setRefresh((n) => n + 1);
@@ -487,13 +506,13 @@ function ChangeTimeButton({
           setOpen(true);
         }}
       >
-        Request a time change
+        {isEvent ? "Change time" : "Request a time change"}
       </button>
       <Modal
         open={open}
         onClose={() => !busy && setOpen(false)}
         size="lg"
-        title="Request a time change"
+        title={isEvent ? "Change time" : "Request a time change"}
         footer={
           <div>
             {sel && (
@@ -505,24 +524,26 @@ function ChangeTimeButton({
             )}
             <ErrorNote>{error}</ErrorNote>
             <button type="button" className="rv-btn w-full mt-2" disabled={!sel || !!same || busy} onClick={send}>
-              {busy ? "Sending…" : "Send request"}
+              {busy ? (isEvent ? "Saving…" : "Sending…") : isEvent ? "Change time" : "Send request"}
             </button>
           </div>
         }
       >
         <p className="text-sm opacity-80 mb-5">
-          Currently {dateShort(view.date)}, {time12(view.start_min)} for {lengthLabel(view.minutes)}. Your current time stays held
-          until we reply.
+          Currently {dateShort(view.date)}, {time12(view.start_min)} for {lengthLabel(view.minutes)}.
+          {isEvent ? "" : " Your current time stays held until we reply."}
         </p>
         <SlotPicker
           party={view.party_size}
           mode="change"
-          calendarUrl={`/api/reserve/calendar?party=${view.party_size}`}
+          calendarUrl={isEvent ? undefined : `/api/reserve/calendar?party=${view.party_size}`}
+          fixedDate={isEvent ? view.date : undefined}
           slotsUrl={(d) => `${base}/slots?date=${d}`}
           onChange={onPick}
           refreshKey={refresh}
           phone={phone}
-          stepNumbers={[1, 2]}
+          stepNumbers={isEvent ? [1, 1] : [1, 2]}
+          spaceLabel={isEvent ? (sp) => `${sp.name} · seats ${sp.min_guests}–${sp.max_guests}` : undefined}
         />
       </Modal>
     </>

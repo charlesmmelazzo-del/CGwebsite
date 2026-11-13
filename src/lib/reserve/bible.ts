@@ -9,6 +9,8 @@ import type {
   GuestReservation,
   PartyChangeResult,
   SpaceSummary,
+  EventStatus,
+  EventBooking,
 } from "./types";
 
 /**
@@ -159,3 +161,30 @@ export const withdrawChange = (token: string) => bible<GuestReservation>("DELETE
 
 export const getReservationSlots = (token: string, date: string) =>
   bible<SpaceSlots[]>("GET", `${t(token)}/slots${q({ date })}`);
+
+// ── Event reservations (Bible file 06) ────────────────────────────────────────
+
+const ev = (id: string) => `/events/${encodeURIComponent(id)}`;
+
+/** Turn reservations on (creates a pending setup) or off for a website event. Dates only; staff set hours in the Bible. */
+export const upsertEventReservations = (
+  websiteEventId: string,
+  body: { title: string; date: string; start_time?: string; end_time?: string; enabled: boolean },
+) => bible<EventStatus>("PUT", ev(websiteEventId), body);
+
+/** Stop taking reservations (the Bible keeps the event and its bookings). */
+export const removeEventReservations = (websiteEventId: string) => bible<EventStatus>("DELETE", ev(websiteEventId));
+
+/** Status per website event id; ids the Bible doesn't know are simply absent. */
+export async function getEventStatuses(ids: string[]): Promise<Record<string, EventStatus>> {
+  const unique = Array.from(new Set(ids.filter(Boolean)));
+  if (!unique.length) return {};
+  const out: Record<string, EventStatus> = {};
+  for (let i = 0; i < unique.length; i += 50) {
+    const chunk = unique.slice(i, i + 50);
+    Object.assign(out, await bible<Record<string, EventStatus>>("GET", `/events/status${q({ ids: chunk.join(",") })}`));
+  }
+  return out;
+}
+
+export const getEventBooking = (websiteEventId: string) => bible<EventBooking>("GET", ev(websiteEventId));

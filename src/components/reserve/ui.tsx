@@ -35,6 +35,10 @@ export function RvRoot({ theme, children, className = "" }: { theme: RvTheme; ch
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+/** Open dialogs, innermost last: only the top one answers Escape and Tab (dialogs can nest). */
+const openStack: number[] = [];
+let nextModalId = 1;
+
 /**
  * Accessible dialog: portalled to <body>, traps focus, closes on Escape or a
  * backdrop tap, locks page scroll, and scrolls its own body on short phones.
@@ -52,7 +56,8 @@ export function Modal({
   title: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
-  size?: "sm" | "md" | "lg";
+  /** "full": a full-screen sheet on phones, a tall panel on larger screens. */
+  size?: "sm" | "md" | "lg" | "full";
 }) {
   const theme = useContext(ThemeCtx);
   const panel = useRef<HTMLDivElement>(null);
@@ -65,6 +70,8 @@ export function Modal({
 
   useEffect(() => {
     if (!open) return;
+    const myId = nextModalId++;
+    openStack.push(myId);
     const before = document.activeElement as HTMLElement | null;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -78,6 +85,7 @@ export function Modal({
     });
 
     function onKey(e: KeyboardEvent) {
+      if (openStack[openStack.length - 1] !== myId) return;
       if (e.key === "Escape") {
         e.stopPropagation();
         onCloseRef.current();
@@ -103,6 +111,8 @@ export function Modal({
     return () => {
       cancelAnimationFrame(id);
       document.removeEventListener("keydown", onKey);
+      const at = openStack.indexOf(myId);
+      if (at >= 0) openStack.splice(at, 1);
       document.body.style.overflow = prevOverflow;
       before?.focus?.();
     };
@@ -110,10 +120,14 @@ export function Modal({
 
   if (!open || !mounted) return null;
 
-  const maxW = size === "sm" ? 420 : size === "lg" ? 640 : 520;
+  const maxW = size === "sm" ? 420 : size === "lg" ? 640 : size === "full" ? 760 : 520;
+  const full = size === "full";
 
   return createPortal(
-    <div className="rv-dialog fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4" style={themeVars(theme)}>
+    <div
+      className={`rv-dialog fixed inset-0 z-[60] flex ${full ? "items-stretch" : "items-end"} sm:items-center justify-center sm:p-4`}
+      style={themeVars(theme)}
+    >
       <div className="absolute inset-0 bg-black/60 animate-fade-in" onClick={onClose} aria-hidden="true" />
       <div
         ref={panel}
@@ -121,10 +135,10 @@ export function Modal({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="relative w-full flex flex-col shadow-2xl rv-step outline-none"
+        className={`relative w-full flex flex-col shadow-2xl rv-step outline-none ${full ? "h-[100dvh] sm:h-[92vh]" : ""}`}
         style={{
           maxWidth: maxW,
-          maxHeight: "min(90dvh, 90vh)",
+          maxHeight: full ? undefined : "min(90dvh, 90vh)",
           background: theme.bg,
           border: `1px solid ${theme.muted}66`,
         }}
