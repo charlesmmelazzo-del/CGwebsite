@@ -4,9 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, Clock } from "lucide-react";
 import type { GuestReservation, OpenReservation, ReserveFaq, SpaceSummary } from "@/lib/reserve/types";
-import { dateLong, dateShort, lengthLabel, telHref, time12, timeRange } from "@/lib/reserve/format";
+import { dateLong, dateShort, lengthLabel, serviceName, telHref, time12, timeRange } from "@/lib/reserve/format";
 import SlotPicker, { type Selection } from "@/components/reserve/SlotPicker";
-import { api, ApiError, Choice, ErrorNote, FaqModal, GENERIC_ERROR, Modal, RvRoot, Stepper, type RvTheme } from "@/components/reserve/ui";
+import { api, ApiError, Choice, ErrorNote, FaqModal, GENERIC_ERROR, Modal, RvRoot, ServiceInfoButton, Stepper, type RvTheme } from "@/components/reserve/ui";
 
 const POLL_MS = 20_000;
 const LATE_OPTIONS = [5, 10, 15, 20, 30];
@@ -180,6 +180,15 @@ function OpenView({
           <dd>{dateLong(view.date)}</dd>
           <dt className="rv-label self-center">Time</dt>
           <dd>{timeRange(view.start_min, view.end_min)}</dd>
+          {view.service?.label?.trim() && (
+            <>
+              <dt className="rv-label self-center">Service</dt>
+              <dd className="flex flex-wrap items-baseline gap-x-3">
+                <span>{view.service.label}</span>
+                <ServiceInfoButton heading={serviceName(view.service.label)} description={view.service.description} />
+              </dd>
+            </>
+          )}
           <dt className="rv-label self-center">Length</dt>
           <dd>{lengthLabel(view.minutes)}</dd>
           <dt className="rv-label self-center">Party</dt>

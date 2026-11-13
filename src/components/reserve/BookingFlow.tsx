@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { BibleConfig, MaskedGuest } from "@/lib/reserve/types";
-import { dateLong, daysPhrase, isEmail, isUsPhone, telHref, timeRange } from "@/lib/reserve/format";
+import { dateLong, daysPhrase, isEmail, isUsPhone, serviceName, telHref, timeRange } from "@/lib/reserve/format";
 import SlotPicker, { PRIVATE_EVENT_HREF, type Selection } from "./SlotPicker";
 import { api, ApiError, ErrorNote, GENERIC_ERROR, Honeypot, Modal, Stepper } from "./ui";
 
@@ -201,10 +201,26 @@ export default function BookingFlow({
     }
   }
 
+  // "Saturday, November 21 · 7:00–9:00 AM · Coffee service · party of 8 · Upper Room"
+  const svcName = selection?.service ? serviceName(selection.service.label) : "";
+  const summary = selection
+    ? [
+        event?.title,
+        dateLong(selection.date),
+        timeRange(selection.start.start_min, selection.start.start_min + selection.minutes),
+        svcName,
+        `party of ${party}`,
+        selection.space.name,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "";
+
   if (done === "approved") {
     return (
       <div ref={doneRef} className="max-w-xl mx-auto text-center rv-step py-6" role="status">
-        <h2 className="rv-h2 text-3xl mb-5">Your table is reserved.</h2>
+        <h2 className="rv-h2 text-3xl mb-3">Your table is reserved.</h2>
+        {summary && <p className="mb-5 text-sm opacity-80">{summary}</p>}
         <div className="space-y-3 leading-relaxed opacity-90">
           <p>We&apos;ve emailed you the details and a link to view or change your reservation.</p>
           <p>We&apos;ll email you the morning of the event to ask you to confirm you&apos;re still coming.</p>
@@ -216,7 +232,8 @@ export default function BookingFlow({
   if (done) {
     return (
       <div ref={doneRef} className="max-w-xl mx-auto text-center rv-step py-6" role="status">
-        <h2 className="rv-h2 text-3xl mb-5">Request received.</h2>
+        <h2 className="rv-h2 text-3xl mb-3">Request received.</h2>
+        {summary && <p className="mb-5 text-sm opacity-80">{summary}</p>}
         <div className="space-y-3 leading-relaxed opacity-90">
           <p>
             This is a request, not yet a confirmed reservation. We&apos;ll email you once our staff have confirmed it. We do our
@@ -235,9 +252,6 @@ export default function BookingFlow({
     );
   }
 
-  const summary = selection
-    ? `${event ? `${event.title} · ` : ""}${dateLong(selection.date)} · ${timeRange(selection.start.start_min, selection.start.start_min + selection.minutes)} · party of ${party} · ${selection.space.name}`
-    : "";
 
   return (
     <div className="max-w-2xl mx-auto">
