@@ -2,15 +2,41 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import type { CalendarDay, SlotStart, SpaceSlots } from "@/lib/reserve/types";
-import { dayOfMonth, lengthLabel, monthShort, telHref, time12, weekdayIndex, dateLong } from "@/lib/reserve/format";
-import { api, ApiError, Choice, ErrorNote, Loading, Modal, SkeletonRow } from "./ui";
+import type { CalendarDay, EventStatus, ServiceInfo, SlotStart, SpaceSlots } from "@/lib/reserve/types";
+import { dayOfMonth, lengthLabel, monthShort, telHref, time12, weekdayIndex, dateLong, serviceHeading } from "@/lib/reserve/format";
+import { api, ApiError, Choice, ErrorNote, Loading, Modal, ServiceInfoButton, SkeletonRow } from "./ui";
 
 export interface Selection {
   date: string;
   space: SpaceSlots;
   start: SlotStart;
   minutes: number;
+  /** The service the chosen start falls in, when the Bible sent services. */
+  service: ServiceInfo | null;
+}
+
+interface StartGroup {
+  key: string;
+  service: ServiceInfo | null;
+  starts: SlotStart[];
+}
+
+/**
+ * Start times grouped by service, in time order. Returns null when the flat list
+ * should be shown: no services (older Bible), or one service with no name and no description.
+ */
+function groupStarts(space: SpaceSlots): { groups: StartGroup[]; multiple: boolean } | null {
+  const services = [...(space.services ?? [])].sort((a, b) => a.open_min - b.open_min);
+  if (!services.length) return null;
+  if (services.length === 1 && !services[0].label.trim() && !services[0].description.trim()) return null;
+  const groups: StartGroup[] = services
+    .map((sv) => ({ key: `sv-${sv.id}`, service: sv, starts: space.starts.filter((st) => st.service_id === sv.id) }))
+    .filter((g) => g.starts.length > 0);
+  // Starts that match no listed service go last, without a heading.
+  const known = new Set(services.map((sv) => sv.id));
+  const rest = space.starts.filter((st) => st.service_id == null || !known.has(st.service_id));
+  if (rest.length) groups.push({ key: "sv-none", service: null, starts: rest });
+  return { groups, multiple: services.length >= 2 };
 }
 
 const spaceKey = (s: { room_id: number; table_id: number | null }) => `${s.room_id}:${s.table_id ?? ""}`;
@@ -32,10 +58,14 @@ export default function SlotPicker({
   phone,
   belowCalendar,
   stepNumbers = [2, 3],
+  fixedDate,
+  spaceLabel = (s) => `${s.name} · ${s.min_guests}–${s.max_guests}`,
+  noSlots,
 }: {
   party: number;
   mode: "new" | "change";
-  calendarUrl: string;
+  /** Not needed with fixedDate. */
+  calendarUrl?: string;
   slotsUrl: (date: string) => string;
   onChange: (s: Selection | null) => void;
   /** Bump to re-fetch the open day's slots (e.g. after a slot was taken). */
@@ -43,10 +73,17 @@ export default function SlotPicker({
   phone: string;
   belowCalendar?: ReactNode;
   stepNumbers?: [number, number];
+  /** Skip the date step: the booking is for this date (an event). */
+  fixedDate?: string;
+  spaceLabel?: (s: SpaceSlots) => string;
+  /** Replaces the "Nothing is open…" sentence. */
+  noSlots?: ReactNode;
 }) {
   const [days, setDays] = useState<CalendarDay[] | null>(null);
   const [calError, setCalError] = useState("");
-  const [date, setDate] = useState<string | null>(null);
+  const [date, setDate] = useState<string | null>(fixedDate ?? null);
+  // The event pop-up asks the Bible where that event's setup stands.
+  const [popupState, setPopupState] = useState<EventStatus["state"] | null>(null);
   const [slots, setSlots] = useState<SpaceSlots[] | null>(null);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotsError, setSlotsError] = useState("");
@@ -60,6 +97,7 @@ export default function SlotPicker({
 
   // ── Calendar (re-fetched when the party size changes) ──
   useEffect(() => {
+    if (fixedDate || !calendarUrl) return;
     const ctrl = new AbortController();
     setCalError("");
     setDays(null);
@@ -82,7 +120,11 @@ export default function SlotPicker({
         setDays([]);
       });
     return () => ctrl.abort();
-  }, [calendarUrl, mode]);
+  }, [calendarUrl, mode, fixedDate]);
+
+  useEffect(() => {
+    if (fixedDate) setDate(fixedDate);
+  }, [fixedDate]);
 
   // ── Slots for the chosen date ──
   const slotsFor = date ? slotsUrl(date) : null;
@@ -130,7 +172,8 @@ export default function SlotPicker({
   // Report the full selection (or null) upward.
   useEffect(() => {
     if (date && chosenSpace && chosenStart && minutes !== null && chosenStart.lengths.includes(minutes)) {
-      onChangeRef.current({ date, space: chosenSpace, start: chosenStart, minutes });
+      const service = chosenSpace.services?.find((sv) => sv.id === chosenStart.service_id) ?? null;
+      onChangeRef.current({ date, space: chosenSpace, start: chosenStart, minutes, service });
     } else {
       onChangeRef.current(null);
     }
@@ -139,6 +182,13 @@ export default function SlotPicker({
   function pickDay(d: CalendarDay) {
     if (mode === "new" && d.status !== "open") {
       setPopup(d);
+      setPopupState(null);
+      const wid = d.status === "event" ? d.event?.website_event_id : null;
+      if (wid) {
+        api<Record<string, EventStatus>>(`/api/reserve/events/status?ids=${encodeURIComponent(wid)}`)
+          .then((m) => setPopupState(m[wid]?.state ?? null))
+          .catch(() => {});
+      }
       return;
     }
     if (d.date !== date) {
@@ -162,6 +212,7 @@ export default function SlotPicker({
   return (
     <>
       {/* ── Date ── */}
+      {!fixedDate && (
       <section className="rv-step" aria-labelledby="rv-date-h">
         <h2 id="rv-date-h" className="rv-label mb-3">
           {n1}. Date
@@ -222,14 +273,15 @@ export default function SlotPicker({
         )}
         {belowCalendar}
       </section>
+      )}
 
       {/* ── Time and length ── */}
       {date && (
-        <section className="rv-step mt-10" aria-labelledby="rv-time-h">
+        <section className={`rv-step ${fixedDate ? "" : "mt-10"}`} aria-labelledby="rv-time-h">
           <h2 id="rv-time-h" className="rv-label mb-1">
             {n2}. Time
           </h2>
-          <p className="text-sm opacity-80 mb-4">{dateLong(date)}</p>
+          {fixedDate ? <div className="mb-3" /> : <p className="text-sm opacity-80 mb-4">{dateLong(date)}</p>}
 
           {slotsLoading && !slots ? (
             <>
@@ -240,11 +292,15 @@ export default function SlotPicker({
             <ErrorNote>{slotsError}</ErrorNote>
           ) : !slots || slots.length === 0 ? (
             <p className="text-sm">
-              Nothing is open for a party of {party} that day. Try another date, or{" "}
-              <a className="rv-link" href={telHref(phone)}>
-                call us
-              </a>
-              .
+              {noSlots ?? (
+                <>
+                  Nothing is open for a party of {party} that day. Try another date, or{" "}
+                  <a className="rv-link" href={telHref(phone)}>
+                    call us
+                  </a>
+                  .
+                </>
+              )}
             </p>
           ) : (
             <div className={slotsLoading ? "opacity-60 transition-opacity" : ""}>
@@ -267,7 +323,7 @@ export default function SlotPicker({
                           }
                         }}
                       >
-                        {s.name} · {s.min_guests}–{s.max_guests}
+                        {spaceLabel(s)}
                       </Choice>
                     );
                   })}
@@ -278,8 +334,8 @@ export default function SlotPicker({
               {chosenSpace && (
                 <div className="mb-6 rv-step">
                   <h3 className="text-sm mb-2">Start time</h3>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                    {chosenSpace.starts.map((st) => (
+                  {(() => {
+                    const startButton = (st: SlotStart) => (
                       <Choice
                         key={st.start_min}
                         pressed={startMin === st.start_min}
@@ -290,8 +346,41 @@ export default function SlotPicker({
                       >
                         {time12(st.start_min)}
                       </Choice>
-                    ))}
-                  </div>
+                    );
+                    const grid = "grid grid-cols-3 sm:grid-cols-4 gap-2";
+                    const grouped = groupStarts(chosenSpace);
+                    if (!grouped) return <div className={grid}>{chosenSpace.starts.map(startButton)}</div>;
+                    return (
+                      <div className="space-y-5">
+                        {grouped.multiple && (
+                          <p className="text-sm opacity-80">We have more than one service this day. Pick a time under the one you want.</p>
+                        )}
+                        {grouped.groups.map((g) => {
+                          const headingId = `rv-svc-${spaceKey(chosenSpace).replace(":", "-")}-${g.key}`;
+                          const heading = g.service ? serviceHeading(g.service) : "";
+                          return (
+                            <div key={g.key}>
+                              {g.service && (
+                                <div className="flex items-baseline justify-between gap-3 mb-2">
+                                  <h4 id={headingId} className="text-sm font-medium tracking-wide">
+                                    {heading}
+                                  </h4>
+                                  <ServiceInfoButton heading={heading} description={g.service.description} />
+                                </div>
+                              )}
+                              <div
+                                className={grid}
+                                role="group"
+                                {...(g.service ? { "aria-labelledby": headingId } : { "aria-label": "Other times" })}
+                              >
+                                {g.starts.map(startButton)}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 
@@ -335,7 +424,7 @@ export default function SlotPicker({
           href={popup?.event?.website_event_id ? `/events?event=${encodeURIComponent(popup.event.website_event_id)}` : "/events"}
           className="rv-btn w-full mt-2"
         >
-          Reserve for this event
+          {popupState === "scheduled" ? "See event details" : "Reserve for this event"}
         </Link>
       </Modal>
     </>

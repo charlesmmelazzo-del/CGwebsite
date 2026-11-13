@@ -55,6 +55,25 @@ export function timeRange(startMin: number, endMin: number): string {
   return `${a}–${b}`;
 }
 
+/** "Coffee" → "Coffee service"; "Brunch Service" stays as is; "" → "". */
+export function serviceName(label: string): string {
+  const l = label.trim();
+  if (!l) return "";
+  return /service$/i.test(l) ? l : `${l} service`;
+}
+
+/** Hours for a service heading: "7:00 AM – 12:00 PM", "5:00 – 11:00 PM". */
+export function serviceHours(openMin: number, closeMin: number): string {
+  return timeRange(openMin, closeMin).replace("–", " – ");
+}
+
+/** "Coffee service · 7:00 AM – 12:00 PM", or just the hours when unnamed. */
+export function serviceHeading(sv: { label: string; open_min: number; close_min: number }): string {
+  const name = serviceName(sv.label);
+  const hours = serviceHours(sv.open_min, sv.close_min);
+  return name ? `${name} · ${hours}` : hours;
+}
+
 /** 90 → "1½ hours", 60 → "1 hour", 45 → "45 minutes", 135 → "2¼ hours" */
 export function lengthLabel(minutes: number): string {
   if (minutes < 60) return `${minutes} minutes`;
@@ -101,4 +120,28 @@ export function isUsPhone(v: string): boolean {
 export const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
 export function isToken(v: string): boolean {
   return TOKEN_RE.test(v);
+}
+
+export const BAR_TIME_ZONE = "America/Chicago";
+
+/**
+ * The Bible's opens_at (ISO with offset) in the bar's time zone, whatever the
+ * visitor's: "Tue, Dec 1 at 12:00 AM" (or "Dec 1 at 12:00 AM" without weekday).
+ */
+export function opensAtLabel(iso: string, { weekday = true }: { weekday?: boolean } = {}): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const date = new Intl.DateTimeFormat("en-US", {
+    timeZone: BAR_TIME_ZONE,
+    ...(weekday ? { weekday: "short" as const } : {}),
+    month: "short",
+    day: "numeric",
+  }).format(d);
+  const time = new Intl.DateTimeFormat("en-US", { timeZone: BAR_TIME_ZONE, hour: "numeric", minute: "2-digit" }).format(d);
+  return `${date} at ${time}`;
+}
+
+/** Website event ids are free text; keep what the Bible accepts (≤ 100 chars, no slashes or control characters). */
+export function isWebsiteEventId(v: string): boolean {
+  return v.length > 0 && v.length <= 100 && /^[^\s/\\?#%]+$/.test(v);
 }

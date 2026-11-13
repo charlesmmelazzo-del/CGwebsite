@@ -57,9 +57,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    await createRequest(payload);
-    // The token goes to the guest by email only; the page doesn't need it.
-    return NextResponse.json({ ok: true });
+    const out = await createRequest(payload);
+    // The token goes to the guest by email only; the page needs just the status
+    // ('approved' for event bookings, which skip staff review).
+    return NextResponse.json({ ok: true, status: out.status });
   } catch (e) {
     return fromError(e);
   }

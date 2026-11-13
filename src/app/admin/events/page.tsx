@@ -5,6 +5,29 @@ import { Plus, Trash2, Calendar, Loader2, Save, GripVertical, FileText, Type, Co
 import type { CalendarEvent, HostSection, PageHeaderData } from "@/types";
 import { getPageDefault } from "@/lib/pagedefaults";
 import { WEEKDAY_NAMES, MAX_OCCURRENCES, DEFAULT_OCCURRENCES, describeRecurrence } from "@/lib/recurrence";
+import type { EventReservationInfo } from "@/lib/reserve/types";
+import { opensAtLabel } from "@/lib/reserve/format";
+
+/** An event as the admin API returns it: reservations is null when the CG Bible couldn't be reached. */
+type AdminEvent = CalendarEvent & { reservations?: EventReservationInfo | null };
+type EditingEvent = Partial<AdminEvent> & { reservationsEnabled?: boolean };
+
+const BIBLE_UNREACHABLE = "Couldn't reach the CG Bible to check reservation status.";
+
+function reservationStateLabel(r: EventReservationInfo | null | undefined): string {
+  if (!r?.state) return "Waiting for setup in the CG Bible";
+  if (r.state === "pending") return "Waiting for setup in the CG Bible";
+  if (r.state === "scheduled") return r.opens_at ? `Opens ${opensAtLabel(r.opens_at, { weekday: false })}` : "Scheduled";
+  if (r.state === "open") return "Open for reservations";
+  return "Closed";
+}
+
+function stateTagCls(r: EventReservationInfo | null | undefined): string {
+  if (r?.state === "open") return "bg-green-50 text-green-700 border-green-200";
+  if (r?.state === "scheduled") return "bg-blue-50 text-blue-700 border-blue-200";
+  if (r?.state === "closed") return "bg-gray-50 text-gray-500 border-gray-200";
+  return "bg-amber-50 text-amber-700 border-amber-200";
+}
 
 function newId() { return `e-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
 
@@ -158,8 +181,9 @@ export default function AdminEventsPage() {
   const [tab, setTab] = useState<"calendar" | "host">("calendar");
 
   // Calendar tab state
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [editing, setEditing] = useState<Partial<CalendarEvent> | null>(null);
+  const [events, setEvents] = useState<AdminEvent[]>([]);
+  const [editing, setEditing] = useState<EditingEvent | null>(null);
+  const [reservationsWarning, setReservationsWarning] = useState("");
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [savingEvent, setSavingEvent] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -198,17 +222,28 @@ export default function AdminEventsPage() {
   }, []);
 
   // ── Calendar handlers ──
-  function openNew() { setExtraDates([]); setDuplicating(false); setEditing({ title: "", start: "", description: "", location: "", recurrence: "none" }); }
-  function openEdit(event: CalendarEvent) { setExtraDates([]); setDuplicating(false); setEditing({ ...event }); }
-  function openDuplicate(event: CalendarEvent) {
+  // Reservations can't be read when the Bible was unreachable at load.
+  const bibleUnreachable = events.some((e) => e.reservations === null);
+
+  function openNew() {
+    setExtraDates([]); setDuplicating(false); setReservationsWarning("");
+    setEditing({ title: "", start: "", description: "", location: "", recurrence: "none", reservationsEnabled: bibleUnreachable ? undefined : false });
+  }
+  function openEdit(event: AdminEvent) {
+    setExtraDates([]); setDuplicating(false); setReservationsWarning("");
+    setEditing({ ...event, reservationsEnabled: event.reservations === null ? undefined : !!event.reservations?.enabled });
+  }
+  function openDuplicate(event: AdminEvent) {
     // Copy every field except id and the dates — so it saves as a brand-new
     // event and the user just picks the new date(s). The end date is dropped
     // too, since it only makes sense relative to the original start date.
-    const { id: _id, start: _start, end: _end, ...rest } = event;
+    // Reservations carry over as a choice: each new event gets its own setup in the Bible.
+    const { id: _id, start: _start, end: _end, reservations, ...rest } = event;
     void _id; void _start; void _end;
     setExtraDates([]);
     setDuplicating(true);
-    setEditing({ ...rest, start: "" });
+    setReservationsWarning("");
+    setEditing({ ...rest, start: "", reservationsEnabled: reservations === null ? undefined : !!reservations?.enabled });
   }
 
   async function saveEvent() {
@@ -217,6 +252,13 @@ export default function AdminEventsPage() {
     // A weekly series doesn't need an explicit first date — default to today.
     const startDate = editing.start || (isWeekly ? todayISO() : "");
     if (!startDate) return;
+
+    // Unticking an event that takes reservations needs a yes first.
+    const wasOn = !!editing.id && !!editing.reservations?.enabled;
+    if (wasOn && editing.reservationsEnabled === false) {
+      const ok = window.confirm("Turn off reservations for this event? Existing reservations stay in the CG Bible, but guests won't be able to book.");
+      if (!ok) return;
+    }
 
     const base = {
       title: editing.title,
@@ -235,11 +277,17 @@ export default function AdminEventsPage() {
         ? editing.recurrenceDay ?? new Date(startDate + "T12:00:00").getDay()
         : undefined,
       recurrenceCount: isWeekly ? editing.recurrenceCount ?? DEFAULT_OCCURRENCES : undefined,
+      // undefined (Bible unreachable) → the server leaves reservations alone.
+      // true = on (also re-sends a changed title/date); false only when turning an enabled event off.
+      reservationsEnabled:
+        !isWeekly && editing.reservationsEnabled === true ? true
+          : wasOn && (isWeekly || editing.reservationsEnabled === false) ? false
+            : undefined,
     };
 
     // Editing an existing event saves just that one. A weekly series is always a
     // single row — the site expands it. Otherwise create one event per date.
-    let toSave: CalendarEvent[];
+    let toSave: (AdminEvent & { reservationsEnabled?: boolean })[];
     if (editing.id) {
       toSave = [{ id: editing.id, start: startDate, ...base }];
     } else if (isWeekly) {
@@ -250,7 +298,10 @@ export default function AdminEventsPage() {
     }
 
     setSavingEvent(true);
+    setReservationsWarning("");
     try {
+      const saved: AdminEvent[] = [];
+      const warnings: string[] = [];
       for (const event of toSave) {
         const res = await fetch("/api/admin/events", {
           method: "POST",
@@ -258,11 +309,31 @@ export default function AdminEventsPage() {
           body: JSON.stringify(event),
         });
         if (!res.ok) throw new Error("Save failed");
+        const out = await res.json().catch(() => ({}));
+        if (out.reservationsWarning) warnings.push(out.reservationsWarning);
+        const { reservationsEnabled: _r, ...plain } = event;
+        void _r;
+        saved.push({
+          ...plain,
+          reservations:
+            out.reservations ??
+            (editing.id && editing.reservations !== undefined
+              ? editing.reservations
+              : bibleUnreachable ? null : { enabled: false, state: null, opens_at: null }),
+        });
       }
       setEvents((prev) => editing.id
-        ? prev.map((e) => e.id === toSave[0].id ? toSave[0] : e)
-        : [...prev, ...toSave]);
-      setEditing(null);
+        ? prev.map((e) => e.id === saved[0].id ? saved[0] : e)
+        : [...prev, ...saved]);
+      if (warnings.length) {
+        // Keep the editor open so the admin can retry.
+        setReservationsWarning(Array.from(new Set(warnings)).join(" "));
+        if (!editing.id) setEditing(null);
+        else setEditing((v) => (v ? { ...v, reservations: saved[0].reservations } : v));
+        if (!editing.id) alert(Array.from(new Set(warnings)).join(" "));
+      } else {
+        setEditing(null);
+      }
     } catch {
       alert("Failed to save event. Please try again.");
     } finally {
@@ -388,6 +459,11 @@ export default function AdminEventsPage() {
                     : new Date(event.start + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "long", day: "numeric", year: "numeric" })}
                 </p>
                 {event.description && <p className="text-gray-400 text-xs mt-1 truncate">{event.description}</p>}
+                {event.reservations?.enabled && (
+                  <span className={`inline-block mt-1.5 text-[10px] tracking-wide px-1.5 py-0.5 border rounded-sm ${stateTagCls(event.reservations)}`}>
+                    Reservations · {reservationStateLabel(event.reservations)}
+                  </span>
+                )}
               </div>
               <button
                 onClick={(e) => { e.stopPropagation(); openDuplicate(event); }}
@@ -653,6 +729,38 @@ export default function AdminEventsPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+              <div className="pt-3 border-t border-gray-100">
+                <label className={`flex items-start gap-2 ${isWeekly || editing.reservationsEnabled === undefined ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
+                  <input
+                    type="checkbox"
+                    className="accent-[#C97D5A] mt-0.5"
+                    checked={!isWeekly && !!editing.reservationsEnabled}
+                    disabled={isWeekly || editing.reservationsEnabled === undefined}
+                    onChange={(e) => setEditing((v) => ({ ...v, reservationsEnabled: e.target.checked }))}
+                  />
+                  <span className="flex-1">
+                    <span className="text-sm text-gray-700 font-medium">Take reservations for this event</span>
+                    {!isWeekly && editing.id && editing.reservationsEnabled && editing.reservations?.enabled && (
+                      <span className={`ml-2 inline-block text-[10px] tracking-wide px-1.5 py-0.5 border rounded-sm align-middle ${stateTagCls(editing.reservations)}`}>
+                        {reservationStateLabel(editing.reservations)}
+                      </span>
+                    )}
+                    <span className="block text-xs text-gray-400 mt-1 leading-relaxed">
+                      {isWeekly
+                        ? "Reservations can be turned on for one-time events only."
+                        : editing.reservationsEnabled === undefined
+                          ? BIBLE_UNREACHABLE
+                          : "Guests will be able to reserve a table for this event from the Events page. After you save, finish the setup in the CG Bible: Comms → Reservations → Settings → Events."}
+                    </span>
+                    {!isWeekly && !editing.id && extraDates.filter(Boolean).length > 0 && editing.reservationsEnabled && (
+                      <span className="block text-xs text-gray-400 mt-1">Each date becomes its own event with its own setup in the CG Bible.</span>
+                    )}
+                  </span>
+                </label>
+                {reservationsWarning && (
+                  <p className="mt-2 p-2 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-sm">{reservationsWarning}</p>
+                )}
               </div>
               <div className="pt-2 border-t border-gray-100">
                 <p className="text-[10px] tracking-widest uppercase text-gray-400 mb-2">Visibility Schedule <span className="normal-case opacity-60">(optional — leave blank to {isWeekly ? "repeat forever" : "always show"})</span></p>
