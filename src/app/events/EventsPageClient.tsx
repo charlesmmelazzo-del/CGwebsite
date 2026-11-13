@@ -1,13 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import PageThemeWrapper from "@/components/layout/PageThemeWrapper";
 import type { CalendarEvent, FormField, PageHeaderData, HostSection } from "@/types";
 import { resolveTheme } from "@/lib/themes";
 import type { ThemeName } from "@/lib/themes";
 import clsx from "clsx";
-import { Download, FileText, MapPin, ChevronDown, CalendarPlus } from "lucide-react";
+import { Download, FileText, MapPin, ChevronDown, CalendarPlus, BellRing } from "lucide-react";
+import type { EventStatus } from "@/lib/reserve/types";
+import { opensAtLabel } from "@/lib/reserve/format";
+import EventBookingModal from "@/components/reserve/EventBookingModal";
 import { CurrentCompetitions, PastCompetitions, type CurrentCompetition, type PastCompetition } from "./CompetitionCards";
 
 type TabId = "upcoming" | "past" | "host";
@@ -61,8 +64,180 @@ function buildICS(event: CalendarEvent): string {
   return `data:text/calendar;charset=utf-8,${encodeURIComponent(lines.join("\r\n"))}`;
 }
 
-function EventCard({ event, theme }: { event: CalendarEvent; theme: { text: string; muted: string } }) {
-  const [expanded, setExpanded] = useState(false);
+// ── "Remind me" when reservations open ───────────────────────────────────────
+
+/** 2026-12-01T06:00:00.000Z → 20261201T060000Z */
+function icsUtc(d: Date): string {
+  return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+}
+
+function reminderParts(event: CalendarEvent, opensAt: string) {
+  const start = new Date(opensAt);
+  const end = new Date(start.getTime() + 15 * 60_000);
+  const link = `${typeof window !== "undefined" ? window.location.origin : "https://commongoodcocktailhouse.com"}/events?event=${encodeURIComponent(event.id)}`;
+  return {
+    start,
+    end,
+    title: `Reservations open: ${event.title} at Common Good`,
+    description: `Reserve your table: ${link}`,
+    link,
+  };
+}
+
+/** An .ics entry for the moment reservations open, with an alarm at that time. */
+function buildReminderICS(event: CalendarEvent, opensAt: string): string {
+  const r = reminderParts(event, opensAt);
+  const esc = (s: string) => s.replace(/[\\,;]/g, "\\$&").replace(/\n/g, "\\n");
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Common Good Cocktail House//Reservations//EN",
+    "BEGIN:VEVENT",
+    `UID:reserve-${event.id}@commongoodcocktailhouse.com`,
+    `DTSTAMP:${icsUtc(new Date())}`,
+    `DTSTART:${icsUtc(r.start)}`,
+    `DTEND:${icsUtc(r.end)}`,
+    `SUMMARY:${esc(r.title)}`,
+    `DESCRIPTION:${esc(r.description)}`,
+    `URL:${r.link}`,
+    "BEGIN:VALARM",
+    "ACTION:DISPLAY",
+    `DESCRIPTION:${esc(r.title)}`,
+    "TRIGGER:PT0M",
+    "END:VALARM",
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ];
+  return `data:text/calendar;charset=utf-8,${encodeURIComponent(lines.join("\r\n"))}`;
+}
+
+function googleReminderUrl(event: CalendarEvent, opensAt: string): string {
+  const r = reminderParts(event, opensAt);
+  const p = new URLSearchParams({
+    action: "TEMPLATE",
+    text: r.title,
+    dates: `${icsUtc(r.start)}/${icsUtc(r.end)}`,
+    details: r.description,
+  });
+  return `https://calendar.google.com/calendar/render?${p.toString()}`;
+}
+
+function RemindMe({ event, opensAt, theme }: { event: CalendarEvent; opensAt: string; theme: { text: string; muted: string } }) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent | KeyboardEvent) => {
+      if (e instanceof KeyboardEvent ? e.key === "Escape" : !wrap.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, [open]);
+  const item = "block px-4 py-2.5 text-xs tracking-wider hover:bg-black/20 whitespace-nowrap";
+  return (
+    <div ref={wrap} className="relative inline-block" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex items-center gap-2 px-4 py-2 border text-xs tracking-widest uppercase hover:opacity-100 opacity-90 transition-opacity"
+        style={{ borderColor: `${theme.muted}80`, color: theme.text }}
+      >
+        <BellRing size={13} />
+        Remind me
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute left-0 mt-1 z-20 shadow-xl border"
+          style={{ background: "#1A1F17", borderColor: `${theme.muted}60`, color: theme.text }}
+        >
+          <a
+            role="menuitem"
+            className={item}
+            href={buildReminderICS(event, opensAt)}
+            download={`reservations-open-${event.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.ics`}
+            onClick={() => setOpen(false)}
+          >
+            Apple / Outlook (.ics file)
+          </a>
+          <a role="menuitem" className={item} href={googleReminderUrl(event, opensAt)} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)}>
+            Google Calendar
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The reservation line on an event card, by where the Bible setup stands. */
+function ReservationLine({
+  event,
+  status,
+  onBook,
+  theme,
+}: {
+  event: CalendarEvent;
+  status: EventStatus;
+  onBook: () => void;
+  theme: { text: string; muted: string };
+}) {
+  if (status.state === "pending") {
+    return (
+      <p className="text-xs mt-3 opacity-60" style={{ color: theme.text }}>
+        Check back soon to reserve a table.
+      </p>
+    );
+  }
+  if (status.state === "scheduled" && status.opens_at) {
+    return (
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <p className="text-xs opacity-80" style={{ color: theme.text }}>
+          Reservations open {opensAtLabel(status.opens_at)}.
+        </p>
+        <RemindMe event={event} opensAt={status.opens_at} theme={theme} />
+      </div>
+    );
+  }
+  if (status.state === "open") {
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onBook();
+        }}
+        className="mt-4 inline-block w-full sm:w-auto text-center px-6 py-3 bg-[#C97D5A] text-white text-xs tracking-widest uppercase hover:bg-[#b86d4a] transition-colors"
+      >
+        Book a table
+      </button>
+    );
+  }
+  return null;
+}
+
+function EventCard({
+  event,
+  theme,
+  status,
+  onBook,
+  defaultExpanded = false,
+}: {
+  event: CalendarEvent;
+  theme: { text: string; muted: string };
+  status?: EventStatus;
+  onBook?: () => void;
+  defaultExpanded?: boolean;
+}) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  useEffect(() => {
+    if (defaultExpanded) setExpanded(true);
+  }, [defaultExpanded]);
   const start = formatEventDate(event.start);
   const isMultiDay = !!(event.end && event.end !== event.start);
   const end = isMultiDay ? formatEventDate(event.end!) : null;
@@ -71,7 +246,7 @@ function EventCard({ event, theme }: { event: CalendarEvent; theme: { text: stri
   const icsHref = buildICS(event);
 
   return (
-    <div style={{ borderBottom: `1px solid ${theme.muted}20` }}>
+    <div id={`event-${event.id}`} style={{ borderBottom: `1px solid ${theme.muted}20`, scrollMarginTop: "calc(var(--header-h, 72px) + 12px)" }}>
       {/* ── Main row (always visible) ── */}
       <div
         className="flex gap-4 md:gap-6 px-4 md:px-8 py-6 cursor-pointer select-none"
@@ -116,6 +291,7 @@ function EventCard({ event, theme }: { event: CalendarEvent; theme: { text: stri
               {event.description}
             </p>
           )}
+          {status && onBook && <ReservationLine event={event} status={status} onBook={onBook} theme={theme} />}
         </div>
 
         {/* Thumbnail (collapsed only) + expand chevron */}
@@ -266,11 +442,16 @@ export default function EventsPageClient({
   header,
   hasFutureEvents,
   competitions = { current: [], past: [] },
+  reservations = {},
+  phone = "",
 }: {
   initialEvents: CalendarEvent[];
   header: PageHeaderData;
   hasFutureEvents: boolean;
   competitions?: { current: CurrentCompetition[]; past: PastCompetition[] };
+  /** Table-reservation state per website event id (empty when reservations are off). */
+  reservations?: Record<string, EventStatus>;
+  phone?: string;
 }) {
   // A published competition counts as something upcoming even with no calendar events.
   const hasUpcoming = hasFutureEvents || competitions.current.length > 0;
@@ -281,6 +462,10 @@ export default function EventsPageClient({
   const [error, setError] = useState(false);
   const themeName: ThemeName = header.theme ?? "green";
   const theme = resolveTheme(header);
+
+  // Booking sheet for an event, and the event a deep link (?event=<id>) points at.
+  const [booking, setBooking] = useState<CalendarEvent | null>(null);
+  const [focusId, setFocusId] = useState<string | null>(null);
 
   const hostSections = header.hostSections?.length ? header.hostSections : DEFAULT_HOST_SECTIONS;
 
@@ -298,7 +483,25 @@ export default function EventsPageClient({
   // inquiry form (the Reserve page sends private-event questions here).
   // Read on mount rather than via useSearchParams so the page needs no Suspense boundary.
   useEffect(() => {
-    const tab = new URLSearchParams(window.location.search).get("tab");
+    const params = new URLSearchParams(window.location.search);
+    // /events?event=<id>: Upcoming tab, scroll to the card, expand it, and open
+    // booking when that event is taking reservations now.
+    const eventId = params.get("event");
+    if (eventId) {
+      const ev = initialEvents.find((e) => e.id === eventId);
+      if (ev) {
+        if (hasUpcoming) setActiveTab("upcoming");
+        setFocusId(ev.id);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            document.getElementById(`event-${ev.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+        });
+        if (reservations[ev.id]?.state === "open") setBooking(ev);
+      }
+      return;
+    }
+    const tab = params.get("tab");
     const valid = visibleTabs.some((t) => t.id === tab);
     if (valid) setActiveTab(tab as TabId);
     if (window.location.hash === "#inquiry" && (valid ? tab === "host" : activeTab === "host")) {
@@ -387,7 +590,14 @@ export default function EventsPageClient({
             <CurrentCompetitions items={competitions.current} />
             <div style={{ borderTop: initialEvents.length ? `1px solid ${theme.muted}20` : undefined }}>
               {initialEvents.map((event) => (
-                <EventCard key={event.id} event={event} theme={theme} />
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  theme={theme}
+                  status={reservations[event.id]}
+                  onBook={() => setBooking(event)}
+                  defaultExpanded={focusId === event.id}
+                />
               ))}
             </div>
           </div>
@@ -468,6 +678,16 @@ export default function EventsPageClient({
           </div>
         )}
       </div>
+      {booking && (
+        <EventBookingModal
+          websiteEventId={booking.id}
+          title={booking.title}
+          open={!!booking}
+          onClose={() => setBooking(null)}
+          phone={phone}
+          theme={{ bg: theme.bg, text: theme.text, muted: theme.muted }}
+        />
+      )}
     </PageThemeWrapper>
   );
 }

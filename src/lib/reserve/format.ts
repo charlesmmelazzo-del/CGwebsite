@@ -102,3 +102,27 @@ export const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
 export function isToken(v: string): boolean {
   return TOKEN_RE.test(v);
 }
+
+export const BAR_TIME_ZONE = "America/Chicago";
+
+/**
+ * The Bible's opens_at (ISO with offset) in the bar's time zone, whatever the
+ * visitor's: "Tue, Dec 1 at 12:00 AM" (or "Dec 1 at 12:00 AM" without weekday).
+ */
+export function opensAtLabel(iso: string, { weekday = true }: { weekday?: boolean } = {}): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const date = new Intl.DateTimeFormat("en-US", {
+    timeZone: BAR_TIME_ZONE,
+    ...(weekday ? { weekday: "short" as const } : {}),
+    month: "short",
+    day: "numeric",
+  }).format(d);
+  const time = new Intl.DateTimeFormat("en-US", { timeZone: BAR_TIME_ZONE, hour: "numeric", minute: "2-digit" }).format(d);
+  return `${date} at ${time}`;
+}
+
+/** Website event ids are free text; keep what the Bible accepts (≤ 100 chars, no slashes or control characters). */
+export function isWebsiteEventId(v: string): boolean {
+  return v.length > 0 && v.length <= 100 && /^[^\s/\\?#%]+$/.test(v);
+}

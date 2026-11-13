@@ -163,3 +163,36 @@ export interface ReservePageConfig {
   content: ReserveContent;
   phone: string;
 }
+
+// ── Event reservations (Bible instruction file 06) ────────────────────────────
+
+/** Where an event's reservation setup stands in the Bible. */
+export type EventState = "pending" | "scheduled" | "open" | "closed";
+
+export interface EventStatus {
+  /** The Bible's own event id — what slots and requests take as `event_id`. */
+  event_id: number;
+  website_event_id: string;
+  title: string;
+  date: string;
+  state: EventState;
+  /** ISO 8601 with the bar's offset, e.g. 2026-12-01T00:00-06:00; null until confirmed. */
+  opens_at: string | null;
+}
+
+/** GET /events/:id — status, plus booking details when scheduled or open. */
+export interface EventBooking extends EventStatus {
+  start_time?: string | null;
+  end_time?: string | null;
+  rules?: Omit<ReserveRules, "window_open_days">;
+  party?: { min: number | null; max: number | null };
+  policies?: string[];
+  spaces?: SpaceSummary[];
+}
+
+/** What the website admin sees per event. */
+export interface EventReservationInfo {
+  enabled: boolean;
+  state: EventState | null;
+  opens_at: string | null;
+}
