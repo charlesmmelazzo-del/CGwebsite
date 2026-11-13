@@ -296,6 +296,40 @@ export function Honeypot({ value, onChange }: { value: string; onChange: (v: str
   );
 }
 
+// ── Service "More info" ───────────────────────────────────────────────────────
+
+/** A small "More info" button that opens the service description staff wrote in the CG Bible. */
+export function ServiceInfoButton({ heading, description, className = "" }: { heading: string; description: string; className?: string }) {
+  const [open, setOpen] = useState(false);
+  if (!description.trim()) return null;
+  return (
+    <>
+      <button
+        type="button"
+        className={`rv-link text-sm shrink-0 ${className}`}
+        onClick={() => setOpen(true)}
+        aria-haspopup="dialog"
+        aria-label={`More info about ${heading}`}
+      >
+        More info
+      </button>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        size="sm"
+        title={heading}
+        footer={
+          <button type="button" className="rv-btn rv-btn-ghost w-full" onClick={() => setOpen(false)}>
+            Close
+          </button>
+        }
+      >
+        <p className="whitespace-pre-line leading-relaxed opacity-90">{description}</p>
+      </Modal>
+    </>
+  );
+}
+
 // ── FAQ ───────────────────────────────────────────────────────────────────────
 
 export function FaqModal({ open, onClose, faq }: { open: boolean; onClose: () => void; faq: ReserveFaq[] }) {

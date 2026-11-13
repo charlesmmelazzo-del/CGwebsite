@@ -43,11 +43,26 @@ export interface SlotStart {
   start_min: number;
   start_time: string; // HH:MM
   lengths: number[]; // minutes
+  /** The service this start falls in (Bible file 06d); null/absent when none or on an older Bible. */
+  service_id?: number | null;
+}
+
+/** One of the day's openings, e.g. Coffee 7:00 AM–12:00 PM (Bible file 06d). */
+export interface ServiceInfo {
+  id: number;
+  label: string; // '' when staff haven't named it
+  description: string; // '' when none
+  open_time: string; // HH:MM
+  close_time: string;
+  open_min: number;
+  close_min: number; // may exceed 1440 when it closes after midnight
 }
 
 export interface SpaceSlots extends SpaceSummary {
   room_name: string;
   starts: SlotStart[];
+  /** Absent on an older Bible: render the flat list. */
+  services?: ServiceInfo[];
 }
 
 export interface MaskedGuest {
@@ -124,6 +139,8 @@ export interface OpenReservation {
   event: { id: number; title: string; website_event_id: string | null } | null;
   messages: GuestMessage[];
   change_request: { id: number; date: string; start_time: string; minutes: number; start_min: number } | null;
+  /** The service the reservation starts in (Bible file 06d); null for events or outside every opening. */
+  service?: { label: string; description: string } | null;
   can_confirm: boolean;
   policies: string[];
 }
