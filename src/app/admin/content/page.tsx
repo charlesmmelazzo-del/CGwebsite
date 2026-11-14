@@ -1,5 +1,6 @@
-import ContentPagesEditor from "@/components/admin/ContentPagesEditor";
+import { redirect } from "next/navigation";
 
-export default function AdminContentPage() {
-  return <ContentPagesEditor initialSlug="about" />;
+// Retired — About, Club and Shop each have their own panel now.
+export default function AdminContentRedirect() {
+  redirect("/admin/about");
 }

@@ -1,8 +1,15 @@
 import HomeCarousel from "@/components/home/HomeCarousel";
 import { getHomeData } from "@/lib/homedata";
+import { getPageHeader } from "@/lib/pageheaders";
 
 export default async function HomePage() {
-  const { bgUrl, carouselItems, autoAdvance, autoAdvanceInterval } = await getHomeData();
+  const [home, style] = await Promise.all([getHomeData(), getPageHeader("home")]);
+  const { carouselItems, autoAdvance, autoAdvanceInterval } = home;
+  // Background & Style tab of the Home admin panel; older saves kept the photo
+  // with the carousel, so fall back to that until the tab is first saved.
+  const bgUrl = style.bgImageUrl ?? home.bgUrl;
+  const bgColor = style.customBg || "#1A1F17";
+  const bgOpacity = Math.min(100, Math.max(0, style.bgImageOpacity ?? 35)) / 100;
 
   const now = new Date();
   const visibleItems = carouselItems
@@ -17,13 +24,13 @@ export default async function HomePage() {
   return (
     <div
       className="min-h-screen relative flex flex-col items-center justify-center"
-      style={{ backgroundColor: "#1A1F17" }}
+      style={{ backgroundColor: bgColor }}
     >
       {/* Full-bleed background image — only when admin has set one */}
       {bgUrl && (
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: `url('${bgUrl}')`, opacity: 0.35 }}
+          style={{ backgroundImage: `url('${bgUrl}')`, opacity: bgOpacity }}
         />
       )}
 

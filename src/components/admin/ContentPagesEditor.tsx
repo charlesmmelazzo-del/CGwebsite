@@ -35,11 +35,10 @@ const PAGE_CONFIG: Record<ContentSlug, {
   shop:  { label: "Shop",  kind: "tabs",     defaults: DEFAULT_SHOP_TABS, addLabel: "Add Tab" },
 };
 
-const PAGE_ORDER: ContentSlug[] = ["about", "club", "shop"];
-
-export default function ContentPagesEditor({ initialSlug = "about" }: { initialSlug?: ContentSlug }) {
-  const [slug, setSlug] = useState<ContentSlug>(initialSlug);
-  const [items, setItems] = useState<Item[]>(PAGE_CONFIG[initialSlug].defaults);
+// Body-content editor for ONE of the About / Club / Shop pages. Rendered in
+// the first tab of that page's admin panel.
+export default function ContentPagesEditor({ slug }: { slug: ContentSlug }) {
+  const [items, setItems] = useState<Item[]>(PAGE_CONFIG[slug].defaults);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -71,12 +70,6 @@ export default function ContentPagesEditor({ initialSlug = "about" }: { initialS
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [slug]);
-
-  function switchPage(next: ContentSlug) {
-    if (next === slug) return;
-    if (dirty && !window.confirm("You have unsaved changes that will be lost. Switch pages anyway?")) return;
-    setSlug(next);
-  }
 
   function updateItem(id: string, patch: Partial<Item>) {
     setItems((prev) => prev.map((it) => it.id === id ? { ...it, ...patch } as Item : it));
@@ -153,15 +146,19 @@ export default function ContentPagesEditor({ initialSlug = "about" }: { initialS
 
   return (
     <div className="max-w-2xl">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl text-gray-800" style={{ fontFamily: "var(--font-display)" }}>
-            Content Pages
-          </h1>
+          <h2 className="text-lg text-gray-800" style={{ fontFamily: "var(--font-display)" }}>
+            {config.kind === "tabs" ? "Shop Tabs" : "Page Content"}
+          </h2>
           <p className="text-gray-400 text-xs mt-1">
-            Edit the body content of the About, Club, and Shop pages
+            {config.kind === "tabs"
+              ? "Each tab on the Shop page — its text, image and button. Drag to reorder."
+              : `The sections shown on the ${config.label} page. Drag to reorder.`}
           </p>
         </div>
+        <div className="flex items-center gap-3 shrink-0">
+          {dirty && <span className="text-[11px] text-amber-600">Unsaved changes</span>}
         <button
           onClick={handleSave}
           disabled={saving}
@@ -170,24 +167,7 @@ export default function ContentPagesEditor({ initialSlug = "about" }: { initialS
           <Save size={14} />
           {saved ? "Saved!" : saving ? "Saving…" : "Save Changes"}
         </button>
-      </div>
-
-      {/* Page picker */}
-      <div className="flex gap-1 mb-6 border-b border-gray-200">
-        {PAGE_ORDER.map((s) => (
-          <button
-            key={s}
-            onClick={() => switchPage(s)}
-            className={`px-4 py-2.5 text-xs tracking-wider uppercase transition-colors border-b-2 -mb-px ${
-              slug === s
-                ? "border-[#C97D5A] text-[#C97D5A]"
-                : "border-transparent text-gray-400 hover:text-gray-700"
-            }`}
-          >
-            {PAGE_CONFIG[s].label}
-            {dirty && slug === s && <span className="ml-1 text-[#C97D5A]">•</span>}
-          </button>
-        ))}
+        </div>
       </div>
 
       {saveError && (
