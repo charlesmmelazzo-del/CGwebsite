@@ -24,7 +24,7 @@ export const metadata: Metadata = {
 const NOT_FOUND = "We couldn't find that reservation. Check the link in your email, or call us.";
 
 export default async function GuestReservationPage({ params }: { params: { token: string } }) {
-  if (!reserveEnabled()) notFound();
+  if (!(await reserveEnabled())) notFound();
 
   const [header, content, settings] = await Promise.all([getPageHeader("reserve"), getReserveContent(), getSiteSettings()]);
   const themeName: ThemeName = header.theme ?? "green";

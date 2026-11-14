@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 /** GET /api/reserve/events/:websiteEventId — state, plus rules, party range, policies and spaces once set up. */
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const stop = guard(req, "read");
+  const stop = await guard(req, "read");
   if (stop) return stop;
   if (!isWebsiteEventId(params.id)) return notFound();
   try {

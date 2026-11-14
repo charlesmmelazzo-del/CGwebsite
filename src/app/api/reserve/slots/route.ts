@@ -5,7 +5,7 @@ import { guard, fromError, intParam, bad, DATE_RE } from "@/lib/reserve/route";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const stop = guard(req, "read");
+  const stop = await guard(req, "read");
   if (stop) return stop;
   const sp = req.nextUrl.searchParams;
   const date = sp.get("date") ?? "";

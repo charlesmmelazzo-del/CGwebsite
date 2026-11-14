@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 };
 
 export default async function ReservePage() {
-  if (!reserveEnabled()) notFound();
+  if (!(await reserveEnabled())) notFound();
 
   const [header, content, settings, config] = await Promise.all([
     getPageHeader("reserve"),

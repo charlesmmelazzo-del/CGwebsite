@@ -5,7 +5,7 @@ import { guard, fromError, intParam, bad } from "@/lib/reserve/route";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const stop = guard(req, "read");
+  const stop = await guard(req, "read");
   if (stop) return stop;
   const raw = req.nextUrl.searchParams.get("party");
   const party = raw ? intParam(raw, 1, 500) : null;

@@ -15,7 +15,7 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
   if (!ACTIONS.includes(action)) return notFound();
   // Confirm, notes, and withdrawing are low-risk; the rest count toward the guest-action limit.
   const bucket: BucketName = action === "confirm" || action === "notes" || action === "withdraw-change" ? "read" : "guest-action";
-  const stop = guard(req, bucket) ?? badToken(params.token);
+  const stop = (await guard(req, bucket)) ?? badToken(params.token);
   if (stop) return stop;
 
   const token = params.token;

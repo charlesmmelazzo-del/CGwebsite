@@ -6,6 +6,7 @@ import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, us
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import ImagePicker from "@/components/ui/ImagePicker";
+import ReserveSwitch from "@/components/admin/ReserveSwitch";
 import type { ReserveContent, ReserveFaq } from "@/lib/reserve/types";
 
 const inputCls =
@@ -141,6 +142,7 @@ export default function AdminReservePage() {
 
   return (
     <div className="max-w-2xl">
+      <ReserveSwitch />
       <div className="flex items-center justify-between gap-4 mb-4">
         <h2 className="text-lg text-gray-800" style={{ fontFamily: "var(--font-display)" }}>
           Page Content
