@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
 import {
   LayoutDashboard, ChevronLeft, ChevronRight, LogOut, Menu, ExternalLink, Globe,
 } from "lucide-react";
-import { PAGE_PANELS, GENERAL_PANEL, findPanel, type AdminPanel } from "@/lib/adminNav";
+import { PAGE_PANELS, GENERAL_PANEL, findPanel, visibleTabs, type AdminPanel } from "@/lib/adminNav";
+
+type Me = { role: "owner" | "user"; username: string; name: string };
 
 // Editors that manage their own full-height layout (side-by-side preview etc.)
 const FULL_HEIGHT = ["/admin/pages", "/admin/header", "/admin/images"];
@@ -15,10 +17,24 @@ const FULL_HEIGHT = ["/admin/pages", "/admin/header", "/admin/images"];
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [me, setMe] = useState<Me | null>(null);
   const pathname = usePathname();
+  const onLogin = pathname === "/admin/login";
+
+  // Who's signed in — decides whether the Users tab shows, and names them in
+  // the sidebar. Re-read after signing in (the layout stays mounted).
+  useEffect(() => {
+    if (onLogin) { setMe(null); return; }
+    let live = true;
+    fetch("/api/admin/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (live) setMe(d); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [onLogin]);
 
   // Login page renders standalone — no sidebar wrapper
-  if (pathname === "/admin/login") return <>{children}</>;
+  if (onLogin) return <>{children}</>;
 
   const current = findPanel(pathname);
   const fullHeight = FULL_HEIGHT.some((p) => pathname.startsWith(p));
@@ -85,6 +101,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </nav>
 
       <div className="p-3 border-t border-gray-200 space-y-0.5">
+        {me && !collapsed && (
+          <p className="px-3 pb-1.5 text-[11px] text-gray-400 truncate" title={`Signed in as ${me.name}`}>
+            Signed in as <span className="text-gray-600">{me.name}</span>
+          </p>
+        )}
         <Link
           href="/"
           target="_blank"
@@ -150,7 +171,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               )}
             </div>
             <div className="flex gap-1 mt-3 -mb-px overflow-x-auto" role="tablist" aria-label={`${current.panel.label} sections`}>
-              {current.panel.tabs.map((t) => {
+              {visibleTabs(current.panel, me?.role === "owner").map((t) => {
                 const active = t.href === current.tab.href;
                 return (
                   <Link
