@@ -123,9 +123,9 @@ export default function AdminCoffeePage() {
   return (
     <div className="max-w-2xl">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl text-gray-800" style={{ fontFamily: "var(--font-display)" }}>
+        <h2 className="text-lg text-gray-800" style={{ fontFamily: "var(--font-display)" }}>
           Coffee Menus
-        </h1>
+        </h2>
         <button
           onClick={handleSave}
           disabled={saving}

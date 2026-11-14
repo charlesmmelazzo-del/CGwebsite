@@ -8,6 +8,8 @@ import CarouselEditor from "@/components/admin/CarouselEditor";
 
 export default function AdminHomePage() {
   const [items, setItems] = useState<CarouselItem[]>([]);
+  // Legacy background field — now edited in the Background & Style tab; passed
+  // through untouched so saving slides never clears it.
   const [bgUrl, setBgUrl] = useState("");
   const [autoAdvance, setAutoAdvance] = useState(true);
   const [autoAdvanceInterval, setAutoAdvanceInterval] = useState(6);
@@ -51,7 +53,7 @@ export default function AdminHomePage() {
   return (
     <div className="max-w-2xl">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl text-gray-800" style={{ fontFamily: "var(--font-display)" }}>Home Page</h1>
+        <h2 className="text-lg text-gray-800" style={{ fontFamily: "var(--font-display)" }}>Slides &amp; Content</h2>
         <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-[#C97D5A] text-white text-xs tracking-widest uppercase hover:bg-[#b86d4a] transition-colors disabled:opacity-60">
           <Save size={14} />
           {saved ? "Saved!" : saving ? "Saving..." : "Save Changes"}
@@ -69,13 +71,6 @@ export default function AdminHomePage() {
           {saveError}
         </div>
       )}
-
-      {/* Background image */}
-      <section className="mb-4 p-4 bg-white border border-gray-200 rounded-sm">
-        <h2 className="text-xs tracking-widest uppercase text-gray-400 mb-3">Background Image</h2>
-        <input type="text" value={bgUrl} onChange={(e) => setBgUrl(e.target.value)} placeholder="https://... or /images/..." className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm px-3 py-2 outline-none focus:border-[#C97D5A]/50 rounded-sm" />
-        <p className="text-gray-400 text-xs mt-2">Leave blank to use default background image</p>
-      </section>
 
       {/* Auto-advance */}
       <section className="mb-8 p-4 bg-white border border-gray-200 rounded-sm space-y-3">

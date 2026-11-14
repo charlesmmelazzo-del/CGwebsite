@@ -27,7 +27,7 @@ export default async function EventsPage() {
   // website event id). Recurring occurrences never do. If the Bible can't be
   // reached the page renders exactly as it would without reservations.
   let reservations: Record<string, EventStatus> = {};
-  if (reserveEnabled()) {
+  if (await reserveEnabled()) {
     try {
       reservations = await getEventStatuses(events.filter((e) => !e.seriesId && e.recurrence !== "weekly").map((e) => e.id));
     } catch {

@@ -30,6 +30,7 @@ export default function GuestPageClient({
   faq,
   phone,
   partyMax,
+  bookingOpen,
   theme,
 }: {
   token: string;
@@ -38,6 +39,8 @@ export default function GuestPageClient({
   faq: ReserveFaq[];
   phone: string;
   partyMax: number;
+  /** False while new bookings are switched off in the admin — hides the link to /reserve. */
+  bookingOpen: boolean;
   theme: RvTheme;
 }) {
   const [view, setView] = useState<GuestReservation | null>(initial);
@@ -55,7 +58,7 @@ export default function GuestPageClient({
             </p>
           </div>
         ) : view.closed ? (
-          <Closed firstName={view.first_name} status={view.status} />
+          <Closed firstName={view.first_name} status={view.status} bookingOpen={bookingOpen} />
         ) : (
           <OpenView token={token} view={view} setView={setView} faq={faq} phone={phone} partyMax={partyMax} />
         )}
@@ -64,7 +67,7 @@ export default function GuestPageClient({
   );
 }
 
-function Closed({ firstName, status }: { firstName: string; status: string }) {
+function Closed({ firstName, status, bookingOpen }: { firstName: string; status: string; bookingOpen: boolean }) {
   const line =
     status === "cancelled"
       ? "This reservation was cancelled."
@@ -75,9 +78,11 @@ function Closed({ firstName, status }: { firstName: string; status: string }) {
     <div className="text-center py-16 rv-step">
       <h1 className="rv-h2 text-3xl mb-4">Thanks{firstName ? `, ${firstName}` : ""}.</h1>
       <p className="opacity-90 mb-8">{line}</p>
-      <Link href="/reserve" className="rv-btn">
-        Make a new reservation
-      </Link>
+      {bookingOpen && (
+        <Link href="/reserve" className="rv-btn">
+          Make a new reservation
+        </Link>
+      )}
     </div>
   );
 }

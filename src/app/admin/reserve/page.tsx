@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { Loader2, Save, Plus, Trash2, GripVertical, ExternalLink, Info } from "lucide-react";
+import { Loader2, Save, Plus, Trash2, GripVertical, Info } from "lucide-react";
 import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import ImagePicker from "@/components/ui/ImagePicker";
+import ReserveSwitch from "@/components/admin/ReserveSwitch";
 import type { ReserveContent, ReserveFaq } from "@/lib/reserve/types";
 
 const inputCls =
@@ -142,18 +142,12 @@ export default function AdminReservePage() {
 
   return (
     <div className="max-w-2xl">
+      <ReserveSwitch />
       <div className="flex items-center justify-between gap-4 mb-4">
-        <h1 className="text-2xl text-gray-800" style={{ fontFamily: "var(--font-display)" }}>
-          Reserve Page
-        </h1>
+        <h2 className="text-lg text-gray-800" style={{ fontFamily: "var(--font-display)" }}>
+          Page Content
+        </h2>
         <div className="flex items-center gap-3">
-          <Link
-            href="/reserve"
-            target="_blank"
-            className="flex items-center gap-1.5 text-xs tracking-widest uppercase text-gray-500 hover:text-[#C97D5A]"
-          >
-            Preview <ExternalLink size={12} />
-          </Link>
           <button
             onClick={save}
             disabled={saving}

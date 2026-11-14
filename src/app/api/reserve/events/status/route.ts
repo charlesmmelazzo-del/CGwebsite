@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 /** GET /api/reserve/events/status?ids=a,b — reservation state per website event. */
 export async function GET(req: NextRequest) {
-  const stop = guard(req, "read");
+  const stop = await guard(req, "read");
   if (stop) return stop;
   const ids = (req.nextUrl.searchParams.get("ids") ?? "")
     .split(",")

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 import PageThemeWrapper from "@/components/layout/PageThemeWrapper";
 import { resolveTheme } from "@/lib/themes";
 import type { ThemeName } from "@/lib/themes";
@@ -24,9 +23,13 @@ export const metadata: Metadata = {
 const NOT_FOUND = "We couldn't find that reservation. Check the link in your email, or call us.";
 
 export default async function GuestReservationPage({ params }: { params: { token: string } }) {
-  if (!reserveEnabled()) notFound();
-
-  const [header, content, settings] = await Promise.all([getPageHeader("reserve"), getReserveContent(), getSiteSettings()]);
+  // A guest's own link always works, even while new bookings are switched off.
+  const [header, content, settings, bookingOpen] = await Promise.all([
+    getPageHeader("reserve"),
+    getReserveContent(),
+    getSiteSettings(),
+    reserveEnabled(),
+  ]);
   const themeName: ThemeName = header.theme ?? "green";
   const theme = resolveTheme(header);
 
@@ -61,6 +64,7 @@ export default async function GuestReservationPage({ params }: { params: { token
         faq={content.faq}
         phone={settings.phone}
         partyMax={partyMax}
+        bookingOpen={bookingOpen}
         theme={{ bg: theme.bg, text: theme.text, muted: theme.muted }}
       />
     </PageThemeWrapper>

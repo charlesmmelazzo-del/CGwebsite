@@ -187,9 +187,9 @@ function MenuAdminPanel({
   return (
     <div className="max-w-2xl">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl text-gray-800" style={{ fontFamily: "var(--font-display)" }}>
+        <h2 className="text-lg text-gray-800" style={{ fontFamily: "var(--font-display)" }}>
           {pageLabel}
-        </h1>
+        </h2>
         <button
           onClick={handleSave}
           disabled={saving}
@@ -499,5 +499,5 @@ function SortableItem({ item, onEdit, onRemove }: { item: MenuItem; onEdit: (ite
 
 // Default export for /admin/menu
 export default function AdminMenuPage() {
-  return <MenuAdminPanel pageLabel="Menu" apiPath="/api/admin/menu" />;
+  return <MenuAdminPanel pageLabel="Menu Tabs & Items" apiPath="/api/admin/menu" />;
 }
