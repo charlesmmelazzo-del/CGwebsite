@@ -67,7 +67,7 @@ export default function ReserveSwitch() {
             <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
               {enabled
                 ? "Guests can see Reserve in the site navigation and book online."
-                : "Hidden from the website: no navigation link, the page can't be opened, and events show no table bookings. You can still edit everything here."}
+                : "Hidden from the website: no navigation link, the page can't be opened, and events show no table bookings. Guests who already have a reservation can still use their link. You can still edit everything here."}
             </p>
           </div>
         </div>
@@ -90,7 +90,7 @@ export default function ReserveSwitch() {
         <div className="mt-3 pt-3 border-t border-gray-200 flex flex-wrap items-center justify-between gap-3">
           <p className="text-xs text-gray-700 leading-relaxed max-w-md">
             {enabled
-              ? "Hide Reserve from the website? Guests who already have a reservation link won't be able to open it while it's disabled."
+              ? "Hide Reserve from the website? Nobody will be able to make a new reservation. Guests who already have one can still open their link to view, change, or cancel it."
               : "Show Reserve on the live website now? It appears in the navigation right away and guests can start booking."}
           </p>
           <div className="flex items-center gap-2 shrink-0">
