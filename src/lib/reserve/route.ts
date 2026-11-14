@@ -16,8 +16,13 @@ export function notFound() {
 /**
  * Feature switch + rate limit. Returns a response to send instead, or null to carry on.
  */
-export async function guard(req: NextRequest, bucket: BucketName): Promise<NextResponse | null> {
-  if (!(await reserveEnabled())) return notFound();
+export async function guard(
+  req: NextRequest,
+  bucket: BucketName,
+  /** "existing": a route a guest's own reservation link depends on — these keep working while new bookings are switched off. */
+  scope: "booking" | "existing" = "booking",
+): Promise<NextResponse | null> {
+  if (scope === "booking" && !(await reserveEnabled())) return notFound();
   if (isRateLimited(bucket, getIp(req))) {
     return NextResponse.json({ error: RATE_LIMIT_MESSAGE }, { status: 429 });
   }

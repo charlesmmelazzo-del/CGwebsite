@@ -5,7 +5,8 @@ import { guard, fromError, intParam, bad } from "@/lib/reserve/route";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const stop = await guard(req, "read");
+  // Read-only availability; also used when a guest moves an existing reservation.
+  const stop = await guard(req, "read", "existing");
   if (stop) return stop;
   const raw = req.nextUrl.searchParams.get("party");
   const party = raw ? intParam(raw, 1, 500) : null;

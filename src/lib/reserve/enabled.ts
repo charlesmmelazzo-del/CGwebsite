@@ -2,9 +2,14 @@ import { unstable_noStore as noStore } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 /**
- * The single switch for guest reservations on the website. When it is off the
- * whole feature is hidden: the /reserve pages and API routes answer 404, the
- * nav link and sitemap entry disappear, and events show no table bookings.
+ * The single switch for NEW guest reservations on the website. When it is off
+ * nobody can start a booking: the /reserve page and the booking API routes
+ * answer 404, the nav link and sitemap entry disappear, and events show no
+ * table bookings.
+ *
+ * Reservations that already exist are not affected. A guest's own link
+ * (/reserve/r/<token>) and the routes behind it keep working, so they can
+ * still view, change, or cancel while new bookings are paused.
  *
  * Two ways to turn it on:
  *
