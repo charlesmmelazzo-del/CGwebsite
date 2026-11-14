@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 const s = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 
 export async function POST(req: NextRequest) {
-  const stop = guard(req, "request");
+  const stop = await guard(req, "request");
   if (stop) return stop;
   const body = await readJson(req);
   if (looksLikeBot(body)) return silentOk();

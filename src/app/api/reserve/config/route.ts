@@ -8,7 +8,7 @@ import type { ReservePageConfig } from "@/lib/reserve/types";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const stop = guard(req, "read");
+  const stop = await guard(req, "read");
   if (stop) return stop;
   try {
     const [bible, content, settings] = await Promise.all([getConfig(), getReserveContent(), getSiteSettings()]);

@@ -65,8 +65,8 @@ export default async function RootLayout({
     getFontCSS(),
   ]);
 
-  // Reservations stay off the live site until RESERVE_ENABLED=1 there.
-  const showReserve = reserveEnabled();
+  // Reservations stay hidden until enabled in the admin's Reserve panel.
+  const showReserve = await reserveEnabled();
   const header = showReserve ? savedHeader : withoutReserveLink(savedHeader);
 
   const desktopPad = header.headerHeight       ?? 72;

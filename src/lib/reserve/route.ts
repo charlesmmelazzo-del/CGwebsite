@@ -16,8 +16,8 @@ export function notFound() {
 /**
  * Feature switch + rate limit. Returns a response to send instead, or null to carry on.
  */
-export function guard(req: NextRequest, bucket: BucketName): NextResponse | null {
-  if (!reserveEnabled()) return notFound();
+export async function guard(req: NextRequest, bucket: BucketName): Promise<NextResponse | null> {
+  if (!(await reserveEnabled())) return notFound();
   if (isRateLimited(bucket, getIp(req))) {
     return NextResponse.json({ error: RATE_LIMIT_MESSAGE }, { status: 429 });
   }

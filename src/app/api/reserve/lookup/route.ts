@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 // Rate-limited tighter than other reads: this is the route someone would use
 // to probe which phone numbers belong to guests.
 export async function POST(req: NextRequest) {
-  const stop = guard(req, "lookup");
+  const stop = await guard(req, "lookup");
   if (stop) return stop;
   const body = await readJson(req);
   if (looksLikeBot(body)) return silentOk();

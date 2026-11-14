@@ -6,7 +6,7 @@ import { phoneDigits } from "@/lib/reserve/format";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const stop = guard(req, "lookup");
+  const stop = await guard(req, "lookup");
   if (stop) return stop;
   const body = await readJson(req);
   const lookup_token = typeof body.lookup_token === "string" ? body.lookup_token.slice(0, 2000) : "";
