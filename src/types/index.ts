@@ -341,6 +341,7 @@ export interface PageHeaderData {
   subtitle?: string;
   subtitleSize?: number;   // px, default 13
   bgImageUrl?: string;     // custom background image URL (overrides theme bg color)
+  bgImageOpacity?: number; // 0–100, home page only: how strongly the background photo shows (default 35)
   tabs?: PageHeaderTab[];  // nav tabs within the page (events, shop)
   hostSections?: HostSection[];  // events page "Host Your Event" tab content
   theme?: ThemeName;       // page color palette; falls back to per-page default

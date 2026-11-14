@@ -5,93 +5,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
 import {
-  LayoutDashboard,
-  Home,
-  FileText,
-  Calendar,
-  UtensilsCrossed,
-  Coffee,
-  Users,
-  Settings,
-  ChevronLeft,
-  ChevronRight,
-  LogOut,
-  Menu,
-  Type,
-  AlignLeft,
-  Layout,
-  ImageIcon,
-  Files,
-  Sparkles,
-  UserRound,
-  Trophy,
-  Mail,
-  CalendarCheck,
+  LayoutDashboard, ChevronLeft, ChevronRight, LogOut, Menu, ExternalLink, Globe,
 } from "lucide-react";
+import { PAGE_PANELS, GENERAL_PANEL, findPanel, type AdminPanel } from "@/lib/adminNav";
 
-type NavItem = { href: string; label: string; icon: typeof Home; exact?: boolean };
-type NavGroup = { group: string; items: NavItem[] };
-
-const NAV: NavGroup[] = [
-  {
-    group: "Overview",
-    items: [
-      { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
-    ],
-  },
-  {
-    group: "Pages & Content",
-    items: [
-      { href: "/admin/home",      label: "Home Page",     icon: Home },
-      { href: "/admin/pages",     label: "Pages",         icon: FileText },
-      { href: "/admin/content",   label: "Content Pages", icon: Files },
-      { href: "/admin/page-text", label: "Page Headers",  icon: AlignLeft },
-    ],
-  },
-  {
-    group: "Menus",
-    items: [
-      { href: "/admin/menu",   label: "Cocktail Menu", icon: UtensilsCrossed },
-      { href: "/admin/coffee", label: "Coffee Menu",   icon: Coffee },
-    ],
-  },
-  {
-    group: "Pop Up Zone",
-    items: [
-      { href: "/admin/popup", label: "Pop Ups", icon: Sparkles },
-      { href: "/admin/popup/guests", label: "Guest Accounts", icon: UserRound },
-    ],
-  },
-  {
-    group: "Marketing",
-    items: [
-      { href: "/admin/marketing", label: "Email List", icon: Mail },
-    ],
-  },
-  {
-    group: "Site Setup",
-    items: [
-      { href: "/admin/header",   label: "Header & Nav", icon: Layout },
-      { href: "/admin/fonts",    label: "Type & Fonts", icon: Type },
-      { href: "/admin/settings", label: "Settings",     icon: Settings },
-    ],
-  },
-  {
-    group: "Media & Data",
-    items: [
-      { href: "/admin/images", label: "Images",           icon: ImageIcon },
-      { href: "/admin/forms",  label: "Form Submissions", icon: Users },
-    ],
-  },
-  {
-    group: "Events",
-    items: [
-      { href: "/admin/events", label: "Events", icon: Calendar },
-      { href: "/admin/reserve", label: "Reserve Page", icon: CalendarCheck },
-      { href: "/admin/competitions", label: "Competitions", icon: Trophy },
-    ],
-  },
-];
+// Editors that manage their own full-height layout (side-by-side preview etc.)
+const FULL_HEIGHT = ["/admin/pages", "/admin/header", "/admin/images"];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -101,12 +20,35 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // Login page renders standalone — no sidebar wrapper
   if (pathname === "/admin/login") return <>{children}</>;
 
-  function isActive(item: NavItem) {
-    if (item.exact) return pathname === item.href;
-    if (!pathname.startsWith(item.href) || item.href === "/admin") return false;
-    // A nested item (Pop Ups → Guest Accounts) lights up instead of its parent.
-    return !NAV.some((g) =>
-      g.items.some((o) => o.href.length > item.href.length && o.href.startsWith(item.href) && pathname.startsWith(o.href))
+  const current = findPanel(pathname);
+  const fullHeight = FULL_HEIGHT.some((p) => pathname.startsWith(p));
+
+  function navLink(href: string, label: string, Icon: AdminPanel["icon"], active: boolean) {
+    return (
+      <Link
+        key={href}
+        href={href}
+        onClick={() => setMobileOpen(false)}
+        title={collapsed ? label : undefined}
+        aria-current={active ? "page" : undefined}
+        className={clsx(
+          "flex items-center gap-3 px-3 py-2.5 text-xs tracking-wider uppercase transition-colors duration-150 border-l-2",
+          active
+            ? "text-[#C97D5A] bg-[#C97D5A]/10 border-[#C97D5A]"
+            : "text-gray-500 hover:text-gray-800 hover:bg-gray-100 border-transparent"
+        )}
+      >
+        <Icon size={15} className="shrink-0" />
+        {!collapsed && <span className="truncate">{label}</span>}
+      </Link>
+    );
+  }
+
+  function groupLabel(text: string) {
+    return collapsed ? (
+      <div className="mx-3 my-2 border-t border-gray-100" />
+    ) : (
+      <p className="px-3 pt-4 pb-1 text-[10px] tracking-widest uppercase text-gray-300 font-medium">{text}</p>
     );
   }
 
@@ -117,66 +59,38 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         collapsed ? "w-14" : "w-56"
       )}
     >
-      {/* Logo area */}
       <div className="flex items-center justify-between p-3 border-b border-gray-200 min-h-[52px]">
         {!collapsed && (
           <span className="text-gray-400 text-xs tracking-widest uppercase font-medium truncate">
-            Admin
+            Common Good Admin
           </span>
         )}
         <button
           onClick={() => setCollapsed((c) => !c)}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           className="text-gray-400 hover:text-gray-600 ml-auto hidden md:flex"
         >
           {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
         </button>
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 py-3 overflow-y-auto">
-        {NAV.map((section, gi) => (
-          <div key={section.group} className={clsx(gi > 0 && "mt-3")}>
-            {/* Group header — text when expanded, thin divider when collapsed */}
-            {collapsed ? (
-              gi > 0 && <div className="mx-3 my-2 border-t border-gray-100" />
-            ) : (
-              <p className="px-3 pb-1 text-[10px] tracking-widest uppercase text-gray-300 font-medium">
-                {section.group}
-              </p>
-            )}
-            <div className="space-y-0.5">
-              {section.items.map((item) => {
-                const Icon = item.icon;
-                const active = isActive(item);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setMobileOpen(false)}
-                    className={clsx(
-                      "flex items-center gap-3 px-3 py-2.5 text-xs tracking-wider uppercase transition-colors duration-150",
-                      active
-                        ? "text-[#C97D5A] bg-[#C97D5A]/10"
-                        : "text-gray-500 hover:text-gray-800 hover:bg-gray-100"
-                    )}
-                  >
-                    <Icon size={15} className="shrink-0" />
-                    {!collapsed && <span className="truncate">{item.label}</span>}
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+      <nav className="flex-1 py-2 overflow-y-auto">
+        {navLink("/admin", "Dashboard", LayoutDashboard, pathname === "/admin")}
+
+        {groupLabel("Website Pages")}
+        {PAGE_PANELS.map((p) => navLink(p.tabs[0].href, p.label, p.icon, current?.panel.key === p.key))}
+
+        {groupLabel("Site-wide")}
+        {navLink(GENERAL_PANEL.tabs[0].href, GENERAL_PANEL.label, GENERAL_PANEL.icon, current?.panel.key === "general")}
       </nav>
 
-      {/* Bottom */}
       <div className="p-3 border-t border-gray-200 space-y-0.5">
         <Link
           href="/"
+          target="_blank"
           className="flex items-center gap-3 px-3 py-2 text-xs tracking-wider uppercase text-gray-400 hover:text-gray-700 transition-colors"
         >
-          <LogOut size={15} className="shrink-0" />
+          <Globe size={15} className="shrink-0" />
           {!collapsed && <span>View Site</span>}
         </Link>
         <button
@@ -195,10 +109,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="flex h-screen bg-gray-50 text-gray-800 overflow-hidden">
-      {/* Desktop sidebar */}
       <div className="hidden md:flex">{Sidebar}</div>
 
-      {/* Mobile sidebar overlay */}
       {mobileOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
           <div className="w-56 h-full">{Sidebar}</div>
@@ -206,26 +118,65 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       )}
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Mobile topbar */}
         <div className="md:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200">
-          <button
-            onClick={() => setMobileOpen(true)}
-            className="text-gray-500 hover:text-gray-700"
-          >
+          <button onClick={() => setMobileOpen(true)} aria-label="Open menu" className="text-gray-500 hover:text-gray-700">
             <Menu size={20} />
           </button>
-          <span className="text-xs tracking-widest uppercase text-gray-500">Admin Panel</span>
+          <span className="text-xs tracking-widest uppercase text-gray-500">
+            {current ? current.panel.label : "Admin"}
+          </span>
         </div>
 
-        {/* Scrollable content — full-height (no padding) for page builder + header editor */}
-        <div className={clsx(
-          "flex-1 flex flex-col overflow-hidden",
-          pathname.startsWith("/admin/pages") || pathname.startsWith("/admin/header") || pathname.startsWith("/admin/images")
-            ? ""
-            : "overflow-y-auto p-6"
-        )}>{children}</div>
+        {/* Panel header — which page you're editing, and everything you can change on it */}
+        {current && (
+          <div className="shrink-0 bg-white border-b border-gray-200 px-6 pt-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <current.panel.icon size={18} className="text-[#C97D5A] shrink-0" />
+                <h1 className="text-xl text-gray-800 truncate" style={{ fontFamily: "var(--font-display)" }}>
+                  {current.panel.label}
+                </h1>
+              </div>
+              {current.panel.publicHref && (
+                <Link
+                  href={current.panel.publicHref}
+                  target="_blank"
+                  className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-gray-400 hover:text-[#C97D5A] transition-colors shrink-0"
+                >
+                  View page <ExternalLink size={12} />
+                </Link>
+              )}
+            </div>
+            <div className="flex gap-1 mt-3 -mb-px overflow-x-auto" role="tablist" aria-label={`${current.panel.label} sections`}>
+              {current.panel.tabs.map((t) => {
+                const active = t.href === current.tab.href;
+                return (
+                  <Link
+                    key={t.href}
+                    href={t.href}
+                    role="tab"
+                    aria-selected={active}
+                    className={clsx(
+                      "px-4 py-2 text-xs tracking-widest uppercase whitespace-nowrap border-b-2 transition-colors",
+                      active
+                        ? "border-[#C97D5A] text-[#C97D5A]"
+                        : "border-transparent text-gray-500 hover:text-gray-800"
+                    )}
+                  >
+                    {t.label}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Content — full-height (no padding) for editors with their own layout */}
+        <div className={clsx("flex-1 flex flex-col overflow-hidden", !fullHeight && "overflow-y-auto p-6")}>
+          {children}
+        </div>
       </div>
     </div>
   );
