@@ -1,5 +1,7 @@
 import "server-only";
 import { headers } from "next/headers";
+import { setDefaultResultOrder } from "node:dns";
+import { createHash, randomUUID } from "node:crypto";
 import type {
   BibleConfig,
   CalendarDay,
@@ -21,7 +23,21 @@ import type {
  * is marked server-only so it can never be pulled into a browser bundle.
  */
 
-const TIMEOUT_MS = 10_000;
+// Railway has no IPv6 egress; never wait on an AAAA address first.
+try { setDefaultResultOrder("ipv4first"); } catch { /* older runtimes */ }
+
+/**
+ * Each attempt gets its own timeout, so a stalled connection fails fast enough
+ * to retry once inside the guest's patience. Reads (GET) retry once on a
+ * connect failure or a timeout; writes retry once only when the request
+ * cannot have reached the Bible (connect failure), or when the Bible will
+ * de-duplicate it (POST /requests carries an Idempotency-Key).
+ */
+const READ_TIMEOUT_MS = 4_000;
+const WRITE_TIMEOUT_MS = 8_000;
+const RETRY_DELAY_MS = 150;
+/** A successful call slower than this is logged too, so slow spells show up in the deploy log. */
+const SLOW_MS = 1_000;
 
 export const UNAVAILABLE_MESSAGE = "Reservations are temporarily unavailable. Please call us.";
 
@@ -29,11 +45,14 @@ export class BibleError extends Error {
   status: number;
   /** Extra fields the Bible sent with the error (e.g. `options` for party changes). */
   extra: Record<string, unknown>;
-  constructor(status: number, message: string, extra: Record<string, unknown> = {}) {
+  /** False when the request never got an answer from the Bible (connect failure or timeout). */
+  reached: boolean;
+  constructor(status: number, message: string, extra: Record<string, unknown> = {}, reached = true) {
     super(message);
     this.name = "BibleError";
     this.status = status;
     this.extra = extra;
+    this.reached = reached;
   }
 }
 
@@ -61,7 +80,42 @@ export function siteOrigin(): string {
 
 type Method = "GET" | "POST" | "PUT" | "DELETE";
 
-export async function bible<T>(method: Method, path: string, body?: Record<string, unknown>): Promise<T> {
+/** Error codes that mean the connection was never made, so nothing was sent. */
+const CONNECT_CODES = new Set([
+  "ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN", "EHOSTUNREACH", "ENETUNREACH",
+  "UND_ERR_CONNECT_TIMEOUT", "UND_ERR_CONNECT",
+]);
+
+export type FailureKind = "connect" | "timeout" | "network";
+
+/** Sort a fetch() rejection into where it failed. Exported for tests. */
+export function classifyFailure(e: unknown): { kind: FailureKind; name: string; code: string } {
+  const err = e as { name?: string; code?: string; cause?: { name?: string; code?: string; errors?: { code?: string }[] } };
+  const name = err?.name || "Error";
+  const cause = err?.cause;
+  const code = cause?.code || err?.code || cause?.errors?.[0]?.code || cause?.name || "";
+  if (name === "TimeoutError" || name === "AbortError" || code === "UND_ERR_HEADERS_TIMEOUT" || code === "UND_ERR_BODY_TIMEOUT") {
+    return { kind: code === "UND_ERR_CONNECT_TIMEOUT" ? "connect" : "timeout", name, code: code || name };
+  }
+  if (CONNECT_CODES.has(code)) return { kind: "connect", name, code };
+  return { kind: "network", name, code };
+}
+
+/** Whether a failed attempt may be tried once more. Exported for tests. */
+export function mayRetry(method: Method, kind: FailureKind, idempotent: boolean): boolean {
+  if (kind === "connect") return true; // nothing reached the Bible
+  if (kind === "timeout") return method === "GET" || idempotent;
+  return method === "GET" || idempotent;
+}
+
+const pathForLog = (path: string) => path.replace(/\/r\/[^/?]+/, "/r/…").replace(/\?.*$/, "");
+
+export async function bible<T>(
+  method: Method,
+  path: string,
+  body?: Record<string, unknown>,
+  opts: { idempotencyKey?: string } = {},
+): Promise<T> {
   const key = process.env.RESERVATIONS_SYNC_KEY;
   if (!key) throw new BibleError(503, UNAVAILABLE_MESSAGE);
 
@@ -75,22 +129,39 @@ export async function bible<T>(method: Method, path: string, body?: Record<strin
     payload = JSON.stringify({ ...(body ?? {}), ...(origin ? { site_origin: origin } : {}) });
   }
 
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      method,
-      headers: {
-        Authorization: `Bearer ${key}`,
-        Accept: "application/json",
-        ...(payload ? { "Content-Type": "application/json" } : {}),
-      },
-      body: payload,
-      cache: "no-store",
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-  } catch {
-    throw new BibleError(503, UNAVAILABLE_MESSAGE);
+  const idempotent = !!opts.idempotencyKey;
+  const timeoutMs = method === "GET" ? READ_TIMEOUT_MS : WRITE_TIMEOUT_MS;
+  const started = Date.now();
+  let res: Response | null = null;
+  for (let attempt = 1; attempt <= 2 && !res; attempt++) {
+    const t0 = Date.now();
+    try {
+      res = await fetch(url, {
+        method,
+        headers: {
+          Authorization: `Bearer ${key}`,
+          Accept: "application/json",
+          ...(payload ? { "Content-Type": "application/json" } : {}),
+          ...(opts.idempotencyKey ? { "Idempotency-Key": opts.idempotencyKey } : {}),
+        },
+        body: payload,
+        cache: "no-store",
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (e) {
+      const f = classifyFailure(e);
+      const retry = attempt === 1 && mayRetry(method, f.kind, idempotent);
+      console.error(
+        `[reserve] Bible ${method} ${pathForLog(path)} failed: phase=${f.kind} error=${f.name}${f.code && f.code !== f.name ? `/${f.code}` : ""} ` +
+          `elapsed=${Date.now() - t0}ms total=${Date.now() - started}ms attempt=${attempt}${retry ? " → retrying" : ""}`,
+      );
+      if (!retry) throw new BibleError(503, UNAVAILABLE_MESSAGE, {}, false);
+      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+    }
   }
+  if (!res) throw new BibleError(503, UNAVAILABLE_MESSAGE, {}, false);
+  const total = Date.now() - started;
+  if (total > SLOW_MS) console.warn(`[reserve] Bible ${method} ${pathForLog(path)} slow: ${total}ms → ${res.status}`);
 
   let data: unknown = null;
   try { data = await res.json(); } catch { /* empty or non-JSON body */ }
@@ -100,7 +171,7 @@ export async function bible<T>(method: Method, path: string, body?: Record<strin
     const { error, ...extra } = obj;
     // A 401 means the shared key is wrong or missing on one side — not the guest's problem.
     if (res.status === 401 || res.status >= 500) {
-      console.error(`[reserve] Bible ${method} ${path.replace(/\/r\/[^/?]+/, "/r/…")} → ${res.status}`);
+      console.error(`[reserve] Bible ${method} ${pathForLog(path)} → ${res.status}`);
       throw new BibleError(res.status === 401 ? 503 : res.status, UNAVAILABLE_MESSAGE);
     }
     throw new BibleError(res.status, typeof error === "string" && error ? error : "Something went wrong.", extra);
@@ -132,8 +203,20 @@ export const lookupGuest = (by: { email: string } | { phone: string }) =>
 export const reportNotMe = (body: { lookup_token: string; email?: string; phone?: string }) =>
   bible<{ ok: true }>("POST", "/not-me", body);
 
-export const createRequest = (body: CreateRequestBody) =>
-  bible<{ token: string; status: string }>("POST", "/requests", body as unknown as Record<string, unknown>);
+/**
+ * The Idempotency-Key sent to the Bible for a new request. The browser sends a
+ * random submission_id per visit to the form; mixing in the request itself
+ * means the same press of Send (or our own retry) maps to one reservation,
+ * while a guest who changes the time and sends again gets a new one.
+ */
+export function idempotencyKeyFor(submissionId: string, payload: CreateRequestBody): string {
+  const id = /^[A-Za-z0-9_-]{8,100}$/.test(submissionId) ? submissionId : randomUUID();
+  return createHash("sha256").update(`${id}\n${JSON.stringify(payload)}`).digest("base64url");
+}
+
+/** idempotencyKey: the same key for a retried submission makes the Bible return the first reservation instead of a second one. */
+export const createRequest = (body: CreateRequestBody, idempotencyKey: string) =>
+  bible<{ token: string; status: string }>("POST", "/requests", body as unknown as Record<string, unknown>, { idempotencyKey });
 
 export const getReservation = (token: string) => bible<GuestReservation>("GET", t(token));
 

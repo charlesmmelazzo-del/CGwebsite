@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createRequest } from "@/lib/reserve/bible";
+import { createRequest, idempotencyKeyFor } from "@/lib/reserve/bible";
 import { guard, fromError, readJson, bad, looksLikeBot, silentOk, intParam, DATE_RE, TIME_RE } from "@/lib/reserve/route";
 import { isEmail, isUsPhone, phoneDigits } from "@/lib/reserve/format";
 import type { CreateRequestBody } from "@/lib/reserve/types";
@@ -57,11 +57,11 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const out = await createRequest(payload);
+    const out = await createRequest(payload, idempotencyKeyFor(s(body.submission_id, 100), payload));
     // The token goes to the guest by email only; the page needs just the status
     // ('approved' for event bookings, which skip staff review).
     return NextResponse.json({ ok: true, status: out.status });
   } catch (e) {
-    return fromError(e);
+    return fromError(e, { req, bucket: "request" });
   }
 }

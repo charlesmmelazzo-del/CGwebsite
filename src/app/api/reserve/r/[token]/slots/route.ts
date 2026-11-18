@@ -12,6 +12,6 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
   try {
     return NextResponse.json(await getReservationSlots(params.token, date));
   } catch (e) {
-    return fromError(e);
+    return fromError(e, { req, bucket: "read" });
   }
 }

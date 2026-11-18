@@ -55,11 +55,9 @@ export function timeRange(startMin: number, endMin: number): string {
   return `${a}–${b}`;
 }
 
-/** "Coffee" → "Coffee service"; "Brunch Service" stays as is; "" → "". */
+/** A service's name exactly as staff typed it in the Bible (trimmed); nothing is added. */
 export function serviceName(label: string): string {
-  const l = label.trim();
-  if (!l) return "";
-  return /service$/i.test(l) ? l : `${l} service`;
+  return label.trim();
 }
 
 /** Hours for a service heading: "7:00 AM – 12:00 PM", "5:00 – 11:00 PM". */
@@ -67,7 +65,7 @@ export function serviceHours(openMin: number, closeMin: number): string {
   return timeRange(openMin, closeMin).replace("–", " – ");
 }
 
-/** "Coffee service · 7:00 AM – 12:00 PM", or just the hours when unnamed. */
+/** "Coffee Service · 7:00 AM – 12:00 PM", or just the hours when unnamed. */
 export function serviceHeading(sv: { label: string; open_min: number; close_min: number }): string {
   const name = serviceName(sv.label);
   const hours = serviceHours(sv.open_min, sv.close_min);

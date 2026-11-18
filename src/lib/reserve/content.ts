@@ -8,12 +8,15 @@ import type { ReserveContent, ReserveFaq } from "./types";
  * Booking rules and policies live in the CG Bible, not here.
  */
 
+/** Used when the admin leaves the photo's alt text blank (QA B6). */
+export const DEFAULT_IMAGE_ALT = "The Upper Room at Common Good";
+
 export const DEFAULT_RESERVE_CONTENT: ReserveContent = {
   title: "Reserve the Upper Room at Common Good",
   intro:
     "Our Upper Room is a small space above the bar for groups of 6 to 15. You can reserve it for your group at no charge.",
   imageUrl: "",
-  imageAlt: "",
+  imageAlt: DEFAULT_IMAGE_ALT,
   faq: [
     { id: "faq-fee", question: "Is there a fee to reserve?", answer: "No. Reservations are free." },
     {
@@ -65,7 +68,7 @@ export function normalizeReserveContent(raw: unknown): ReserveContent {
     title: str(d.title, 200)?.trim() || DEFAULT_RESERVE_CONTENT.title,
     intro: str(d.intro, 5000) ?? DEFAULT_RESERVE_CONTENT.intro,
     imageUrl: str(d.imageUrl, 2000) ?? "",
-    imageAlt: str(d.imageAlt, 300) ?? "",
+    imageAlt: str(d.imageAlt, 300)?.trim() || DEFAULT_IMAGE_ALT,
     faq: faq ?? DEFAULT_RESERVE_CONTENT.faq,
   };
 }

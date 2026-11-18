@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, Clock } from "lucide-react";
-import type { GuestReservation, OpenReservation, ReserveFaq, SpaceSummary } from "@/lib/reserve/types";
+import type { ClosedReservation, GuestReservation, OpenReservation, ReserveFaq, SpaceSummary } from "@/lib/reserve/types";
 import { dateLong, dateShort, lengthLabel, serviceName, telHref, time12, timeRange } from "@/lib/reserve/format";
 import SlotPicker, { type Selection } from "@/components/reserve/SlotPicker";
 import { api, ApiError, Choice, ErrorNote, FaqModal, GENERIC_ERROR, Modal, RvRoot, ServiceInfoButton, Stepper, type RvTheme } from "@/components/reserve/ui";
@@ -29,7 +29,7 @@ export default function GuestPageClient({
   problem,
   faq,
   phone,
-  partyMax,
+  partyRange,
   bookingOpen,
   theme,
 }: {
@@ -38,7 +38,7 @@ export default function GuestPageClient({
   problem: string;
   faq: ReserveFaq[];
   phone: string;
-  partyMax: number;
+  partyRange: { min: number; max: number };
   /** False while new bookings are switched off in the admin — hides the link to /reserve. */
   bookingOpen: boolean;
   theme: RvTheme;
@@ -58,26 +58,40 @@ export default function GuestPageClient({
             </p>
           </div>
         ) : view.closed ? (
-          <Closed firstName={view.first_name} status={view.status} bookingOpen={bookingOpen} />
+          <Closed view={view} bookingOpen={bookingOpen} />
         ) : (
-          <OpenView token={token} view={view} setView={setView} faq={faq} phone={phone} partyMax={partyMax} />
+          <OpenView token={token} view={view} setView={setView} faq={faq} phone={phone} partyRange={partyRange} />
         )}
       </div>
     </RvRoot>
   );
 }
 
-function Closed({ firstName, status, bookingOpen }: { firstName: string; status: string; bookingOpen: boolean }) {
+function Closed({ view, bookingOpen }: { view: ClosedReservation; bookingOpen: boolean }) {
+  const { first_name: firstName, status } = view;
+  const name = firstName ? `, ${firstName}` : "";
+  // Staff cancelled or denied: apologise and give their reason. "Thanks" is for
+  // a completed visit or the guest's own cancellation.
+  const staffEnded = status === "denied" || (status === "cancelled" && view.cancelled_by === "staff");
+  const heading = staffEnded ? `We're sorry${name}.` : `Thanks${name}.`;
   const line =
-    status === "cancelled"
-      ? "This reservation was cancelled."
-      : status === "denied"
-        ? "We weren't able to confirm this request."
+    status === "denied"
+      ? "We couldn't accept this request."
+      : status === "cancelled"
+        ? staffEnded
+          ? "We had to cancel this reservation."
+          : "This reservation was cancelled."
         : "This reservation has passed.";
+  const reason = staffEnded ? (view.reason || "").trim() : "";
   return (
     <div className="text-center py-16 rv-step">
-      <h1 className="rv-h2 text-3xl mb-4">Thanks{firstName ? `, ${firstName}` : ""}.</h1>
-      <p className="opacity-90 mb-8">{line}</p>
+      <h1 className="rv-h2 text-3xl mb-4">{heading}</h1>
+      <p className={`opacity-90 ${reason ? "mb-4" : "mb-8"}`}>{line}</p>
+      {reason && (
+        <p className="opacity-90 mb-8 max-w-md mx-auto whitespace-pre-line" style={{ borderLeft: "2px solid var(--rv-accent)", paddingLeft: 12, textAlign: "left" }}>
+          {reason}
+        </p>
+      )}
       {bookingOpen && (
         <Link href="/reserve" className="rv-btn">
           Make a new reservation
@@ -93,14 +107,14 @@ function OpenView({
   setView,
   faq,
   phone,
-  partyMax,
+  partyRange,
 }: {
   token: string;
   view: OpenReservation;
   setView: (v: GuestReservation) => void;
   faq: ReserveFaq[];
   phone: string;
-  partyMax: number;
+  partyRange: { min: number; max: number };
 }) {
   const base = `/api/reserve/r/${token}`;
   const [faqOpen, setFaqOpen] = useState(false);
@@ -235,7 +249,7 @@ function OpenView({
 
         <div className="flex flex-wrap gap-2">
           {dayOf && <LateButton onSend={(m) => act("late", { minutes: m })} busy={busy === "late"} />}
-          <PartyButton view={view} base={base} partyMax={partyMax} setView={setView} />
+          <PartyButton view={view} base={base} partyRange={partyRange} setView={setView} />
           {!view.change_request && (
             <ChangeTimeButton view={view} base={base} phone={phone} setView={setView} onChanged={() => setNotice("Your time has been changed")} />
           )}
@@ -366,12 +380,12 @@ function LateButton({ onSend, busy }: { onSend: (m: number) => Promise<boolean>;
 function PartyButton({
   view,
   base,
-  partyMax,
+  partyRange,
   setView,
 }: {
   view: OpenReservation;
   base: string;
-  partyMax: number;
+  partyRange: { min: number; max: number };
   setView: (v: GuestReservation) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -379,8 +393,12 @@ function PartyButton({
   const [options, setOptions] = useState<SpaceSummary[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  // Let guests try a bit past the biggest space so the Bible can say what fits.
-  const max = Math.min(99, Math.max(partyMax, view.party_range.max) + 5);
+  // Bounded like the Reserve page: smallest minimum to largest maximum across
+  // bookable spaces (never cutting off the size already booked). Falls back to
+  // this space's range when the overall range couldn't be loaded.
+  const min = Math.max(1, Math.min(partyRange.min || view.party_range.min, view.party_size));
+  const max = Math.max(partyRange.max || view.party_range.max, view.party_size);
+  const tooSmall = size < view.party_range.min;
 
   function show() {
     setSize(view.party_size);
@@ -419,7 +437,7 @@ function PartyButton({
         <div className="flex flex-col items-start gap-3">
           <Stepper
             value={size}
-            min={1}
+            min={min}
             max={max}
             onChange={(n) => {
               setSize(n);
@@ -448,7 +466,9 @@ function PartyButton({
         )}
         {options && options.length === 0 && (
           <p className="mt-5 text-[15px] rv-step">
-            We don&apos;t have a space for that many at this time. Send us a message below and we&apos;ll see what we can do.
+            {tooSmall
+              ? `Reservations are for parties of ${view.party_range.min} or more. If your group has shrunk, send us a message below.`
+              : "We don't have a space for that many at this time. Send us a message below and we'll see what we can do."}
           </p>
         )}
         <ErrorNote>{error}</ErrorNote>
@@ -550,7 +570,8 @@ function ChangeTimeButton({
         <SlotPicker
           party={view.party_size}
           mode="change"
-          calendarUrl={isEvent ? undefined : `/api/reserve/calendar?party=${view.party_size}`}
+          calendarUrl={isEvent ? undefined : `${base}/calendar?party=${view.party_size}`}
+          currentDate={view.date}
           fixedDate={isEvent ? view.date : undefined}
           slotsUrl={(d) => `${base}/slots?date=${d}`}
           onChange={onPick}
