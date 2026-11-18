@@ -10,6 +10,6 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
   try {
     return NextResponse.json(await getReservation(params.token), { headers: { "Referrer-Policy": "no-referrer" } });
   } catch (e) {
-    return fromError(e);
+    return fromError(e, { req, bucket: "read" });
   }
 }

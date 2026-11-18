@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
+import { SESSION_COOKIE, getSession } from "@/lib/session";
 import { createPopupMiddlewareClient } from "@/lib/popup/auth";
 import { isPreviewDeployment, previewGate } from "@/lib/previewGate";
 
@@ -10,6 +10,10 @@ import { isPreviewDeployment, previewGate } from "@/lib/previewGate";
 function pass(res: NextResponse): NextResponse {
   if (isPreviewDeployment()) res.headers.set("X-Robots-Tag", "noindex, nofollow");
   return res;
+}
+
+function isUsersPath(pathname: string, base: string): boolean {
+  return pathname === base || pathname.startsWith(`${base}/`);
 }
 
 export async function middleware(req: NextRequest) {
@@ -30,18 +34,27 @@ export async function middleware(req: NextRequest) {
   // ── API routes (/api/admin/*) ──────────────────────────────────────────────
   // Return 401 JSON (not a redirect) so fetch() callers get a clean error
   if (pathname.startsWith("/api/admin")) {
-    if (!(await verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value))) {
+    const session = await getSession(req.cookies.get(SESSION_COOKIE)?.value);
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    // Managing users is for the main admin only.
+    if (session.role !== "owner" && isUsersPath(pathname, "/api/admin/users")) {
+      return NextResponse.json({ error: "Only the main admin can manage users." }, { status: 403 });
     }
     return pass(NextResponse.next());
   }
 
   // ── Admin UI routes (/admin/*) ─────────────────────────────────────────────
   if (pathname.startsWith("/admin")) {
-    if (!(await verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value))) {
+    const session = await getSession(req.cookies.get(SESSION_COOKIE)?.value);
+    if (!session) {
       const loginUrl = new URL("/admin/login", req.url);
       loginUrl.searchParams.set("from", pathname);
       return NextResponse.redirect(loginUrl);
+    }
+    if (session.role !== "owner" && isUsersPath(pathname, "/admin/users")) {
+      return NextResponse.redirect(new URL("/admin", req.url));
     }
     return pass(NextResponse.next());
   }

@@ -15,6 +15,6 @@ export async function GET(req: NextRequest) {
     const out: ReservePageConfig = { bible, content, phone: settings.phone };
     return NextResponse.json(out);
   } catch (e) {
-    return fromError(e);
+    return fromError(e, { req, bucket: "read" });
   }
 }

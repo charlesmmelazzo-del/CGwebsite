@@ -9,7 +9,7 @@ import { api, ApiError, ErrorNote, GENERIC_ERROR, Honeypot, Modal, Stepper } fro
 
 type Identity =
   | { kind: "ask" }
-  | { kind: "match"; masked: MaskedGuest; lookupToken: string; value: string }
+  | { kind: "match"; masked: MaskedGuest; lookupToken: string; value: string; atLimit: boolean }
   | { kind: "new" };
 
 interface GuestForm {
@@ -80,6 +80,13 @@ export default function BookingFlow({
   const [occasion, setOccasion] = useState("");
   const [company, setCompany] = useState(""); // honeypot
   const renderedAt = useRef<number>(0);
+  // One id per visit to the form; the server mixes in the request, so pressing
+  // Send again after a failure can never book the same thing twice.
+  const submissionId = useRef(
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`,
+  );
   useEffect(() => {
     renderedAt.current = Date.now();
   }, []);
@@ -114,11 +121,11 @@ export default function BookingFlow({
     }
     setLookupBusy(true);
     try {
-      const out = await api<{ ok?: true; match?: boolean; masked?: MaskedGuest; lookup_token?: string }>("/api/reserve/lookup", {
+      const out = await api<{ ok?: true; match?: boolean; masked?: MaskedGuest; lookup_token?: string; at_limit?: boolean }>("/api/reserve/lookup", {
         body: { value: v, company, rendered_at: renderedAt.current },
       });
       if (out.match && out.masked && out.lookup_token) {
-        setIdentity({ kind: "match", masked: out.masked, lookupToken: out.lookup_token, value: v });
+        setIdentity({ kind: "match", masked: out.masked, lookupToken: out.lookup_token, value: v, atLimit: out.at_limit === true });
       } else {
         // No match: full form, with what they typed already in place.
         setForm({ ...EMPTY_FORM, ...(v.includes("@") ? { email: v } : { phone: v }) });
@@ -139,6 +146,11 @@ export default function BookingFlow({
     // Best effort: staff see the report; the guest carries on either way.
     api("/api/reserve/not-me", { body: { lookup_token: lookupToken, value } }).catch(() => {});
   }
+
+  // A returning guest already at the active-reservation limit is told so here,
+  // before the occasion and policies (QA B2). Event tables count separately.
+  // The Bible still enforces the limit when the request is sent.
+  const atLimit = identity.kind === "match" && identity.atLimit && !event;
 
   function validateForm(): boolean {
     if (identity.kind !== "new") return identity.kind === "match";
@@ -181,6 +193,7 @@ export default function BookingFlow({
             : { guest: { ...form, first_name: form.first_name.trim(), last_name: form.last_name.trim(), email: form.email.trim() } }),
           company,
           rendered_at: renderedAt.current,
+          submission_id: submissionId.current,
         },
       });
       setPoliciesOpen(false);
@@ -372,7 +385,17 @@ export default function BookingFlow({
                 {identity.masked.email_hint && identity.masked.phone_hint ? " · " : ""}
                 <span className="whitespace-nowrap">{identity.masked.phone_hint}</span>
               </p>
-              <button type="button" className="rv-link text-sm mt-3" onClick={notMe}>
+              {atLimit && (
+                <p className="text-[15px] mt-3 leading-relaxed" role="status">
+                  You already have an active reservation with us. Use the link in your confirmation email to change it, or call
+                  us at{" "}
+                  <a className="rv-link" href={telHref(phone)}>
+                    {phone}
+                  </a>
+                  .
+                </p>
+              )}
+              <button type="button" className="rv-link text-sm mt-3 block" onClick={notMe}>
                 That&apos;s not me
               </button>
             </div>
@@ -413,7 +436,7 @@ export default function BookingFlow({
             </div>
           )}
 
-          {identity.kind !== "ask" && (
+          {identity.kind !== "ask" && !atLimit && (
             <div className="rv-step">
               <div className="mt-6 max-w-xl">
                 <label htmlFor="rv-occasion" className="block text-sm mb-1.5">
@@ -456,6 +479,8 @@ export default function BookingFlow({
             <label className="flex items-start gap-3 cursor-pointer text-[15px]">
               <input
                 type="checkbox"
+                id="rv-policy-ack"
+                aria-label="I've read and agree to these policies"
                 className="mt-1 w-5 h-5 shrink-0 accent-[#C97D5A]"
                 checked={agreed}
                 onChange={(e) => setAgreed(e.target.checked)}
@@ -472,7 +497,7 @@ export default function BookingFlow({
         {policies.length ? (
           <ul className="space-y-3 list-disc pl-5 leading-relaxed">
             {policies.map((p, i) => (
-              <li key={i}>{p}</li>
+              <li key={i} className="whitespace-pre-line">{p}</li>
             ))}
           </ul>
         ) : (

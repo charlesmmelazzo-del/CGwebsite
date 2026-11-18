@@ -11,7 +11,8 @@ import {
  * the panel's TABS. Site-wide things live in the single "General Settings"
  * panel. The sidebar, the tab bar and the dashboard are all drawn from this.
  */
-export type AdminTab = { href: string; label: string };
+/** ownerOnly tabs are shown to the main admin only (see src/lib/session.ts). */
+export type AdminTab = { href: string; label: string; ownerOnly?: boolean };
 
 export type AdminPanel = {
   key: string;
@@ -102,7 +103,7 @@ export const PAGE_PANELS: AdminPanel[] = [
 
 export const GENERAL_PANEL: AdminPanel = {
   key: "general", label: "General Settings", icon: Settings,
-  desc: "Business info, header & footer, fonts, content library, form inbox",
+  desc: "Business info, header & footer, fonts, content library, form inbox, users",
   tabs: [
     { href: "/admin/settings", label: "Business Info" },
     { href: "/admin/header",   label: "Header & Footer" },
@@ -110,8 +111,14 @@ export const GENERAL_PANEL: AdminPanel = {
     { href: "/admin/images",   label: "Content Library" },
     { href: "/admin/forms",    label: "Form Inbox" },
     { href: "/admin/pages",    label: "Custom Pages" },
+    { href: "/admin/users",    label: "Users", ownerOnly: true },
   ],
 };
+
+/** The tabs of a panel this person may see. */
+export function visibleTabs(panel: AdminPanel, isOwner: boolean): AdminTab[] {
+  return panel.tabs.filter((t) => isOwner || !t.ownerOnly);
+}
 
 export const ALL_PANELS: AdminPanel[] = [...PAGE_PANELS, GENERAL_PANEL];
 

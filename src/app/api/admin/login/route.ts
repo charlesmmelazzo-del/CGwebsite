@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SESSION_COOKIE, createSessionToken } from "@/lib/session";
+import { SESSION_COOKIE, OWNER_USERNAME, createSessionToken } from "@/lib/session";
+import { authenticateAdminUser, normalizeUsername, safeEqual } from "@/lib/adminUsers";
+
+// Two ways in:
+//   * the MAIN ADMIN — username "admin" (or left blank) + ADMIN_PASSWORD
+//   * a USER the main admin created at /admin/users — their own username and
+//     password, checked against the admin_users table
 
 // ─── Admin password ────────────────────────────────────────────────────────────
 // Set ADMIN_PASSWORD environment variable on Railway.
@@ -64,11 +70,19 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { password } = await req.json();
-  const adminPw = getAdminPassword();
+  const body = await req.json().catch(() => ({}));
+  const password = typeof body.password === "string" ? body.password : "";
+  const username = normalizeUsername(body.username);
+  const wrong = () => NextResponse.json({ error: "Incorrect username or password" }, { status: 401 });
 
-  if (!adminPw || password !== adminPw) {
-    return NextResponse.json({ error: "Incorrect password" }, { status: 401 });
+  let user: { id: string; sessionVersion: number } | undefined;
+  if (username === "" || username === OWNER_USERNAME) {
+    const adminPw = getAdminPassword();
+    if (!adminPw || !safeEqual(password, adminPw)) return wrong();
+  } else {
+    const found = password ? await authenticateAdminUser(username, password) : null;
+    if (!found) return wrong();
+    user = found;
   }
 
   // Successful login — clear rate limit counter and set a signed session cookie.
@@ -76,7 +90,7 @@ export async function POST(req: NextRequest) {
   // forged by anyone reading the public source.
   clearRateLimit(ip);
 
-  const token = await createSessionToken(COOKIE_MAX_AGE);
+  const token = await createSessionToken(COOKIE_MAX_AGE, user);
   if (!token) {
     // No signing secret configured (ADMIN_PASSWORD/SESSION_SECRET missing).
     return NextResponse.json({ error: "Server not configured for login" }, { status: 500 });

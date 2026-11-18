@@ -1,12 +1,24 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { X } from "lucide-react";
 import type { BibleConfig, ReserveContent } from "@/lib/reserve/types";
 import { telHref } from "@/lib/reserve/format";
 import BookingFlow from "@/components/reserve/BookingFlow";
 import { FaqModal, RvRoot, type RvTheme } from "@/components/reserve/ui";
 
+
+/** Hosts next.config.mjs lets the image optimizer fetch; anything else is shown as is. */
+function canOptimize(url: string): boolean {
+  try {
+    const u = new URL(url);
+    if (u.protocol === "https:" && u.hostname.endsWith(".supabase.co")) return u.pathname.startsWith("/storage/v1/object/public/");
+    return u.protocol === "https:" && ["images.unsplash.com", "res.cloudinary.com", "imagedelivery.net"].includes(u.hostname);
+  } catch {
+    return false; // a relative /public path would be fine, but nothing stores those here
+  }
+}
 
 export default function ReservePageClient({
   content,
@@ -52,12 +64,18 @@ export default function ReservePageClient({
               className="block w-full overflow-hidden group"
               aria-label={`Enlarge photo${content.imageAlt ? `: ${content.imageAlt}` : ""}`}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={content.imageUrl}
-                alt={content.imageAlt || ""}
-                className="w-full h-auto object-cover aspect-[4/3] transition-transform duration-500 group-hover:scale-[1.02]"
-              />
+              {/* A resized copy for the page (QA B6); the original is only loaded when enlarged. */}
+              <span className="relative block w-full aspect-[4/3]">
+                <Image
+                  src={content.imageUrl!}
+                  alt={content.imageAlt || ""}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                  priority
+                  unoptimized={!canOptimize(content.imageUrl!)}
+                  className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                />
+              </span>
             </button>
           )}
           <div className={hasPhoto ? "" : "text-center"}>

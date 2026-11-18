@@ -61,6 +61,7 @@ export default function SlotPicker({
   fixedDate,
   spaceLabel = (s) => `${s.name} · ${s.min_guests}–${s.max_guests}`,
   noSlots,
+  currentDate,
 }: {
   party: number;
   mode: "new" | "change";
@@ -78,7 +79,11 @@ export default function SlotPicker({
   spaceLabel?: (s: SpaceSlots) => string;
   /** Replaces the "Nothing is open…" sentence. */
   noSlots?: ReactNode;
+  /** Change mode: the reservation's own date, always selectable (its own booking is what fills it). */
+  currentDate?: string;
 }) {
+  /** A date the guest can't pick. New bookings open a pop-up instead; time changes just can't choose it. */
+  const blocked = (d: CalendarDay) => d.status !== "open" && !(mode === "change" && d.date === currentDate);
   const [days, setDays] = useState<CalendarDay[] | null>(null);
   const [calError, setCalError] = useState("");
   const [date, setDate] = useState<string | null>(fixedDate ?? null);
@@ -110,7 +115,7 @@ export default function SlotPicker({
           if (!cur) return cur;
           const hit = list.find((x) => x.date === cur);
           if (!hit) return null;
-          if (mode === "new" && hit.status !== "open") return null;
+          if (blocked(hit)) return null;
           return cur;
         });
       })
@@ -120,7 +125,8 @@ export default function SlotPicker({
         setDays([]);
       });
     return () => ctrl.abort();
-  }, [calendarUrl, mode, fixedDate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- blocked() only reads mode and currentDate
+  }, [calendarUrl, mode, fixedDate, currentDate]);
 
   useEffect(() => {
     if (fixedDate) setDate(fixedDate);
@@ -180,6 +186,7 @@ export default function SlotPicker({
   }, [date, chosenSpace, chosenStart, minutes]);
 
   function pickDay(d: CalendarDay) {
+    if (mode === "change" && blocked(d)) return;
     if (mode === "new" && d.status !== "open") {
       setPopup(d);
       setPopupState(null);
@@ -244,16 +251,23 @@ export default function SlotPicker({
                 if (!d) return <div key={`b${i}`} aria-hidden="true" />;
                 const first = i === 0 || cells.findIndex((c) => c) === i || dayOfMonth(d.date) === 1;
                 const selected = d.date === date;
-                const statusText =
-                  d.status === "open" ? "" : d.status === "event" ? `, ${d.event?.title ?? "event"}` : ", not available";
+                const isBlocked = blocked(d);
+                const statusText = !isBlocked
+                  ? ""
+                  : mode === "change"
+                    ? ", not available"
+                    : d.status === "event"
+                      ? `, ${d.event?.title ?? "event"}`
+                      : ", not available";
                 return (
                   <button
                     key={d.date}
                     type="button"
                     className="rv-day"
-                    data-status={mode === "change" ? "open" : d.status}
+                    data-status={mode === "change" ? (isBlocked ? "unavailable" : "open") : d.status}
                     aria-pressed={selected}
-                    aria-label={`${dateLong(d.date)}${mode === "new" ? statusText : ""}`}
+                    aria-label={`${dateLong(d.date)}${statusText}`}
+                    disabled={mode === "change" && isBlocked}
                     onClick={() => pickDay(d)}
                   >
                     {first && <span className="text-[9px] tracking-[0.12em] uppercase opacity-80">{monthShort(d.date)}</span>}

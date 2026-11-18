@@ -50,3 +50,12 @@ export function isRateLimited(bucket: BucketName, ip: string): boolean {
   entry.count++;
   return false;
 }
+
+/**
+ * Give back one hit, for an attempt that failed before it did anything (the
+ * service behind it never answered). The guest shouldn't lose a try to our outage.
+ */
+export function refundRateLimit(bucket: BucketName, ip: string): void {
+  const entry = buckets.get(bucket)?.get(ip);
+  if (entry && entry.count > 0 && Date.now() <= entry.resetAt) entry.count--;
+}
