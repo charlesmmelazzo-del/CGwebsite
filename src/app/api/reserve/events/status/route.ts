@@ -17,6 +17,6 @@ export async function GET(req: NextRequest) {
   try {
     return NextResponse.json(await getEventStatuses(ids));
   } catch (e) {
-    return fromError(e);
+    return fromError(e, { req, bucket: "read" });
   }
 }

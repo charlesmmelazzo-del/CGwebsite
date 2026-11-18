@@ -2,7 +2,7 @@ import "server-only";
 import { NextResponse, type NextRequest } from "next/server";
 import { reserveEnabled } from "./enabled";
 import { BibleError, UNAVAILABLE_MESSAGE } from "./bible";
-import { getIp, isRateLimited, type BucketName } from "@/lib/rateLimit";
+import { getIp, isRateLimited, refundRateLimit, type BucketName } from "@/lib/rateLimit";
 import { isToken } from "./format";
 
 /** Shared plumbing for the /api/reserve/* proxy routes. */
@@ -40,8 +40,12 @@ export function badToken(token: string): NextResponse | null {
   return null;
 }
 
-/** Pass the Bible's friendly message (and only that, plus party options) back to the browser. */
-export function fromError(e: unknown): NextResponse {
+/**
+ * Pass the Bible's friendly message (and only that, plus party options) back to the browser.
+ * With `limit`, a call that never got an answer from the Bible gives the guest's rate-limit hit back.
+ */
+export function fromError(e: unknown, limit?: { req: NextRequest; bucket: BucketName }): NextResponse {
+  if (limit && e instanceof BibleError && !e.reached) refundRateLimit(limit.bucket, getIp(limit.req));
   if (e instanceof BibleError) {
     const body: Record<string, unknown> = { error: e.message };
     if (Array.isArray(e.extra.options)) body.options = e.extra.options;

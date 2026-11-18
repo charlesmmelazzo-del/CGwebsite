@@ -73,7 +73,7 @@ export interface MaskedGuest {
 
 export type LookupResult =
   | { match: false }
-  | { match: true; masked: MaskedGuest; lookup_token: string };
+  | { match: true; masked: MaskedGuest; lookup_token: string; /** Already holds the most active reservations allowed (QA B2). */ at_limit?: boolean };
 
 export interface NewGuest {
   first_name: string;
@@ -118,6 +118,10 @@ export interface ClosedReservation {
   closed: true;
   status: ReservationStatus;
   first_name: string;
+  /** Who cancelled (cancelled only). Older Bible versions omit it. */
+  cancelled_by?: "guest" | "staff" | null;
+  /** The reason staff gave, for a staff cancellation or a denial; "" otherwise. */
+  reason?: string;
 }
 
 export interface OpenReservation {

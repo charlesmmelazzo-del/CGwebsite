@@ -445,6 +445,9 @@ body[data-zone="compete"] #cg-main {
   border-style: dashed;
 }
 .rv-day[data-status="unavailable"] .rv-day-num { text-decoration: line-through; }
+/* Time-change dialog: an unavailable date can't be picked at all. */
+.rv-day:disabled { cursor: not-allowed; }
+.rv-day:disabled:hover { border-color: var(--rv-line); }
 .rv-day[aria-pressed="true"] { background: var(--rv-accent); border-color: var(--rv-accent); color: #fff; border-style: solid; }
 .rv-dialog {
   --rv-accent: #C97D5A;

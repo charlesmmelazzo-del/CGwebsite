@@ -68,6 +68,6 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
         return NextResponse.json(await B.withdrawChange(token));
     }
   } catch (e) {
-    return fromError(e);
+    return fromError(e, { req, bucket });
   }
 }

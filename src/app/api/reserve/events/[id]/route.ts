@@ -13,6 +13,6 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   try {
     return NextResponse.json(await getEventBooking(params.id));
   } catch (e) {
-    return fromError(e);
+    return fromError(e, { req, bucket: "read" });
   }
 }

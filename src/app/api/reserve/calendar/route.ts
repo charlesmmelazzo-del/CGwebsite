@@ -5,8 +5,9 @@ import { guard, fromError, intParam, bad } from "@/lib/reserve/route";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  // Read-only availability; also used when a guest moves an existing reservation.
-  const stop = await guard(req, "read", "existing");
+  // New bookings only: switched off with the Reserve page. A guest moving an
+  // existing reservation uses /api/reserve/r/<token>/calendar instead.
+  const stop = await guard(req, "read");
   if (stop) return stop;
   const raw = req.nextUrl.searchParams.get("party");
   const party = raw ? intParam(raw, 1, 500) : null;
@@ -14,6 +15,6 @@ export async function GET(req: NextRequest) {
   try {
     return NextResponse.json(await getCalendar(party));
   } catch (e) {
-    return fromError(e);
+    return fromError(e, { req, bucket: "read" });
   }
 }

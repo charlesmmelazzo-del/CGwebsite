@@ -184,7 +184,7 @@ export default function AdminReservePage() {
           <input
             id="rp-alt"
             className={inputCls}
-            placeholder="Describe the photo for screen readers"
+            placeholder="The Upper Room at Common Good"
             value={content.imageAlt ?? ""}
             onChange={(e) => update({ imageAlt: e.target.value })}
           />

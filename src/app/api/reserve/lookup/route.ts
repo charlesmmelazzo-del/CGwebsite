@@ -26,9 +26,11 @@ export async function POST(req: NextRequest) {
   try {
     const out = await lookupGuest(by);
     // Only the masked hints and the short-lived lookup token ever reach the browser.
-    if (out.match) return NextResponse.json({ match: true, masked: out.masked, lookup_token: out.lookup_token });
+    if (out.match) {
+      return NextResponse.json({ match: true, masked: out.masked, lookup_token: out.lookup_token, at_limit: out.at_limit === true });
+    }
     return NextResponse.json({ match: false });
   } catch (e) {
-    return fromError(e);
+    return fromError(e, { req, bucket: "lookup" });
   }
 }

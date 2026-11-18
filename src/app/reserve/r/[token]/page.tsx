@@ -45,8 +45,14 @@ export default async function GuestReservationPage({ params }: { params: { token
     }
   }
 
-  // The overall party range lets the guest try sizes outside their current space.
-  const partyMax = reservation && !reservation.closed ? await getConfig().then((c) => c.party.max ?? 0).catch(() => 0) : 0;
+  // The overall party range (smallest minimum to largest maximum across bookable
+  // spaces) bounds the party-size stepper, as on the Reserve page.
+  const partyRange =
+    reservation && !reservation.closed
+      ? await getConfig()
+          .then((c) => ({ min: c.party.min ?? 0, max: c.party.max ?? 0 }))
+          .catch(() => ({ min: 0, max: 0 }))
+      : { min: 0, max: 0 };
 
   return (
     <PageThemeWrapper
@@ -63,7 +69,7 @@ export default async function GuestReservationPage({ params }: { params: { token
         problem={problem}
         faq={content.faq}
         phone={settings.phone}
-        partyMax={partyMax}
+        partyRange={partyRange}
         bookingOpen={bookingOpen}
         theme={{ bg: theme.bg, text: theme.text, muted: theme.muted }}
       />

@@ -19,6 +19,6 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ ok: true });
   } catch (e) {
-    return fromError(e);
+    return fromError(e, { req, bucket: "lookup" });
   }
 }
