@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getAllMenus, getMenuById } from "@/lib/popup/menus";
+import { demoExists } from "@/lib/givingTree/admin";
+import { TEMPLATE_KEY as GIVING_TREE_TEMPLATE } from "@/lib/givingTree/access";
 
 /**
  * The one place a pop-up's lifecycle changes.
@@ -28,6 +30,22 @@ export async function POST(req: NextRequest) {
 
   const menu = await getMenuById(menuId);
   if (!menu) return NextResponse.json({ error: "Pop-up not found." }, { status: 404 });
+
+  // The Giving Tree's demo data names real organizations that haven't agreed
+  // to anything, so that pop-up can't be published (or set to publish itself)
+  // while any of it exists.
+  if ((action === "golive" || action === "schedule") && menu.templateKey === GIVING_TREE_TEMPLATE) {
+    let blocked: boolean;
+    try {
+      blocked = await demoExists();
+    } catch (e) {
+      console.error("[POST /api/admin/popup/status] demo check failed", e);
+      return NextResponse.json({ error: "Couldn't check for Giving Tree demo data (has db/giving-tree.sql been run?). Not published." }, { status: 409 });
+    }
+    if (blocked) {
+      return NextResponse.json({ error: "Wipe demo data first (Pop Ups → Giving Tree → Demo & season)." }, { status: 409 });
+    }
+  }
 
   const nowIso = new Date().toISOString();
   const sb = getSupabaseAdmin();
