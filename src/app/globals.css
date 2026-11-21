@@ -199,11 +199,14 @@ p, span, a, li, td, th, label, input, textarea, button {
 body[data-zone="popup"] > header,
 body[data-zone="popup"] > footer,
 body[data-zone="compete"] > header,
-body[data-zone="compete"] > footer {
+body[data-zone="compete"] > footer,
+body[data-zone="passport"] > header,
+body[data-zone="passport"] > footer {
   display: none;
 }
 body[data-zone="popup"] #cg-main,
-body[data-zone="compete"] #cg-main {
+body[data-zone="compete"] #cg-main,
+body[data-zone="passport"] #cg-main {
   padding-top: 0;
   --header-h: 0px;
 }

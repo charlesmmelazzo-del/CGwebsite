@@ -82,6 +82,19 @@ export async function middleware(req: NextRequest) {
     return pass(res);
   }
 
+  // ── Passport (/passport/*) ─────────────────────────────────────────────────
+  // Its own app shell, like the Pop Up Zone: tag the path so the root layout
+  // hides the site header and footer on first paint. Pages and /api/passport/*
+  // routes check the member's sign-in themselves.
+  if (pathname === "/passport" || pathname.startsWith("/passport/")) {
+    const requestHeaders = new Headers(req.headers);
+    requestHeaders.set("x-pathname", pathname);
+    const res = NextResponse.next({ request: { headers: requestHeaders } });
+    // One-time links carry their code in the address: never send it on to another site.
+    if (pathname === "/passport/set-password" || pathname === "/passport/confirm") res.headers.set("Referrer-Policy", "no-referrer");
+    return pass(res);
+  }
+
   // ── Competitions (/compete/*) ──────────────────────────────────────────────
   // Their own full-screen shell, like the Pop Up Zone: tag the path so the root
   // layout hides the site header and footer on first paint.

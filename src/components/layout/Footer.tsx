@@ -63,14 +63,28 @@ export default function Footer({ config, settings, logoUrl, showReserve = false 
               absent from the header, so it reads as a separate place you're let
               into rather than another page of the site.
             */}
-            {config.showPopupLink !== false && (
-              <Link
-                href="/popup"
-                style={{ color: text, borderColor: `${muted}70` }}
-                className="mt-1 px-4 py-2 border rounded-full text-[10px] tracking-[0.2em] uppercase hover:opacity-70 transition-opacity text-center"
-              >
-                {config.popupLinkLabel ?? "Common Good Pop Up Zone"}
-              </Link>
+            {/* Passport sits beside it, with its own switch (Admin → Header & Footer). */}
+            {(config.showPopupLink !== false || config.showPassportLink !== false) && (
+              <div className="mt-1 flex flex-wrap justify-center gap-2">
+                {config.showPopupLink !== false && (
+                  <Link
+                    href="/popup"
+                    style={{ color: text, borderColor: `${muted}70` }}
+                    className="px-4 py-2 border rounded-full text-[10px] tracking-[0.2em] uppercase hover:opacity-70 transition-opacity text-center"
+                  >
+                    {config.popupLinkLabel ?? "Common Good Pop Up Zone"}
+                  </Link>
+                )}
+                {config.showPassportLink !== false && (
+                  <Link
+                    href="/passport"
+                    style={{ color: text, borderColor: `${muted}70` }}
+                    className="px-4 py-2 border rounded-full text-[10px] tracking-[0.2em] uppercase hover:opacity-70 transition-opacity text-center"
+                  >
+                    Passport
+                  </Link>
+                )}
+              </div>
             )}
           </div>
 

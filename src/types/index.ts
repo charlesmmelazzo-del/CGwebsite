@@ -388,6 +388,8 @@ export interface FooterConfig {
   /** Pop Up Zone link — deliberately footer-only, never in the header nav. */
   showPopupLink?: boolean;
   popupLinkLabel?: string;
+  /** Passport link, beside the Pop Up Zone link. On unless switched off. */
+  showPassportLink?: boolean;
 }
 
 export interface SiteConfig {
