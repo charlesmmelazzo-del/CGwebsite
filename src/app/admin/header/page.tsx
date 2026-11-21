@@ -469,6 +469,23 @@ export default function AdminHeaderPage() {
                   Links to /popup. Kept out of the header nav on purpose — the zone is its own place.
                 </p>
               </section>
+
+              {/* Passport — beside the Pop Up Zone link; /passport works either way */}
+              <section>
+                <p className="text-[10px] tracking-widest uppercase text-gray-500 mb-3 font-medium">Passport Link</p>
+                <label className="flex items-center gap-2 text-xs text-gray-500">
+                  <input
+                    type="checkbox"
+                    checked={config.footer.showPassportLink !== false}
+                    onChange={(e) => updateFooter({ showPassportLink: e.target.checked })}
+                    className="accent-[#C97D5A]"
+                  />
+                  Show the Passport link in the footer
+                </label>
+                <p className="mt-2 text-[10px] text-gray-400 leading-relaxed">
+                  Links to /passport. Hiding the link doesn&apos;t close Passport: anyone with the address can still reach the sign-in screen.
+                </p>
+              </section>
             </div>
           )}
         </div>

@@ -16,7 +16,10 @@ export default function ZoneWatcher() {
   const pathname = usePathname();
 
   useEffect(() => {
-    const zone = pathname?.startsWith("/popup") ? "popup" : pathname?.startsWith("/compete") ? "compete" : null;
+    const zone = pathname?.startsWith("/popup") ? "popup"
+      : pathname?.startsWith("/compete") ? "compete"
+      : pathname === "/passport" || pathname?.startsWith("/passport/") ? "passport"
+      : null;
     if (zone) document.body.dataset.zone = zone;
     else delete document.body.dataset.zone;
   }, [pathname]);

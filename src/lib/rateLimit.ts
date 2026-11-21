@@ -17,6 +17,11 @@ export const LIMITS = {
   lookup:         { max: 10,  windowMs: HOUR },
   "guest-action": { max: 30,  windowMs: HOUR },
   read:           { max: 120, windowMs: HOUR },
+  // Passport: sign-in attempts per IP (the Bible also locks one email after 5 misses),
+  // sign-up and forgot-password like the Reserve page's forms, and ordinary member requests.
+  "passport-signin": { max: 20,  windowMs: HOUR },
+  "passport-form":   { max: 5,   windowMs: HOUR },
+  "passport-member": { max: 300, windowMs: HOUR },
 } as const;
 
 export type BucketName = keyof typeof LIMITS;
