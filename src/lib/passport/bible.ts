@@ -100,3 +100,19 @@ export type SignUpResult = { ok: true; check_email: true } | (SignedIn & { signe
 
 export const getConfig = () => passport<{ config: Config }>("GET", "/config").then((r) => r.config);
 export const getMe = (auth: MemberAuth) => passport<Me>("GET", "/me", { auth });
+
+// ── File 03a: the library, Passport cocktails, the spirits archive, Toast menus ──
+// Exactly the fields the Bible's approved list sends (server/passport/guestSafe.js).
+export interface CocktailCard { id: number; name: string; flavor: string; menu_name: string; menu_status: "current" | "past"; passport: "current" | "past" | null }
+export interface Cocktail extends CocktailCard { ingredients: string; tagline: string; notes: string }
+export interface ArchivedBottle { id: number; name: string; category: string; producer: string; description: string; status_label: string }
+export interface MenuInfo { available: boolean; updated_at: string | null }
+
+export const getLibrary = (auth: MemberAuth, q = "") =>
+  passport<{ cocktails: CocktailCard[] }>("GET", `/library${q ? `?q=${encodeURIComponent(q.slice(0, 100))}` : ""}`, { auth }).then((r) => r.cocktails);
+export const getCocktail = (auth: MemberAuth, id: number) => passport<{ cocktail: Cocktail }>("GET", `/library/${id}`, { auth }).then((r) => r.cocktail);
+export const getPassportCocktails = (auth: MemberAuth) => passport<{ passport_cocktails: Cocktail[] }>("GET", "/passport-cocktails", { auth }).then((r) => r.passport_cocktails);
+export const getArchive = (auth: MemberAuth) => passport<{ archive: ArchivedBottle[] }>("GET", "/spirits/archive", { auth }).then((r) => r.archive);
+export const getArchivedBottle = (auth: MemberAuth, id: number) => passport<{ bottle: ArchivedBottle }>("GET", `/spirits/archive/${id}`, { auth }).then((r) => r.bottle);
+export const getMenus = (auth: MemberAuth) => passport<{ menu_info: MenuInfo; menus: unknown[] }>("GET", "/menus", { auth });
+
