@@ -30,7 +30,7 @@ export default function ZoneList({
   return (
     <section className="gt-sheet" aria-label={title}>
       <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-2 border-b border-black/10">
-        <h2 ref={heading} tabIndex={-1} className="gt-display text-[var(--gt-size-l)]">
+        <h2 ref={heading} tabIndex={-1} className="gt-display text-[length:var(--gt-size-l)]">
           {title}
         </h2>
         <button type="button" className="gt-btn gt-btn-small" onClick={onClose}>

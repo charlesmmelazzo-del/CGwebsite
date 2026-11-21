@@ -301,7 +301,7 @@ export function CashSection({ s, act }: { s: Snapshot; act: Act }) {
   return (
     <Card title="Cash check">
       <p className="text-xs text-gray-500">
-        Pledged is what guests promised (approved, not released). Enter a confirmed figure from the organization and the ornament's meter shows it as
+        Pledged is what guests promised (approved, not released). Enter a confirmed figure from the organization and the ornament&rsquo;s meter shows it as
         &ldquo;raised, as of&rdquo; that date instead. Clear it to go back to pledged.
       </p>
       <ul className="space-y-2">

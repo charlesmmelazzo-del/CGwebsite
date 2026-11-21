@@ -9,7 +9,7 @@ import { validateImport, type ImportResult } from "./importer";
 import { acceptsClaims, isOverdueForReview, lastClaimDay, meter, normalizeCode, spotsLeft, takesSpot } from "./rules";
 import { createPledge, gaveText, loadAll, parsePledgeInput, releasePledge, starLabel, sweepQuietly, TreeError, type Data } from "./service";
 import * as store from "./store";
-import { isDate, isTime } from "./time";
+import { centralDate, isDate, isTime } from "./time";
 import { DEFAULT_SETTINGS, OPP_TYPES, type Opportunity, type Org, type Pledge, type Settings } from "./types";
 
 // ─── Snapshot for the admin screens ──────────────────────────────────────────
@@ -375,6 +375,15 @@ export async function saveSettings(b: Rec): Promise<Settings> {
 
 // ─── Exports (9.10) ──────────────────────────────────────────────────────────
 
+/** "2026-12-01 14:05" in Central time, for spreadsheets. */
+function central(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const date = centralDate(d);
+  const t = d.toLocaleTimeString("en-US", { timeZone: "America/Chicago", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  return `${date} ${t}`;
+}
+
 function csv(rows: (string | number | null | undefined)[][]): string {
   const cell = (v: string | number | null | undefined) => {
     let t = v == null ? "" : String(v);
@@ -400,7 +409,7 @@ export async function exportCsv(kind: string, opts: { orgId?: string; includeDem
     for (const p of d.pledges) {
       const o = oppById.get(p.opportunityId);
       if (!o || o.orgId !== org.id || o.type !== "volunteer" || p.hold === "denied") continue;
-      rows.push([org.name, o.title, o.description, o.eventDate, o.startTime, o.endTime, o.location, p.hours ?? o.hoursFixed, p.name, p.email, p.phone, p.code, p.createdAt, p.status]);
+      rows.push([org.name, o.title, o.description, o.eventDate, o.startTime, o.endTime, o.location, p.hours ?? o.hoursFixed, p.name, p.email, p.phone, p.code, central(p.createdAt), p.status]);
     }
     return { filename: `volunteers-${org.slug}.csv`, body: csv(rows) };
   }
@@ -411,7 +420,7 @@ export async function exportCsv(kind: string, opts: { orgId?: string; includeDem
     ];
     for (const p of d.pledges.filter(keep)) {
       const o = oppById.get(p.opportunityId);
-      rows.push([p.code, p.createdAt, p.source, o ? orgById.get(o.orgId)?.name : "", o?.type, o?.title, p.name, p.email, p.phone, p.displayMode, p.displayName, p.note, p.hours, p.amount, p.status, p.hold, p.hidden ? "yes" : "", p.dueDate, p.reminderSentAt, p.guestResponse, p.releasedAt, p.releaseReason, p.receivedAt, p.deliveredAt, p.ornament, p.isDemo ? "yes" : ""]);
+      rows.push([p.code, central(p.createdAt), p.source, o ? orgById.get(o.orgId)?.name : "", o?.type, o?.title, p.name, p.email, p.phone, p.displayMode, p.displayName, p.note, p.hours, p.amount, p.status, p.hold, p.hidden ? "yes" : "", p.dueDate, central(p.reminderSentAt), p.guestResponse, central(p.releasedAt), p.releaseReason, central(p.receivedAt), central(p.deliveredAt), p.ornament, p.isDemo ? "yes" : ""]);
     }
     return { filename: "giving-tree-pledges.csv", body: csv(rows) };
   }

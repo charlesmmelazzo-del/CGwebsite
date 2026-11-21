@@ -34,7 +34,7 @@ export function PartnerCard({ org, focused, onWaysToGive, hasOpen }: { org: Publ
     <article ref={ref} tabIndex={-1} id={`partner-${org.slug}`} className={`gt-card p-4 space-y-3 ${focused ? "ring-4 ring-[var(--gt-accent)]" : ""}`}>
       <div className="flex items-center gap-3">
         <Logo org={org} size={52} />
-        <h2 className="gt-display text-[var(--gt-size-l)] leading-tight">{org.name}</h2>
+        <h2 className="gt-display text-[length:var(--gt-size-l)] leading-tight">{org.name}</h2>
       </div>
       {org.description && <p className="whitespace-pre-line">{org.description}</p>}
       <ul className="flex flex-wrap gap-2">
@@ -93,7 +93,7 @@ export default function Partners({
     <div className="h-full overflow-y-auto">
       <div className="max-w-[var(--gt-sheet-max)] mx-auto px-3 py-3 space-y-3">
         <div className="flex items-center justify-between gap-2">
-          <h1 className="gt-display text-[var(--gt-size-xl)]">{COPY.partnersTitle}</h1>
+          <h1 className="gt-display text-[length:var(--gt-size-xl)]">{COPY.partnersTitle}</h1>
           <button type="button" className="gt-btn gt-btn-small" onClick={onBack}>
             {COPY.back}
           </button>

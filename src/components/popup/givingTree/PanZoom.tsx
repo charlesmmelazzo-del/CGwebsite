@@ -13,7 +13,7 @@ import { useReducedMotion, zoomTransition, ZOOM_MS } from "./motion";
 
 export interface PanZoomHandle {
   /** Glide so this rectangle (in content pixels) fills the view. */
-  zoomTo: (r: { x: number; y: number; w: number; h: number }, opts?: { maxScale?: number }) => void;
+  zoomTo: (r: { x: number; y: number; w: number; h: number }, opts?: { maxScale?: number; visible?: number }) => void;
   fit: () => void;
   zoomBy: (factor: number) => void;
 }
@@ -71,8 +71,11 @@ export default forwardRef<PanZoomHandle, {
   useImperativeHandle(ref, () => ({
     zoomTo(r, opts) {
       if (!size.w) return;
-      const s = Math.min(opts?.maxScale ?? maxScale, (size.w / r.w) * 0.9, (size.h / r.h) * 0.9);
-      glide(clamp({ scale: s, tx: size.w / 2 - (r.x + r.w / 2) * s, ty: size.h / 2 - (r.y + r.h / 2) * s }));
+      // `visible`: the share of the viewport (from the top) not covered by a
+      // sheet; the rectangle is fitted into that part.
+      const vh = size.h * (opts?.visible ?? 1);
+      const s = Math.min(opts?.maxScale ?? maxScale, (size.w / r.w) * 0.9, (vh / r.h) * 0.9);
+      glide(clamp({ scale: s, tx: size.w / 2 - (r.x + r.w / 2) * s, ty: vh / 2 - (r.y + r.h / 2) * s }));
     },
     fit,
     zoomBy(f) {

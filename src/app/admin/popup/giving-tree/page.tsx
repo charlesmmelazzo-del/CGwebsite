@@ -83,7 +83,7 @@ export default function GivingTreeAdminPage() {
         </div>
       )}
 
-      <nav className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1" aria-label="Giving Tree sections">
+      <nav className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Giving Tree sections">
         {SECTIONS.map(([k, label]) => (
           <button
             key={k}

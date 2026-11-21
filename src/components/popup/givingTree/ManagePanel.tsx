@@ -65,7 +65,7 @@ export default function ManagePanel({
 
   return (
     <div className="gt-card max-w-md mx-auto p-5 space-y-3">
-      <h1 className="gt-display text-[var(--gt-size-xl)]">{status === "released" ? COPY.manageReleasedTitle : COPY.manageTitle}</h1>
+      <h1 className="gt-display text-[length:var(--gt-size-xl)]">{status === "released" ? COPY.manageReleasedTitle : COPY.manageTitle}</h1>
       <p>
         <span className="font-semibold">{opp.title}</span> · {orgName}
       </p>

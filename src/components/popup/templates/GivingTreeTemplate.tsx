@@ -22,7 +22,7 @@ import OrnamentCard from "../givingTree/OrnamentCard";
 import type { PanZoomHandle } from "../givingTree/PanZoom";
 import Partners from "../givingTree/Partners";
 import Recipes from "../givingTree/Recipes";
-import Sky, { Counters } from "../givingTree/Sky";
+import Sky from "../givingTree/Sky";
 import Success from "../givingTree/Success";
 import { GivingTreeStyles } from "../givingTree/theme";
 import Tree, { ornamentRect, zoneRect } from "../givingTree/Tree";
@@ -77,7 +77,7 @@ export default function GivingTreeTemplate({ cocktails, recordInteraction, isSan
   const back = useCallback(() => window.history.back(), []);
 
   const orgs = useMemo(() => new Map((state?.orgs ?? []).map((o) => [o.id, o])), [state]);
-  const opps = state?.opportunities ?? [];
+  const opps = useMemo(() => state?.opportunities ?? [], [state]);
   const openOrgIds = useMemo(() => new Set(opps.map((o) => o.orgId)), [opps]);
 
   const stars = useMemo(() => {
@@ -95,13 +95,15 @@ export default function GivingTreeTemplate({ cocktails, recordInteraction, isSan
   );
 
   function openOrnament(o: PublicOpportunity) {
-    tree.current?.zoomTo(ornamentRect(o), { maxScale: 3 });
+    tree.current?.zoomTo(ornamentRect(o), { maxScale: 3, visible: zone && window.innerWidth < 900 ? 0.45 : 1 });
     window.setTimeout(() => setSelected(o), reduced ? 0 : ZOOM_MS);
   }
 
   function openZone(z: OppType) {
     setZone(z);
-    tree.current?.zoomTo(zoneRect(z));
+    // On a phone the list covers the lower part of the screen: fit the zone
+    // into the part above it.
+    tree.current?.zoomTo(zoneRect(z), { visible: window.innerWidth < 900 ? 0.45 : 1 });
   }
 
   function showPartner(orgId: string | null) {
@@ -186,28 +188,24 @@ export default function GivingTreeTemplate({ cocktails, recordInteraction, isSan
         {screen === "tree" && !closed && (
           <div className="h-full flex flex-col">
             {/* The sky above the tree: tap it to open the sky. */}
-            <button type="button" className="gt-sky text-left px-3 py-2 border-b border-[var(--gt-line)]" onClick={() => go("sky")}>
-              <span className="flex items-center justify-between gap-2">
-                <span className="gt-display text-[var(--gt-size-l)]">{COPY.skyTitle}</span>
-                <span className="gt-small underline">{COPY.openSky} ↑</span>
+            <button type="button" className="gt-sky text-left px-3 py-2 border-b border-[var(--gt-line)] flex items-center gap-3" onClick={() => go("sky")}>
+              <span className="gt-display text-[length:var(--gt-size-l)] shrink-0">{COPY.skyTitle}</span>
+              <span className="gt-small gt-muted flex-1 min-w-0 truncate">
+                {COPY.neighborsLine(state.counters.neighbors)}
               </span>
-              <span className="block mt-1 pointer-events-none">
-                <Counters c={state.counters} />
-              </span>
+              <span className="gt-small underline shrink-0" aria-hidden="true">↑</span>
             </button>
 
-            <div className="px-3 py-2 flex flex-wrap items-center gap-2">
-              <h1 className="gt-display text-[var(--gt-size-l)] mr-auto">{COPY.treeTitle}</h1>
-              {partnersButton}
-              {recipesButton}
-            </div>
+            <h1 className="sr-only">{COPY.treeTitle}</h1>
             {/* Zone chips: the keyboard and screen-reader way into each zone's list. */}
-            <div className="px-3 pb-2 flex flex-wrap gap-2" role="group" aria-label={COPY.treeTitle}>
+            <div className="px-3 py-2 flex gap-2 overflow-x-auto gt-noscroll" role="group" aria-label={COPY.treeTitle}>
               {(["volunteer", "gift", "cash"] as OppType[]).map((z) => (
-                <button key={z} type="button" className="gt-btn gt-btn-small" aria-pressed={zone === z} onClick={() => openZone(z)}>
+                <button key={z} type="button" className="gt-btn gt-btn-small shrink-0" aria-pressed={zone === z} onClick={() => openZone(z)}>
                   {COPY.zoneLabels[z]} ({opps.filter((o) => o.zone === z && (!orgFilter || o.orgId === orgFilter)).length})
                 </button>
               ))}
+              <span className="shrink-0">{partnersButton}</span>
+              <span className="shrink-0">{recipesButton}</span>
             </div>
             {orgFilter && (
               <div className="px-3 pb-2 flex items-center gap-2 gt-small">
@@ -223,7 +221,7 @@ export default function GivingTreeTemplate({ cocktails, recordInteraction, isSan
               {opps.length === 0 && (
                 <div className="absolute inset-0 z-20 flex items-center justify-center p-6 bg-black/60">
                   <div className="gt-card p-5 max-w-sm text-center space-y-3">
-                    <h2 className="gt-display text-[var(--gt-size-xl)]">{COPY.treeFullTitle}</h2>
+                    <h2 className="gt-display text-[length:var(--gt-size-xl)]">{COPY.treeFullTitle}</h2>
                     <p>{COPY.treeFullBody}</p>
                     <button type="button" className="gt-btn gt-btn-primary w-full" onClick={() => showPartner(null)}>
                       {COPY.partnersButton}

@@ -4,9 +4,7 @@
 // and .gt-* classes below, so applying the final mood board is a change to
 // this file (and the copy file), not to the components.
 
-export function GivingTreeStyles() {
-  return (
-    <style>{`
+const CSS = `
 .gt-root {
   /* Colors */
   --gt-bg: #0f1a14;
@@ -48,6 +46,8 @@ export function GivingTreeStyles() {
 }
 .gt-root *:focus-visible { outline: 3px solid var(--gt-accent); outline-offset: 2px; }
 .gt-display { font-family: var(--gt-font-display); }
+.gt-noscroll { scrollbar-width: none; }
+.gt-noscroll::-webkit-scrollbar { display: none; }
 .gt-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   min-height: 44px; padding: 0 16px; border-radius: var(--gt-radius);
@@ -112,6 +112,9 @@ export function GivingTreeStyles() {
 .gt-counters { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; text-align: center; }
 .gt-counter-n { font-family: var(--gt-font-display); font-size: var(--gt-size-l); }
 .gt-counter-l { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.75; }
-`}</style>
-  );
+`;
+
+export function GivingTreeStyles() {
+  // Set as raw HTML so the server and browser render byte-identical text.
+  return <style dangerouslySetInnerHTML={{ __html: CSS }} />;
 }

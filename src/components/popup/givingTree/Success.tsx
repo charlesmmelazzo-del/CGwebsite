@@ -42,19 +42,19 @@ export default function Success({ s, onSky, onClose }: { s: ClaimSuccess; onSky:
           <div className="flex justify-center" aria-hidden="true">
             <span className="gt-star-dot" style={{ width: 22, height: 22 }} />
           </div>
-          <h2 id="gt-success-title" ref={heading} tabIndex={-1} className="gt-display text-[var(--gt-size-xl)] text-center">
+          <h2 id="gt-success-title" ref={heading} tabIndex={-1} className="gt-display text-[length:var(--gt-size-xl)] text-center">
             {COPY.successTitle}
           </h2>
 
           {s.type === "gift" ? (
             <>
-              <p className="rounded-lg p-3 bg-black/5 text-[var(--gt-size-l)] font-semibold">{COPY.giftCodeFirst(s.code)}</p>
+              <p className="rounded-lg p-3 bg-black/5 text-[length:var(--gt-size-l)] font-semibold">{COPY.giftCodeFirst(s.code)}</p>
               {s.dropoff && <p>{s.dropoff}</p>}
               {s.dueDate && <p>{COPY.giftDue(longDate(s.dueDate))}</p>}
             </>
           ) : (
             <p className="text-center">
-              {COPY.codeLabel}: <span className="font-mono text-[var(--gt-size-l)] font-semibold tracking-widest">{s.code}</span>
+              {COPY.codeLabel}: <span className="font-mono text-[length:var(--gt-size-l)] font-semibold tracking-widest">{s.code}</span>
             </p>
           )}
           {s.type === "volunteer" && <p>{COPY.volunteerNext(s.orgName)}</p>}

@@ -130,6 +130,7 @@ export const COPY = {
     giftsReceived: "gifts received",
     neighbors: "neighbors taking part",
   },
+  neighborsLine: (n: number) => `${n} ${n === 1 ? "neighbor" : "neighbors"} taking part`,
   anonymous: "Anonymous",
   skyEmpty: "The first star is waiting for you.",
   gaveVolunteer: (title: string, h: number | null) => (h ? `${hoursLabel(h)}: ${title}` : title),

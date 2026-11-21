@@ -167,7 +167,12 @@ export async function remove(table: TableKey, ids: string[]): Promise<void> {
 export async function clearPhones(): Promise<number> {
   if (memoryMode) {
     let n = 0;
-    for (const p of mem().pledges) if (p.phone) (p.phone = null), n++;
+    for (const p of mem().pledges) {
+      if (p.phone) {
+        p.phone = null;
+        n++;
+      }
+    }
     return n;
   }
   const sb = getSupabaseAdmin();

@@ -95,7 +95,7 @@ export default function OrnamentCard({
           >
             {/* Front */}
             <div className="gt-card p-6 text-center absolute inset-0 flex items-center justify-center" style={{ backfaceVisibility: "hidden", visibility: side === "front" ? "visible" : "hidden" }} aria-hidden={side !== "front"}>
-              <p className="gt-display text-[var(--gt-size-xl)]">{o.title}</p>
+              <p className="gt-display text-[length:var(--gt-size-xl)]">{o.title}</p>
             </div>
             {/* Back */}
             <div className="gt-card p-4" style={{ backfaceVisibility: "hidden", transform: reduced ? undefined : "rotateY(180deg)" }}>
@@ -108,7 +108,7 @@ export default function OrnamentCard({
                   {COPY.close}
                 </button>
               </div>
-              <h2 className="gt-display text-[var(--gt-size-xl)] mt-3 leading-tight">{o.title}</h2>
+              <h2 className="gt-display text-[length:var(--gt-size-xl)] mt-3 leading-tight">{o.title}</h2>
               {o.description && <p className="mt-2 whitespace-pre-line">{o.description}</p>}
               <ul className="mt-3 space-y-1 gt-small">
                 {when && <li>{when}</li>}

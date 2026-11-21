@@ -81,7 +81,7 @@ export default function Sky({
     <div className="h-full flex flex-col gt-sky">
       <header className="px-3 pt-3 pb-2 space-y-2 max-w-[var(--gt-sheet-max)] w-full mx-auto">
         <div className="flex items-center justify-between gap-2">
-          <h1 className="gt-display text-[var(--gt-size-xl)]">{heading}</h1>
+          <h1 className="gt-display text-[length:var(--gt-size-xl)]">{heading}</h1>
           {onBack && (
             <button type="button" className="gt-btn gt-btn-small" onClick={onBack}>
               {backLabel ?? COPY.backToTree}
@@ -120,7 +120,7 @@ export default function Sky({
       {open && (
         <div className="gt-overlay" onClick={(e) => e.target === e.currentTarget && setOpen(null)}>
           <div role="dialog" aria-modal="true" aria-label={open.label} className="gt-dialog gt-card p-5 space-y-2">
-            <p className="gt-display text-[var(--gt-size-l)]">{open.label}</p>
+            <p className="gt-display text-[length:var(--gt-size-l)]">{open.label}</p>
             {open.note && <p className="italic">“{open.note}”</p>}
             {open.gave && <p className="gt-small">{open.gave}</p>}
             <button type="button" className="gt-btn w-full" autoFocus onClick={() => setOpen(null)}>

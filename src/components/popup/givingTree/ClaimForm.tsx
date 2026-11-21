@@ -116,7 +116,7 @@ export default function ClaimForm({
   return (
     <form onSubmit={submit} noValidate className="space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="gt-display text-[var(--gt-size-l)]">{COPY.formTitle}</h2>
+        <h2 className="gt-display text-[length:var(--gt-size-l)]">{COPY.formTitle}</h2>
         <button type="button" className="gt-btn gt-btn-small" onClick={onCancel}>
           {COPY.back}
         </button>
