@@ -19,11 +19,11 @@ export async function loadMe(): Promise<{ me?: Me; signedOut?: boolean; ended?: 
   }
 }
 
-/** The sign-up switch and terms, or a safe default (sign-up off) when the Bible can't be reached. */
+/** The sign-up setting and terms, or a safe default (sign-up Off) when the Bible can't be reached. */
 export async function loadConfig(): Promise<Config & { unavailable?: boolean }> {
   try {
     return await getConfig();
   } catch {
-    return { signup_enabled: false, terms_version: 0, terms_text: "", unavailable: true };
+    return { signup_mode: "off", terms_version: 0, terms_text: "", unavailable: true };
   }
 }

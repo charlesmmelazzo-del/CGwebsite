@@ -88,7 +88,9 @@ export interface Member {
 }
 export interface HouseholdMember { first_name: string; last_name: string; status: "invited" | "active" }
 export interface Me { member: Member; household: HouseholdMember[] }
-export interface Config { signup_enabled: boolean; terms_version: number; terms_text: string }
+/** Sign-up: off (nobody joins), invite (a valid invitation is needed), open (anyone). */
+export type SignupMode = "off" | "invite" | "open";
+export interface Config { signup_mode: SignupMode; terms_version: number; terms_text: string }
 export interface LinkInfo { kind: "set_password" | "reset"; first_name: string; needs_details: boolean; phone: string }
 export interface SignedIn { member: Member; session_token: string; expires_at: string; household_invited?: number }
 

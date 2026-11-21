@@ -22,6 +22,8 @@ export const LIMITS = {
   "passport-signin": { max: 20,  windowMs: HOUR },
   "passport-form":   { max: 5,   windowMs: HOUR },
   "passport-member": { max: 300, windowMs: HOUR },
+  // Invitation codes typed in or opened from a link: few, so a code can't be guessed (the Bible also caps wrong codes overall).
+  "passport-code":   { max: 10,  windowMs: HOUR },
 } as const;
 
 export type BucketName = keyof typeof LIMITS;

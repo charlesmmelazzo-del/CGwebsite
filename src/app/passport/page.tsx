@@ -12,5 +12,5 @@ export default async function PassportPage() {
   if (s.me) return <Shell tab="home"><Home me={s.me} /></Shell>;
   if (s.unavailable) return <Unavailable />;
   const config = await loadConfig();
-  return <SignIn signupEnabled={config.signup_enabled} notice={s.ended ? "You've been signed out. Please sign in again." : undefined} />;
+  return <SignIn signupOpen={config.signup_mode === "open"} notice={s.ended ? "You've been signed out. Please sign in again." : undefined} />;
 }

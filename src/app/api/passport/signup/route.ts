@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
         terms_version: Number(body.terms_version) || 0,
         marketing_consent: body.marketing_consent === true,
         household,
+        invitation_code: str(body.invitation_code, 20),
       },
     });
     return signedInResponse(out, { household_invited: out.household_invited ?? 0 });

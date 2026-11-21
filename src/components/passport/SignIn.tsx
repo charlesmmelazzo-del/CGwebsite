@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Cover, Field, Notice, TextLink, inputCls, postJson, useBotFields } from "./ui";
 
-export default function SignIn({ signupEnabled, notice }: { signupEnabled: boolean; notice?: string }) {
+/** signupOpen: only with sign-up set to Open is the sign-up page linked from here (never for Invite only). */
+export default function SignIn({ signupOpen, notice }: { signupOpen: boolean; notice?: string }) {
   const router = useRouter();
   const { trap, fields } = useBotFields();
   const [email, setEmail] = useState("");
@@ -30,7 +31,7 @@ export default function SignIn({ signupEnabled, notice }: { signupEnabled: boole
       footer={
         <div className="space-y-3">
           <p><TextLink href="/passport/forgot">Forgot your password?</TextLink></p>
-          {signupEnabled && <p>New here? <TextLink href="/passport/signup">Create your Passport</TextLink></p>}
+          {signupOpen && <p>New here? <TextLink href="/passport/signup">Create your Passport</TextLink></p>}
           <p className="pt-4"><a href="/" className="text-xs tracking-[0.2em] uppercase opacity-70 hover:opacity-100">← commongoodcocktailhouse.com</a></p>
         </div>
       }>

@@ -10,10 +10,10 @@ const blank = (): Person => ({ first_name: "", last_name: "", email: "" });
 
 /**
  * Sign-up, in two steps: the member's own details, then the household question.
- * Only reachable while the Bible's sign-up setting is on (the page 404s otherwise,
- * and the Bible refuses the request regardless).
+ * Reached only as the sign-up page allows (Invite only: with a valid invitation;
+ * Open: anyone). The Bible checks again and uses the invitation up on finishing.
  */
-export default function SignUp({ termsText, termsVersion }: { termsText: string; termsVersion: number }) {
+export default function SignUp({ termsText, termsVersion, invitationCode }: { termsText: string; termsVersion: number; invitationCode?: string }) {
   const router = useRouter();
   const { trap, fields } = useBotFields();
   const [step, setStep] = useState<1 | 2>(1);
@@ -44,7 +44,8 @@ export default function SignUp({ termsText, termsVersion }: { termsText: string;
     const household = wantsHousehold ? people.filter((p) => p.first_name || p.last_name || p.email) : [];
     setBusy(true);
     const r = await postJson<{ household_invited?: number }>("/api/passport/signup", {
-      ...me, password, age_confirmed: age, terms_version: termsVersion, marketing_consent: marketing, household, ...fields(),
+      ...me, password, age_confirmed: age, terms_version: termsVersion, marketing_consent: marketing, household,
+      ...(invitationCode ? { invitation_code: invitationCode } : {}), ...fields(),
     });
     if (r.ok) {
       router.replace("/passport");
@@ -97,7 +98,7 @@ export default function SignUp({ termsText, termsVersion }: { termsText: string;
   }
 
   return (
-    <Cover title="Create your Passport" subtitle="So every bartender knows your favorites, no matter who is working."
+    <Cover title={invitationCode ? "You're invited" : "Create your Passport"} subtitle="So every bartender knows your favorites, no matter who is working."
       footer={<>Already have one? <TextLink href="/passport">Sign in</TextLink></>}>
       <form onSubmit={next} className="space-y-4 relative" noValidate>
         {trap}
