@@ -105,7 +105,12 @@ export const getMe = (auth: MemberAuth) => passport<Me>("GET", "/me", { auth });
 // Exactly the fields the Bible's approved list sends (server/passport/guestSafe.js).
 export interface CocktailCard { id: number; name: string; flavor: string; menu_name: string; menu_status: "current" | "past"; passport: "current" | "past" | null }
 export interface Cocktail extends CocktailCard { ingredients: string; tagline: string; notes: string }
-export interface ArchivedBottle { id: number; name: string; category: string; producer: string; description: string; status_label: string }
+export interface ArchivedBottle { id: number; name: string; category: string; producer: string; description: string; status_label: string | null }
+/** Toast menus as the Bible's approved list sends them (menu reader). */
+export interface MenuPrice { label: string | null; price: number }
+export interface MenuItem { name: string; description: string; prices: MenuPrice[]; cocktail_id: number | null; bottle_id: number | null; unavailable: boolean }
+export interface MenuGroup { name: string; items: MenuItem[] }
+export interface ToastMenu { name: string; groups: MenuGroup[] }
 export interface MenuInfo { available: boolean; updated_at: string | null }
 
 export const getLibrary = (auth: MemberAuth, q = "") =>
@@ -114,5 +119,8 @@ export const getCocktail = (auth: MemberAuth, id: number) => passport<{ cocktail
 export const getPassportCocktails = (auth: MemberAuth) => passport<{ passport_cocktails: Cocktail[] }>("GET", "/passport-cocktails", { auth }).then((r) => r.passport_cocktails);
 export const getArchive = (auth: MemberAuth) => passport<{ archive: ArchivedBottle[] }>("GET", "/spirits/archive", { auth }).then((r) => r.archive);
 export const getArchivedBottle = (auth: MemberAuth, id: number) => passport<{ bottle: ArchivedBottle }>("GET", `/spirits/archive/${id}`, { auth }).then((r) => r.bottle);
-export const getMenus = (auth: MemberAuth) => passport<{ menu_info: MenuInfo; menus: unknown[] }>("GET", "/menus", { auth });
+export const getMenus = (auth: MemberAuth) => passport<{ menu_info: MenuInfo; menus: ToastMenu[]; passport_group: MenuGroup | null }>("GET", "/menus", { auth });
+export const getSpirits = (auth: MemberAuth) => passport<{ menu_info: MenuInfo; spirits: ToastMenu | null }>("GET", "/spirits", { auth });
+/** A bottle page: on the spirits list or in the archive. */
+export const getBottle = (auth: MemberAuth, id: number) => passport<{ bottle: ArchivedBottle }>("GET", `/spirits/bottle/${id}`, { auth }).then((r) => r.bottle);
 

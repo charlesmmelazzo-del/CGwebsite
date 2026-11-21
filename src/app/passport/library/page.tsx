@@ -30,6 +30,10 @@ export default async function LibraryPage({ searchParams }: { searchParams: { q?
         : <Quiet>{q ? "Nothing matches that. Try one ingredient, like “mezcal”." : "The library is being filled in."}</Quiet>}
       {!q && (
         <>
+          <SectionTitle>Spirits</SectionTitle>
+          <a href="/passport/spirits" className="block rounded-xl border px-5 py-4 font-body text-[15px]" style={{ borderColor: "#323B29", color: "#EDE6D3" }}>
+            The spirits list, by category, with pour prices →
+          </a>
           <span id="archive" />
           <SectionTitle>Spirits archive</SectionTitle>
           <Quiet>Bottles we no longer carry. Your history with them stays here.</Quiet>
