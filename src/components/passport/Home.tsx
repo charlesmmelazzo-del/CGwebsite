@@ -1,6 +1,7 @@
 "use client";
 
 import InstallHint from "./InstallHint";
+import PhonePrompt from "./PhonePrompt";
 import { C } from "./ui";
 import type { Me } from "@/lib/passport/bible";
 
@@ -13,6 +14,7 @@ function greeting() {
 export default function Home({ me }: { me: Me }) {
   return (
     <div className="animate-fade-in">
+      {me.member.needs_phone && <PhonePrompt />}
       <InstallHint />
       <p className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }} suppressHydrationWarning>{greeting()}</p>
       <h1 className="font-display text-[44px] leading-[1.05] mt-2">Welcome, {me.member.first_name}.</h1>

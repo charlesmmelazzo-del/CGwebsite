@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { passport, type SignedIn } from "@/lib/passport/bible";
+import { passport, type SignUpResult } from "@/lib/passport/bible";
 import { bad, fromError, limited, looksLikeBot, readJson, sameOrigin, signedInResponse, silentOk } from "@/lib/passport/route";
 import { canSignIn } from "@/lib/passport/session";
 import { isEmail, isUsPhone, phoneDigits } from "@/lib/reserve/format";
@@ -9,8 +9,9 @@ export const dynamic = "force-dynamic";
 const str = (v: unknown, max = 100) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 
 /**
- * Sign-up. Built but hidden: while the Bible's sign-up setting is off, the
- * Bible refuses this (403) no matter who calls it.
+ * Sign-up. The Bible refuses it while sign-up is Off, needs a valid invitation
+ * in Invite only, and answers "check your email" whether or not the email is
+ * already a member (so it never reveals who is).
  */
 export async function POST(req: NextRequest) {
   if (!sameOrigin(req)) return bad("Not allowed", 403);
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
     if (!h.first_name || !h.last_name || !isEmail(h.email)) return bad("Each person in your household needs a first name, last name and email.");
   }
   try {
-    const out = await passport<SignedIn>("POST", "/signup", {
+    const out = await passport<SignUpResult>("POST", "/signup", {
       body: {
         first_name: str(body.first_name), last_name: str(body.last_name), email, phone: phoneDigits(phone),
         password: typeof body.password === "string" ? body.password.slice(0, 200) : "",
@@ -44,7 +45,9 @@ export async function POST(req: NextRequest) {
         invitation_code: str(body.invitation_code, 20),
       },
     });
-    return signedInResponse(out, { household_invited: out.household_invited ?? 0 });
+    // Always the same "check your email" unless the Bible signed them in (a personal invitation to this same email).
+    if ("session_token" in out) return signedInResponse(out, { signed_in: true });
+    return NextResponse.json({ ok: true, check_email: true });
   } catch (e) {
     return fromError(e, { req, bucket: "passport-form" });
   }

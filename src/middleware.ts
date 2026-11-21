@@ -89,7 +89,10 @@ export async function middleware(req: NextRequest) {
   if (pathname === "/passport" || pathname.startsWith("/passport/")) {
     const requestHeaders = new Headers(req.headers);
     requestHeaders.set("x-pathname", pathname);
-    return pass(NextResponse.next({ request: { headers: requestHeaders } }));
+    const res = NextResponse.next({ request: { headers: requestHeaders } });
+    // One-time links carry their code in the address: never send it on to another site.
+    if (pathname === "/passport/set-password" || pathname === "/passport/confirm") res.headers.set("Referrer-Policy", "no-referrer");
+    return pass(res);
   }
 
   // ── Competitions (/compete/*) ──────────────────────────────────────────────

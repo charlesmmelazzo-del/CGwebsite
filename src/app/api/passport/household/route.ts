@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { passport, type Me } from "@/lib/passport/bible";
+import { passport } from "@/lib/passport/bible";
 import { bad, fromError, limited, looksLikeBot, readJson, sameOrigin, silentOk } from "@/lib/passport/route";
 import { currentAuth } from "@/lib/passport/session";
 import { isEmail } from "@/lib/reserve/format";
@@ -25,8 +25,9 @@ export async function POST(req: NextRequest) {
   if (!h.first_name || !h.last_name) return bad("Enter their first and last name.");
   if (!isEmail(h.email)) return bad("Enter their email address.");
   try {
-    const out = await passport<Me & { ok: true }>("POST", "/household", { auth, body: h });
-    return NextResponse.json({ ok: true, household: out.household });
+    // The same answer whether or not that email already has a Passport (then they are emailed and nobody is added).
+    await passport<{ ok: true }>("POST", "/household", { auth, body: h });
+    return NextResponse.json({ ok: true });
   } catch (e) {
     return fromError(e, { req, bucket: "passport-form" });
   }

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Agreement from "./Terms";
+import CheckEmail from "./CheckEmail";
 import { Button, C, Cover, Field, Notice, TextLink, inputCls, postJson, useBotFields } from "./ui";
 
 type Person = { first_name: string; last_name: string; email: string };
@@ -26,6 +27,7 @@ export default function SignUp({ termsText, termsVersion, invitationCode }: { te
   const [people, setPeople] = useState<Person[]>([blank()]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
 
   const next = (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,10 +45,14 @@ export default function SignUp({ termsText, termsVersion, invitationCode }: { te
     setError("");
     const household = wantsHousehold ? people.filter((p) => p.first_name || p.last_name || p.email) : [];
     setBusy(true);
-    const r = await postJson<{ household_invited?: number }>("/api/passport/signup", {
+    const r = await postJson<{ check_email?: boolean; signed_in?: boolean }>("/api/passport/signup", {
       ...me, password, age_confirmed: age, terms_version: termsVersion, marketing_consent: marketing, household,
       ...(invitationCode ? { invitation_code: invitationCode } : {}), ...fields(),
     });
+    if (r.ok && r.data.check_email) {
+      setSent(true);
+      return;
+    }
     if (r.ok) {
       router.replace("/passport");
       router.refresh();
@@ -57,6 +63,8 @@ export default function SignUp({ termsText, termsVersion, invitationCode }: { te
   };
 
   const set = (k: keyof typeof me) => (e: React.ChangeEvent<HTMLInputElement>) => setMe({ ...me, [k]: e.target.value });
+
+  if (sent) return <CheckEmail email={me.email.trim()} />;
 
   if (step === 2) {
     return (
@@ -70,7 +78,7 @@ export default function SignUp({ termsText, termsVersion, invitationCode }: { te
           {wantsHousehold && (
             <div className="space-y-5">
               <p className="font-body text-sm leading-relaxed" style={{ color: C.muted }}>
-                We&rsquo;ll email each person a link to set up their own Passport. They choose their own password, and their history stays their own.
+                A household is up to 3 people, counting you. Once you confirm your email, we&rsquo;ll email each person a link to set up their own Passport. They choose their own password, and their history stays their own.
               </p>
               {people.map((p, i) => (
                 <div key={i} className="space-y-3 rounded-lg border p-4" style={{ borderColor: C.line }}>
@@ -84,7 +92,7 @@ export default function SignUp({ termsText, termsVersion, invitationCode }: { te
                   )}
                 </div>
               ))}
-              {people.length < 6 && (
+              {people.length < 2 && (
                 <button type="button" className="font-body text-sm underline underline-offset-4" style={{ color: C.text }} onClick={() => setPeople([...people, blank()])}>+ Add another person</button>
               )}
             </div>

@@ -13,6 +13,9 @@ export default function Account({ me: initial }: { me: Me }) {
   const [error, setError] = useState("");
   const [showInstall, setShowInstall] = useState(false);
   const [inviting, setInviting] = useState(false);
+  const [sentTo, setSentTo] = useState("");
+  // Up to 3 people in a household, counting anyone invited who hasn't joined.
+  const full = me.household.length >= 2;
   const m = me.member;
 
   const setMarketing = async (on: boolean) => {
@@ -41,7 +44,7 @@ export default function Account({ me: initial }: { me: Me }) {
 
       <Block title="Contact">
         <Row label="Email" value={m.email} />
-        <Row label="Phone" value={formatPhone(m.phone)} />
+        <Row label="Phone" value={m.phone ? formatPhone(m.phone) : "Not added yet"} />
         <p className="font-body text-xs leading-relaxed pt-1" style={{ color: C.faint }}>To change these, message us or ask at the bar. They&rsquo;re how we match your visits to your Passport.</p>
       </Block>
 
@@ -59,8 +62,10 @@ export default function Account({ me: initial }: { me: Me }) {
           <p className="font-body text-sm" style={{ color: C.muted }}>Nobody else yet.</p>
         )}
         <p className="font-body text-xs leading-relaxed" style={{ color: C.faint }}>Everyone in a household has their own sign-in and sees only their own history and notes.</p>
-        {m.can_invite_household && (inviting
-          ? <InviteForm onDone={(household) => { setMe({ ...me, household }); setInviting(false); }} onCancel={() => setInviting(false)} />
+        {sentTo && <Notice kind="ok">Invitation sent to {sentTo}.</Notice>}
+        {full && m.can_invite_household && <p className="font-body text-xs" style={{ color: C.faint }}>A household can have up to 3 people.</p>}
+        {m.can_invite_household && !full && (inviting
+          ? <InviteForm onDone={(first) => { setSentTo(first); setInviting(false); }} onCancel={() => setInviting(false)} />
           : <button type="button" className="font-body text-sm underline underline-offset-4" style={{ color: C.text }} onClick={() => setInviting(true)}>+ Add someone in your household</button>)}
       </Block>
 
@@ -83,7 +88,7 @@ export default function Account({ me: initial }: { me: Me }) {
   );
 }
 
-function InviteForm({ onDone, onCancel }: { onDone: (h: Me["household"]) => void; onCancel: () => void }) {
+function InviteForm({ onDone, onCancel }: { onDone: (firstName: string) => void; onCancel: () => void }) {
   const { trap, fields } = useBotFields();
   const [p, setP] = useState({ first_name: "", last_name: "", email: "" });
   const [error, setError] = useState("");
@@ -92,9 +97,10 @@ function InviteForm({ onDone, onCancel }: { onDone: (h: Me["household"]) => void
     e.preventDefault();
     setBusy(true);
     setError("");
-    const r = await postJson<{ household: Me["household"] }>("/api/passport/household", { ...p, ...fields() });
+    const r = await postJson("/api/passport/household", { ...p, ...fields() });
     setBusy(false);
-    if (r.ok && r.data.household) onDone(r.data.household);
+    // The same "Invitation sent" whether or not they already have a Passport.
+    if (r.ok) onDone(p.first_name.trim());
     else setError(r.data.error || "Couldn't send the invitation. Please try again.");
   };
   return (

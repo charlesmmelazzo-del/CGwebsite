@@ -85,6 +85,8 @@ export interface Member {
   member_since: string | null;
   marketing_consent: boolean;
   can_invite_household: boolean;
+  /** Their number was already on another Passport when they joined: the app asks for a different one. */
+  needs_phone: boolean;
 }
 export interface HouseholdMember { first_name: string; last_name: string; status: "invited" | "active" }
 export interface Me { member: Member; household: HouseholdMember[] }
@@ -93,6 +95,8 @@ export type SignupMode = "off" | "invite" | "open";
 export interface Config { signup_mode: SignupMode; terms_version: number; terms_text: string }
 export interface LinkInfo { kind: "set_password" | "reset"; first_name: string; needs_details: boolean; phone: string }
 export interface SignedIn { member: Member; session_token: string; expires_at: string; household_invited?: number }
+/** Sign-up answers "check your email", or (a personal invitation sent to that same email) signs in at once. */
+export type SignUpResult = { ok: true; check_email: true } | (SignedIn & { signed_in: true })
 
 export const getConfig = () => passport<{ config: Config }>("GET", "/config").then((r) => r.config);
 export const getMe = (auth: MemberAuth) => passport<Me>("GET", "/me", { auth });
