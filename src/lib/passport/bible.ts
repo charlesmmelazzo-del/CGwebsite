@@ -131,9 +131,10 @@ export const getSpirits = (auth: MemberAuth) => passport<{ menu_info: MenuInfo; 
 // ── File 03b: bottle and producer pages, the base-spirit filter, at-home recipes ──
 export interface Fact { label: string; value: string }
 export interface BottleCocktail { id: number; name: string; menu_name: string; menu_status: "current" | "past" }
-export interface Bottle extends ArchivedBottle { producer_id: number | null; prices: MenuPrice[]; facts: Fact[]; cocktails: BottleCocktail[] }
+export interface Bottle extends ArchivedBottle { producer_id: number | null; passport_description?: string; prices: MenuPrice[]; facts: Fact[]; cocktails: BottleCocktail[] }
 export interface ProducerBottle { id: number; name: string; category: string; status_label: string | null }
-export interface Producer { id: number; name: string; based_in: string; bottles: ProducerBottle[] }
+/** passport_description: the approved Passport text (Part 6), or "" when there is none yet. */
+export interface Producer { id: number; name: string; based_in: string; passport_description?: string; bottles: ProducerBottle[] }
 export interface BaseSpirit { key: string; label: string; count: number }
 /** A bottle page: on the spirits list, in the archive, or linked from a cocktail shown in Passport. */
 export const getBottle = (auth: MemberAuth, id: number) => passport<{ bottle: Bottle }>("GET", `/spirits/bottle/${id}`, { auth }).then((r) => r.bottle);

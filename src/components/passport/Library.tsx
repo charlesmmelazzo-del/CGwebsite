@@ -141,9 +141,9 @@ export function BottlePage({ b }: { b: Bottle | ArchivedBottle }) {
       </p>
       {r.prices && r.prices.length > 0 && <p className="mt-3"><Prices prices={r.prices} /></p>}
       <div className="w-14 h-px my-6" style={{ background: C.brass, opacity: 0.6 }} />
-      {b.description
-        ? <p className="font-body text-[16px] leading-relaxed" style={{ color: C.text }}>{b.description}</p>
-        : <p className="font-body text-sm" style={{ color: C.faint }}>No description yet.</p>}
+      {/* The Toast description leads; the approved Passport text (Part 6) follows. Either alone reads as complete. */}
+      {b.description && <p className="font-body text-[16px] leading-relaxed" style={{ color: C.text }}>{b.description}</p>}
+      {r.passport_description && <LongText text={r.passport_description} className={b.description ? "mt-4" : ""} />}
       {r.facts && r.facts.length > 0 && (
         <dl className="mt-6 grid grid-cols-[auto,1fr] gap-x-6 gap-y-2">
           {r.facts.map((f) => (
@@ -173,6 +173,16 @@ export function BottlePage({ b }: { b: Bottle | ArchivedBottle }) {
   );
 }
 
+/** Approved Passport text: plain paragraphs (blank lines split them; stray Markdown marks are dropped). */
+function LongText({ text, className = "" }: { text: string; className?: string }) {
+  const paras = text.split(/\n\s*\n/).map((t) => t.replace(/^#+\s*/gm, "").replace(/\*\*|__/g, "").trim()).filter(Boolean);
+  return (
+    <div className={`space-y-3 ${className}`}>
+      {paras.map((t, i) => <p key={i} className="font-body text-[15px] leading-relaxed whitespace-pre-line" style={{ color: C.muted }}>{t}</p>)}
+    </div>
+  );
+}
+
 /** File 03b: a producer page: who they are and their bottles a member may open. */
 export function ProducerPage({ p }: { p: Producer }) {
   return (
@@ -182,6 +192,7 @@ export function ProducerPage({ p }: { p: Producer }) {
       <h1 className="font-display text-[38px] leading-[1.05] mt-2" style={{ color: C.text }}>{p.name}</h1>
       {p.based_in && <p className="font-body text-sm mt-2" style={{ color: C.muted }}>{p.based_in}</p>}
       <div className="w-14 h-px my-6" style={{ background: C.brass, opacity: 0.6 }} />
+      {p.passport_description && <LongText text={p.passport_description} className="mb-8" />}
       <section>
         <h2 className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>Their bottles</h2>
         <ul className="mt-2">
