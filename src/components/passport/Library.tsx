@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { C } from "./theme";
-import type { ArchivedBottle, Cocktail, CocktailCard, MenuGroup, MenuItem, MenuPrice } from "@/lib/passport/bible";
+import type { ArchivedBottle, Bottle, Cocktail, CocktailCard, MenuGroup, MenuItem, MenuPrice, Producer } from "@/lib/passport/bible";
 
 /** File 03a: the library pieces (server-rendered). Only fields from the Bible's approved list. */
 
@@ -83,7 +83,16 @@ export function CocktailPage({ c }: { c: Cocktail }) {
       {c.ingredients && (
         <section>
           <h2 className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>In the glass</h2>
-          <p className="font-body text-[16px] mt-2 leading-relaxed" style={{ color: C.text }}>{c.ingredients}</p>
+          <p className="font-body text-[16px] mt-2 leading-relaxed" style={{ color: C.text }}>
+            {c.ingredient_items && c.ingredient_items.length ? c.ingredient_items.map((it, i) => (
+              <span key={i}>
+                {i > 0 && ", "}
+                {it.bottle_id
+                  ? <Link href={`/passport/spirits/${it.bottle_id}`} className="underline decoration-1 underline-offset-4" style={{ textDecorationColor: `${C.brass}99` }}>{it.text}</Link>
+                  : it.text}
+              </span>
+            )) : c.ingredients}
+          </p>
         </section>
       )}
       {c.flavor && (
@@ -93,6 +102,11 @@ export function CocktailPage({ c }: { c: Cocktail }) {
         </section>
       )}
       {c.notes && <p className="font-body text-[15px] mt-6 leading-relaxed" style={{ color: C.muted }}>{c.notes}</p>}
+      {c.home_recipe && (
+        <a href={`/passport/library/${c.id}/home-recipe`} className="mt-8 inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 font-body text-sm" style={{ borderColor: `${C.brass}80`, color: C.brass }}>
+          Make it at home <span aria-hidden>↓</span><span className="sr-only">(PDF download)</span>
+        </a>
+      )}
     </article>
   );
 }
@@ -108,21 +122,79 @@ export function BottleRow({ b }: { b: ArchivedBottle }) {
   );
 }
 
-export function BottlePage({ b }: { b: ArchivedBottle }) {
+/** File 03b: the bottle page. Only fields from the Bible's approved list; only what is filled in. */
+export function BottlePage({ b }: { b: Bottle | ArchivedBottle }) {
+  const r = b as Partial<Bottle>;
   const archived = b.status_label === "No longer carried";
+  // Back to where this bottle lives: the archive, the spirits list (it has pour prices there), else the Library.
+  const back = archived ? { href: "/passport/library#archive", label: "Spirits archive" } : r.prices && r.prices.length ? { href: "/passport/spirits", label: "Spirits list" } : { href: "/passport/library", label: "Library" };
   return (
     <article>
-      {archived
-        ? <Link href="/passport/library#archive" className="font-body text-xs tracking-[0.2em] uppercase" style={{ color: C.muted }}>← Spirits archive</Link>
-        : <Link href="/passport/spirits" className="font-body text-xs tracking-[0.2em] uppercase" style={{ color: C.muted }}>← Spirits list</Link>}
+      <Link href={back.href} className="font-body text-xs tracking-[0.2em] uppercase" style={{ color: C.muted }}>← {back.label}</Link>
       {b.status_label && <div className="mt-5"><Label>{b.status_label}</Label></div>}
       <h1 className={`font-display text-[38px] leading-[1.05] ${b.status_label ? "mt-3" : "mt-5"}`} style={{ color: C.text }}>{b.name}</h1>
-      <p className="font-body text-sm mt-2" style={{ color: C.muted }}>{[b.category, b.producer].filter(Boolean).join(" · ")}</p>
+      <p className="font-body text-sm mt-2" style={{ color: C.muted }}>
+        {b.category}{b.category && b.producer ? " · " : ""}
+        {b.producer && (r.producer_id
+          ? <Link href={`/passport/producers/${r.producer_id}`} className="underline decoration-1 underline-offset-4" style={{ textDecorationColor: `${C.brass}99` }}>{b.producer}</Link>
+          : b.producer)}
+      </p>
+      {r.prices && r.prices.length > 0 && <p className="mt-3"><Prices prices={r.prices} /></p>}
       <div className="w-14 h-px my-6" style={{ background: C.brass, opacity: 0.6 }} />
       {b.description
         ? <p className="font-body text-[16px] leading-relaxed" style={{ color: C.text }}>{b.description}</p>
         : <p className="font-body text-sm" style={{ color: C.faint }}>No description yet.</p>}
-      <p className="font-body text-xs mt-8" style={{ color: C.faint }}>The full bottle story, and your own notes, arrive soon.</p>
+      {r.facts && r.facts.length > 0 && (
+        <dl className="mt-6 grid grid-cols-[auto,1fr] gap-x-6 gap-y-2">
+          {r.facts.map((f) => (
+            <div key={f.label} className="contents">
+              <dt className="font-body text-[11px] tracking-[0.2em] uppercase pt-0.5" style={{ color: C.brass }}>{f.label}</dt>
+              <dd className="font-body text-[15px]" style={{ color: C.text }}>{f.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {r.cocktails && r.cocktails.length > 0 && (
+        <section className="mt-8">
+          <h2 className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>In our cocktails</h2>
+          <ul className="mt-2">
+            {r.cocktails.map((c) => (
+              <li key={c.id}>
+                <Link href={`/passport/library/${c.id}`} className="flex items-baseline justify-between gap-3 py-3 border-b" style={{ borderColor: C.line }}>
+                  <span className="font-display text-[19px]" style={{ color: C.text }}>{c.name}</span>
+                  <span className="font-body text-[10px] tracking-[0.15em] uppercase whitespace-nowrap" style={{ color: C.faint }}>{c.menu_status === "past" ? `Past menu · ${c.menu_name}` : c.menu_name}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </article>
+  );
+}
+
+/** File 03b: a producer page: who they are and their bottles a member may open. */
+export function ProducerPage({ p }: { p: Producer }) {
+  return (
+    <article>
+      <Link href="/passport/library" className="font-body text-xs tracking-[0.2em] uppercase" style={{ color: C.muted }}>← Library</Link>
+      <p className="font-body text-[11px] tracking-[0.3em] uppercase mt-5" style={{ color: C.brass }}>Producer</p>
+      <h1 className="font-display text-[38px] leading-[1.05] mt-2" style={{ color: C.text }}>{p.name}</h1>
+      {p.based_in && <p className="font-body text-sm mt-2" style={{ color: C.muted }}>{p.based_in}</p>}
+      <div className="w-14 h-px my-6" style={{ background: C.brass, opacity: 0.6 }} />
+      <section>
+        <h2 className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>Their bottles</h2>
+        <ul className="mt-2">
+          {p.bottles.map((b) => (
+            <li key={b.id}>
+              <Link href={`/passport/spirits/${b.id}`} className="flex items-baseline justify-between gap-3 py-3 border-b" style={{ borderColor: C.line }}>
+                <span className="font-body text-[15px]" style={{ color: C.text }}>{b.name}</span>
+                <span className="font-body text-[10px] tracking-[0.15em] uppercase whitespace-nowrap" style={{ color: C.faint }}>{b.status_label || b.category}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
     </article>
   );
 }
