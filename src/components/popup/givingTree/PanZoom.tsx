@@ -31,7 +31,9 @@ export default forwardRef<PanZoomHandle, {
   children: (scale: number) => ReactNode;
   /** Extra controls drawn over the viewport, under the zoom buttons. */
   overlay?: ReactNode;
-}>(function PanZoom({ width, height, maxScale = 6, maxFitScale = 2, className = "", label, children, overlay }, ref) {
+  /** Something (a list sheet) covers part of the view: allow panning past the edges even at the full view. */
+  loose?: boolean;
+}>(function PanZoom({ width, height, maxScale = 6, maxFitScale = 2, className = "", label, children, overlay, loose: sheetOpen = false }, ref) {
   const box = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [view, setView] = useState<View>({ scale: 1, tx: 0, ty: 0 });
@@ -42,18 +44,26 @@ export default forwardRef<PanZoomHandle, {
   const fitted = useRef(false);
 
   const fitScale = size.w && size.h ? Math.min(size.w / width, size.h / height, maxFitScale) : 1;
-  const minScale = fitScale * 0.6;
+  // Zooming out stops at the whole thing in view: it never shrinks smaller.
+  const minScale = fitScale;
 
   const clamp = useCallback(
-    (v: View): View => {
+    (v: View, loose = false): View => {
       const scale = Math.min(maxScale, Math.max(minScale, v.scale));
-      // Keep at least a third of the content on screen.
+      // At the full view it stays centered. Zoomed in at all, it can be
+      // panned past its edges by some slack, so a zone low on the tree can
+      // still be lifted above the list sheet that covers the bottom half.
+      const axis = (t: number, content: number, view: number, slack: number) => {
+        const centered = (view - content) / 2;
+        const lo = Math.min(centered, view - content) - slack;
+        const hi = Math.max(centered, 0) + slack;
+        return Math.min(hi, Math.max(lo, t));
+      };
       const cw = width * scale, ch = height * scale;
-      const tx = Math.min(size.w - cw / 3, Math.max(-cw + cw / 3, v.tx));
-      const ty = Math.min(size.h - ch / 3, Math.max(-ch + ch / 3, v.ty));
-      return { scale, tx, ty };
+      const zoomed = loose || sheetOpen || scale > minScale * 1.01;
+      return { scale, tx: axis(v.tx, cw, size.w, zoomed ? size.w * 0.25 : 0), ty: axis(v.ty, ch, size.h, zoomed ? size.h * 0.55 : 0) };
     },
-    [height, maxScale, minScale, size.h, size.w, width]
+    [height, maxScale, minScale, sheetOpen, size.h, size.w, width]
   );
 
   const glide = useCallback((v: View) => {
@@ -75,7 +85,9 @@ export default forwardRef<PanZoomHandle, {
       // sheet; the rectangle is fitted into that part.
       const vh = size.h * (opts?.visible ?? 1);
       const s = Math.min(opts?.maxScale ?? maxScale, (size.w / r.w) * 0.9, (vh / r.h) * 0.9);
-      glide(clamp({ scale: s, tx: size.w / 2 - (r.x + r.w / 2) * s, ty: vh / 2 - (r.y + r.h / 2) * s }));
+      // With a sheet covering part of the screen, allow the slack even at
+      // the full view, or a wide zone low on the tree would stay hidden.
+      glide(clamp({ scale: s, tx: size.w / 2 - (r.x + r.w / 2) * s, ty: vh / 2 - (r.y + r.h / 2) * s }, vh < size.h));
     },
     fit,
     zoomBy(f) {

@@ -348,7 +348,7 @@ export function ManualSection({ s, act }: { s: Snapshot; act: Act }) {
           markReceived: f.markReceived,
         },
       });
-      setMsg(`Added. Code ${r.code}. It has a star and is in “Ornaments to write”.`);
+      setMsg(`Added. Code ${r.code}. It has a stocking and is in “Ornaments to write”.`);
       setF({ ...f, name: "", email: "", phone: "", displayName: "", note: "", hours: "", amount: "", markReceived: false });
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Failed.");
@@ -372,9 +372,9 @@ export function ManualSection({ s, act }: { s: Snapshot; act: Act }) {
       {opp?.type === "volunteer" && opp.hoursMode === "choose" && <Field label={`Hours (${opp.hoursMin}–${opp.hoursMax})`}><Text value={f.hours} onChange={(v) => setF({ ...f, hours: v })} inputMode="decimal" /></Field>}
       {opp?.type === "cash" && <Field label="Amount ($)"><Text value={f.amount} onChange={(v) => setF({ ...f, amount: v })} inputMode="decimal" /></Field>}
       <Check label="Anonymous on the tree" checked={f.anonymous} onChange={(v) => setF({ ...f, anonymous: v })} />
-      {!f.anonymous && <Field label="Name on the star"><Text value={f.displayName} onChange={(v) => setF({ ...f, displayName: v })} placeholder={f.name} /></Field>}
+      {!f.anonymous && <Field label="Name on the stocking"><Text value={f.displayName} onChange={(v) => setF({ ...f, displayName: v })} placeholder={f.name} /></Field>}
       <Field label="Note (optional, 200 max)"><Area value={f.note} onChange={(v) => setF({ ...f, note: v.slice(0, 200) })} rows={2} /></Field>
-      <Check label="Show what they gave on the star" checked={f.showGift} onChange={(v) => setF({ ...f, showGift: v })} />
+      <Check label="Show what they gave on the stocking" checked={f.showGift} onChange={(v) => setF({ ...f, showGift: v })} />
       {opp?.type === "cash" && <Check label="Show the amount" checked={f.showAmount} onChange={(v) => setF({ ...f, showAmount: v })} />}
       {opp?.type === "gift" && <Check label="They brought the gift with them (mark received)" checked={f.markReceived} onChange={(v) => setF({ ...f, markReceived: v })} />}
       {err && <p className="text-xs text-red-600">{err}</p>}
