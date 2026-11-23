@@ -7,13 +7,22 @@
 // moves to the next one once it's done. "Skip" goes straight to the home
 // screen. With reduced motion on, each panel simply appears.
 
-import { Dancing_Script } from "next/font/google";
+import localFont from "next/font/local";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { COPY } from "@/lib/givingTree/copy";
 import { useReducedMotion } from "./motion";
 
-export const scriptFont = Dancing_Script({ subsets: ["latin"], weight: ["400", "600"], display: "swap" });
+// Dancing Script (SIL Open Font License, see fonts/OFL.txt), kept in the repo
+// rather than fetched from Google Fonts at build time, which fails at random.
+export const scriptFont = localFont({
+  src: [
+    { path: "./fonts/dancing-script-latin-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/dancing-script-latin-600-normal.woff2", weight: "600", style: "normal" },
+  ],
+  display: "swap",
+  fallback: ["cursive"],
+});
 
 /** Milliseconds between letters, and the pause once a panel is finished. */
 const LETTER_MS = 38;
