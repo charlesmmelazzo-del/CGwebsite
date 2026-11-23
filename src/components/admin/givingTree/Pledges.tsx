@@ -47,14 +47,14 @@ export function PledgeRow({ p, act, open: startOpen = false }: { p: AdminPledge;
         <div className="px-3 pb-3 space-y-3 text-sm text-gray-700">
           {!editing ? (
             <dl className="grid grid-cols-[110px_1fr] gap-x-3 gap-y-1 text-[13px]">
-              <dt className="text-gray-400">On the star</dt>
+              <dt className="text-gray-400">On the stocking</dt>
               <dd>{p.label}{p.displayMode === "anonymous" ? " (anonymous)" : ""}</dd>
               <dt className="text-gray-400">Note</dt>
               <dd>{p.note || "—"}</dd>
               <dt className="text-gray-400">Gave</dt>
               <dd>
                 {p.gave}
-                {!p.showGift && " (not shown on star)"}
+                {!p.showGift && " (not shown on stocking)"}
                 {p.oppType === "cash" && p.amount != null && !p.showAmount && " (amount not shown)"}
               </dd>
               <dt className="text-gray-400">Email</dt>
@@ -98,7 +98,7 @@ export function PledgeRow({ p, act, open: startOpen = false }: { p: AdminPledge;
               <Field label="Email"><Text value={draft.email} onChange={(v) => setDraft({ ...draft, email: v })} /></Field>
               {p.oppType === "volunteer" && <Field label="Phone"><Text value={draft.phone} onChange={(v) => setDraft({ ...draft, phone: v })} /></Field>}
               <Check label="Anonymous on the tree" checked={draft.displayMode === "anonymous"} onChange={(v) => setDraft({ ...draft, displayMode: v ? "anonymous" : "named" })} />
-              {draft.displayMode === "named" && <Field label="Name on the star"><Text value={draft.displayName} onChange={(v) => setDraft({ ...draft, displayName: v })} /></Field>}
+              {draft.displayMode === "named" && <Field label="Name on the stocking"><Text value={draft.displayName} onChange={(v) => setDraft({ ...draft, displayName: v })} /></Field>}
               <Field label="Note (200 max)"><Area value={draft.note} onChange={(v) => setDraft({ ...draft, note: v.slice(0, 200) })} rows={2} /></Field>
               <div className="flex gap-2">
                 <Btn kind="primary" disabled={busy} onClick={() => op("edit", draft)}>Save</Btn>
@@ -120,7 +120,7 @@ export function PledgeRow({ p, act, open: startOpen = false }: { p: AdminPledge;
               <Btn small disabled={busy} onClick={() => setEditing(true)}>Edit name / note</Btn>
               {p.hidden ? <Btn small disabled={busy} onClick={() => op("unhide")}>Unhide</Btn> : <Btn small disabled={busy} onClick={() => op("hide")}>Hide</Btn>}
               {p.status === "pledged" && (
-                <Btn small kind="danger" disabled={busy} onClick={() => confirm("Release this pledge? The spot goes back on the tree; the star stays.") && op("release")}>Release</Btn>
+                <Btn small kind="danger" disabled={busy} onClick={() => confirm("Release this pledge? The spot goes back on the tree; the stocking stays.") && op("release")}>Release</Btn>
               )}
               {(p.status !== "pledged" || p.hidden || p.hold === "denied") && <Btn small disabled={busy} onClick={() => op("restore")}>Restore</Btn>}
               {p.ornament === "to_write" ? <Btn small disabled={busy} onClick={() => op("hung")}>Mark hung</Btn> : <Btn small disabled={busy} onClick={() => op("unhung")}>Not hung</Btn>}

@@ -234,7 +234,7 @@ export function DemoSection({ s, act }: { s: Snapshot; act: Act }) {
       </Card>
       <Card title="Reminders and auto-release">
         <p className="text-sm text-gray-600">
-          These run whenever the tree, the sky, this admin or a guest&rsquo;s link is opened (at most once a minute). Run them now by hand:
+          These run whenever the tree, What we&rsquo;ve given, this admin or a guest&rsquo;s link is opened (at most once a minute). Run them now by hand:
         </p>
         <Btn onClick={() => run({ action: "sweep" }, (r) => { const x = (r.report ?? {}) as Record<string, number>; return `Reminders sent ${x.reminded ?? 0}, released ${x.released ?? 0}, closed as not received ${x.notReceived ?? 0}, flagged overdue ${x.flagged ?? 0}.`; })}>
           Run now

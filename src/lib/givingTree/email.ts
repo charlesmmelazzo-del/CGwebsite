@@ -156,7 +156,7 @@ export async function notifyAdminRelease(p: Pledge, o: Opportunity, org: Org, re
   const blocks: Block[] = [
     { kind: "p", text: `Pledge ${p.code} was released (${reason === "auto" ? "automatically, past due with no answer" : reason === "guest" ? "by the guest" : "in the admin"}).` },
     { kind: "p", text: `${org.name}: ${o.title}\n${p.name}${p.email ? ` <${p.email}>` : ""}` },
-    { kind: "p", text: "The spot is back on the tree. Their star stays in the sky and their ornament stays on the wall." },
+    { kind: "p", text: "The spot is back on the tree. Their stocking stays hung and their ornament stays on the wall." },
     { kind: "button", text: "Open the Giving Tree admin", href: `${ctx.origin}/admin/popup/giving-tree` },
   ];
   for (const to of recipients) {

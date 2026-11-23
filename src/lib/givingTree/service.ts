@@ -137,7 +137,7 @@ export function buildState(all: Data, mode: TreeMode, now = Date.now()): TreeSta
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
     .map((p, i) => {
       const o = oppById.get(p.opportunityId)!;
-      return { id: p.id, label: starLabel(p), note: p.note, gave: gaveText(p, o), ...starPosition(i), createdAt: p.createdAt };
+      return { id: p.id, type: o.type, label: starLabel(p), note: p.note, gave: gaveText(p, o), ...starPosition(i), createdAt: p.createdAt };
     });
 
   return {
@@ -351,7 +351,7 @@ export async function createPledge(
       giveUrl: opp.type === "cash" ? opp.giveUrl : null,
       dueDate,
       dropoff: opp.type === "gift" ? opp.dropoffInstructions || s.defaultDropoff : null,
-      star: { id: pledge.id, label: starLabel(pledge), note: pledge.note, gave: gaveText(pledge, opp), x: 0, y: 0, createdAt: nowIso },
+      star: { id: pledge.id, type: opp.type, label: starLabel(pledge), note: pledge.note, gave: gaveText(pledge, opp), x: 0, y: 0, createdAt: nowIso },
     },
   };
 }

@@ -1,6 +1,6 @@
 // ─── The Giving Tree — animations, isolated so they can be swapped (12) ──────
 //
-// Zoom, flip and rise-to-star all read their timing from here. With the
+// Zoom and flip read their timing from here. With the
 // system's reduced-motion setting on, each becomes a simple fade.
 
 "use client";
@@ -36,13 +36,3 @@ export function flipVariants(reduced: boolean): Variants {
   };
 }
 export const flipTransition: Transition = { duration: 0.55, ease: [0.2, 0.7, 0.2, 1] };
-
-/** An ornament leaving the tree and becoming a star. */
-export function riseVariants(reduced: boolean): Variants {
-  if (reduced) return { start: { opacity: 1 }, end: { opacity: 0 } };
-  return {
-    start: { y: 0, scale: 1, opacity: 1, borderRadius: "50%" },
-    end: { y: "-60vh", scale: 0.12, opacity: 0.9, borderRadius: "50%" },
-  };
-}
-export const riseTransition = (reduced: boolean): Transition => (reduced ? { duration: 0.4 } : { duration: 1.4, ease: [0.4, 0, 0.2, 1] });

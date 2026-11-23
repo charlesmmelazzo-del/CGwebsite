@@ -59,12 +59,14 @@ export default forwardRef<PanZoomHandle, {
   onOpen: (o: PublicOpportunity) => void;
   onZone: (zone: OppType) => void;
   overlay?: React.ReactNode;
-}>(function Tree({ opportunities, orgFilter, onOpen, onZone, overlay }, ref) {
+  /** A list sheet covers the lower part of the view. */
+  sheetOpen?: boolean;
+}>(function Tree({ opportunities, orgFilter, onOpen, onZone, overlay, sheetOpen }, ref) {
   const apex = `${TREE.apexX * UNIT},${TREE.apexY * UNIT}`;
   const left = `${(TREE.apexX - TREE.halfBase) * UNIT},${TREE.baseY * UNIT}`;
   const right = `${(TREE.apexX + TREE.halfBase) * UNIT},${TREE.baseY * UNIT}`;
   return (
-    <PanZoom ref={ref} width={TREE_PX} height={TREE_PX} maxFitScale={1.2} className="h-full w-full" label={COPY.treeTitle} overlay={overlay}>
+    <PanZoom ref={ref} width={TREE_PX} height={TREE_PX} maxFitScale={1.2} className="h-full w-full" label={COPY.treeTitle} overlay={overlay} loose={sheetOpen}>
       {(scale) => (
         <>
           <svg width={TREE_PX} height={TREE_PX} className="absolute inset-0" aria-hidden="true">

@@ -202,6 +202,8 @@ export interface PublicOpportunity {
 
 export interface PublicStar {
   id: string;
+  /** Which part of the tree it came from: the section it's listed under. */
+  type: OppType;
   label: string;
   note: string | null;
   /** What they gave, only when the guest allowed it. */

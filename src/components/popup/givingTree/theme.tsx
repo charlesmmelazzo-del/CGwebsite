@@ -24,6 +24,14 @@ const CSS = `
   --gt-zone-gift: #d98f8f;
   --gt-zone-cash: #d9c48f;
   --gt-star: #fff4c2;
+  --gt-intro-bg: #133224;
+  --gt-intro-ink: #f6eedd;
+  --gt-stocking-volunteer: #3f6f9e;
+  --gt-stocking-gift: #a3272b;
+  --gt-stocking-cash: #2f6b45;
+  --gt-stocking-cuff: #f7f3ea;
+  --gt-garland: #6f8f5a;
+  --gt-tabs-h: 60px;
   --gt-danger: #b3261e;
   --gt-banner: #fde68a;
   --gt-banner-ink: #3b2f05;
@@ -107,6 +115,69 @@ const CSS = `
 .gt-star[data-new="true"] .gt-star-dot { width: 16px; height: 16px; box-shadow: 0 0 18px 6px rgba(255, 244, 194, 0.9); }
 .gt-star-label { margin-top: 3px; font-size: 11px; white-space: nowrap; max-width: 110px; overflow: hidden; text-overflow: ellipsis; opacity: 0.85; }
 .gt-sky { background: radial-gradient(ellipse at 50% 30%, var(--gt-sky-2), var(--gt-sky)); }
+
+/* Opening: script written onto dark green */
+.gt-intro {
+  position: absolute; inset: 0; z-index: 60; overflow: hidden; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; padding: 56px 24px 96px;
+  background: var(--gt-intro-bg); color: var(--gt-intro-ink);
+}
+.gt-intro-panel { max-width: 34rem; width: 100%; }
+.gt-written { font-size: clamp(25px, 6.6vw, 38px); line-height: 1.35; text-align: center; }
+.gt-ink { display: inline-block; opacity: 0; animation: gt-ink 0.55s ease-out both; }
+@keyframes gt-ink {
+  from { opacity: 0; filter: blur(3px); transform: translateY(0.08em); }
+  to { opacity: 1; filter: blur(0); transform: none; }
+}
+.gt-intro-skip { font-family: var(--gt-font); color: var(--gt-intro-ink); border-color: rgba(246,238,221,0.35); }
+.gt-intro-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--gt-intro-ink); opacity: 0.3; transition: opacity 0.4s; }
+.gt-intro-dot[data-on="true"] { opacity: 0.9; }
+.gt-intro-hint { font-family: var(--gt-font); font-size: var(--gt-size-s); transition: opacity 0.6s; }
+
+/* Home: a background image or logo, and two ways in */
+.gt-home {
+  height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 28px; padding: 24px; text-align: center;
+  background: var(--gt-intro-bg) var(--gt-home-image, none) center / cover no-repeat; color: var(--gt-intro-ink);
+}
+.gt-home-actions { width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 12px; }
+.gt-home .gt-btn { min-height: 56px; font-size: var(--gt-size-l); }
+
+/* Tabs along the bottom */
+.gt-tabs {
+  display: grid; grid-auto-columns: 1fr; grid-auto-flow: column; height: var(--gt-tabs-h);
+  border-top: 1px solid var(--gt-line); background: var(--gt-bg); padding-bottom: env(safe-area-inset-bottom);
+}
+.gt-tab { display: flex; align-items: center; justify-content: center; background: none; border: 0; color: var(--gt-ink-soft); font: inherit; cursor: pointer; border-top: 3px solid transparent; }
+.gt-tab[aria-current="page"] { color: var(--gt-ink); font-weight: 600; border-top-color: var(--gt-accent); }
+
+/* What we've given: stockings on a line */
+.gt-given { background: var(--gt-bg); }
+.gt-given-empty { padding: 48px 12px; text-align: center; font-size: var(--gt-size-l); font-family: var(--gt-font-display); opacity: 0.85; line-height: 1.4; }
+.gt-stockings { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 18px; }
+@media (min-width: 520px) { .gt-stockings { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.gt-stocking-slot { position: relative; padding: 10px 4px 0; }
+.gt-stocking-slot::before { content: ""; position: absolute; left: 0; right: 0; top: 4px; height: 3px; background: var(--gt-garland); }
+.gt-stocking { position: relative; display: flex; flex-direction: column; align-items: center; width: 100%; background: none; border: 0; color: inherit; cursor: pointer; padding: 0; text-align: center; }
+.gt-stocking-shape { position: relative; display: block; width: 86%; max-width: 110px; }
+.gt-stocking-shape svg { display: block; width: 100%; height: auto; overflow: visible; }
+.gt-stocking-body { fill: var(--gt-stocking-gift); stroke: rgba(0,0,0,0.25); stroke-width: 1.5; }
+.gt-stocking-shape[data-zone="volunteer"] .gt-stocking-body { fill: var(--gt-stocking-volunteer); }
+.gt-stocking-shape[data-zone="cash"] .gt-stocking-body { fill: var(--gt-stocking-cash); }
+.gt-stocking-cuff { fill: var(--gt-stocking-cuff); stroke: rgba(0,0,0,0.2); stroke-width: 1.5; }
+.gt-stocking-loop { fill: none; stroke: var(--gt-stocking-cuff); stroke-width: 2.5; }
+.gt-stocking-name {
+  position: absolute; left: 8%; width: 66%; top: 7.7%; height: 20%;
+  display: flex; align-items: center; justify-content: center; padding: 0 3px;
+  color: #1d1d1b; font-weight: 600; font-size: 11px; line-height: 1.05; overflow: hidden; overflow-wrap: anywhere;
+}
+.gt-stocking-name[data-long="true"] { font-size: 9px; letter-spacing: -0.01em; }
+.gt-stocking-gave, .gt-stocking-note {
+  margin-top: 4px; font-size: 11px; line-height: 1.25; opacity: 0.85;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.gt-stocking-note { font-style: italic; margin-top: 2px; }
+.gt-stocking-slot[data-new="true"] .gt-stocking-shape svg { filter: drop-shadow(0 0 10px rgba(255, 244, 194, 0.75)); }
 
 /* Counters */
 .gt-counters { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; text-align: center; }

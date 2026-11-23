@@ -2,44 +2,56 @@
 
 // ─── The Giving Tree (Christmas) ─────────────────────────────────────────────
 //
-// Two parts: the Christmas recipe downloads (same as the last two pop-ups),
-// and the Giving Tree. Guests pick an ornament from a partner charity,
-// promise to do it, and their ornament rises into the sky as a star.
+// Opens with three panels written out in script, then a home screen with two
+// ways in: the Christmas recipe downloads (same as the last two pop-ups) and
+// the Giving Tree. On the tree guests pick an ornament from a partner
+// charity and promise to do it; their stocking is then hung under "What
+// we've given". The two are tabs along the bottom.
 //
 // Everything is drawn from /api/popup/giving-tree/state. While this pop-up
-// is live the tree takes pledges; once another pop-up goes live it shows only
-// the sky. In the admin sandbox it also shows the demo data, with a banner.
+// is live the tree takes pledges; once another pop-up goes live only "What
+// we've given" remains. In the admin sandbox it also shows the demo data,
+// with a banner.
 // See docs/giving-tree-spec.md; the look lives in givingTree/theme.tsx and
 // every word in lib/givingTree/copy.ts.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PopupTemplateProps } from "@/lib/popup/types";
 import { COPY } from "@/lib/givingTree/copy";
-import { starPosition } from "@/lib/givingTree/layout";
 import type { OppType, PublicOpportunity, PublicStar, TreeState } from "@/lib/givingTree/types";
 import type { ClaimSuccess } from "../givingTree/ClaimForm";
 import OrnamentCard from "../givingTree/OrnamentCard";
 import type { PanZoomHandle } from "../givingTree/PanZoom";
+import Given from "../givingTree/Given";
+import Intro from "../givingTree/Intro";
 import Partners from "../givingTree/Partners";
 import Recipes from "../givingTree/Recipes";
-import Sky from "../givingTree/Sky";
-import Success from "../givingTree/Success";
 import { GivingTreeStyles } from "../givingTree/theme";
 import Tree, { ornamentRect, zoneRect } from "../givingTree/Tree";
 import ZoneList from "../givingTree/ZoneList";
 import { ZOOM_MS, useReducedMotion } from "../givingTree/motion";
 
-type Screen = "tree" | "sky" | "partners" | "recipes";
+type Screen = "home" | "tree" | "given" | "partners" | "recipes";
+
+/** The opening plays once per visit (per browser tab). */
+const INTRO_SEEN = "gt-intro-seen";
+function introSeen(): boolean {
+  try {
+    return window.sessionStorage.getItem(INTRO_SEEN) === "1";
+  } catch {
+    return false;
+  }
+}
 
 export default function GivingTreeTemplate({ cocktails, recordInteraction, isSandbox }: PopupTemplateProps) {
   const [state, setState] = useState<TreeState | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [screen, setScreen] = useState<Screen>("tree");
+  const [screen, setScreen] = useState<Screen>("home");
+  const [intro, setIntro] = useState<boolean | null>(null);
   const [zone, setZone] = useState<OppType | "all" | null>(null);
   const [orgFilter, setOrgFilter] = useState<string | null>(null);
   const [selected, setSelected] = useState<PublicOpportunity | null>(null);
   const [success, setSuccess] = useState<ClaimSuccess | null>(null);
-  const [highlight, setHighlight] = useState<string | null>(null);
   const [extraStars, setExtraStars] = useState<PublicStar[]>([]);
   const [partnerFocus, setPartnerFocus] = useState<string | null>(null);
   const tree = useRef<PanZoomHandle>(null);
@@ -63,14 +75,27 @@ export default function GivingTreeTemplate({ cocktails, recordInteraction, isSan
     return () => window.clearInterval(t);
   }, [load]);
 
-  // Screens are history entries, so the phone's back button moves between them.
-  const go = useCallback((next: Screen) => {
+  useEffect(() => setIntro(!introSeen()), []);
+  const endIntro = useCallback(() => {
+    try {
+      window.sessionStorage.setItem(INTRO_SEEN, "1");
+    } catch {
+      /* private browsing: it just plays again next time */
+    }
+    setIntro(false);
+  }, []);
+
+  // Screens are history entries, so the phone's back button moves between
+  // them. Switching tabs replaces the entry, so Back from either tab goes home.
+  const go = useCallback((next: Screen, opts?: { replace?: boolean }) => {
     setScreen(next);
-    window.history.pushState({ ...(window.history.state ?? {}), gt: next }, "");
+    const entry = { ...(window.history.state ?? {}), gt: next };
+    if (opts?.replace) window.history.replaceState(entry, "");
+    else window.history.pushState(entry, "");
   }, []);
   useEffect(() => {
-    window.history.replaceState({ ...(window.history.state ?? {}), gt: "tree" }, "");
-    const onPop = (e: PopStateEvent) => setScreen(((e.state as { gt?: Screen } | null)?.gt ?? "tree") as Screen);
+    window.history.replaceState({ ...(window.history.state ?? {}), gt: "home" }, "");
+    const onPop = (e: PopStateEvent) => setScreen(((e.state as { gt?: Screen } | null)?.gt ?? "home") as Screen);
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
@@ -80,13 +105,12 @@ export default function GivingTreeTemplate({ cocktails, recordInteraction, isSan
   const opps = useMemo(() => state?.opportunities ?? [], [state]);
   const openOrgIds = useMemo(() => new Set(opps.map((o) => o.orgId)), [opps]);
 
-  const stars = useMemo(() => {
+  const stockings = useMemo(() => {
     const base = state?.stars ?? [];
     const ids = new Set(base.map((s) => s.id));
-    // A star the server doesn't show yet (e.g. held for review) still appears
-    // for the guest who just made it, for this visit.
-    const mine = extraStars.filter((s) => !ids.has(s.id)).map((s, i) => ({ ...s, ...starPosition(base.length + i) }));
-    return [...base, ...mine];
+    // A stocking the server doesn't show yet (e.g. held for review) still
+    // appears for the guest who just hung it, for this visit.
+    return [...base, ...extraStars.filter((s) => !ids.has(s.id))];
   }, [state, extraStars]);
 
   const listItems = useMemo(
@@ -120,8 +144,10 @@ export default function GivingTreeTemplate({ cocktails, recordInteraction, isSan
 
   function claimed(s: ClaimSuccess) {
     setSelected(null);
+    setZone(null);
     setSuccess(s);
     setExtraStars((x) => [...x, s.star]);
+    go("given", { replace: true });
     void recordInteraction("giving_tree_pledge", { type: s.type });
     load();
   }
@@ -149,17 +175,36 @@ export default function GivingTreeTemplate({ cocktails, recordInteraction, isSan
       {COPY.partnersButton}
     </button>
   );
-  const recipesButton = (
-    <button type="button" className="gt-btn gt-btn-small" onClick={() => go("recipes")}>
-      {COPY.recipesButton}
+  const homeButton = (
+    <button type="button" className="gt-btn gt-btn-small" onClick={() => go("home")}>
+      ← {COPY.home}
     </button>
   );
+  // While closed there is no tree: "What we've given" stands alone.
+  const tab = screen === "tree" && !closed ? "tree" : screen === "given" || (screen === "tree" && closed) ? "given" : null;
 
   return (
     <div className="gt-root relative h-[calc(100dvh-49px)] overflow-hidden flex flex-col">
       <GivingTreeStyles />
+      {intro && <Intro onDone={endIntro} />}
+      {intro === null && <div className="gt-intro" aria-hidden="true" />}
       {banner}
       <div className="relative flex-1 min-h-0">
+        {screen === "home" && (
+          <div className="gt-home">
+            {/* eslint-disable-next-line @next/next/no-img-element -- placeholder until the Christmas art is in */}
+            <img src="/images/logo/logo.svg" alt="Common Good" className="w-40 h-40 opacity-90" />
+            <div className="gt-home-actions">
+              <button type="button" className="gt-btn gt-btn-primary" onClick={() => go("recipes")}>
+                {COPY.homeRecipes}
+              </button>
+              <button type="button" className="gt-btn" onClick={() => go(closed ? "given" : "tree")}>
+                {closed ? COPY.homeGiven : COPY.homeTree}
+              </button>
+            </div>
+          </div>
+        )}
+
         {screen === "recipes" && (
           <Recipes cocktails={cocktails} onBack={back} onDownload={(c) => void recordInteraction("recipe_download", { name: c.name }, c.id)} />
         )}
@@ -168,44 +213,35 @@ export default function GivingTreeTemplate({ cocktails, recordInteraction, isSan
           <Partners orgs={state.orgs} focusId={partnerFocus} openOrgIds={closed ? new Set() : openOrgIds} onBack={back} onWaysToGive={waysToGive} />
         )}
 
-        {(screen === "sky" || (closed && screen === "tree")) && (
-          <Sky
-            stars={stars}
+        {tab === "given" && (
+          <Given
+            stockings={stockings}
             counters={state.counters}
-            highlight={highlight}
             heading={closed ? COPY.closedTitle : COPY.skyTitle}
             intro={closed ? COPY.closedBody : undefined}
-            onBack={closed ? undefined : back}
+            mine={success}
+            onDismissMine={() => setSuccess(null)}
             actions={
               <div className="flex flex-wrap gap-2">
+                {homeButton}
                 {partnersButton}
-                {closed && recipesButton}
               </div>
             }
           />
         )}
 
-        {screen === "tree" && !closed && (
+        {tab === "tree" && (
           <div className="h-full flex flex-col">
-            {/* The sky above the tree: tap it to open the sky. */}
-            <button type="button" className="gt-sky text-left px-3 py-2 border-b border-[var(--gt-line)] flex items-center gap-3" onClick={() => go("sky")}>
-              <span className="gt-display text-[length:var(--gt-size-l)] shrink-0">{COPY.skyTitle}</span>
-              <span className="gt-small gt-muted flex-1 min-w-0 truncate">
-                {COPY.neighborsLine(state.counters.neighbors)}
-              </span>
-              <span className="gt-small underline shrink-0" aria-hidden="true">↑</span>
-            </button>
-
             <h1 className="sr-only">{COPY.treeTitle}</h1>
             {/* Zone chips: the keyboard and screen-reader way into each zone's list. */}
             <div className="px-3 py-2 flex gap-2 overflow-x-auto gt-noscroll" role="group" aria-label={COPY.treeTitle}>
+              <span className="shrink-0">{homeButton}</span>
               {(["volunteer", "gift", "cash"] as OppType[]).map((z) => (
                 <button key={z} type="button" className="gt-btn gt-btn-small shrink-0" aria-pressed={zone === z} onClick={() => openZone(z)}>
                   {COPY.zoneLabels[z]} ({opps.filter((o) => o.zone === z && (!orgFilter || o.orgId === orgFilter)).length})
                 </button>
               ))}
               <span className="shrink-0">{partnersButton}</span>
-              <span className="shrink-0">{recipesButton}</span>
             </div>
             {orgFilter && (
               <div className="px-3 pb-2 flex items-center gap-2 gt-small">
@@ -217,7 +253,7 @@ export default function GivingTreeTemplate({ cocktails, recordInteraction, isSan
             )}
 
             <div className="relative flex-1 min-h-0">
-              <Tree ref={tree} opportunities={opps} orgFilter={orgFilter} onOpen={openOrnament} onZone={openZone} />
+              <Tree ref={tree} opportunities={opps} orgFilter={orgFilter} onOpen={openOrnament} onZone={openZone} sheetOpen={zone !== null} />
               {opps.length === 0 && (
                 <div className="absolute inset-0 z-20 flex items-center justify-center p-6 bg-black/60">
                   <div className="gt-card p-5 max-w-sm text-center space-y-3">
@@ -246,18 +282,18 @@ export default function GivingTreeTemplate({ cocktails, recordInteraction, isSan
             onSuccess={claimed}
           />
         )}
-        {success && (
-          <Success
-            s={success}
-            onClose={() => setSuccess(null)}
-            onSky={() => {
-              setHighlight(success.star.id);
-              setSuccess(null);
-              go("sky");
-            }}
-          />
-        )}
       </div>
+
+      {tab && !closed && (
+        <nav className="gt-tabs" aria-label={COPY.popupTitle}>
+          <button type="button" className="gt-tab" aria-current={tab === "tree" ? "page" : undefined} onClick={() => go("tree", { replace: true })}>
+            {COPY.tabTree}
+          </button>
+          <button type="button" className="gt-tab" aria-current={tab === "given" ? "page" : undefined} onClick={() => go("given", { replace: true })}>
+            {COPY.tabGiven}
+          </button>
+        </nav>
+      )}
     </div>
   );
 }

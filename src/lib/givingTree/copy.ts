@@ -13,9 +13,28 @@ export const COPY = {
   treeTitle: "Ways to give", // APPROVED
   skyTitle: "What we've given", // APPROVED
 
+  // ── Opening (written in script, one panel at a time) ── APPROVED
+  introPanels: [
+    "Here’s to a light in the window, old friends at the door, and a glass raised in welcome. May you always find that kind of warmth here. Welcome to Common Good.",
+    "The joy of Christmas is as much in what we give as in what we receive. Our gift to you is a collection of cocktail recipes for the friends and family you welcome through your own door. And as we gather with those we love, we hope you’ll join us in sharing some of that warmth with neighbors who could use it this year.",
+    "Each ornament on our virtual Giving Tree is an invitation from one of our partner organizations to lend a hand. Tap an ornament to find a way to give, whether you make a donation, drop off gifts or supplies, or sign up to volunteer your time. Thank you for spending part of your season with us. From all of us at Common Good, happy holidays and a very merry Christmas to you and yours.",
+  ],
+  introSkip: "Skip",
+  introContinue: "Tap to continue",
+
+  // ── Home (after the opening) ──
+  homeRecipes: "Download cocktail recipes",
+  homeTree: "View the Giving Tree",
+  homeGiven: "See what we've given",
+  home: "Home",
+
+  // ── Tabs along the bottom ──
+  tabTree: "Giving Tree",
+  tabGiven: "What we've given",
+
   // ── Page ──
   popupTitle: "The Giving Tree",
-  intro: "Pick an ornament, promise to do it, and watch it rise into the sky.",
+  intro: "Pick an ornament, promise to do it, and hang your stocking with everyone else's.",
   sampleBanner: "Sample data: these organizations and opportunities are made up for a demo and are not real.",
   sandboxNote: "Sandbox: nothing here is public.",
   recipesButton: "Christmas cocktail recipes",
@@ -76,11 +95,11 @@ export const COPY = {
   phoneHelp: "We delete phone numbers when the season ends.",
   showName: "Show my name",
   stayAnonymous: "Stay anonymous",
-  displayName: "Name on your star",
+  displayName: "Name on your stocking",
   note: "A note (optional)",
   noteHelp: "Like a name on a brick. A line or two that everyone will see on the tree and on the wall at the bar.",
-  showWhatIGave: "Show what I gave on my star",
-  showAmount: "Show the amount on my star",
+  showWhatIGave: "Show what I gave on my stocking",
+  showAmount: "Show the amount on my stocking",
   hours: "How many hours?",
   amount: "Amount",
   requirements: "From the organization",
@@ -113,14 +132,13 @@ export const COPY = {
   errGeneric: "Something went wrong. Please try again.",
 
   // ── Success ──
-  successTitle: "Your ornament is in the sky",
+  successTitle: "Your stocking is hung",
   codeLabel: "Your code",
   giftCodeFirst: (code: string) =>
     `Your code is ${code}. When you drop off your gift, write this code on one of the tags next to the box and attach it, so we can get it to the right person.`,
   volunteerNext: (org: string) => `We'll pass your details to ${org} and they will reach out to you directly to coordinate.`,
   cashContinue: (org: string) => `Continue to ${org}'s giving page`,
   emailSent: "We've emailed you a copy, with a link to change your plans.",
-  seeYourStar: "See your star",
 
   // ── Sky ──
   counters: {
@@ -132,7 +150,12 @@ export const COPY = {
   },
   neighborsLine: (n: number) => `${n} ${n === 1 ? "neighbor" : "neighbors"} taking part`,
   anonymous: "Anonymous",
-  skyEmpty: "The first star is waiting for you.",
+  givenEmpty: "Check back as people give and volunteer to see what we've done together as a community.",
+  givenAll: "All",
+  givenSections: { volunteer: "Volunteering", gift: "Gifts", cash: "Donations" } as Record<OppType, string>,
+  givenSectionEmpty: "Nothing here yet.",
+  yourStocking: "Your stocking is hung",
+  done: "Done",
   gaveVolunteer: (title: string, h: number | null) => (h ? `${hoursLabel(h)}: ${title}` : title),
   gaveGift: (title: string) => `Gift: ${title}`,
   gaveCash: (title: string, amount: number | null) => (amount != null ? `${money(amount)} toward ${title}` : title),
@@ -146,7 +169,7 @@ export const COPY = {
   manageNotFound: "We couldn't find that ornament. The link may be incomplete.",
   manageReleasedTitle: "Thank you for wanting to be part of it",
   manageReleasedBody:
-    "It's the thought that counts, and we're glad you wanted to be part of this. We've put the ornament back on the tree for someone else, and your star stays in the sky.",
+    "It's the thought that counts, and we're glad you wanted to be part of this. We've put the ornament back on the tree for someone else, and your stocking stays hung.",
   manageExtended: (due: string) => `Done. Your new drop-off date is ${due}.`,
   manageStillOnItDone: "Thanks for letting us know. We'll keep your ornament for you.",
   manageAlreadyExtended: "You've already had extra time on this one. If you need more, email us.",
