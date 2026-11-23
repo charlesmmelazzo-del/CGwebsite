@@ -6,13 +6,14 @@
 
 import { forwardRef } from "react";
 import { COPY } from "@/lib/givingTree/copy";
-import { TREE, ZONES } from "@/lib/givingTree/layout";
+import { LABEL_ROOM, TIERS, TREE, ZONES, tierPaths, zoneHalfWidth } from "@/lib/givingTree/layout";
 import type { OppType, PublicOpportunity } from "@/lib/givingTree/types";
 import PanZoom, { type PanZoomHandle } from "./PanZoom";
 
-/** Tree units (0–100) to content pixels. */
+/** Tree units to content pixels. */
 export const UNIT = 10;
-export const TREE_PX = 100 * UNIT;
+export const TREE_W = TREE.width * UNIT;
+export const TREE_H = TREE.height * UNIT;
 
 export function ornamentRect(o: PublicOpportunity) {
   const s = o.size * UNIT;
@@ -21,8 +22,8 @@ export function ornamentRect(o: PublicOpportunity) {
 
 export function zoneRect(zone: OppType) {
   const z = ZONES.find((x) => x.key === zone)!;
-  const half = TREE.halfBase * ((z.y1 - TREE.apexY) / (TREE.baseY - TREE.apexY));
-  return { x: (50 - half) * UNIT, y: z.y0 * UNIT, w: half * 2 * UNIT, h: (z.y1 - z.y0) * UNIT };
+  const half = zoneHalfWidth(zone);
+  return { x: (TREE.centerX - half) * UNIT, y: z.y0 * UNIT, w: half * 2 * UNIT, h: (z.y1 - z.y0) * UNIT };
 }
 
 export function Ornament({ o, size, dim, onOpen }: { o: PublicOpportunity; size: number; dim: boolean; onOpen: () => void }) {
@@ -62,41 +63,45 @@ export default forwardRef<PanZoomHandle, {
   /** A list sheet covers the lower part of the view. */
   sheetOpen?: boolean;
 }>(function Tree({ opportunities, orgFilter, onOpen, onZone, overlay, sheetOpen }, ref) {
-  const apex = `${TREE.apexX * UNIT},${TREE.apexY * UNIT}`;
-  const left = `${(TREE.apexX - TREE.halfBase) * UNIT},${TREE.baseY * UNIT}`;
-  const right = `${(TREE.apexX + TREE.halfBase) * UNIT},${TREE.baseY * UNIT}`;
+  // Lowest tier first, so each tier above overlaps the one below it.
+  const tiers = tierPaths().reverse();
   return (
-    <PanZoom ref={ref} width={TREE_PX} height={TREE_PX} maxFitScale={1.2} className="h-full w-full" label={COPY.treeTitle} overlay={overlay} loose={sheetOpen}>
+    <PanZoom ref={ref} width={TREE_W} height={TREE_H} maxFitScale={1.2} className="h-full w-full" label={COPY.treeTitle} overlay={overlay} loose={sheetOpen} controls={false}>
       {(scale) => (
         <>
-          <svg width={TREE_PX} height={TREE_PX} className="absolute inset-0" aria-hidden="true">
-            <rect x={46 * UNIT} y={TREE.baseY * UNIT} width={8 * UNIT} height={5 * UNIT} fill="var(--gt-trunk)" />
-            <polygon points={`${apex} ${right} ${left}`} fill="var(--gt-tree)" stroke="var(--gt-tree-edge)" strokeWidth={6} />
-            {ZONES.slice(1).map((z) => {
-              const hw = TREE.halfBase * ((z.y0 - TREE.apexY) / (TREE.baseY - TREE.apexY));
-              return <line key={z.key} x1={(50 - hw) * UNIT} x2={(50 + hw) * UNIT} y1={z.y0 * UNIT} y2={z.y0 * UNIT} stroke="var(--gt-tree-edge)" strokeWidth={3} strokeDasharray="12 10" />;
-            })}
+          <svg width={TREE_W} height={TREE_H} viewBox={`0 0 ${TREE.width} ${TREE.height}`} className="absolute inset-0" aria-hidden="true">
+            <rect x={TREE.centerX - 5} y={TREE.trunkTop - 2} width={10} height={TREE.height - TREE.trunkTop + 2} fill="var(--gt-trunk)" />
+            {tiers.map((d, i) => (
+              <path key={i} d={d} fill="var(--gt-tree)" stroke="var(--gt-tree-edge)" strokeWidth={0.6} strokeLinejoin="round" />
+            ))}
+            {/* A star on top. */}
+            <polygon
+              transform={`translate(${TREE.centerX} ${TIERS[0].top + 1})`}
+              points={Array.from({ length: 10 }, (_, i) => {
+                const r = i % 2 ? 2.2 : 5;
+                const a = (Math.PI / 5) * i - Math.PI / 2;
+                return `${(r * Math.cos(a)).toFixed(2)},${(r * Math.sin(a)).toFixed(2)}`;
+              }).join(" ")}
+              fill="var(--gt-accent)"
+            />
           </svg>
           {opportunities.map((o) => (
             <Ornament key={o.id} o={o} size={o.size} dim={!!orgFilter && o.orgId !== orgFilter} onOpen={() => onOpen(o)} />
           ))}
           {/* Zone labels: readable when zoomed out, out of the way when zoomed in. */}
           {scale < 1.4 &&
-            ZONES.map((z) => {
-              const hw = TREE.halfBase * ((z.y0 - TREE.apexY) / (TREE.baseY - TREE.apexY));
-              const x = z.key === "volunteer" ? 50 : 50 - hw - 2;
-              return (
+            ZONES.map((z) => (
                 <button
                   key={z.key}
                   type="button"
                   className="gt-zone-label"
-                  style={{ left: x * UNIT, top: (z.key === "volunteer" ? z.y0 - 3 : z.y0 + 2) * UNIT, fontSize: Math.min(56, 18 / scale) }}
+                  // Each label sits in the clear strip at the top of its zone.
+                  style={{ left: TREE.centerX * UNIT, top: (z.y0 + LABEL_ROOM / 2) * UNIT, fontSize: Math.min(48, 14 / scale) }}
                   onClick={() => onZone(z.key)}
                 >
                   {COPY.zoneLabels[z.key]}
                 </button>
-              );
-            })}
+            ))}
         </>
       )}
     </PanZoom>

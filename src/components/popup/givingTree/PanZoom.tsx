@@ -33,7 +33,9 @@ export default forwardRef<PanZoomHandle, {
   overlay?: ReactNode;
   /** Something (a list sheet) covers part of the view: allow panning past the edges even at the full view. */
   loose?: boolean;
-}>(function PanZoom({ width, height, maxScale = 6, maxFitScale = 2, className = "", label, children, overlay, loose: sheetOpen = false }, ref) {
+  /** Draw the +, − and Fit buttons in the corner. Off when the parent puts them elsewhere. */
+  controls?: boolean;
+}>(function PanZoom({ width, height, maxScale = 6, maxFitScale = 2, className = "", label, children, overlay, loose: sheetOpen = false, controls = true }, ref) {
   const box = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [view, setView] = useState<View>({ scale: 1, tx: 0, ty: 0 });
@@ -91,6 +93,8 @@ export default forwardRef<PanZoomHandle, {
     },
     fit,
     zoomBy(f) {
+      setAnimate(true);
+      window.setTimeout(() => setAnimate(false), ZOOM_MS + 30);
       setView((v) => {
         const s = v.scale * f;
         const cx = size.w / 2, cy = size.h / 2;
@@ -214,7 +218,7 @@ export default forwardRef<PanZoomHandle, {
       >
         {children(view.scale)}
       </div>
-      <div className="absolute right-2 bottom-2 z-10 flex flex-col gap-1.5">
+      {controls && <div className="absolute right-2 bottom-2 z-10 flex flex-col gap-1.5">
         <button type="button" className="gt-btn gt-btn-small bg-black/50" onClick={() => glide(clamp({ ...view, scale: view.scale * 1.5, tx: size.w / 2 - ((size.w / 2 - view.tx) / view.scale) * view.scale * 1.5, ty: size.h / 2 - ((size.h / 2 - view.ty) / view.scale) * view.scale * 1.5 }))} aria-label={COPY.zoomIn}>
           +
         </button>
@@ -224,7 +228,7 @@ export default forwardRef<PanZoomHandle, {
         <button type="button" className="gt-btn gt-btn-small bg-black/50" onClick={fit}>
           {COPY.resetView}
         </button>
-      </div>
+      </div>}
       {overlay}
     </div>
   );

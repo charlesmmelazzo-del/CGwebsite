@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import ImagePicker from "@/components/ui/ImagePicker";
 import { PartnerCard } from "@/components/popup/givingTree/Partners";
 import { GivingTreeStyles } from "@/components/popup/givingTree/theme";
-import { TREE, ZONES } from "@/lib/givingTree/layout";
+import { TREE, ZONES, tierPaths, toPercent, toUnits } from "@/lib/givingTree/layout";
 import type { OppType, Org, PublicOrg } from "@/lib/givingTree/types";
 import { type Act, type AdminOpp, Area, Badge, Btn, Card, Check, Field, inputCls, type Snapshot, Text, TYPE_LABEL } from "./kit";
 
@@ -119,19 +119,24 @@ export function OrgsSection({ s, act }: { s: Snapshot; act: Act }) {
 /** Click on the little tree to place an ornament; clear to auto-place. */
 function Placer({ zone, x, y, onChange }: { zone: OppType; x: number | null; y: number | null; onChange: (x: number | null, y: number | null) => void }) {
   const z = ZONES.find((q) => q.key === zone)!;
+  // Positions are stored as percent of the tree's width and height.
+  const dot = x != null && y != null ? toUnits(x, y) : null;
   return (
     <div className="space-y-1">
       <svg
-        viewBox="0 0 100 100"
-        className="w-full max-w-[260px] bg-gray-50 border border-gray-200 cursor-crosshair"
+        viewBox={`0 0 ${TREE.width} ${TREE.height}`}
+        className="w-full max-w-[180px] bg-gray-50 border border-gray-200 cursor-crosshair"
         onClick={(e) => {
           const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
-          onChange(Math.round(((e.clientX - r.left) / r.width) * 1000) / 10, Math.round(((e.clientY - r.top) / r.height) * 1000) / 10);
+          const p = toPercent(((e.clientX - r.left) / r.width) * TREE.width, ((e.clientY - r.top) / r.height) * TREE.height);
+          onChange(p.x, p.y);
         }}
       >
-        <polygon points={`${TREE.apexX},${TREE.apexY} ${TREE.apexX + TREE.halfBase},${TREE.baseY} ${TREE.apexX - TREE.halfBase},${TREE.baseY}`} fill="#cfe3d3" />
-        <rect x={0} y={z.y0} width={100} height={z.y1 - z.y0} fill="#C97D5A" opacity={0.15} />
-        {x != null && y != null && <circle cx={x} cy={y} r={3} fill="#C97D5A" />}
+        {tierPaths().reverse().map((d, i) => (
+          <path key={i} d={d} fill="#cfe3d3" stroke="#9fc2a6" strokeWidth={0.6} />
+        ))}
+        <rect x={0} y={z.y0} width={TREE.width} height={z.y1 - z.y0} fill="#C97D5A" opacity={0.15} />
+        {dot && <circle cx={dot.x} cy={dot.y} r={3} fill="#C97D5A" />}
       </svg>
       <p className="text-[11px] text-gray-500">
         {x != null && y != null ? `Placed at ${x}, ${y}. ` : "Auto-placed in its zone. "}

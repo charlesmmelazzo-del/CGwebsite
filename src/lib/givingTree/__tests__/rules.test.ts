@@ -13,7 +13,7 @@ import { addDays, centralDate, centralInstant, endOfDay } from "../time";
 import { DEFAULT_SETTINGS, type Opportunity, type Pledge, type Settings } from "../types";
 import { needsModeration, pledgeNeedsModeration } from "../filter";
 import { validateImport } from "../importer";
-import { placeOrnaments, starPosition } from "../layout";
+import { halfWidthAt, placeOrnaments, starPosition, TREE, zoneOf } from "../layout";
 
 let checks = 0;
 function test(name: string, fn: () => void) {
@@ -328,7 +328,14 @@ test("auto-placed ornaments sit inside the tree, in their zone, without overlapp
   const pos = placeOrnaments(items);
   assert.equal(pos.size, 78);
   const all = Array.from(pos.values());
-  for (const p of all) assert.ok(p.x > 0 && p.x < 100 && p.y > 0 && p.y < 100);
+  for (const p of all) assert.ok(p.x > 0 && p.x < TREE.width && p.y > 0 && p.y < TREE.height);
+  // Every ornament's centre is inside the tree's outline and inside its own zone.
+  for (const it of items) {
+    const p = pos.get(it.id)!;
+    assert.ok(Math.abs(p.x - TREE.centerX) < halfWidthAt(p.y), `${it.id} is outside the tree`);
+    const z = zoneOf(it.zone);
+    assert.ok(p.y >= z.y0 && p.y <= z.y1, `${it.id} is outside its zone`);
+  }
   for (let i = 0; i < all.length; i++)
     for (let j = i + 1; j < all.length; j++) {
       const d = Math.hypot(all[i].x - all[j].x, all[i].y - all[j].y);
