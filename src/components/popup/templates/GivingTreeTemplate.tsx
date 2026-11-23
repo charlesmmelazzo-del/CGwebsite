@@ -130,6 +130,11 @@ export default function GivingTreeTemplate({ cocktails, recordInteraction, isSan
     tree.current?.zoomTo(zoneRect(z), { visible: window.innerWidth < 900 ? 0.45 : 1 });
   }
 
+  function showWholeTree() {
+    setZone(null);
+    tree.current?.fit();
+  }
+
   function showPartner(orgId: string | null) {
     setSelected(null);
     setPartnerFocus(orgId);
@@ -233,15 +238,45 @@ export default function GivingTreeTemplate({ cocktails, recordInteraction, isSan
         {tab === "tree" && (
           <div className="h-full flex flex-col">
             <h1 className="sr-only">{COPY.treeTitle}</h1>
-            {/* Zone chips: the keyboard and screen-reader way into each zone's list. */}
-            <div className="px-3 py-2 flex gap-2 overflow-x-auto gt-noscroll" role="group" aria-label={COPY.treeTitle}>
-              <span className="shrink-0">{homeButton}</span>
-              {(["volunteer", "gift", "cash"] as OppType[]).map((z) => (
-                <button key={z} type="button" className="gt-btn gt-btn-small shrink-0" aria-pressed={zone === z} onClick={() => openZone(z)}>
-                  {COPY.zoneLabels[z]} ({opps.filter((o) => o.zone === z && (!orgFilter || o.orgId === orgFilter)).length})
+            {/* One row: home, a dropdown of the zones (the keyboard and
+                screen-reader way into each zone's list), and the zoom buttons. */}
+            <div className="px-3 py-2 flex items-center gap-2">
+              <button type="button" className="gt-btn gt-btn-small gt-btn-icon shrink-0" aria-label={COPY.home} onClick={() => go("home")}>
+                ←
+              </button>
+              <label className="sr-only" htmlFor="gt-zone-select">
+                {COPY.showLabel}
+              </label>
+              <select
+                id="gt-zone-select"
+                className="gt-select min-w-0 flex-1"
+                value={zone ?? "all"}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "partners") showPartner(null);
+                  else if (v === "all") showWholeTree();
+                  else openZone(v as OppType);
+                }}
+              >
+                <option value="all">{COPY.wholeTree}</option>
+                {(["volunteer", "gift", "cash"] as OppType[]).map((z) => (
+                  <option key={z} value={z}>
+                    {COPY.zoneLabels[z]} ({opps.filter((o) => o.zone === z && (!orgFilter || o.orgId === orgFilter)).length})
+                  </option>
+                ))}
+                <option value="partners">{COPY.partnersButton}</option>
+              </select>
+              <div className="shrink-0 flex gap-1" role="group" aria-label={COPY.zoomGroup}>
+                <button type="button" className="gt-btn gt-btn-small gt-btn-icon" aria-label={COPY.zoomOut} onClick={() => tree.current?.zoomBy(1 / 1.5)}>
+                  −
                 </button>
-              ))}
-              <span className="shrink-0">{partnersButton}</span>
+                <button type="button" className="gt-btn gt-btn-small gt-btn-icon" aria-label={COPY.zoomIn} onClick={() => tree.current?.zoomBy(1.5)}>
+                  +
+                </button>
+                <button type="button" className="gt-btn gt-btn-small" onClick={showWholeTree}>
+                  {COPY.resetView}
+                </button>
+              </div>
             </div>
             {orgFilter && (
               <div className="px-3 pb-2 flex items-center gap-2 gt-small">

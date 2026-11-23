@@ -65,6 +65,13 @@ const CSS = `
 .gt-btn[disabled] { opacity: 0.5; cursor: default; }
 .gt-btn-primary { background: var(--gt-accent); color: var(--gt-accent-ink); border-color: var(--gt-accent); font-weight: 600; }
 .gt-btn-small { min-height: 36px; padding: 0 12px; font-size: var(--gt-size-s); }
+.gt-btn-icon { width: 36px; padding: 0; font-size: 18px; }
+.gt-select {
+  min-height: 36px; padding: 0 30px 0 12px; border-radius: var(--gt-radius); border: 1px solid var(--gt-line);
+  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23f4efe4' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat right 11px center;
+  color: inherit; font: inherit; font-size: var(--gt-size-s); appearance: none; -webkit-appearance: none; cursor: pointer;
+}
+.gt-select option { color: #1d1d1b; }
 .gt-card { background: var(--gt-surface); color: var(--gt-surface-ink); border-radius: var(--gt-radius); }
 .gt-card .gt-btn { border-color: rgba(0,0,0,0.2); }
 .gt-card .gt-btn-primary { border-color: var(--gt-accent); }

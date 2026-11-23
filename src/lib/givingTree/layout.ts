@@ -1,41 +1,81 @@
-// ─── Where things go on the tree and in the sky (12) ─────────────────────────
+// ─── Where things go on the tree (12) ─────────────────────────────────────────
 //
-// Positions come from data, never hand-placed markup. The tree is a 100 × 100
-// box; zones are horizontal tiers of equal area, so each holds a similar
-// number of ornaments. An opportunity with its own tree_x / tree_y keeps it;
-// everything else is auto-placed inside its zone. Pure, so it is stable: the
-// same opportunities always land in the same spots.
+// Positions come from data, never hand-placed markup. The tree is a tall box,
+// 100 wide by 170 high, so it fills a phone screen, shaped as three stacked
+// tiers. Zones are horizontal bands sized so each holds a similar number of
+// ornaments. An opportunity with its own tree_x / tree_y (stored as percent of
+// the tree's width and height) keeps it; everything else is auto-placed
+// inside its zone. Pure, so it is stable: the same opportunities always land
+// in the same spots.
 
 import type { OppType } from "./types";
 
-/** The tree outline: apex at the top, base across the bottom. */
-export const TREE = { apexX: 50, apexY: 4, baseY: 94, halfBase: 46 } as const;
+/** The tree box, in tree units. */
+export const TREE = { width: 100, height: 170, centerX: 50, trunkTop: 162 } as const;
 
-/** Zones top to bottom, as bands of the tree's height. */
-export const ZONES: { key: OppType; y0: number; y1: number }[] = [
-  { key: "volunteer", y0: 10, y1: 56 },
-  { key: "gift", y0: 56, y1: 78 },
-  { key: "cash", y0: 78, y1: 92 },
+/** The three tiers, top to bottom: where each starts and ends, and its half-width there. */
+export const TIERS: { top: number; bottom: number; topHalf: number; bottomHalf: number }[] = [
+  { top: 4, bottom: 76, topHalf: 0, bottomHalf: 38 },
+  { top: 60, bottom: 122, topHalf: 12, bottomHalf: 42 },
+  { top: 108, bottom: 162, topHalf: 16, bottomHalf: 47 },
 ];
+
+/** Zones top to bottom, as bands of the tree's height (one per tier). */
+export const ZONES: { key: OppType; y0: number; y1: number }[] = [
+  { key: "volunteer", y0: 12, y1: 76 },
+  { key: "gift", y0: 76, y1: 122 },
+  { key: "cash", y0: 122, y1: 160 },
+];
+
+/** Room left clear at the top of each zone for its label. */
+export const LABEL_ROOM = 5;
 
 export function zoneOf(key: OppType) {
   return ZONES.find((z) => z.key === key)!;
 }
 
-/** Half the tree's width at a given height. */
+/** Half the tree's width at a given height (the widest tier there). */
 export function halfWidthAt(y: number): number {
-  return (TREE.halfBase * Math.max(0, y - TREE.apexY)) / (TREE.baseY - TREE.apexY);
+  let hw = 0;
+  for (const t of TIERS) {
+    if (y < t.top || y > t.bottom) continue;
+    hw = Math.max(hw, t.topHalf + ((t.bottomHalf - t.topHalf) * (y - t.top)) / (t.bottom - t.top));
+  }
+  return hw;
 }
+
+/** The widest the tree gets anywhere in a zone (for fitting the view to it). */
+export function zoneHalfWidth(key: OppType): number {
+  const z = zoneOf(key);
+  let hw = 0;
+  for (let y = z.y0; y <= z.y1; y += 0.5) hw = Math.max(hw, halfWidthAt(y));
+  return hw;
+}
+
+/** Each tier as an SVG path in tree units: straight sides, a gently curved hem. */
+export function tierPaths(): string[] {
+  const c = TREE.centerX;
+  return TIERS.map(
+    (t) =>
+      `M ${c - t.topHalf} ${t.top} L ${c + t.topHalf} ${t.top} L ${c + t.bottomHalf} ${t.bottom} ` +
+      `Q ${c} ${t.bottom + 6} ${c - t.bottomHalf} ${t.bottom} Z`
+  );
+}
+
+/** Stored positions are percent of the tree's width and height; tree units are not. */
+export const toUnits = (xPct: number, yPct: number) => ({ x: xPct, y: (yPct * TREE.height) / 100 });
+export const toPercent = (x: number, y: number) => ({ x: Math.round(x * 10) / 10, y: Math.round(((y * 100) / TREE.height) * 10) / 10 });
 
 /** Grid points inside a zone band at a given spacing (offset rows, like a hex grid). */
 function pointsAt(zone: { y0: number; y1: number }, s: number): { x: number; y: number }[] {
   const out: { x: number; y: number }[] = [];
   let row = 0;
-  for (let y = zone.y0 + s * 0.6; y <= zone.y1 - s * 0.4; y += s * 0.87, row++) {
-    const hw = halfWidthAt(y) - s * 0.55;
+  for (let y = zone.y0 + LABEL_ROOM + s * 0.6; y <= zone.y1 - s * 0.4; y += s * 0.87, row++) {
+    // The narrower of this row's top and bottom edge, so ornaments stay inside a slanted side.
+    const hw = Math.min(halfWidthAt(y - s * 0.4), halfWidthAt(y + s * 0.4) || halfWidthAt(y)) - s * 0.42;
     if (hw <= 0) continue;
     const offset = row % 2 ? s / 2 : 0;
-    for (let x = TREE.apexX - hw + ((hw * 2) % s) / 2 + offset; x <= TREE.apexX + hw + 0.001; x += s) {
+    for (let x = TREE.centerX - hw + ((hw * 2) % s) / 2 + offset; x <= TREE.centerX + hw + 0.001; x += s) {
       out.push({ x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 });
     }
   }
@@ -46,7 +86,7 @@ function pointsAt(zone: { y0: number; y1: number }, s: number): { x: number; y: 
 export function autoPlace(zoneKey: OppType, count: number): { spacing: number; points: { x: number; y: number }[] } {
   const zone = zoneOf(zoneKey);
   if (count <= 0) return { spacing: 12, points: [] };
-  let s = 16;
+  let s = 18;
   let pts = pointsAt(zone, s);
   while (pts.length < count && s > 2) {
     s -= 0.25;
@@ -61,9 +101,10 @@ export function autoPlace(zoneKey: OppType, count: number): { spacing: number; p
 }
 
 /**
- * Place every opportunity. Auto-placed ones fill their zone in sort order;
- * the slot an opportunity gets is fixed by its order among ALL of the zone's
- * opportunities (open or not), so claiming one never shuffles the others.
+ * Place every opportunity, in tree units. Auto-placed ones fill their zone in
+ * sort order; the slot an opportunity gets is fixed by its order among ALL of
+ * the zone's opportunities (open or not), so claiming one never shuffles the
+ * others.
  */
 export function placeOrnaments<T extends { id: string; zone: OppType; x: number | null; y: number | null }>(
   items: T[]
@@ -72,9 +113,9 @@ export function placeOrnaments<T extends { id: string; zone: OppType; x: number 
   for (const z of ZONES) {
     const inZone = items.filter((i) => i.zone === z.key);
     const { spacing, points } = autoPlace(z.key, inZone.length);
-    const size = Math.min(12, spacing * 0.86);
+    const size = Math.min(14, spacing * 0.86);
     inZone.forEach((item, i) => {
-      if (item.x != null && item.y != null) out.set(item.id, { x: item.x, y: item.y, size });
+      if (item.x != null && item.y != null) out.set(item.id, { ...toUnits(item.x, item.y), size });
       else out.set(item.id, { ...points[i], size });
     });
   }
