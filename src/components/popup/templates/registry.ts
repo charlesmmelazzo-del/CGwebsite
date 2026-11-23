@@ -17,6 +17,7 @@ import ClassicTemplate from "./ClassicTemplate";
 import HighScoresTemplate from "./HighScoresTemplate";
 import CreepypastasTemplate from "./CreepypastasTemplate";
 import HolidaysTemplate from "./HolidaysTemplate";
+import GivingTreeTemplate from "./GivingTreeTemplate";
 
 export interface PopupTemplate {
   key: string;
@@ -60,10 +61,18 @@ export const TEMPLATES: Record<string, PopupTemplate> = {
     component: HolidaysTemplate,
     defaultConfig: {},
   },
+  "giving-tree": {
+    key: "giving-tree",
+    label: "The Giving Tree (Christmas)",
+    description:
+      "Christmas recipe downloads (PDFs) plus the Giving Tree: guests pick a way to give from partner charities and their ornament becomes a star in the sky. Organizations, opportunities and pledges are managed under Pop Ups → Giving Tree. No sign-in.",
+    component: GivingTreeTemplate,
+    defaultConfig: {},
+  },
 };
 
 /** Templates where each cocktail carries a downloadable recipe PDF instead of a game or story. */
-export const RECIPE_TEMPLATES = ["creepypastas", "holidays"];
+export const RECIPE_TEMPLATES = ["creepypastas", "holidays", "giving-tree"];
 
 export const FALLBACK_TEMPLATE_KEY = "classic";
 

@@ -92,9 +92,10 @@ export const PAGE_PANELS: AdminPanel[] = [
   },
   {
     key: "popup", label: "Pop Ups", icon: Sparkles, publicHref: "/popup",
-    desc: "Pop-up menus, guest accounts and the email list",
+    desc: "Pop-up menus, the Giving Tree, guest accounts and the email list",
     tabs: [
       { href: "/admin/popup",        label: "Pop Ups" },
+      { href: "/admin/popup/giving-tree", label: "Giving Tree" },
       { href: "/admin/popup/guests", label: "Guest Accounts" },
       { href: "/admin/marketing",    label: "Email List" },
     ],

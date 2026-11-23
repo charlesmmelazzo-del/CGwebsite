@@ -9,7 +9,7 @@ const FROM_ADDRESS = "Common Good Website <forms@commongoodcocktailhouse.com>";
 
 // Read the notification recipient list from site settings (admin-editable),
 // falling back to the defaults in constants if the DB is unavailable or empty.
-async function getNotificationRecipients(): Promise<string[]> {
+export async function getNotificationRecipients(): Promise<string[]> {
   try {
     const sb = getSupabaseAdmin();
     const { data } = await sb.from("site_settings").select("data").eq("id", 1).single();
