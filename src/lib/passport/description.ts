@@ -26,3 +26,21 @@ export function descriptionParts(text: string): DescriptionPart[] {
 
 /** A flavor line the library may store with its brackets, shown without them. */
 export const bareFlavor = (s: string) => String(s || "").trim().replace(/^\[(.*)\]$/, "$1").trim();
+
+/**
+ * What a Menu tab item shows under its name: the matched cocktail's card (tagline, ingredients, flavor line) when the
+ * Bible sent one, else the item's own Toast description laid out by line. The Bible sends a card only when the Toast
+ * item is that cocktail by name, so a variant ("Pear Thee Well - Free Spirited") shows its own description.
+ */
+export type MenuItemBody =
+  | { kind: "card"; tagline: string; ingredients: string; flavor: string }
+  | { kind: "description"; parts: DescriptionPart[] }
+  | { kind: "none" };
+export function menuItemBody(it: { name?: string; description?: string; card?: { tagline?: string; ingredients?: string; flavor?: string } }): MenuItemBody {
+  const c = it.card;
+  if (c && (c.tagline || c.ingredients || bareFlavor(c.flavor || ""))) {
+    return { kind: "card", tagline: c.tagline || "", ingredients: c.ingredients || "", flavor: bareFlavor(c.flavor || "") };
+  }
+  const parts = descriptionParts(it.description || "");
+  return parts.length ? { kind: "description", parts } : { kind: "none" };
+}

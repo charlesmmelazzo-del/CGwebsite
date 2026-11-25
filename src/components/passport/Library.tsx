@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { C } from "./theme";
-import { bareFlavor, descriptionParts } from "@/lib/passport/description";
+import { bareFlavor, descriptionParts, menuItemBody } from "@/lib/passport/description";
 import { markKey, type ArchivedBottle, type Bottle, type Cocktail, type CocktailCard, type Mark, type Marks, type MenuGroup, type MenuItem, type MenuPrice, type Producer } from "@/lib/passport/bible";
 
 /** File 03a: the library pieces (server-rendered). Only fields from the Bible's approved list. */
@@ -96,16 +96,29 @@ export function CocktailPage({ c }: { c: Cocktail }) {
       {c.ingredients && (
         <section>
           <h2 className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>In the glass</h2>
-          <p className="font-body text-[16px] mt-2 leading-relaxed" style={{ color: C.text }}>
-            {c.ingredient_items && c.ingredient_items.length ? c.ingredient_items.map((it, i) => (
-              <span key={i}>
-                {i > 0 && ", "}
-                {it.bottle_id
-                  ? <Link href={`/passport/spirits/${it.bottle_id}`} className="underline decoration-1 underline-offset-4" style={{ textDecorationColor: `${C.brass}99` }}>{it.text}</Link>
-                  : it.text}
-              </span>
-            )) : c.ingredients}
-          </p>
+          <p className="font-body text-[16px] mt-2 leading-relaxed" style={{ color: C.text }}>{c.ingredients}</p>
+        </section>
+      )}
+      {c.bottles && c.bottles.length > 0 && (
+        <section className="mt-6">
+          <h2 className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>Bottles in this drink</h2>
+          <ul className="mt-1">
+            {c.bottles.map((b, i) => {
+              const body = (
+                <>
+                  <span className="font-body text-[15px]" style={{ color: C.text }}>{b.name}</span>
+                  {b.category && <span className="font-body text-[10px] tracking-[0.15em] uppercase whitespace-nowrap" style={{ color: C.faint }}>{b.category}</span>}
+                </>
+              );
+              return (
+                <li key={`${b.id ?? "word"}-${i}`}>
+                  {b.id
+                    ? <Link href={`/passport/spirits/${b.id}`} className="flex items-baseline justify-between gap-3 py-2.5 border-b" style={{ borderColor: C.line }}>{body}</Link>
+                    : <div className="flex items-baseline justify-between gap-3 py-2.5 border-b" style={{ borderColor: C.line }}>{body}</div>}
+                </li>
+              );
+            })}
+          </ul>
         </section>
       )}
       {c.flavor && (
@@ -261,35 +274,35 @@ export function Description({ text, large = false }: { text: string; large?: boo
   );
 }
 
-function ItemBody({ it, mark, c }: { it: MenuItem; mark?: Mark; c?: Cocktail }) {
-  // Matched to a library cocktail: its tagline, ingredients and flavor line, as on a Passport cocktail's card. The
-  // long notes paragraph stays on the cocktail's own page.
-  const structured = c && (c.tagline || c.ingredients || c.flavor) ? c : null;
+function ItemBody({ it, mark }: { it: MenuItem; mark?: Mark }) {
+  // The item IS a library cocktail (same name): its tagline, ingredients and flavor line, sent with the menu, as on a
+  // Passport cocktail's card. A variant, or anything else, shows its own Toast description. The long notes paragraph
+  // stays on the cocktail's own page.
+  const body = menuItemBody(it);
   return (
     <>
       <div className="flex items-baseline justify-between gap-3">
         <span className="font-display text-[20px] leading-tight flex items-baseline gap-2" style={{ color: C.text }}>{it.name}<MarkBadge mark={mark} /></span>
         {it.prices.length > 0 && <Prices prices={it.prices} />}
       </div>
-      {structured ? (
+      {body.kind === "card" ? (
         <div className="mt-1 space-y-1.5">
-          {structured.tagline && <p className="font-display italic text-[16px] leading-snug" style={{ color: C.muted }}>{structured.tagline}</p>}
-          {structured.ingredients && <p className="font-body text-sm leading-relaxed" style={{ color: C.text }}>{structured.ingredients}</p>}
-          {bareFlavor(structured.flavor) && <FlavorLine text={bareFlavor(structured.flavor)} className="pt-0.5" />}
+          {body.tagline && <p className="font-display italic text-[16px] leading-snug" style={{ color: C.muted }}>{body.tagline}</p>}
+          {body.ingredients && <p className="font-body text-sm leading-relaxed" style={{ color: C.text }}>{body.ingredients}</p>}
+          {body.flavor && <FlavorLine text={body.flavor} className="pt-0.5" />}
         </div>
-      ) : it.description ? <Description text={it.description} /> : null}
+      ) : body.kind === "description" ? <Description text={it.description} /> : null}
     </>
   );
 }
 
 /** One menu item: opens its library cocktail when there is one. Cocktails are never marked unavailable. */
-export function MenuItemRow({ it, marks, cocktails }: { it: MenuItem; marks?: Marks; cocktails?: Map<number, Cocktail> }) {
+export function MenuItemRow({ it, marks }: { it: MenuItem; marks?: Marks }) {
   const href = it.cocktail_id ? `/passport/library/${it.cocktail_id}` : it.bottle_id ? `/passport/spirits/${it.bottle_id}` : null;
   const mark = markOf(it, marks);
-  const c = it.cocktail_id && cocktails ? cocktails.get(it.cocktail_id) : undefined;
   return (
     <li className="border-b" style={{ borderColor: C.line }}>
-      {href ? <Link href={href} className="block py-3"><ItemBody it={it} mark={mark} c={c} /></Link> : <div className="py-3"><ItemBody it={it} mark={mark} c={c} /></div>}
+      {href ? <Link href={href} className="block py-3"><ItemBody it={it} mark={mark} /></Link> : <div className="py-3"><ItemBody it={it} mark={mark} /></div>}
     </li>
   );
 }
@@ -308,11 +321,11 @@ function SpiritRow({ it, marks }: { it: MenuItem; marks?: Marks }) {
   return <li className="border-b" style={{ borderColor: C.line }}>{it.bottle_id ? <Link href={`/passport/spirits/${it.bottle_id}`} className="block">{body}</Link> : body}</li>;
 }
 
-export function MenuGroupBlock({ g, spirits = false, marks, cocktails }: { g: MenuGroup; spirits?: boolean; marks?: Marks; cocktails?: Map<number, Cocktail> }) {
+export function MenuGroupBlock({ g, spirits = false, marks }: { g: MenuGroup; spirits?: boolean; marks?: Marks }) {
   return (
     <section className="mt-6">
       <h3 className="font-body text-[12px] tracking-[0.2em] uppercase" style={{ color: C.muted }}>{g.name}</h3>
-      <ul className="mt-1">{g.items.map((it, i) => (spirits ? <SpiritRow key={i} it={it} marks={marks} /> : <MenuItemRow key={i} it={it} marks={marks} cocktails={cocktails} />))}</ul>
+      <ul className="mt-1">{g.items.map((it, i) => (spirits ? <SpiritRow key={i} it={it} marks={marks} /> : <MenuItemRow key={i} it={it} marks={marks} />))}</ul>
     </section>
   );
 }
