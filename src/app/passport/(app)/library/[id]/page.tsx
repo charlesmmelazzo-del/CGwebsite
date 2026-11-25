@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Unavailable from "@/components/passport/Unavailable";
 import { CocktailPage } from "@/components/passport/Library";
 import { ItemControls } from "@/components/passport/Personal";
+import { AskAboutThis } from "@/components/passport/Inbox";
 import { getCocktail, getMine } from "@/lib/passport/bible";
 import { memberData } from "@/lib/passport/member";
 
@@ -20,6 +21,8 @@ export default async function CocktailRoute({ params }: { params: { id: string }
     <>
       <CocktailPage c={r.data.c} />
       <ItemControls key={`cocktail-${id}`} kind="cocktail" id={id} name={r.data.c.name} initial={r.data.mine} />
+      {/* File 08: a message to the bar with this cocktail attached. */}
+      <AskAboutThis kind="cocktail" id={id} name={r.data.c.name} />
     </>
   );
 }

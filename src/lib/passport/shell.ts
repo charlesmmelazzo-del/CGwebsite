@@ -27,7 +27,7 @@ export function tabOfPath(pathname: string | null | undefined): TabId | null {
 
 /** For a page opened straight from a link (no tab behind it yet): the tab it belongs under. */
 export function homeTabOf(pathname: string): TabId {
-  if (/^\/passport\/(bottles|messages)(\/|$)/.test(pathname)) return "inbox";
+  if (/^\/passport\/(bottles|messages|inbox)(\/|$)/.test(pathname)) return "inbox";
   if (/^\/passport\/account(\/|$)/.test(pathname)) return "home";
   if (/^\/passport\/spirits\/?$/.test(pathname)) return "menu";
   return "index";
@@ -55,6 +55,10 @@ export const OLD_ADDRESSES: { path: string; goes: string; note: string }[] = [
   { path: "/passport/bottles", goes: "/passport/inbox", note: "My bottles now lives in the Inbox tab" },
   { path: "/passport/messages", goes: "/passport/inbox", note: "the old Messages tab is the Inbox" },
   { path: "/passport/account", goes: "same", note: "your account (the round button at the top)" },
+  { path: "/passport/inbox/new", goes: "same", note: "file 08: Message the bar, Make a request, Plan an event (over the Inbox)" },
+  { path: "/passport/inbox/messages/[id]", goes: "same", note: "file 08: one conversation with the bar" },
+  { path: "/passport/inbox/requests/[id]", goes: "same", note: "file 08: one request" },
+  { path: "/passport/inbox/events/[id]", goes: "same", note: "file 08: one event inquiry" },
   { path: "/passport/forgot", goes: "same", note: "forgot password" },
   { path: "/passport/set-password", goes: "same", note: "set-password links" },
   { path: "/passport/confirm", goes: "same", note: "confirm-email links" },

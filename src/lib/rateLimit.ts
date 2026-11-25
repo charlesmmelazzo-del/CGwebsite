@@ -28,6 +28,10 @@ export const LIMITS = {
   "passport-bottles": { max: 60,  windowMs: HOUR },
   // File 06: the one search bar (answers as the member types, after a short pause; a word is a few requests).
   "passport-search": { max: 600, windowMs: HOUR },
+  // File 08: the Inbox. Writing to the bar, requests and event inquiries (the Bible also caps 30 messages a day, five open
+  // threads and ten open requests), and reading one open conversation, which asks again every 30 seconds while on screen.
+  "passport-inbox":      { max: 80,  windowMs: HOUR },
+  "passport-inbox-read": { max: 900, windowMs: HOUR },
   // Invitation codes typed in or opened from a link: few, so a code can't be guessed (the Bible also caps wrong codes overall).
   "passport-code":   { max: 10,  windowMs: HOUR },
 } as const;

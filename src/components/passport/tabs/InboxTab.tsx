@@ -3,19 +3,24 @@
 import { ScreenSkeleton } from "../bits";
 import { MyBottles } from "../Bottles";
 import { PageTitle, SectionTitle } from "../Library";
+import { InboxActions, InboxSections } from "../Inbox";
 import TabView from "./TabView";
-import type { BottleRequests } from "@/lib/passport/types";
+import type { BottleRequests, InboxData } from "@/lib/passport/types";
 
 /**
- * File 06: the Inbox tab. "My bottles" (file 05: requests with their statuses, accept, decline and cancel) lives here
- * now, with "Something we don't carry". Messages from the bar arrive in a later file.
+ * File 08: the Inbox tab. Three actions at the top (Message the bar, Make a request, Plan an event), then, each only
+ * when it has something: Needs you (a price to answer, a bottle ready, an unread reply, a question on a request),
+ * Messages (newest activity first, unread marked), Requests (general requests and event inquiries with their status),
+ * and My bottles (file 05, unchanged).
  */
 export default function InboxTab() {
   return (
-    <TabView<BottleRequests> name="inbox" skeleton={<ScreenSkeleton rows={3} />}>
+    <TabView<BottleRequests & { inbox?: InboxData | null }> name="inbox" skeleton={<ScreenSkeleton rows={4} cards={1} />}>
       {(d) => (
         <>
           <PageTitle kicker="For you" title="Inbox" />
+          <InboxActions />
+          <InboxSections inbox={d.inbox ?? null} bottles={d.requests} title={(id, children) => <div id={id}><SectionTitle>{children}</SectionTitle></div>} />
           <section aria-labelledby="pp-my-bottles">
             <div id="pp-my-bottles"><SectionTitle>My bottles</SectionTitle></div>
             <MyBottles initial={d} />

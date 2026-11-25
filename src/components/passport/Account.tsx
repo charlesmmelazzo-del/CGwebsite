@@ -4,9 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import InstallHint from "./InstallHint";
 import { Button, C, Check, Field, Notice, inputCls, postJson, useBotFields } from "./ui";
-import type { Me } from "@/lib/passport/bible";
+import type { Me, NotifyPrefs } from "@/lib/passport/bible";
 
-export default function Account({ me: initial }: { me: Me }) {
+export default function Account({ me: initial, prefs }: { me: Me; prefs?: NotifyPrefs | null }) {
   const router = useRouter();
   const [me, setMe] = useState(initial);
   const [saving, setSaving] = useState(false);
@@ -69,13 +69,15 @@ export default function Account({ me: initial }: { me: Me }) {
           : <button type="button" className="font-body text-sm underline underline-offset-4" style={{ color: C.text }} onClick={() => setInviting(true)}>+ Add someone in your household</button>)}
       </Block>
 
-      <Block title="Email from Common Good">
-        <Check checked={m.marketing_consent} onChange={setMarketing}>
-          Send me occasional news and offers. {saving && <span style={{ color: C.faint }}>Saving…</span>}
-        </Check>
-        <p className="font-body text-xs leading-relaxed" style={{ color: C.faint }}>Account emails, like password resets, always come through.</p>
-        {error && <Notice>{error}</Notice>}
-      </Block>
+      {prefs ? <Notifications initial={prefs} onNews={(on) => setMe({ ...me, member: { ...m, marketing_consent: on } })} /> : (
+        <Block title="Email from Common Good">
+          <Check checked={m.marketing_consent} onChange={setMarketing}>
+            Send me occasional news and offers. {saving && <span style={{ color: C.faint }}>Saving…</span>}
+          </Check>
+          <p className="font-body text-xs leading-relaxed" style={{ color: C.faint }}>Account emails, like password resets, always come through.</p>
+          {error && <Notice>{error}</Notice>}
+        </Block>
+      )}
 
       {showInstall
         ? <InstallHint force onClose={() => setShowInstall(false)} />
@@ -85,6 +87,52 @@ export default function Account({ me: initial }: { me: Me }) {
         <Button type="button" kind="quiet" onClick={signOut}>Sign out</Button>
       </div>
     </div>
+  );
+}
+
+const HOURS = Array.from({ length: 17 }, (_, i) => i + 6);
+const hourWord = (h: number) => `${((h + 11) % 12) + 1} ${h < 12 ? "AM" : "PM"}`;
+/**
+ * File 08: Account → Notifications. A switch per kind, and one daily summary instead of separate emails. "Ready for
+ * pickup" always sends. News from the bar is the same choice as "occasional news and offers".
+ */
+function Notifications({ initial, onNews }: { initial: NotifyPrefs; onNews: (on: boolean) => void }) {
+  const router = useRouter();
+  const [p, setP] = useState(initial);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const save = async (patch: Partial<NotifyPrefs>) => {
+    const before = p;
+    setP({ ...p, ...patch });
+    setSaving(true);
+    setError("");
+    const r = await postJson<{ notify_prefs: NotifyPrefs }>("/api/passport/notifications", patch, "PUT");
+    setSaving(false);
+    if (r.ok) { setP(r.data.notify_prefs); if (patch.news !== undefined) onNews(r.data.notify_prefs.news); }
+    else if (r.data.signed_out) router.refresh();
+    else { setP(before); setError(r.data.error || "Couldn't save that. Please try again."); }
+  };
+  return (
+    <Block title="Notifications">
+      <p className="font-body text-xs leading-relaxed" style={{ color: C.faint }}>Email me when{saving && <span> · Saving…</span>}</p>
+      <Check checked={p.messages} onChange={(v) => save({ messages: v })}>The bar replies to a message</Check>
+      <Check checked={p.requests} onChange={(v) => save({ requests: v })}>Something changes on a request or event inquiry</Check>
+      <Check checked={p.bottles} onChange={(v) => save({ bottles: v })}>There is news about a bottle request <span style={{ color: C.faint }}>(a bottle ready for pickup is always emailed)</span></Check>
+      <Check checked={p.news} onChange={(v) => save({ news: v })}>News from the bar: occasional news and offers</Check>
+      <div className="pt-2 border-t space-y-2" style={{ borderColor: C.line }}>
+        <Check checked={p.digest} onChange={(v) => save({ digest: v })}>One daily summary instead of separate emails</Check>
+        {p.digest && (
+          <label className="flex items-center gap-3 font-body text-sm pl-[30px]" style={{ color: C.muted }}>
+            Send it at
+            <select value={p.digest_hour} onChange={(e) => save({ digest_hour: Number(e.target.value) })} className="rounded-lg px-3 py-2 bg-[#0E120B] border border-[#323B29] text-[#EDE6D3] text-[15px]">
+              {HOURS.map((h) => <option key={h} value={h}>{hourWord(h)}</option>)}
+            </select>
+          </label>
+        )}
+      </div>
+      <p className="font-body text-xs leading-relaxed" style={{ color: C.faint }}>Emails only say that something is waiting; read it in your Inbox. At most one an hour about the same conversation, and none while you have it open. Notifications on this phone are coming in a later update. Account emails, like password resets, always come through.</p>
+      {error && <Notice>{error}</Notice>}
+    </Block>
   );
 }
 

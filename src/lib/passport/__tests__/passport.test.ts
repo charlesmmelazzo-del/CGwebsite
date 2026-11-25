@@ -424,6 +424,58 @@ function slowServer() {
     });
   }
 
+
+  // ── File 08: the Inbox ─────────────────────────────────────────────────────
+  {
+    const I = await import("../inbox");
+    await test("a new message sends only the subject, the words and an attached item (never a status, staff name or member number)", () => {
+      const x = I.threadBody({ subject: " Hi ", body: "A question", ref_kind: "cocktail", ref_id: "12", status: "closed", author: "staff", by: "Mike", member_id: 9 });
+      assert.deepEqual(x, { body: { subject: "Hi", body: "A question", ref_kind: "cocktail", ref_id: 12 } });
+      assert.deepEqual(I.threadBody({ body: "Plain" }), { body: { subject: "", body: "Plain" } });
+      assert.ok("error" in I.threadBody({ body: "" }) && "error" in I.threadBody({ body: "x".repeat(2001) }) && "error" in I.threadBody({ body: "x", ref_kind: "producer", ref_id: 1 }));
+    });
+    await test("requests and event inquiries send only their own fields; no name, email or phone is typed again", () => {
+      assert.deepEqual(I.requestBody({ kind: "access", date: "", details: " Near the door ", status: "done" }), { body: { kind: "access", date: "", details: "Near the door" } });
+      assert.ok("error" in I.requestBody({ kind: "free", details: "x" }) && "error" in I.requestBody({ kind: "other", details: "x".repeat(1001) }));
+      const e = I.eventBody({ kind: "tasting", preferred_date: "2027-01-08", time_of_day: "evening", guests: "10", budget: "500_1000", details: "", email: "x@y.z", deposit: 100 });
+      assert.deepEqual(e, { body: { kind: "tasting", preferred_date: "2027-01-08", backup_date: "", time_of_day: "evening", guests: 10, budget: "500_1000", details: "" } });
+      assert.ok("error" in I.eventBody({ kind: "tasting", preferred_date: "2027-01-08", time_of_day: "evening", guests: 0 }));
+      assert.ok("error" in I.eventBody({ kind: "tasting", preferred_date: "soon", time_of_day: "evening", guests: 4 }));
+    });
+    await test("Ask about this: only a cocktail, bottle or list, and the item opens only while it may", () => {
+      assert.deepEqual(I.parseAbout("bottle:7"), { kind: "bottle", id: 7 });
+      for (const v of ["producer:1", "bottle:", "<x>", 7]) assert.equal(I.parseAbout(v), null);
+      assert.equal(I.refHref({ kind: "list", id: 3, name: "x", opens: true }), "/passport/house/3");
+      assert.equal(I.refHref({ kind: "cocktail", id: null, name: "x", opens: false }), null);
+      assert.ok(I.askHref("cocktail", 4, "Paper Plane").startsWith("/passport/inbox/new?kind=message&about=cocktail%3A4"));
+    });
+    await test("Needs you and the Inbox dot: a question, an unread reply, an event reply, a price or a pickup", () => {
+      const t = { id: 1, unread: true } as never;
+      const q = { id: 2, question: true, unread: true } as never;
+      const none = { threads: [], member_requests: [], inquiries: [] };
+      assert.equal(I.inboxLit(none, []), false);
+      assert.equal(I.inboxLit({ ...none, threads: [t] }, []), true);
+      assert.equal(I.inboxLit({ ...none, member_requests: [q] }, []), true);
+      assert.equal(I.inboxLit(none, [{ can_answer: true, status: "quoted" } as never]), true);
+      const n = I.needsYou({ ...none, threads: [t], member_requests: [q] }, []);
+      assert.deepEqual(n.map((x) => x.kind), ["question", "reply"], "a question waiting on the member comes first");
+    });
+    await test("the Inbox routes are members only and rate limited; the pages over the Inbox exist", () => {
+      const api = join(APP, "api", "passport");
+      const post = readFileSync(join(api, "inbox", "route.ts"), "utf8");
+      const one = readFileSync(join(api, "inbox", "[what]", "[id]", "route.ts"), "utf8");
+      const prefs = readFileSync(join(api, "notifications", "route.ts"), "utf8");
+      assert.ok(post.includes('memberRequest(req, "passport-inbox"') && one.includes('memberRequest(req, "passport-inbox-read"') && one.includes('memberRequest(req, "passport-inbox"') && prefs.includes("memberRequest(req,"));
+      for (const src of [post, one, prefs]) assert.ok(!/member_id|memberId/.test(src));
+      assert.ok(LIMITS["passport-inbox"].max > 0 && LIMITS["passport-inbox-read"].max > 0);
+      for (const p of ["/passport/inbox/new", "/passport/inbox/messages/[id]", "/passport/inbox/requests/[id]", "/passport/inbox/events/[id]"]) {
+        assert.ok(pageOf(p), p);
+        assert.equal(homeTabOf(p.replace("[id]", "4")), "inbox", p);
+        assert.equal(tabOfPath(p.replace("[id]", "4")), null, `${p} opens over the Inbox`);
+      }
+    });
+  }
+
   console.log(`\n${passed} passed, ${failed} failed`);
   if (failed) process.exit(1);
 })();
