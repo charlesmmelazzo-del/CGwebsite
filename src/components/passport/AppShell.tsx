@@ -9,8 +9,9 @@ import AddToList from "./AddToList";
 import { CHANGED_EVENT, appMoved, reducedMotion, type Changed } from "./appEvents";
 import { ShellContext, ViewStore, type AddTarget, type ShellApi, type ViewEntry, type ViewName } from "./shellContext";
 import { TABS, homeTabOf, inboxDot, tabOfPath, type TabId } from "@/lib/passport/shell";
-import type { BottleRequests, InboxData, PassportList } from "@/lib/passport/types";
+import type { BottleRequests, InboxData, PassportList, SocialInbox } from "@/lib/passport/types";
 import { needsYou } from "@/lib/passport/inbox";
+import { socialLit } from "@/lib/passport/social";
 import HomeTab from "./tabs/HomeTab";
 import MenuTab from "./tabs/MenuTab";
 import IndexTab from "./tabs/IndexTab";
@@ -86,11 +87,12 @@ function Frame({ children }: { children: ReactNode }) {
   // The Inbox dot needs My bottles from the start, whichever tab opened first.
   useEffect(() => { if (!views.loaded("inbox")) void views.load("inbox"); }, [views]);
   // (Read from the store directly: this component provides the context, so it can't read it.)
-  const inbox = useSyncExternalStore((fn) => views.subscribe("inbox", fn), () => views.get("inbox"), () => views.get("inbox")) as ViewEntry<BottleRequests & { inbox?: InboxData | null }>;
+  const inbox = useSyncExternalStore((fn) => views.subscribe("inbox", fn), () => views.get("inbox"), () => views.get("inbox")) as ViewEntry<BottleRequests & { inbox?: InboxData | null; social?: SocialInbox | null }>;
   useEffect(() => {
     if (!inbox.data) return;
     setDot(inboxDot(inbox.data.requests));
-    setMessagesDot(needsYou(inbox.data.inbox, []).length > 0);
+    // File 09: a friend request, an unread message from a friend, or a note from the bar light it too.
+    setMessagesDot(needsYou(inbox.data.inbox, []).length > 0 || socialLit(inbox.data.social));
   }, [inbox.data]);
   // Something changed (a heart, a list, a bottle request): the tabs that show it refresh in the background.
   useEffect(() => {

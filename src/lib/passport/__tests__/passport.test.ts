@@ -344,7 +344,11 @@ function slowServer() {
     // File 07 fills Spirit of the Day and the Index's house lists: each still draws nothing until it has something.
     assert.ok(/function SpiritOfTheDay[\s\S]*?if \(!spirit\) return null;/.test(slots), "SpiritOfTheDay");
     assert.ok(/function HouseLists[\s\S]*?if \(!lists\?\.length && !charts\?\.length && !pastCount\) return null;/.test(slots), "HouseLists");
-    for (const f of ["SharedWithYou", "HereButtons"]) assert.ok(new RegExp(`function ${f}\\(\\) \\{ return null; \\}`).test(slots), f);
+    // File 09 fills "Shared with you" and the two round buttons (components/passport/Social.tsx): still nothing until they have something.
+    const social = readFileSync(join(__dirname, "..", "..", "..", "components", "passport", "Social.tsx"), "utf8");
+    assert.ok(/export \{ HereButtons, SharedWithYou \} from "\.\.\/Social";/.test(slots), "the slots point at file 09's sections");
+    assert.ok(/function SharedWithYou[\s\S]*?if \(!shown\.length\) return null;/.test(social), "SharedWithYou");
+    assert.ok(/function HereButtons[\s\S]*?if \(!p\) return null;/.test(social), "HereButtons");
     const all = ["AppShell.tsx", "tabs/HomeTab.tsx", "tabs/MenuTab.tsx", "tabs/IndexTab.tsx", "tabs/EventsTab.tsx", "tabs/InboxTab.tsx", "tabs/Slots.tsx"]
       .map((f) => readFileSync(join(__dirname, "..", "..", "..", "components", "passport", f), "utf8")).join("\n");
     assert.ok(!/coming soon/i.test(all), "no 'coming soon' anywhere in the new shell");
@@ -473,6 +477,87 @@ function slowServer() {
         assert.equal(homeTabOf(p.replace("[id]", "4")), "inbox", p);
         assert.equal(tabOfPath(p.replace("[id]", "4")), null, `${p} opens over the Inbox`);
       }
+    });
+  }
+
+  // ── File 09: friends, messages, sharing, Let's go, I'm here, Passport events, and the instant search ─────────────
+  console.log("File 09: friends, direct messages, sharing, Let's go, I'm here and Passport events");
+  {
+    const S = await import("../social");
+    const { localFind } = await import("../shell");
+    await test("finding a friend: exactly one of an email, a phone or a friend code, never a name", () => {
+      assert.deepEqual(S.lookupBody({ email: " sam@x.example " }), { body: { email: "sam@x.example" } });
+      assert.deepEqual(S.lookupBody({ phone: "(312) 555-0123" }), { body: { phone: "3125550123" } });
+      assert.deepEqual(S.lookupBody({ code: "abcd-2345" }), { body: { code: "ABCD2345" } });
+      for (const b of [{ name: "Sam" }, {}, { email: "sam@x.example", phone: "3125550123" }, { email: "not an email" }, { phone: "123" }, { code: "ABC" }, { code: "ABCD-23456" }]) assert.ok("error" in S.lookupBody(b), JSON.stringify(b));
+      assert.equal(S.cleanCode("ab cd 23 45"), "ABCD2345");
+      assert.ok(S.friendLink("https://x.example/", "ABCD-2345").endsWith("/passport/friends?code=ABCD2345"));
+      assert.ok(S.isTarget("friend:12") && S.isTarget("ask:3") && S.isTarget("thread:9") && !S.isTarget("member:4") && !S.isTarget("friend:") && !S.isTarget(7));
+    });
+    await test("messages, shares, plans and answers send only their own fields (never a member number)", () => {
+      assert.deepEqual(S.messageBody({ body: " Hi ", member_id: 4, to: 9 }), { body: { body: "Hi" } });
+      assert.ok("error" in S.messageBody({ body: "" }) && "error" in S.messageBody({ body: "x".repeat(1001) }));
+      assert.deepEqual(S.shareBody({ kind: "list", id: "5", to: [3, "4", 3, "x"], note: " For you ", member_id: 1, stars: 5 }), { body: { kind: "list", id: 5, to: [3, 4], note: "For you" } });
+      assert.ok("error" in S.shareBody({ kind: "member", id: 1, to: [1] }) && "error" in S.shareBody({ kind: "cocktail", id: 1, to: [] }) && "error" in S.shareBody({ kind: "cocktail", id: 1, to: Array.from({ length: 21 }, (_, i) => i + 1) }));
+      assert.deepEqual(S.letsgoBody({ day: "2026-12-04", time: "evening", note: "", to: "all", member_ids: [1] }), { body: { day: "2026-12-04", time: "evening", note: "", to: "all" } });
+      assert.ok("error" in S.letsgoBody({ day: "Friday", time: "evening", to: "all" }) && "error" in S.letsgoBody({ day: "2026-12-04", time: "midnight", to: "all" }) && "error" in S.letsgoBody({ day: "2026-12-04", time: "late", to: [] }));
+      assert.deepEqual(S.rsvpBody({ answer: "going", guests: "1", capacity: 999 }), { body: { answer: "going", guests: 1 } });
+      assert.deepEqual(S.rsvpBody({ answer: "cant", guests: 4 }), { body: { answer: "cant", guests: 0 } });
+      assert.ok("error" in S.rsvpBody({ answer: "maybe" }) && "error" in S.rsvpBody({ answer: "going", guests: -1 }));
+    });
+    await test("a ticket link opens only when it is a plain https address", () => {
+      assert.equal(S.ticketHref("https://tickets.example.com/x"), "https://tickets.example.com/x");
+      for (const u of ["http://tickets.example.com", "javascript:alert(1)", "https://u:p@tickets.example.com", "not a link", null]) assert.equal(S.ticketHref(u as string | null), null, String(u));
+    });
+    await test("friends going, shares and the Inbox dot in members' words", () => {
+      assert.equal(S.friendsGoingLine(null), "");
+      assert.equal(S.friendsGoingLine({ names: ["Sam"], count: 1 }), "Sam is going");
+      assert.equal(S.friendsGoingLine({ names: ["Sam", "Ana"], count: 2 }), "Sam and Ana are going");
+      assert.equal(S.friendsGoingLine({ names: ["Sam", "Ana"], count: 3 }), "Sam and 2 friends are going");
+      assert.equal(S.shareHref({ id: 4, kind: "cocktail", ref_id: 12, opens: true }), "/passport/library/12");
+      assert.equal(S.shareHref({ id: 4, kind: "event", ref_id: 3, opens: true }), "/passport/events/3");
+      assert.equal(S.shareHref({ id: 4, kind: "list", ref_id: null, opens: true }), "/passport/shared/4");
+      assert.equal(S.shareHref({ id: 4, kind: "bottle", ref_id: null, opens: false }), null, "something the receiver may not open opens nothing");
+      const none = { conversations: [], incoming: [], notices: [] };
+      assert.equal(S.socialLit(none), false);
+      assert.equal(S.socialLit({ ...none, incoming: [{ id: 1, name: "Sam S.", at: "" }] }), true);
+      assert.equal(S.socialLit({ ...none, conversations: [{ id: 1, available: true, name: "Sam S.", unread: true }] }), true);
+      assert.equal(S.nextDays(new Date("2026-12-04T18:00:00Z"), 3).map((d) => d.label)[0], "Tonight");
+      assert.equal(S.PRIVATE_LINE, "Private between you and your friend. If something is reported, our team can review it.");
+    });
+    await test("the friends, messages, sharing, plans and events routes are members only, rate limited, and never take a member number", () => {
+      const api = join(APP, "api", "passport");
+      const files = [["friends", "route.ts"], ["conversations", "route.ts"], ["conversations", "[id]", "route.ts"], ["share", "route.ts"], ["shares", "[id]", "route.ts"], ["meetups", "route.ts"], ["events", "[id]", "route.ts"]];
+      for (const f of files) {
+        const src = readFileSync(join(api, ...f), "utf8");
+        assert.ok(/memberRequest\(req, (bucket|"passport-(social|social-read|member|friends)")/.test(src), f.join("/"));
+        assert.ok(!/member_id|memberId|searchParams\.get\("member/.test(src), `${f.join("/")} never takes a member number`);
+      }
+      assert.ok(LIMITS["passport-friends"].max > 0 && LIMITS["passport-social"].max > 0 && LIMITS["passport-social-read"].max > 0);
+      for (const p of ["/passport/friends", "/passport/inbox/friends/[id]", "/passport/events/[id]", "/passport/letsgo", "/passport/shared/[id]"]) assert.ok(pageOf(p), p);
+      assert.equal(homeTabOf("/passport/inbox/friends/4"), "inbox");
+      assert.equal(homeTabOf("/passport/events/4"), "events");
+      assert.equal(homeTabOf("/passport/friends"), "home");
+      assert.equal(tabOfPath("/passport/events/4"), null, "an event opens over the Events tab");
+      const msg = readFileSync(join(APP, "..", "components", "passport", "Social.tsx"), "utf8");
+      assert.ok(msg.includes("{PRIVATE_LINE}"), "where members write to a friend, the app says it is private between them");
+      const ev = readFileSync(join(APP, "..", "components", "passport", "Events.tsx"), "utf8");
+      assert.ok(ev.includes('target="_blank" rel="noopener noreferrer"') && ev.includes("ticketHref("), "Get tickets opens outside the app, only for an https link");
+    });
+    await test("search answers at once from the Index data: the same names, in the Bible's order and limits", () => {
+      const c = (id: number, name: string, menu_status: "current" | "past" = "current") => ({ id, name, flavor: "", menu_name: "M", menu_status, passport: null, available: false });
+      const b = (id: number, name: string) => ({ id, name, category: "Rum", status_label: null, available: true });
+      const index = { cocktails: [c(1, "Zombie", "past"), c(2, "Café Royale"), c(3, "Old Fashioned"), c(4, "Zingara")], bottles: [b(5, "Zacapa 23"), b(6, "Plantation Xaymaca"), b(7, "El Dorado 12")] };
+      const r = localFind(index, "z")!;
+      assert.deepEqual(r, { cocktails: [], bottles: [] }, "one letter is not a search");
+      assert.deepEqual(localFind(index, "Z  i")!.cocktails.map((x) => x.id), [4, 1], "every word must match; current menus first, then by name");
+      assert.deepEqual(localFind(index, "a 2")!.bottles.map((x) => x.id), [7, 5], "bottles by name");
+      assert.deepEqual(localFind(index, "cafe")!.cocktails.map((x) => x.id), [2], "accents are ignored, as at the Bible");
+      assert.equal(localFind(null, "rum"), null, "with no Index data, it waits for the Bible as before");
+      const many = { cocktails: Array.from({ length: 30 }, (_, i) => c(i + 1, `Rum ${String(i).padStart(2, "0")}`)), bottles: Array.from({ length: 30 }, (_, i) => b(i + 100, `Rum ${i}`)) };
+      assert.ok(localFind(many, "rum")!.cocktails.length === 20 && localFind(many, "rum")!.bottles.length === 25, "the Bible's limits");
+      const src = readFileSync(join(APP, "..", "components", "passport", "Search.tsx"), "utf8");
+      assert.ok(src.includes('useView<IndexData>("index")') && src.includes("/api/passport/find"), "the Index data answers first; the Bible's answer still comes (producers, ingredients)");
     });
   }
 

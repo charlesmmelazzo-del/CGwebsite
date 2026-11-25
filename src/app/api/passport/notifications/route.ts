@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   return memberRequest(req, "passport-member", (auth) => passport("GET", "/notifications", { auth }));
 }
 
-const SWITCHES = ["messages", "requests", "bottles", "news", "digest"] as const;
+const SWITCHES = ["messages", "requests", "bottles", "friends", "news", "digest"] as const;
 export async function PUT(req: NextRequest) {
   return memberRequest(req, "passport-personal", async (auth, b) => {
     const body: Record<string, boolean | number> = {};

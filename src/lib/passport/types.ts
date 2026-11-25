@@ -165,4 +165,45 @@ export interface InboxLimits {
 }
 export interface InboxData { threads: InboxThread[]; member_requests: MemberRequest[]; inquiries: EventInquiry[]; limits: InboxLimits }
 /** Account → Notifications. news is the member's marketing choice. digest_hour: bar time, 6 to 22. */
-export interface NotifyPrefs { messages: boolean; requests: boolean; bottles: boolean; news: boolean; digest: boolean; digest_hour: number }
+export interface NotifyPrefs { messages: boolean; requests: boolean; bottles: boolean; friends?: boolean; news: boolean; digest: boolean; digest_hour: number }
+
+// ── File 09: friends, direct messages, sharing, Let's go, I'm here and Passport events (the Bible's approved list). ──
+// What a member ever sees of another member is a display name. Numbers here name a friendship, a request, a
+// conversation, a share, a plan or a block the member is part of; never another member.
+export interface SocialSettings { display_name: string; default_name: string; shown_as: string; friend_code: string; share_presence: boolean }
+export interface Friend { id: number; name: string; here: boolean; since: string; conversation_id: number | null; unread: boolean }
+export interface FriendRequest { id: number; name: string; at: string }
+export interface FriendAsk { id: number; typed: string; via: "email" | "phone" | "code" | "household"; at: string }
+export interface FriendSuggestion { id: string; name: string }
+export interface BlockedPerson { id: number; name: string }
+export interface SocialLimits { friends: number; max_friends: number; sent: number; max_sent: number; lookups_left: number; muted: boolean }
+export interface FriendsOverview { settings: SocialSettings; friends: Friend[]; incoming: FriendRequest[]; sent: FriendAsk[]; suggested: FriendSuggestion[]; blocked: BlockedPerson[]; limits: SocialLimits }
+export type ShareKind = "cocktail" | "bottle" | "house_list" | "list" | "recipe" | "event";
+export interface SharedListItem { kind: ItemKind; id: number | null; name: string; opens: boolean }
+export interface ShareCard {
+  id: number; kind: ShareKind; name: string; note: string; from: "me" | "friend"; from_name: string | null; ref_id: number | null; opens: boolean; saved: boolean; at: string;
+  list?: { kind: ItemKind; ranked: boolean; items: SharedListItem[] };
+  recipe?: { name: string; notes: string; lines: BespokeLine[]; made_by: string | null };
+}
+export interface DmPost { id: number; from: "me" | "friend"; body: string; removed: boolean; at: string; share: ShareCard | null }
+export interface Conversation {
+  id: number; available: boolean; name: string | null; friend_id?: number; unread: boolean; last_at?: string; last_from?: "me" | "friend"; preview?: string;
+  here?: boolean; can_write?: boolean; posts?: DmPost[];
+}
+export type LetsGoTime = "afternoon" | "early" | "evening" | "late";
+export type LetsGoAnswer = "in" | "maybe" | "cant";
+export interface LetsGo {
+  id: number; mine: boolean; day: string; time: LetsGoTime; time_label: string; note: string; from_name: string | null;
+  my_answer?: LetsGoAnswer | null; in_count?: number; maybe_count?: number; answers?: { name: string; answer: LetsGoAnswer | null }[];
+}
+export interface Presence { here: boolean; until: string | null; share_presence: boolean }
+export interface MemberNotice { id: number; body: string; at: string; unread: boolean }
+export interface EventRsvp { status: "going" | "cant" | "waitlist" | "offered" | "missed"; label: string; guests: number; offer_expires_at: string | null }
+export interface PassportEvent {
+  id: number; title: string; description: string; date: string; start: string; end: string | null; price_text: string; ticket_url: string | null; rsvp: boolean; guest_limit: number;
+  status: "announced" | "full" | "past" | "cancelled"; status_label: string; cancel_note: string; my_rsvp: EventRsvp | null; friends_going: { names: string[]; count: number } | null;
+  answered?: "going" | "waitlist" | "cant";
+}
+export interface EventNotice { kind: "offer" | "cancelled"; id: number; title: string; date: string; until: string | null }
+export interface SocialHome { presence: Presence; friends_here: { name: string }[]; letsgo: LetsGo[]; shared: ShareCard[]; has_friends: boolean; event_notices: EventNotice[] }
+export interface SocialInbox { conversations: Conversation[]; incoming: FriendRequest[]; notices: MemberNotice[] }

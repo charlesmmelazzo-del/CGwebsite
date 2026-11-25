@@ -32,6 +32,12 @@ export const LIMITS = {
   // threads and ten open requests), and reading one open conversation, which asks again every 30 seconds while on screen.
   "passport-inbox":      { max: 80,  windowMs: HOUR },
   "passport-inbox-read": { max: 900, windowMs: HOUR },
+  // File 09: friends. Looking someone up (the Bible also caps ten lookups an hour per member), and everything else a
+  // member does with friends: messages, shares, plans, answers (the Bible caps 100 messages a day), and reading an open
+  // conversation, which asks again every 30 seconds while on screen.
+  "passport-friends":      { max: 40,  windowMs: HOUR },
+  "passport-social":       { max: 300, windowMs: HOUR },
+  "passport-social-read":  { max: 900, windowMs: HOUR },
   // Invitation codes typed in or opened from a link: few, so a code can't be guessed (the Bible also caps wrong codes overall).
   "passport-code":   { max: 10,  windowMs: HOUR },
 } as const;

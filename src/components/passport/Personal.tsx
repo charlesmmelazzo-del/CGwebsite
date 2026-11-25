@@ -10,6 +10,7 @@ import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, v
 import { CSS } from "@dnd-kit/utilities";
 import { C, Notice, inputCls, postJson } from "./ui";
 import { PRIVATE_LINE, itemHref } from "./personalShared";
+import { ShareButton } from "./Social";
 import { createSaveQueue } from "@/lib/passport/saveQueue";
 import type { Bespoke, BespokeLine, ItemKind, ListItem, Mine, PassportList, Pick } from "@/lib/passport/types";
 import { notifyChanged } from "./appEvents";
@@ -308,6 +309,8 @@ export function ListEditor({ initial }: { initial: PassportList }) {
       <div className="flex gap-4 mt-2 font-body text-xs">
         {!renaming && <button type="button" className="underline" style={{ color: C.muted }} onClick={() => setRenaming(true)}>Rename</button>}
         <button type="button" className="underline" style={{ color: C.muted }} onClick={del}>Delete list</button>
+        {/* File 09: friends get a copy they can save (names and order only; never your stars or notes). */}
+        {items.length > 0 && <ShareButton kind="list" id={list.id} name={list.name} compact />}
       </div>
       {error && <div className="mt-4"><Notice>{error}</Notice></div>}
 
@@ -444,6 +447,8 @@ export function BespokeBook({ initial, units, startNew = false }: { initial: Bes
               ))}
             </ul>
             {r.notes && <p className="font-body text-sm mt-3 leading-relaxed whitespace-pre-line" style={{ color: C.muted }}>{r.notes}</p>}
+            {/* File 09: a recipe the member wrote, or one staff made for them ("Made for you by …" travels with it). */}
+            <div className="mt-3"><ShareButton kind="recipe" id={r.id} name={r.name} compact /></div>
           </li>
         ))}
       </ul>

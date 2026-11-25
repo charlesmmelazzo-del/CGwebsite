@@ -182,7 +182,7 @@ export function InboxSections({ inbox, bottles, title }: { inbox: InboxData | nu
   useEffect(() => { setData(inbox); }, [inbox]);
   const shell = useShell();
   const needs = needsYou(data, bottles);
-  useEffect(() => { shell?.setMessagesDot(needsYou(data, []).length > 0); }, [data, shell]);
+  useEffect(() => { if (needsYou(data, []).length > 0) shell?.setMessagesDot(true); }, [data, shell]);
   const answered = (r: MemberRequest) => setData((d) => (d ? { ...d, member_requests: d.member_requests.map((x) => (x.id === r.id ? r : x)) } : d));
   if (!data) {
     return <p className="font-body text-sm mt-6" style={{ color: C.faint }}>Your messages and requests can&rsquo;t load right now. Pull down or come back in a minute.</p>;

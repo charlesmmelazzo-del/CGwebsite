@@ -28,7 +28,8 @@ export function tabOfPath(pathname: string | null | undefined): TabId | null {
 /** For a page opened straight from a link (no tab behind it yet): the tab it belongs under. */
 export function homeTabOf(pathname: string): TabId {
   if (/^\/passport\/(bottles|messages|inbox)(\/|$)/.test(pathname)) return "inbox";
-  if (/^\/passport\/account(\/|$)/.test(pathname)) return "home";
+  if (/^\/passport\/(account|friends|letsgo|shared)(\/|$)/.test(pathname)) return "home";
+  if (/^\/passport\/events\/./.test(pathname)) return "events";
   if (/^\/passport\/spirits\/?$/.test(pathname)) return "menu";
   return "index";
 }
@@ -59,6 +60,11 @@ export const OLD_ADDRESSES: { path: string; goes: string; note: string }[] = [
   { path: "/passport/inbox/messages/[id]", goes: "same", note: "file 08: one conversation with the bar" },
   { path: "/passport/inbox/requests/[id]", goes: "same", note: "file 08: one request" },
   { path: "/passport/inbox/events/[id]", goes: "same", note: "file 08: one event inquiry" },
+  { path: "/passport/friends", goes: "same", note: "file 09: Friends (requests, add a friend, friends, blocked); ?code= fills in a friend code" },
+  { path: "/passport/inbox/friends/[id]", goes: "same", note: "file 09: a conversation with a friend (over the Inbox)" },
+  { path: "/passport/events/[id]", goes: "same", note: "file 09: one Passport event (over the Events tab)" },
+  { path: "/passport/letsgo", goes: "same", note: "file 09: Let's go, plan a visit with friends (over Home)" },
+  { path: "/passport/shared/[id]", goes: "same", note: "file 09: a friend's list or recipe shared with the member" },
   { path: "/passport/forgot", goes: "same", note: "forgot password" },
   { path: "/passport/set-password", goes: "same", note: "set-password links" },
   { path: "/passport/confirm", goes: "same", note: "confirm-email links" },
@@ -106,3 +112,26 @@ export const searchable = (q: string) => q.trim().replace(/\s+/g, "").length >= 
 
 /** "Available now" is a small marker, never a whole row: what a row needs to know. */
 export const isAvailable = (x: Pick<IndexCocktail, "available"> | Pick<IndexBottle, "available"> | null | undefined) => !!x?.available;
+
+// ── Instant search from the Index data already in the browser ─────────────────
+// The Bible's /find matches cocktails by name or published ingredient words and bottles by name or producer, names
+// first; producers by name. With the Index tab's data loaded, the browser can answer the name matches at once, in the
+// Bible's own order (so the server's answer, when it arrives, only adds to the end: ingredient and producer matches, and
+// the producers). The Index holds only what the member may open, so nothing here can open what the Bible wouldn't.
+const FIND_LIMITS = { cocktails: 20, bottles: 25 };
+const plainWords = (s: string) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+export function findWords(q: string): string[] {
+  return plainWords(q).split(/\s+/).filter(Boolean).slice(0, 6);
+}
+/** Cocktails and bottles from the Index whose names hold every word, in the Bible's order and limits. */
+export function localFind(index: { cocktails: IndexCocktail[]; bottles: IndexBottle[] } | null | undefined, q: string): { cocktails: IndexCocktail[]; bottles: IndexBottle[] } | null {
+  if (!index) return null;
+  const words = findWords(q);
+  if (!words.length || words.join("").length < 2) return { cocktails: [], bottles: [] };
+  const has = (text: string) => { const t = plainWords(text); return words.every((w) => t.includes(w)); };
+  const cocktails = index.cocktails.filter((c) => has(c.name))
+    .sort((a, b) => (a.menu_status === b.menu_status ? 0 : a.menu_status === "current" ? -1 : 1) || a.name.localeCompare(b.name))
+    .slice(0, FIND_LIMITS.cocktails);
+  const bottles = index.bottles.filter((b) => has(b.name)).sort((a, b) => a.name.localeCompare(b.name)).slice(0, FIND_LIMITS.bottles);
+  return { cocktails, bottles };
+}

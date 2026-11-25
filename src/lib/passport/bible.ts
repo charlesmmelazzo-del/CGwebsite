@@ -4,6 +4,7 @@ import {
   markKey, type MemberAuth, type Me, type Config, type CocktailCard, type Cocktail, type ArchivedBottle, type MenuGroup, type ToastMenu, type MenuInfo, type Bottle, type Producer, type BaseSpirit, type ItemKind, type FavoriteItem, type RatingItem, type NoteItem, type Mark, type Marks, type Mine, type PassportList, type Bespoke, type History, type BottleRequests,
   type IndexData, type FindResults, type Reservation, type BarHome, type BarLists, type HouseList, type Chart,
   type InboxData, type InboxThread, type MemberRequest, type EventInquiry, type NotifyPrefs,
+  type FriendsOverview, type SocialHome, type SocialInbox, type Conversation, type ShareCard, type PassportEvent,
 } from "./types";
 
 // The shapes themselves live in ./types (no server-only code, so browser components can use them too).
@@ -166,3 +167,13 @@ export const getThread = (auth: MemberAuth, id: number) => passport<{ thread: In
 export const getMemberRequest = (auth: MemberAuth, id: number) => passport<{ member_request: MemberRequest }>("GET", `/inbox/requests/${id}`, { auth }).then((r) => r.member_request);
 export const getInquiry = (auth: MemberAuth, id: number) => passport<{ inquiry: EventInquiry }>("GET", `/inbox/events/${id}`, { auth }).then((r) => r.inquiry);
 export const getNotifyPrefs = (auth: MemberAuth) => passport<{ notify_prefs: NotifyPrefs }>("GET", "/notifications", { auth }).then((r) => r.notify_prefs);
+
+// ── File 09: friends, messages, sharing, Let's go, I'm here and Passport events. Only the signed-in member's own (the
+// Bible names other members by display name only, and every number names something the member is part of). ──────
+export const getFriends = (auth: MemberAuth) => passport<FriendsOverview>("GET", "/friends", { auth });
+export const getSocialHome = (auth: MemberAuth) => passport<SocialHome>("GET", "/social/home", { auth });
+export const getSocialInbox = (auth: MemberAuth) => passport<SocialInbox>("GET", "/social/inbox", { auth });
+export const getConversation = (auth: MemberAuth, id: number) => passport<{ conversation: Conversation }>("GET", `/conversations/${id}`, { auth }).then((r) => r.conversation);
+export const getShare = (auth: MemberAuth, id: number) => passport<{ share: ShareCard }>("GET", `/shares/${id}`, { auth }).then((r) => r.share);
+export const getPassportEvents = (auth: MemberAuth) => passport<{ events: PassportEvent[] }>("GET", "/events", { auth }).then((r) => r.events);
+export const getPassportEvent = (auth: MemberAuth, id: number) => passport<{ event: PassportEvent }>("GET", `/events/${id}`, { auth }).then((r) => r.event);

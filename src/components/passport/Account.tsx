@@ -4,9 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import InstallHint from "./InstallHint";
 import { Button, C, Check, Field, Notice, inputCls, postJson, useBotFields } from "./ui";
-import type { Me, NotifyPrefs } from "@/lib/passport/bible";
+import type { FriendsOverview, Me, NotifyPrefs } from "@/lib/passport/bible";
+import Link from "next/link";
+import { friendLink } from "@/lib/passport/social";
 
-export default function Account({ me: initial, prefs }: { me: Me; prefs?: NotifyPrefs | null }) {
+export default function Account({ me: initial, prefs, friends }: { me: Me; prefs?: NotifyPrefs | null; friends?: FriendsOverview | null }) {
   const router = useRouter();
   const [me, setMe] = useState(initial);
   const [saving, setSaving] = useState(false);
@@ -69,6 +71,8 @@ export default function Account({ me: initial, prefs }: { me: Me; prefs?: Notify
           : <button type="button" className="font-body text-sm underline underline-offset-4" style={{ color: C.text }} onClick={() => setInviting(true)}>+ Add someone in your household</button>)}
       </Block>
 
+      {friends && <FriendsBlock initial={friends} />}
+
       {prefs ? <Notifications initial={prefs} onNews={(on) => setMe({ ...me, member: { ...m, marketing_consent: on } })} /> : (
         <Block title="Email from Common Good">
           <Check checked={m.marketing_consent} onChange={setMarketing}>
@@ -118,6 +122,7 @@ function Notifications({ initial, onNews }: { initial: NotifyPrefs; onNews: (on:
       <Check checked={p.messages} onChange={(v) => save({ messages: v })}>The bar replies to a message</Check>
       <Check checked={p.requests} onChange={(v) => save({ requests: v })}>Something changes on a request or event inquiry</Check>
       <Check checked={p.bottles} onChange={(v) => save({ bottles: v })}>There is news about a bottle request <span style={{ color: C.faint }}>(a bottle ready for pickup is always emailed)</span></Check>
+      {p.friends !== undefined && <Check checked={!!p.friends} onChange={(v) => save({ friends: v })}>A friend sends me a request or a message <span style={{ color: C.faint }}>(who, never the words)</span></Check>}
       <Check checked={p.news} onChange={(v) => save({ news: v })}>News from the bar: occasional news and offers</Check>
       <div className="pt-2 border-t space-y-2" style={{ borderColor: C.line }}>
         <Check checked={p.digest} onChange={(v) => save({ digest: v })}>One daily summary instead of separate emails</Check>
@@ -132,6 +137,71 @@ function Notifications({ initial, onNews }: { initial: NotifyPrefs; onNews: (on:
       </div>
       <p className="font-body text-xs leading-relaxed" style={{ color: C.faint }}>Emails only say that something is waiting; read it in your Inbox. At most one an hour about the same conversation, and none while you have it open. Notifications on this phone are coming in a later update. Account emails, like password resets, always come through.</p>
       {error && <Notice>{error}</Notice>}
+    </Block>
+  );
+}
+
+/**
+ * File 09: Friends in Account: the name friends see, the member's friend code (show it, copy the "add me" link, reset
+ * it), "Let friends see when I'm at Common Good" (on by default), and who they blocked, with a way to the Friends page.
+ */
+function FriendsBlock({ initial }: { initial: FriendsOverview }) {
+  const router = useRouter();
+  const [s, setS] = useState(initial.settings);
+  const [blocked, setBlocked] = useState(initial.blocked);
+  const [name, setName] = useState(initial.settings.display_name);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
+  const call = async (body: Record<string, unknown>) => {
+    setBusy(true);
+    setError("");
+    const r = await postJson<{ settings?: FriendsOverview["settings"]; blocked?: FriendsOverview["blocked"] }>("/api/passport/friends", body);
+    setBusy(false);
+    if (r.ok) { if (r.data.settings) setS(r.data.settings); if (r.data.blocked) setBlocked(r.data.blocked); return true; }
+    if (r.data.signed_out) router.refresh(); else setError(r.data.error || "Couldn't save that. Please try again.");
+    return false;
+  };
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(friendLink(window.location.origin, s.friend_code)); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { setError("Couldn't copy. Your code is " + s.friend_code); }
+  };
+  return (
+    <Block title="Friends">
+      <p className="font-body text-sm leading-relaxed" style={{ color: C.muted }}>Friends see you as <span style={{ color: C.text }}>{s.shown_as}</span>. Never your email, phone, history or notes.</p>
+      <Field label="Display name for friends" hint={`Leave it empty to show ${s.default_name}.`}>
+        <div className="flex gap-2">
+          <input className={inputCls} value={name} maxLength={30} onChange={(e) => setName(e.target.value)} placeholder={s.default_name} />
+          <button type="button" disabled={busy || name.trim() === s.display_name} onClick={() => call({ action: "settings", display_name: name.trim() })}
+            className="shrink-0 rounded-lg border px-4 font-body text-[12px] tracking-[0.12em] uppercase disabled:opacity-40" style={{ borderColor: C.brass, color: C.brass }}>Save</button>
+        </div>
+      </Field>
+      <div className="pt-1">
+        <span className="block font-body text-[11px] tracking-[0.2em] uppercase mb-1.5" style={{ color: C.muted }}>Your friend code</span>
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="font-display text-[28px] tracking-[0.12em]" style={{ color: C.text }}>{s.friend_code}</span>
+          <button type="button" onClick={copy} className="font-body text-sm underline" style={{ color: C.text }}>{copied ? "Link copied" : "Copy my link"}</button>
+          <button type="button" disabled={busy} onClick={() => { if (confirm("Reset your friend code? The old code and link stop working.")) void call({ action: "code_reset" }); }} className="font-body text-sm underline" style={{ color: C.muted }}>Reset</button>
+        </div>
+        <p className="font-body text-xs mt-1" style={{ color: C.faint }}>Share it with people you want as friends on Passport. Anyone with it can send you a request.</p>
+      </div>
+      <Check checked={s.share_presence} onChange={(v) => call({ action: "settings", share_presence: v })}>Let friends see when I&rsquo;m at Common Good <span style={{ color: C.faint }}>(and that I&rsquo;m going to a Passport event)</span></Check>
+      {blocked.length > 0 && (
+        <div className="pt-1">
+          <span className="block font-body text-[11px] tracking-[0.2em] uppercase mb-1.5" style={{ color: C.muted }}>Blocked</span>
+          <ul className="space-y-1.5">
+            {blocked.map((b) => (
+              <li key={b.id} className="flex items-center justify-between font-body text-[15px]" style={{ color: C.text }}>
+                <span>{b.name}</span>
+                <button type="button" disabled={busy} className="text-xs underline" style={{ color: C.muted }} onClick={() => call({ action: "unblock", id: b.id })}>Unblock</button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {error && <Notice>{error}</Notice>}
+      <Link href="/passport/friends" scroll={false} className="inline-flex items-center gap-1.5 min-h-[44px] font-body text-sm underline underline-offset-4" style={{ color: C.text }}>
+        Friends{initial.incoming.length ? ` · ${initial.incoming.length} request${initial.incoming.length === 1 ? "" : "s"} waiting` : ""} <span aria-hidden>→</span>
+      </Link>
     </Block>
   );
 }

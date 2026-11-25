@@ -4,6 +4,7 @@ import { BottlePage } from "@/components/passport/Library";
 import { ItemControls } from "@/components/passport/Personal";
 import { RequestBottle } from "@/components/passport/Bottles";
 import { AskAboutThis } from "@/components/passport/Inbox";
+import { ShareButton } from "@/components/passport/Social";
 import { getBottle, getMine } from "@/lib/passport/bible";
 import { memberData } from "@/lib/passport/member";
 
@@ -27,6 +28,8 @@ export default async function BottleRoute({ params }: { params: { id: string } }
       <RequestBottle key={`request-${id}`} bottleId={id} name={r.data.b.name} />
       {/* File 08: a message to the bar with this bottle attached. */}
       <AskAboutThis kind="bottle" id={id} name={r.data.b.name} />
+      {/* File 09: share it with friends. */}
+      <div className="mt-3"><ShareButton kind="bottle" id={id} name={r.data.b.name} /></div>
     </>
   );
 }
