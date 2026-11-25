@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
-  getBottleRequests, getIndex, getLists, getMarksSafe, getMe, getMenus, getPassportCocktails, getReservations, getSpirits,
+  getBarHome, getBarLists, getBottleRequests, getIndex, getLists, getMarksSafe, getMe, getMenus, getPassportCocktails, getReservations, getSpirits,
   type MemberAuth,
 } from "@/lib/passport/bible";
 import { memberRequest } from "@/lib/passport/route";
@@ -16,13 +16,15 @@ export const dynamic = "force-dynamic";
  * is asked a few things at once per tab, never once per item.
  */
 const VIEWS: Record<string, (auth: MemberAuth) => Promise<unknown>> = {
-  // Home: their first name, the Passport exclusives, and what needs them right now.
+  // Home: their first name, the Passport exclusives, what needs them right now, and (file 07) From the bar: messages,
+  // What's new, Spirit of the Day, the Welcome Aperitif and the newest house list. A section that can't load is left out.
   home: async (auth) => {
-    const [me, exclusives, bottles, reservations] = await Promise.all([
+    const [me, exclusives, bottles, reservations, bar] = await Promise.all([
       getMe(auth),
       getPassportCocktails(auth).catch(() => []),
       getBottleRequests(auth).catch(() => null),
       getReservations(auth).catch(() => []),
+      getBarHome(auth).catch(() => null),
     ]);
     return {
       // Only what Home shows of their own record.
@@ -31,6 +33,11 @@ const VIEWS: Record<string, (auth: MemberAuth) => Promise<unknown>> = {
       exclusives,
       attention: bottles ? sortRequests(bottles.requests.filter(needsMember)) : [],
       reservations,
+      messages: bar?.messages ?? [],
+      feed: bar?.feed ?? [],
+      spirit_of_the_day: bar?.spirit_of_the_day ?? null,
+      welcome_aperitif: bar?.welcome_aperitif ?? null,
+      newest_list: bar?.newest_list ?? null,
     };
   },
   // Menu: the Passport exclusives, the Toast menus an admin ticked, the spirits list, and the member's own hearts and stars.
@@ -38,10 +45,10 @@ const VIEWS: Record<string, (auth: MemberAuth) => Promise<unknown>> = {
     const [exclusives, menus, spirits, marks] = await Promise.all([getPassportCocktails(auth), getMenus(auth), getSpirits(auth), getMarksSafe(auth)]);
     return { exclusives, ...menus, spirits: spirits.menu_info.available ? spirits.spirits : null, marks };
   },
-  // Index: everything (one call), the member's own lists, and their hearts and stars.
+  // Index: everything (one call), the member's own lists, their hearts and stars, and (file 07) From Common Good.
   index: async (auth) => {
-    const [index, lists, marks] = await Promise.all([getIndex(auth), getLists(auth), getMarksSafe(auth)]);
-    return { ...index, lists, marks };
+    const [index, lists, marks, bar] = await Promise.all([getIndex(auth), getLists(auth), getMarksSafe(auth), getBarLists(auth).catch(() => null)]);
+    return { ...index, lists, marks, house_lists: bar?.house_lists ?? [], charts: bar?.charts ?? [], past_count: bar?.past_count ?? 0 };
   },
   // Events: their own upcoming reservations, and whether the public booking page is open.
   events: async (auth) => {

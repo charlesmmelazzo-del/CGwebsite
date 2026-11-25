@@ -11,11 +11,11 @@ import SearchArea from "../Search";
 import TabView from "./TabView";
 import { HouseLists } from "./Slots";
 import { byCategory, withSpirit } from "@/lib/passport/shell";
-import { markKey, type IndexData, type IndexDrink, type Marks, type PassportList } from "@/lib/passport/types";
+import { markKey, type Chart, type HouseList, type IndexData, type IndexDrink, type Marks, type PassportList } from "@/lib/passport/types";
 import { scrollToId } from "../appEvents";
 
 /** What the Index view sends (api/passport/view/index). */
-export interface IndexView extends IndexData { lists: PassportList[]; marks: Marks }
+export interface IndexView extends IndexData { lists: PassportList[]; marks: Marks; house_lists?: HouseList[]; charts?: Chart[]; past_count?: number }
 
 const YOURS = [
   { href: "/passport/favorites", title: "Favorites", line: "Cocktails and bottles you love, and your ratings" },
@@ -61,7 +61,9 @@ function Index({ d, version }: { d: IndexView; version: number }) {
   }, []);
   const jump = (id: string) => scrollToId(id, true);
   const sections = [
-    { id: "lists", label: "Lists" }, { id: "yours", label: "Yours" }, { id: "cocktails", label: "Cocktails" },
+    { id: "lists", label: "Lists" },
+    ...(d.house_lists?.length || d.charts?.length || d.past_count ? [{ id: "from-common-good", label: "From Common Good" }] : []),
+    { id: "yours", label: "Yours" }, { id: "cocktails", label: "Cocktails" },
     ...(spirits.length ? [{ id: "spirits", label: "Spirits" }] : []), ...(drinks.length ? [{ id: "beer-wine", label: "Beer & wine" }] : []),
   ];
   return (
@@ -79,7 +81,7 @@ function Index({ d, version }: { d: IndexView; version: number }) {
           <SectionTitle>Your lists</SectionTitle>
           <ListsManager key={`lists-${version}`} initial={d.lists} />
         </section>
-        <HouseLists />
+        <HouseLists lists={d.house_lists} charts={d.charts} pastCount={d.past_count} />
 
         <section id="yours">
           <SectionTitle>Yours</SectionTitle>
