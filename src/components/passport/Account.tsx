@@ -123,6 +123,8 @@ function Notifications({ initial, onNews }: { initial: NotifyPrefs; onNews: (on:
       <Check checked={p.requests} onChange={(v) => save({ requests: v })}>Something changes on a request or event inquiry</Check>
       <Check checked={p.bottles} onChange={(v) => save({ bottles: v })}>There is news about a bottle request <span style={{ color: C.faint }}>(a bottle ready for pickup is always emailed)</span></Check>
       {p.friends !== undefined && <Check checked={!!p.friends} onChange={(v) => save({ friends: v })}>A friend sends me a request or a message <span style={{ color: C.faint }}>(who, never the words)</span></Check>}
+      {p.comments !== undefined && <Check checked={!!p.comments} onChange={(v) => save({ comments: v })}>Comments: someone replies to my comment <span style={{ color: C.faint }}>(who and where, never the words)</span></Check>}
+      {p.votes !== undefined && <Check checked={!!p.votes} onChange={(v) => save({ votes: v })}>Votes and brackets: a bracket I voted in opens its next round or has a winner <span style={{ color: C.faint }}>(at most one a day)</span></Check>}
       <Check checked={p.news} onChange={(v) => save({ news: v })}>News from the bar: occasional news and offers</Check>
       <div className="pt-2 border-t space-y-2" style={{ borderColor: C.line }}>
         <Check checked={p.digest} onChange={(v) => save({ digest: v })}>One daily summary instead of separate emails</Check>

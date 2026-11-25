@@ -9,10 +9,11 @@ import PhonePrompt from "../PhonePrompt";
 import TabView from "./TabView";
 import { FromTheBar, HereButtons, NewestList, SharedWithYou, SpiritOfTheDay, WelcomeAperitif, WhatsNew } from "./Slots";
 import { FriendsHere, LetsGoCards } from "../Social";
+import { VotesHome } from "../Votes";
 import { eventNoticeWords } from "@/lib/passport/social";
 import { dayLong, partyOf, reservationWord } from "@/lib/passport/shell";
 import { money } from "@/lib/passport/bottles";
-import type { InboxData, SocialHome } from "@/lib/passport/types";
+import type { InboxData, SocialHome, VoteCard } from "@/lib/passport/types";
 import type { BarMessage, BottleRequest, Cocktail, FeedCard, HouseList, Reservation, SpiritOfTheDay as Spirit, WelcomeAperitif as Aperitif } from "@/lib/passport/types";
 
 /** What the Home view sends (api/passport/view/home). */
@@ -24,6 +25,8 @@ export interface HomeView {
   inbox?: Pick<InboxData, "threads" | "member_requests" | "inquiries"> | null;
   // File 09: I'm here and friends here, Let's go, Shared with you, a held place or a cancelled event.
   social?: SocialHome | null;
+  // File 10: open votes and brackets, and results during their window.
+  votes?: { open: VoteCard[]; results: VoteCard[] } | null;
 }
 
 function greeting() {
@@ -103,6 +106,7 @@ export default function HomeTab() {
               </section>
             )}
             <LetsGoCards plans={d.social?.letsgo} />
+            <VotesHome open={d.votes?.open} results={d.votes?.results} />
             <WhatsNew cards={d.feed} />
             <NewestList list={d.newest_list} />
             {d.exclusives.length > 0 && (

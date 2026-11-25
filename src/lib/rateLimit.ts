@@ -38,6 +38,10 @@ export const LIMITS = {
   "passport-friends":      { max: 40,  windowMs: HOUR },
   "passport-social":       { max: 300, windowMs: HOUR },
   "passport-social-read":  { max: 900, windowMs: HOUR },
+  // File 10: comments (the Bible also caps 30 a day per member and 500 per item; edits, deletes and reports count here
+  // too) and votes (one tap each; a member may change a pick until voting closes).
+  "passport-comments":     { max: 120, windowMs: HOUR },
+  "passport-votes":        { max: 300, windowMs: HOUR },
   // Invitation codes typed in or opened from a link: few, so a code can't be guessed (the Bible also caps wrong codes overall).
   "passport-code":   { max: 10,  windowMs: HOUR },
 } as const;

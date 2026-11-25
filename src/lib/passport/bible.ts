@@ -5,6 +5,7 @@ import {
   type IndexData, type FindResults, type Reservation, type BarHome, type BarLists, type HouseList, type Chart,
   type InboxData, type InboxThread, type MemberRequest, type EventInquiry, type NotifyPrefs,
   type FriendsOverview, type SocialHome, type SocialInbox, type Conversation, type ShareCard, type PassportEvent,
+  type BarMessage, type Bracket, type CommentThread, type CommentType, type FlightVote, type VoteCard, type VotesData,
 } from "./types";
 
 // The shapes themselves live in ./types (no server-only code, so browser components can use them too).
@@ -177,3 +178,14 @@ export const getConversation = (auth: MemberAuth, id: number) => passport<{ conv
 export const getShare = (auth: MemberAuth, id: number) => passport<{ share: ShareCard }>("GET", `/shares/${id}`, { auth }).then((r) => r.share);
 export const getPassportEvents = (auth: MemberAuth) => passport<{ events: PassportEvent[] }>("GET", "/events", { auth }).then((r) => r.events);
 export const getPassportEvent = (auth: MemberAuth, id: number) => passport<{ event: PassportEvent }>("GET", `/events/${id}`, { auth }).then((r) => r.event);
+
+// ── File 10: comments, flight votes and brackets. Only what the signed-in member may see; their own picks only. ──────
+/** Open votes and brackets (Home, the Index), results in their window, and how many are under Past votes. */
+export const getVotes = (auth: MemberAuth) => passport<VotesData>("GET", "/votes", { auth });
+export const getPastVotes = (auth: MemberAuth) => passport<{ past_votes: VoteCard[] }>("GET", "/votes/past", { auth }).then((r) => r.past_votes);
+export const getFlightVote = (auth: MemberAuth, id: number) => passport<{ flight: FlightVote }>("GET", `/votes/flights/${id}`, { auth }).then((r) => r.flight);
+export const getBracket = (auth: MemberAuth, id: number) => passport<{ bracket: Bracket }>("GET", `/brackets/${id}`, { auth }).then((r) => r.bracket);
+/** One message from the bar on its own page (for its comments). */
+export const getBarMessage = (auth: MemberAuth, id: number) => passport<{ bar_message: BarMessage }>("GET", `/bar/messages/${id}`, { auth }).then((r) => r.bar_message);
+/** The comments place on one curated item, or null when comments are off there. */
+export const getComments = (auth: MemberAuth, type: CommentType, id: number) => passport<{ comments: CommentThread | null }>("GET", `/comments/${type}/${id}`, { auth }).then((r) => r.comments);

@@ -33,7 +33,7 @@ const ICONS: Record<TabId, ReactNode> = {
   inbox: <><path d="M4 13.5 6.5 5h11l2.5 8.5V19H4z" /><path d="M4 13.5h4.5l1.2 2h4.6l1.2-2H20" /></>,
 };
 const VIEW_OF: Record<TabId, ViewName> = { menu: "menu", index: "index", home: "home", events: "events", inbox: "inbox" };
-const WHAT_CHANGES: Record<Changed, ViewName[]> = { marks: ["menu", "index"], lists: ["index"], inbox: ["inbox", "home"] };
+const WHAT_CHANGES: Record<Changed, ViewName[]> = { marks: ["menu", "index"], lists: ["index"], inbox: ["inbox", "home"], votes: ["home", "index"] };
 const STALE_MS = 5 * 60 * 1000;
 
 function Icon({ id, on }: { id: TabId; on: boolean }) {

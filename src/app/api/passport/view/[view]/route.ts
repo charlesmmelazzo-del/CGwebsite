@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
   getBarHome, getBarLists, getBottleRequests, getInbox, getIndex, getLists, getMarksSafe, getMe, getMenus, getPassportCocktails, getReservations, getSpirits,
-  getPassportEvents, getSocialHome, getSocialInbox,
+  getPassportEvents, getSocialHome, getSocialInbox, getVotes,
   type MemberAuth,
 } from "@/lib/passport/bible";
 import { memberRequest } from "@/lib/passport/route";
@@ -20,7 +20,7 @@ const VIEWS: Record<string, (auth: MemberAuth) => Promise<unknown>> = {
   // Home: their first name, the Passport exclusives, what needs them right now, and (file 07) From the bar: messages,
   // What's new, Spirit of the Day, the Welcome Aperitif and the newest house list. A section that can't load is left out.
   home: async (auth) => {
-    const [me, exclusives, bottles, reservations, bar, inbox, social] = await Promise.all([
+    const [me, exclusives, bottles, reservations, bar, inbox, social, votes] = await Promise.all([
       getMe(auth),
       getPassportCocktails(auth).catch(() => []),
       getBottleRequests(auth).catch(() => null),
@@ -28,6 +28,7 @@ const VIEWS: Record<string, (auth: MemberAuth) => Promise<unknown>> = {
       getBarHome(auth).catch(() => null),
       getInbox(auth).catch(() => null),
       getSocialHome(auth).catch(() => null),
+      getVotes(auth).catch(() => null),
     ]);
     return {
       // Only what Home shows of their own record.
@@ -45,6 +46,8 @@ const VIEWS: Record<string, (auth: MemberAuth) => Promise<unknown>> = {
       inbox: inbox ? { threads: inbox.threads.filter((t) => t.unread), member_requests: inbox.member_requests.filter((r) => r.question || r.unread), inquiries: inbox.inquiries.filter((q) => q.unread) } : null,
       // File 09: "I'm here" and friends at Common Good, Let's go plans, Shared with you, and a held place or a cancellation.
       social,
+      // File 10: any open vote or bracket ("Voting is open"), and results during their window.
+      votes: votes ? { open: votes.votes, results: votes.vote_results } : null,
     };
   },
   // Menu: the Passport exclusives, the Toast menus an admin ticked, the spirits list, and the member's own hearts and stars.
@@ -54,8 +57,9 @@ const VIEWS: Record<string, (auth: MemberAuth) => Promise<unknown>> = {
   },
   // Index: everything (one call), the member's own lists, their hearts and stars, and (file 07) From Common Good.
   index: async (auth) => {
-    const [index, lists, marks, bar] = await Promise.all([getIndex(auth), getLists(auth), getMarksSafe(auth), getBarLists(auth).catch(() => null)]);
-    return { ...index, lists, marks, house_lists: bar?.house_lists ?? [], charts: bar?.charts ?? [], past_count: bar?.past_count ?? 0 };
+    const [index, lists, marks, bar, votes] = await Promise.all([getIndex(auth), getLists(auth), getMarksSafe(auth), getBarLists(auth).catch(() => null), getVotes(auth).catch(() => null)]);
+    // File 10: open votes and brackets, then how many are under "Past votes".
+    return { ...index, lists, marks, house_lists: bar?.house_lists ?? [], charts: bar?.charts ?? [], past_count: bar?.past_count ?? 0, votes: votes?.votes ?? [], past_votes_count: votes?.past_count ?? 0 };
   },
   // File 09: upcoming Passport events first (the member's own answers and friends going), then the same as before.
   events: async (auth) => {

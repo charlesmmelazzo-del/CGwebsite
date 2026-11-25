@@ -10,6 +10,7 @@ import { notifyChanged } from "./appEvents";
 import { useShell } from "./shellContext";
 import { whenShort } from "@/lib/passport/inbox";
 import { dayLong } from "@/lib/passport/shell";
+import { itemHref } from "@/lib/passport/votes";
 import {
   ANSWERS, DM_MAX, LETSGO_NOTE_MAX, LETSGO_TIMES, LOOKUP_LINE, NOTE_MAX, POLL_MS, PRIVATE_LINE, SHARE_WORDS, answerWord, nextDays, shareHref, sortPlans,
 } from "@/lib/passport/social";
@@ -53,7 +54,7 @@ function Pill({ on, children, onClick, disabled }: { on: boolean; children: Reac
  * A sheet that slides up over the app (phones) or sits in the middle (wide screens). Drawn at the top of the page (a
  * portal), so it sits above the tab bar even when it opens from a page that slides over a tab.
  */
-function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   const [host, setHost] = useState<HTMLElement | null>(null);
   useEffect(() => { setHost(document.body); }, []);
   useEffect(() => {
@@ -651,8 +652,34 @@ export function InboxFriends({ social, title }: { social: SocialInbox | null | u
     await postJson("/api/passport/friends", { action: "notice_read", id: n.id });
     notifyChanged("inbox");
   };
+  const replies = social.comment_replies || [];
   return (
     <>
+      {/* File 10: replies to the member's comments (who and where), unread until they open the item. */}
+      {replies.length > 0 && (
+        <section aria-labelledby="pp-comment-replies">
+          {title("pp-comment-replies", "Replies to your comments")}
+          <ul className="space-y-2">
+            {replies.map((n) => {
+              const href = itemHref(n.link_kind, n.link_id);
+              const inner = (
+                <>
+                  <span className={`block ${kicker}`} style={{ color: C.brass }}>{n.unread ? "New reply" : "Reply"}</span>
+                  <span className="block font-body text-[15px] mt-1" style={{ color: C.text }}>{n.name} replied to your comment on “{n.title}”</span>
+                  <span className="block font-body text-[11px] mt-1" style={{ color: C.faint }}>{whenShort(n.at)}</span>
+                </>
+              );
+              return (
+                <li key={n.id}>
+                  {href
+                    ? <Link href={href} scroll={false} className="block rounded-xl border px-4 py-3.5 pp-focus pp-row" style={{ borderColor: n.unread ? `${C.brass}80` : C.line, background: n.unread ? "#1a1f14" : C.card }}>{inner}</Link>
+                    : <div className="rounded-xl border px-4 py-3.5" style={{ borderColor: C.line, background: C.card }}>{inner}</div>}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
       {notices.length > 0 && (
         <section aria-labelledby="pp-notices">
           {title("pp-notices", "From Common Good")}

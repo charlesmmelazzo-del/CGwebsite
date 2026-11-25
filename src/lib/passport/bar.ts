@@ -25,9 +25,15 @@ export function feedHref(c: Pick<FeedCard, "link_kind" | "link_id">): string {
   if (c.link_kind === "list" && typeof c.link_id === "number") return houseHref(c.link_id);
   if (c.link_kind === "chart" && (c.link_id === "top" || c.link_id === "critics")) return chartHref(c.link_id);
   if (c.link_kind === "menu") return "/passport/menu";
+  // File 09 and 10: a Passport event, a bracket.
+  if (c.link_kind === "event" && typeof c.link_id === "number") return `/passport/events/${c.link_id}`;
+  if (c.link_kind === "bracket" && typeof c.link_id === "number") return `/passport/brackets/${c.link_id}`;
   return "/passport";
 }
-const KICKERS: Record<string, string> = { list: "A new list", season: "New menu", exclusives: "New Passport exclusives", chart: "On the charts" };
+const KICKERS: Record<string, string> = {
+  list: "A new list", season: "New menu", exclusives: "New Passport exclusives", chart: "On the charts", event: "A Passport event",
+  bracket: "A new bracket", bracket_round: "Next round", bracket_winner: "We have a winner",
+};
 export const feedKicker = (kind: string) => KICKERS[kind] || "New at the bar";
 
 /** "Flight · $28" (whole dollars; tax is never included, so the page says "plus tax"). */

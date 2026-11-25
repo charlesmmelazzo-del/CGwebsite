@@ -131,7 +131,7 @@ export interface HouseList {
 }
 /** Top of the Charts or Critics' Choice: five cocktails in order. Never a number but the cocktails' own page numbers. */
 export interface Chart { key: "top" | "critics"; title: string; season_name: string; items: HouseItem[] }
-export interface BarMessage { id: number; title: string; body: string; link_kind: "list" | "cocktail" | "bottle" | "events" | null; link_id: number | null; link_label: string | null; posted_at: string | null }
+export interface BarMessage { id: number; title: string; body: string; link_kind: "list" | "cocktail" | "bottle" | "events" | null; link_id: number | null; link_label: string | null; posted_at: string | null; comments?: boolean }
 export interface FeedCard { key: string; kind: string; title: string; link_kind: "list" | "chart" | "menu" | string; link_id: number | string | null; at: string }
 export interface SpiritOfTheDay { id: number; name: string; category: string; discount_pct: number | null }
 export interface WelcomeAperitif { name: string; description: string }
@@ -165,7 +165,7 @@ export interface InboxLimits {
 }
 export interface InboxData { threads: InboxThread[]; member_requests: MemberRequest[]; inquiries: EventInquiry[]; limits: InboxLimits }
 /** Account → Notifications. news is the member's marketing choice. digest_hour: bar time, 6 to 22. */
-export interface NotifyPrefs { messages: boolean; requests: boolean; bottles: boolean; friends?: boolean; news: boolean; digest: boolean; digest_hour: number }
+export interface NotifyPrefs { messages: boolean; requests: boolean; bottles: boolean; friends?: boolean; comments?: boolean; votes?: boolean; news: boolean; digest: boolean; digest_hour: number }
 
 // ── File 09: friends, direct messages, sharing, Let's go, I'm here and Passport events (the Bible's approved list). ──
 // What a member ever sees of another member is a display name. Numbers here name a friendship, a request, a
@@ -206,4 +206,26 @@ export interface PassportEvent {
 }
 export interface EventNotice { kind: "offer" | "cancelled"; id: number; title: string; date: string; until: string | null }
 export interface SocialHome { presence: Presence; friends_here: { name: string }[]; letsgo: LetsGo[]; shared: ShareCard[]; has_friends: boolean; event_notices: EventNotice[] }
-export interface SocialInbox { conversations: Conversation[]; incoming: FriendRequest[]; notices: MemberNotice[] }
+export interface SocialInbox { conversations: Conversation[]; incoming: FriendRequest[]; notices: MemberNotice[]; comment_replies?: CommentNotice[] }
+
+// ── File 10: comments on the bar's curated content, flight votes and brackets (the Bible's approved list). A member's own
+// pick is the only vote ever sent; never a count of votes or voters; percentages only after voting ends, when ticked. ──
+export type CommentType = "list" | "message" | "event" | "flight" | "bracket";
+export interface PComment {
+  id: number; from: "me" | "member" | "bar"; name: string | null; body: string; at: string; edited: boolean; removed: boolean; deleted: boolean;
+  can_edit: boolean; edit_until: string | null; replies?: PComment[];
+}
+export interface CommentThread { locked: boolean; can_write: boolean; why_not: string | null; first_time: boolean; note: string; items: PComment[] }
+export interface CommentNotice { id: number; name: string; title: string; link_kind: CommentType; link_id: number; at: string; unread: boolean }
+export interface VoteCard { kind: "flight" | "bracket"; id: number; title: string; status: "open" | "closed"; line: string; winner: string | null; done: boolean }
+export interface FlightOption { id: number; bottle_id: number | null; name: string; category: string; opens: boolean; winner: boolean; pct: number | null }
+export interface FlightSlot { id: number; label: string; my_pick: number | null; options: FlightOption[] }
+export interface FlightVote { id: number; title: string; intro: string; pour_oz: number | null; status: "open" | "closed"; status_label: string; when: string; slots: FlightSlot[]; done: boolean }
+export interface BracketEntry { seed: number; kind: ItemKind; id: number | null; name: string; opens: boolean }
+export interface BracketMatchup { id: number | null; a: BracketEntry | null; b: BracketEntry | null; winner: "a" | "b" | null; my_pick: "a" | "b" | null; a_pct: number | null; b_pct: number | null }
+export interface BracketRound { round: number; name: string; when: string; state: "upcoming" | "open" | "done"; matchups: BracketMatchup[] }
+export interface Bracket {
+  id: number; title: string; intro: string; kind: ItemKind; size: number; status: "open" | "paused" | "closed"; status_label: string; when: string;
+  current_round: number; rounds: BracketRound[]; winner: BracketEntry | null;
+}
+export interface VotesData { votes: VoteCard[]; vote_results: VoteCard[]; past_count: number }

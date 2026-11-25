@@ -2,7 +2,7 @@
  * File 06: how pieces of the app tell the frame that something changed, without reloading the screen.
  * A heart, a star, a list or a bottle request changed: the tabs that show it refresh quietly in the background.
  */
-export type Changed = "marks" | "lists" | "inbox";
+export type Changed = "marks" | "lists" | "inbox" | "votes";
 export const CHANGED_EVENT = "passport:changed";
 
 export function notifyChanged(what: Changed) {
