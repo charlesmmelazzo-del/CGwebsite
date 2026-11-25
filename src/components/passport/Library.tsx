@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { C } from "./theme";
-import type { ArchivedBottle, Bottle, Cocktail, CocktailCard, MenuGroup, MenuItem, MenuPrice, Producer } from "@/lib/passport/bible";
+import { markKey, type ArchivedBottle, type Bottle, type Cocktail, type CocktailCard, type Mark, type Marks, type MenuGroup, type MenuItem, type MenuPrice, type Producer } from "@/lib/passport/bible";
 
 /** File 03a: the library pieces (server-rendered). Only fields from the Bible's approved list. */
 
@@ -33,11 +33,22 @@ export function Label({ children, brass = false }: { children: ReactNode; brass?
   );
 }
 
+/** File 04: the member's own heart and stars on a card (nothing when they haven't marked it). */
+export function MarkBadge({ mark }: { mark?: Mark }) {
+  if (!mark || (!mark.favorite && !mark.rating)) return null;
+  return (
+    <span className="inline-flex items-center gap-1.5 font-body text-[12px] whitespace-nowrap">
+      {mark.favorite && <span style={{ color: C.accent }} aria-label="One of your favorites" title="One of your favorites">♥</span>}
+      {mark.rating ? <span style={{ color: C.brass }} aria-label={`You rated it ${mark.rating} of 5`} title={`You rated it ${mark.rating} of 5`}>★ {mark.rating}</span> : null}
+    </span>
+  );
+}
+
 function menuLine(c: CocktailCard) {
   return c.menu_status === "past" ? `Past menu · ${c.menu_name}` : c.menu_name;
 }
 
-export function CocktailRow({ c }: { c: CocktailCard }) {
+export function CocktailRow({ c, mark }: { c: CocktailCard; mark?: Mark }) {
   return (
     <li>
       <Link href={`/passport/library/${c.id}`} className="block py-4 border-b" style={{ borderColor: C.line }}>
@@ -45,6 +56,7 @@ export function CocktailRow({ c }: { c: CocktailCard }) {
           <span className="font-display text-[22px] leading-tight" style={{ color: C.text }}>{c.name}</span>
           {c.passport === "current" && <Label brass>Passport</Label>}
           {c.passport === "past" && <Label>Past Passport cocktail</Label>}
+          <MarkBadge mark={mark} />
         </div>
         {c.flavor && <p className="font-body text-sm mt-1" style={{ color: C.muted }}>{c.flavor}</p>}
         <p className="font-body text-[11px] tracking-[0.12em] uppercase mt-1.5" style={{ color: C.faint }}>{menuLine(c)}</p>
@@ -54,11 +66,11 @@ export function CocktailRow({ c }: { c: CocktailCard }) {
 }
 
 /** A Passport cocktail as a feature: everything on its menu card. */
-export function CocktailFeature({ c, prices }: { c: Cocktail; prices?: MenuPrice[] }) {
+export function CocktailFeature({ c, prices, mark }: { c: Cocktail; prices?: MenuPrice[]; mark?: Mark }) {
   return (
     <Link href={`/passport/library/${c.id}`} className="block rounded-xl border p-5" style={{ borderColor: `${C.brass}66`, background: "#1a1f14" }}>
       <div className="flex items-baseline justify-between gap-3">
-        <div className="font-display text-2xl" style={{ color: C.text }}>{c.name}</div>
+        <div className="font-display text-2xl flex items-center gap-2" style={{ color: C.text }}>{c.name}<MarkBadge mark={mark} /></div>
         {prices && prices.length > 0 && <Prices prices={prices} />}
       </div>
       {c.tagline && <p className="font-display italic text-[17px] mt-1" style={{ color: C.muted }}>{c.tagline}</p>}
@@ -111,11 +123,11 @@ export function CocktailPage({ c }: { c: Cocktail }) {
   );
 }
 
-export function BottleRow({ b }: { b: ArchivedBottle }) {
+export function BottleRow({ b, mark }: { b: ArchivedBottle; mark?: Mark }) {
   return (
     <li>
       <Link href={`/passport/spirits/${b.id}`} className="flex items-baseline justify-between gap-3 py-3 border-b" style={{ borderColor: C.line }}>
-        <span className="font-body text-[15px]" style={{ color: C.text }}>{b.name}</span>
+        <span className="font-body text-[15px] flex items-baseline gap-2" style={{ color: C.text }}>{b.name}<MarkBadge mark={mark} /></span>
         <span className="font-body text-[10px] tracking-[0.15em] uppercase whitespace-nowrap" style={{ color: C.faint }}>{b.status_label}</span>
       </Link>
     </li>
@@ -224,11 +236,16 @@ export function Prices({ prices }: { prices: MenuPrice[] }) {
   );
 }
 
-function ItemBody({ it }: { it: MenuItem }) {
+function markOf(it: MenuItem, marks?: Marks): Mark | undefined {
+  if (!marks) return undefined;
+  return it.cocktail_id ? marks[markKey("cocktail", it.cocktail_id)] : it.bottle_id ? marks[markKey("bottle", it.bottle_id)] : undefined;
+}
+
+function ItemBody({ it, mark }: { it: MenuItem; mark?: Mark }) {
   return (
     <>
       <div className="flex items-baseline justify-between gap-3">
-        <span className="font-display text-[20px] leading-tight" style={{ color: C.text }}>{it.name}</span>
+        <span className="font-display text-[20px] leading-tight flex items-baseline gap-2" style={{ color: C.text }}>{it.name}<MarkBadge mark={mark} /></span>
         {it.prices.length > 0 && <Prices prices={it.prices} />}
       </div>
       {it.description && <p className="font-body text-sm mt-1 leading-relaxed" style={{ color: C.muted }}>{it.description}</p>}
@@ -237,21 +254,23 @@ function ItemBody({ it }: { it: MenuItem }) {
 }
 
 /** One menu item: opens its library cocktail when there is one. Cocktails are never marked unavailable. */
-export function MenuItemRow({ it }: { it: MenuItem }) {
+export function MenuItemRow({ it, marks }: { it: MenuItem; marks?: Marks }) {
   const href = it.cocktail_id ? `/passport/library/${it.cocktail_id}` : it.bottle_id ? `/passport/spirits/${it.bottle_id}` : null;
+  const mark = markOf(it, marks);
   return (
     <li className="border-b" style={{ borderColor: C.line }}>
-      {href ? <Link href={href} className="block py-3"><ItemBody it={it} /></Link> : <div className="py-3"><ItemBody it={it} /></div>}
+      {href ? <Link href={href} className="block py-3"><ItemBody it={it} mark={mark} /></Link> : <div className="py-3"><ItemBody it={it} mark={mark} /></div>}
     </li>
   );
 }
 
 /** A spirit on the spirits list: name, pour prices and 86 status; the description is on its bottle page. */
-function SpiritRow({ it }: { it: MenuItem }) {
+function SpiritRow({ it, marks }: { it: MenuItem; marks?: Marks }) {
   const body = (
     <div className="flex items-baseline justify-between gap-3 py-2.5">
       <span className="font-body text-[15px]" style={{ color: it.unavailable ? C.faint : C.text }}>
         {it.name}{it.unavailable && <span className="ml-2 align-middle"><Label>Out right now</Label></span>}
+        <span className="ml-2"><MarkBadge mark={markOf(it, marks)} /></span>
       </span>
       {it.prices.length > 0 && <Prices prices={it.prices} />}
     </div>
@@ -259,11 +278,11 @@ function SpiritRow({ it }: { it: MenuItem }) {
   return <li className="border-b" style={{ borderColor: C.line }}>{it.bottle_id ? <Link href={`/passport/spirits/${it.bottle_id}`} className="block">{body}</Link> : body}</li>;
 }
 
-export function MenuGroupBlock({ g, spirits = false }: { g: MenuGroup; spirits?: boolean }) {
+export function MenuGroupBlock({ g, spirits = false, marks }: { g: MenuGroup; spirits?: boolean; marks?: Marks }) {
   return (
     <section className="mt-6">
       <h3 className="font-body text-[12px] tracking-[0.2em] uppercase" style={{ color: C.muted }}>{g.name}</h3>
-      <ul className="mt-1">{g.items.map((it, i) => (spirits ? <SpiritRow key={i} it={it} /> : <MenuItemRow key={i} it={it} />))}</ul>
+      <ul className="mt-1">{g.items.map((it, i) => (spirits ? <SpiritRow key={i} it={it} marks={marks} /> : <MenuItemRow key={i} it={it} marks={marks} />))}</ul>
     </section>
   );
 }
