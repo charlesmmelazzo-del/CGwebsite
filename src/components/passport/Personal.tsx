@@ -11,7 +11,10 @@ import { CSS } from "@dnd-kit/utilities";
 import { C, Notice, inputCls, postJson } from "./ui";
 import { PRIVATE_LINE, itemHref } from "./personalShared";
 import { createSaveQueue } from "@/lib/passport/saveQueue";
-import type { Bespoke, BespokeLine, ItemKind, ListItem, Mine, PassportList, Pick } from "@/lib/passport/bible";
+import type { Bespoke, BespokeLine, ItemKind, ListItem, Mine, PassportList, Pick } from "@/lib/passport/types";
+import { notifyChanged } from "./appEvents";
+import { BackLink } from "./bits";
+import { useShell } from "./shellContext";
 
 /**
  * File 04: the member's own favorites, ratings, notes, lists and bespoke recipes (client pieces).
@@ -39,21 +42,22 @@ function longDate(d: string | null) {
   return new Date(`${d.slice(0, 10)}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-const smallBtn = "rounded-full border px-3 py-1.5 font-body text-[12px] tracking-[0.08em] transition-colors disabled:opacity-50";
+const smallBtn = "rounded-full border px-3.5 min-h-[40px] font-body text-[12px] tracking-[0.08em] transition-colors disabled:opacity-50 pp-focus";
 
 // ── A cocktail or bottle page: favorite, stars, note, and whether they've ordered it ──
 // No tap is ever lost (lib/passport/saveQueue.ts): each tap shows at once and the saves go to the server in order.
-export function ItemControls({ kind, id, initial }: { kind: ItemKind; id: number; initial: Mine }) {
+export function ItemControls({ kind, id, name, initial }: { kind: ItemKind; id: number; name: string; initial: Mine }) {
   const router = useRouter();
+  const shell = useShell();
   const [error, setError] = useState("");
   const [mine, setMine] = useState(initial);
   const [draft, setDraft] = useState(initial.note);
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState(false);
   const [queue] = useState(() => createSaveQueue<Mine>(initial, { view: setMine, error: setError, signedOut: () => router.refresh() }));
-  const save = (url: string, body: Record<string, unknown>, patch: Partial<Mine>, what: string) => {
+  const save = async (url: string, body: Record<string, unknown>, patch: Partial<Mine>, what: string) => {
     setError("");
-    return queue.push({
+    const ok = await queue.push({
       patch, what,
       send: async () => {
         const r = await postJson<{ mine: Mine | null }>(url, body, "PUT");
@@ -61,6 +65,9 @@ export function ItemControls({ kind, id, initial }: { kind: ItemKind; id: number
         return { ok: false, signedOut: !!r.data.signed_out, error: r.data.error };
       },
     });
+    // File 06: the hearts and stars on the Menu and Index cards follow (the same record wherever it is opened).
+    if (ok && what !== "your note") notifyChanged("marks");
+    return ok;
   };
   // Each tap starts from what the screen shows now (including taps still waiting), never from a stale copy.
   const toggleFav = () => { const on = !queue.current().favorite; return save("/api/passport/favorite", { kind, id, on }, { favorite: on }, "your favorite"); };
@@ -75,11 +82,16 @@ export function ItemControls({ kind, id, initial }: { kind: ItemKind; id: number
           className={smallBtn} style={mine.favorite ? { borderColor: C.accent, color: C.accent } : { borderColor: C.line, color: C.text }}>
           <span aria-hidden>{mine.favorite ? "♥" : "♡"}</span> {mine.favorite ? "Favorite" : "Add to favorites"}
         </button>
+        {shell && (
+          <button type="button" onClick={() => shell.openAdd({ kind, id, name })} aria-haspopup="dialog" className={smallBtn} style={{ borderColor: C.line, color: C.text }}>
+            <span aria-hidden>+</span> Add to a list
+          </button>
+        )}
         {kind === "cocktail" && (
           <div className="flex items-center gap-1" role="group" aria-label="Your rating">
             {[1, 2, 3, 4, 5].map((n) => (
               <button key={n} type="button" onClick={() => rate(mine.rating === n ? null : n)} aria-label={`${n} star${n === 1 ? "" : "s"}`} aria-pressed={mine.rating === n}
-                className="w-9 h-9 text-[22px] leading-none" style={{ color: mine.rating && n <= mine.rating ? C.brass : C.line }}>★</button>
+                className="w-10 h-11 text-[24px] leading-none pp-focus rounded" style={{ color: mine.rating && n <= mine.rating ? C.brass : C.line }}>★</button>
             ))}
             {mine.rating ? <button type="button" onClick={() => rate(null)} className="font-body text-[11px] underline ml-1" style={{ color: C.faint }}>Clear</button> : null}
           </div>
@@ -131,7 +143,7 @@ export function RemoveRecord({ what, refId, label = "Remove" }: { what: "favorit
         setBusy(true);
         const ok = await run(`/api/passport/${what}`, { ref: refId }, "DELETE");
         setBusy(false);
-        if (ok) router.refresh();
+        if (ok) { if (what !== "note") notifyChanged("marks"); router.refresh(); }
       }}>{busy ? "…" : label}</button>
       {error && <span className="font-body text-xs" style={{ color: "#f0c4b2" }}>{error}</span>}
     </span>
@@ -145,7 +157,7 @@ export function ItemLine({ kind, id, name, label, opens, children, aside }: { ki
   return (
     <li className="py-3 border-b flex items-start gap-3" style={{ borderColor: C.line }}>
       <div className="flex-1 min-w-0">
-        {href ? <Link href={href}>{title}</Link> : title}
+        {href ? <Link href={href} scroll={false}>{title}</Link> : title}
         {label && <span className="ml-2 font-body text-[10px] tracking-[0.15em] uppercase whitespace-nowrap" style={{ color: C.faint }}>{label}</span>}
         {children}
       </div>
@@ -170,11 +182,11 @@ export function ListsManager({ initial }: { initial: PassportList[] }) {
     const before = lists;
     setLists(next);
     const out = await run<{ lists: PassportList[] }>("/api/passport/lists", { ids: next.map((l) => l.id) }, "PUT");
-    if (!out) setLists(before);
+    if (!out) setLists(before); else notifyChanged("lists");
   };
   const create = async () => {
     const out = await run<{ list: PassportList }>("/api/passport/lists", { name, kind, ranked }, "POST");
-    if (out) router.push(`/passport/lists/${out.list.id}`);
+    if (out) { notifyChanged("lists"); router.push(`/passport/lists/${out.list.id}`, { scroll: false }); }
   };
   return (
     <div>
@@ -182,7 +194,7 @@ export function ListsManager({ initial }: { initial: PassportList[] }) {
         <ul>
           {lists.map((l, i) => (
             <li key={l.id} className="flex items-center gap-2 py-3 border-b" style={{ borderColor: C.line }}>
-              <Link href={`/passport/lists/${l.id}`} className="flex-1 min-w-0">
+              <Link href={`/passport/lists/${l.id}`} scroll={false} className="flex-1 min-w-0 pp-focus rounded-sm">
                 <span className="font-display text-[20px] leading-tight block truncate" style={{ color: C.text }}>{l.name}</span>
                 <span className="font-body text-[11px] tracking-[0.12em] uppercase" style={{ color: C.faint }}>
                   {l.ranked ? "Top 10" : "Playlist"} · {l.count} {l.kind === "cocktail" ? "cocktail" : "bottle"}{l.count === 1 ? "" : "s"}
@@ -207,7 +219,7 @@ export function ListsManager({ initial }: { initial: PassportList[] }) {
           </div>
         </div>
       ) : (
-        <button type="button" className="mt-4 font-body text-sm underline underline-offset-4" style={{ color: C.text }} onClick={() => setMaking(true)}>+ New list</button>
+        <button type="button" className="mt-2 min-h-[44px] font-body text-sm underline underline-offset-4 pp-focus" style={{ color: C.text }} onClick={() => setMaking(true)}>+ New list</button>
       )}
       {error && <div className="mt-3"><Notice>{error}</Notice></div>}
     </div>
@@ -249,7 +261,7 @@ export function ListEditor({ initial }: { initial: PassportList }) {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   const full = list.cap !== null && items.length >= list.cap;
-  const apply = (l: PassportList | undefined) => { if (l) { setList(l); setItems(l.items || []); } };
+  const apply = (l: PassportList | undefined) => { if (l) { setList(l); setItems(l.items || []); notifyChanged("lists"); } };
   const reorder = async (next: ListItem[]) => {
     const before = items;
     setItems(next.map((x, i) => ({ ...x, position: i + 1 })));
@@ -277,12 +289,12 @@ export function ListEditor({ initial }: { initial: PassportList }) {
   const del = async () => {
     if (!confirm(`Delete “${list.name}”? This can't be undone.`)) return;
     const out = await run(`/api/passport/lists/${list.id}`, {}, "DELETE");
-    if (out) { router.push("/passport/lists"); router.refresh(); }
+    if (out) { notifyChanged("lists"); router.push("/passport/library", { scroll: false }); }
   };
   return (
     <div>
-      <Link href="/passport/lists" className="font-body text-xs tracking-[0.2em] uppercase" style={{ color: C.muted }}>← Your lists</Link>
-      <p className="font-body text-[11px] tracking-[0.3em] uppercase mt-5" style={{ color: C.brass }}>
+      <BackLink fallback="/passport/library" label="Index" />
+      <p className="font-body text-[11px] tracking-[0.3em] uppercase mt-3" style={{ color: C.brass }}>
         {list.ranked ? "Top 10" : "Playlist"} · {list.kind === "cocktail" ? "Cocktails" : "Bottles"}
       </p>
       {renaming ? (
@@ -337,7 +349,7 @@ function SortableRow({ it, index, ranked, first, last, onMove, onRemove }: { it:
       </button>
       {ranked && <span className="font-display text-xl w-7 text-right shrink-0" style={{ color: C.brass }}>{index + 1}</span>}
       <div className="flex-1 min-w-0">
-        {href ? <Link href={href}>{name}</Link> : name}
+        {href ? <Link href={href} scroll={false}>{name}</Link> : name}
         {it.label && <span className="ml-2 font-body text-[10px] tracking-[0.15em] uppercase whitespace-nowrap" style={{ color: C.faint }}>{it.label}</span>}
       </div>
       <MoveButtons label={it.name} first={first} last={last} onMove={onMove} />
@@ -394,10 +406,10 @@ function ListSearch({ kind, have, onAdd }: { kind: ItemKind; have: Set<number>; 
 // ── Bespoke recipes ──────────────────────────────────────────────────────────
 const blankLine = (): BespokeLine => ({ quantity: "", unit: "oz", name: "", sub_recipe: "" });
 
-export function BespokeBook({ initial, units }: { initial: Bespoke[]; units: string[] }) {
+export function BespokeBook({ initial, units, startNew = false }: { initial: Bespoke[]; units: string[]; startNew?: boolean }) {
   const { run, error } = useAct();
   const [recipes, setRecipes] = useState(initial);
-  const [editing, setEditing] = useState<Bespoke | "new" | null>(null);
+  const [editing, setEditing] = useState<Bespoke | "new" | null>(startNew ? "new" : null);
   const remove = async (r: Bespoke) => {
     if (!confirm(r.by_staff ? `Remove “${r.name}” from your book? Only the bar can add it back.` : `Delete “${r.name}”?`)) return;
     const out = await run(`/api/passport/bespoke/${r.id}`, {}, "DELETE");
@@ -409,7 +421,7 @@ export function BespokeBook({ initial, units }: { initial: Bespoke[]; units: str
         <RecipeForm recipe={editing === "new" ? null : editing} units={units} onCancel={() => setEditing(null)}
           onSaved={(r) => { setRecipes((x) => [r, ...x.filter((y) => y.id !== r.id)]); setEditing(null); }} />
       ) : (
-        <button type="button" className="font-body text-sm underline underline-offset-4" style={{ color: C.text }} onClick={() => setEditing("new")}>+ New recipe</button>
+        <button type="button" className="font-body text-sm underline underline-offset-4" style={{ color: C.text }} onClick={() => setEditing("new")}>+ Add a cocktail</button>
       )}
       {error && <div className="mt-3"><Notice>{error}</Notice></div>}
       <ul className="mt-6 space-y-4">
@@ -435,7 +447,7 @@ export function BespokeBook({ initial, units }: { initial: Bespoke[]; units: str
           </li>
         ))}
       </ul>
-      {!recipes.length && !editing && <p className="font-body text-sm mt-2" style={{ color: C.faint }}>No recipes yet. Keep the ones made for you at the bar, or your own from home.</p>}
+      {!recipes.length && !editing && <p className="font-body text-sm mt-2" style={{ color: C.faint }}>No cocktails here yet. The ones made for you at the bar land here, and you can add your own from home.</p>}
     </div>
   );
 }
@@ -458,7 +470,7 @@ function RecipeForm({ recipe, units, onCancel, onSaved }: { recipe: Bespoke | nu
   const field = "rounded-lg px-3 py-2.5 font-body text-[16px] bg-[#0E120B] border border-[#323B29] text-[#EDE6D3] placeholder:text-[#5d6a52] focus:outline-none focus:border-[#C9A96E]";
   return (
     <div className="rounded-xl border p-4 space-y-4" style={{ borderColor: C.line, background: C.card }}>
-      <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} placeholder="Recipe name" className={inputCls} aria-label="Recipe name" />
+      <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} placeholder="Cocktail name" className={inputCls} aria-label="Cocktail name" />
       <div>
         <p className="font-body text-[11px] tracking-[0.2em] uppercase mb-2" style={{ color: C.muted }}>Ingredients</p>
         <ul className="space-y-3">
@@ -485,7 +497,7 @@ function RecipeForm({ recipe, units, onCancel, onSaved }: { recipe: Bespoke | nu
       <p className="font-body text-xs" style={{ color: C.faint }}>{PRIVATE_LINE}</p>
       {error && <Notice>{error}</Notice>}
       <div className="flex gap-2">
-        <button type="button" className={smallBtn} style={{ borderColor: C.brass, color: C.brass }} disabled={busy || !name.trim()} onClick={save}>{busy ? "Saving…" : recipe ? "Save" : "Add recipe"}</button>
+        <button type="button" className={smallBtn} style={{ borderColor: C.brass, color: C.brass }} disabled={busy || !name.trim()} onClick={save}>{busy ? "Saving…" : recipe ? "Save" : "Add cocktail"}</button>
         <button type="button" className={smallBtn} style={{ borderColor: C.line, color: C.muted }} onClick={onCancel}>Cancel</button>
       </div>
     </div>

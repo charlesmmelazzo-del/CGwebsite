@@ -26,6 +26,8 @@ export const LIMITS = {
   "passport-personal": { max: 600, windowMs: HOUR },
   // File 05: a member asking for bottles and answering prices (the Bible also caps open requests at ten).
   "passport-bottles": { max: 60,  windowMs: HOUR },
+  // File 06: the one search bar (answers as the member types, after a short pause; a word is a few requests).
+  "passport-search": { max: 600, windowMs: HOUR },
   // Invitation codes typed in or opened from a link: few, so a code can't be guessed (the Bible also caps wrong codes overall).
   "passport-code":   { max: 10,  windowMs: HOUR },
 } as const;

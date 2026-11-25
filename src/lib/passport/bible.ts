@@ -1,5 +1,12 @@
 import "server-only";
 import { setDefaultResultOrder } from "node:dns";
+import {
+  markKey, type MemberAuth, type Me, type Config, type CocktailCard, type Cocktail, type ArchivedBottle, type MenuGroup, type ToastMenu, type MenuInfo, type Bottle, type Producer, type BaseSpirit, type ItemKind, type FavoriteItem, type RatingItem, type NoteItem, type Mark, type Marks, type Mine, type PassportList, type Bespoke, type History, type BottleRequests,
+  type IndexData, type FindResults, type Reservation,
+} from "./types";
+
+// The shapes themselves live in ./types (no server-only code, so browser components can use them too).
+export * from "./types";
 
 /**
  * The website's side of the Passport entrance in the Bible
@@ -27,8 +34,6 @@ export class PassportError extends Error {
   }
 }
 
-/** Who is asking: the Bible checks the session token and that it belongs to this member. */
-export type MemberAuth = { token: string; memberId: number };
 
 function baseUrl(): string {
   return (process.env.BIBLE_API_URL || "https://cgbible.com").replace(/\/+$/, "");
@@ -76,54 +81,12 @@ export async function passport<T>(
 
 // ── What the Bible sends (its approved list, server/passport/guestSafe.js) ────
 
-export interface Member {
-  id: number;
-  first_name: string;
-  last_name: string;
-  email: string;
-  phone: string;
-  member_since: string | null;
-  marketing_consent: boolean;
-  can_invite_household: boolean;
-  /** Their number was already on another Passport when they joined: the app asks for a different one. */
-  needs_phone: boolean;
-}
-export interface HouseholdMember { first_name: string; last_name: string; status: "invited" | "active" }
-export interface Me { member: Member; household: HouseholdMember[] }
-/** Sign-up: off (nobody joins), invite (a valid invitation is needed), open (anyone). */
-export type SignupMode = "off" | "invite" | "open";
-export interface Config { signup_mode: SignupMode; terms_version: number; terms_text: string }
-export interface LinkInfo { kind: "set_password" | "reset"; first_name: string; needs_details: boolean; phone: string }
-export interface SignedIn { member: Member; session_token: string; expires_at: string; household_invited?: number }
-/** Sign-up answers "check your email", or (a personal invitation sent to that same email) signs in at once. */
-export type SignUpResult = { ok: true; check_email: true } | (SignedIn & { signed_in: true })
 
 export const getConfig = () => passport<{ config: Config }>("GET", "/config").then((r) => r.config);
 export const getMe = (auth: MemberAuth) => passport<Me>("GET", "/me", { auth });
 
 // ── File 03a: the library, Passport cocktails, the spirits archive, Toast menus ──
 // Exactly the fields the Bible's approved list sends (server/passport/guestSafe.js).
-export interface CocktailCard { id: number; name: string; flavor: string; menu_name: string; menu_status: "current" | "past"; passport: "current" | "past" | null }
-export interface Cocktail extends CocktailCard { ingredients: string; tagline: string; notes: string; bottles?: DrinkBottle[]; home_recipe?: boolean }
-/**
- * "Bottles in this drink" (Nov 25, 2026): from the Bible's own recipe, names and categories only, in recipe order.
- * id is the bottle page; null for a recipe placeholder, which arrives as a plain spirit word ("Bourbon"). Absent when
- * the cocktail has no bottles to list or the bar keeps its bottles secret.
- */
-export interface DrinkBottle { id: number | null; name: string; category: string }
-export interface ArchivedBottle { id: number; name: string; category: string; producer: string; description: string; status_label: string | null }
-/** Toast menus as the Bible's approved list sends them (menu reader). */
-export interface MenuPrice { label: string | null; price: number }
-export interface MenuItem { name: string; description: string; prices: MenuPrice[]; cocktail_id: number | null; bottle_id: number | null; unavailable: boolean; card?: MenuCard }
-/**
- * The matched library cocktail's tagline, ingredients and flavor line, sent with the menu item (no call per cocktail).
- * Only when the Toast item has that cocktail's own name; a variant ("… - Free Spirited") has none and keeps its own
- * Toast description.
- */
-export interface MenuCard { tagline: string; ingredients: string; flavor: string }
-export interface MenuGroup { name: string; items: MenuItem[] }
-export interface ToastMenu { name: string; groups: MenuGroup[] }
-export interface MenuInfo { available: boolean; updated_at: string | null }
 
 export const getLibrary = (auth: MemberAuth, q = "", spirit = "") => {
   const qs = new URLSearchParams();
@@ -139,13 +102,6 @@ export const getArchivedBottle = (auth: MemberAuth, id: number) => passport<{ bo
 export const getMenus = (auth: MemberAuth) => passport<{ menu_info: MenuInfo; menus: ToastMenu[]; passport_group: MenuGroup | null }>("GET", "/menus", { auth });
 export const getSpirits = (auth: MemberAuth) => passport<{ menu_info: MenuInfo; spirits: ToastMenu | null }>("GET", "/spirits", { auth });
 // ── File 03b: bottle and producer pages, the base-spirit filter, at-home recipes ──
-export interface Fact { label: string; value: string }
-export interface BottleCocktail { id: number; name: string; menu_name: string; menu_status: "current" | "past" }
-export interface Bottle extends ArchivedBottle { producer_id: number | null; passport_description?: string; prices: MenuPrice[]; facts: Fact[]; cocktails: BottleCocktail[] }
-export interface ProducerBottle { id: number; name: string; category: string; status_label: string | null }
-/** passport_description: the approved Passport text (Part 6), or "" when there is none yet. */
-export interface Producer { id: number; name: string; based_in: string; passport_description?: string; bottles: ProducerBottle[] }
-export interface BaseSpirit { key: string; label: string; count: number }
 /** A bottle page: on the spirits list, in the archive, or linked from a cocktail shown in Passport. */
 export const getBottle = (auth: MemberAuth, id: number) => passport<{ bottle: Bottle }>("GET", `/spirits/bottle/${id}`, { auth }).then((r) => r.bottle);
 export const getProducer = (auth: MemberAuth, id: number) => passport<{ producer: Producer }>("GET", `/producers/${id}`, { auth }).then((r) => r.producer);
@@ -168,26 +124,6 @@ export async function getHomeRecipe(auth: MemberAuth, cocktailId: number): Promi
 
 // ── File 04: the personal layer. Only the signed-in member's own records (the Bible scopes every one by
 // the member behind the session; a number here only ever names one of their own records). ──────────────
-export type ItemKind = "cocktail" | "bottle";
-/** An item in the member's records. opens=false: it can no longer be opened, so show its name only (id is null). */
-export interface MyItem { ref: number; kind: ItemKind; id: number | null; name: string; label: string | null; opens: boolean }
-export interface FavoriteItem extends MyItem { added_at: string }
-export interface RatingItem extends MyItem { stars: number; rated_at: string }
-export interface NoteItem extends MyItem { body: string; updated_at: string }
-export interface ListItem extends MyItem { position: number }
-export interface HistoryItem extends Omit<MyItem, "ref"> { count: number; last_ordered: string }
-/** The member's own heart and stars on a card. */
-export interface Mark { kind: ItemKind; id: number; favorite: boolean; rating: number | null }
-export type Marks = Record<string, Mark>;
-export const markKey = (kind: ItemKind, id: number) => `${kind}:${id}`;
-/** The member's own marks on the page they're looking at. */
-export interface Mine { favorite: boolean; rating: number | null; note: string; ordered_count: number; last_ordered: string | null }
-export interface PassportList { id: number; name: string; kind: ItemKind; ranked: boolean; count: number; cap: number | null; items?: ListItem[] }
-export interface Pick { kind: ItemKind; id: number; name: string; label: string | null }
-export interface BespokeLine { quantity: string; unit: string; name: string; sub_recipe: string }
-/** made_by: the first name of the staff member who added it, or null when the member wrote it. */
-export interface Bespoke { id: number; name: string; notes: string; lines: BespokeLine[]; made_by: string | null; by_staff: boolean; created_at: string; updated_at: string }
-export interface History { empty: boolean; cocktails: HistoryItem[]; spirits: HistoryItem[] }
 
 export const getMarks = (auth: MemberAuth) =>
   passport<{ marks: Mark[] }>("GET", "/personal/marks", { auth }).then((r) => Object.fromEntries(r.marks.map((m) => [markKey(m.kind, m.id), m])) as Marks);
@@ -203,39 +139,12 @@ export const getHistory = (auth: MemberAuth) => passport<{ history: History }>("
 
 // ── File 05: bottle requests. Only the signed-in member's own requests (the Bible looks each one up by its number
 // AND the member behind the session). Prices are whole cents, never including tax. Never a cost or markup. ──────
-export type BottleRequestStatus =
-  | "submitted" | "quoted" | "accepted" | "ordered" | "ready" | "picked_up" | "declined" | "cancelled" | "quote_declined" | "pickup_declined";
-/** A confirmed price only (a price a manager has not confirmed is never sent). */
-export interface BottleQuote {
-  id: number;
-  price_cents: number;
-  total_cents: number;
-  quantity: number;
-  message: string;
-  expires_on: string | null;
-  expired: boolean;
-  state: "waiting" | "accepted" | "declined";
-}
-export interface BottleRequest {
-  id: number;
-  kind: "carried" | "other";
-  /** The bottle page it opens, only while the member may open it. */
-  bottle_id: number | null;
-  name: string;
-  quantity: number;
-  note: string;
-  status: BottleRequestStatus;
-  status_label: string;
-  quote: BottleQuote | null;
-  eta: string | null;
-  ready_since: string | null;
-  message: string;
-  message_at: string | null;
-  decline_reason: string;
-  can_cancel: boolean;
-  can_answer: boolean;
-  created_at: string;
-  updated_at: string;
-}
-export interface BottleRequests { requests: BottleRequest[]; open_count: number; max_open: number }
 export const getBottleRequests = (auth: MemberAuth) => passport<BottleRequests>("GET", "/bottles/requests", { auth });
+
+// ── File 06: the new shell. One call per screen, never one per item. ──────────────────────────────────────────────
+/** The Index tab in one answer: every cocktail shown in Passport, every bottle a member may open, beer and wine, the filter. */
+export const getIndex = (auth: MemberAuth) => passport<IndexData>("GET", "/index", { auth });
+/** One search for cocktails, bottles and producers, only things a member may open. */
+export const findAll = (auth: MemberAuth, q: string) => passport<FindResults>("GET", `/find?${new URLSearchParams({ q: q.slice(0, 100) }).toString()}`, { auth });
+/** The member's own upcoming reservations (Guest Book link by confirmed email). */
+export const getReservations = (auth: MemberAuth) => passport<{ reservations: Reservation[] }>("GET", "/reservations", { auth }).then((r) => r.reservations);

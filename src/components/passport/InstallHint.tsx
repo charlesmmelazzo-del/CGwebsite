@@ -57,7 +57,7 @@ export default function InstallHint({ force = false, onClose }: { force?: boolea
   if (!show) return null;
   return (
     <section className="rounded-xl border p-5 mb-6 animate-fade-in relative" style={{ borderColor: C.brass + "66", background: "#1a1f14" }}>
-      <button type="button" onClick={close} aria-label="Dismiss" className="absolute top-3 right-3 w-8 h-8 text-xl leading-none" style={{ color: C.muted }}>×</button>
+      <button type="button" onClick={close} aria-label="Dismiss" className="absolute top-1.5 right-1.5 w-11 h-11 text-xl leading-none pp-focus rounded-full" style={{ color: C.muted }}>×</button>
       <p className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>Keep it handy</p>
       <h2 className="font-display text-2xl mt-1" style={{ color: C.text }}>Save Passport to your home screen</h2>
       {installed ? (
@@ -80,7 +80,7 @@ export default function InstallHint({ force = false, onClose }: { force?: boolea
           Open your browser&rsquo;s menu (⋮) and choose <strong>Add to Home screen</strong> or <strong>Install app</strong>.
         </p>
       )}
-      <button type="button" onClick={close} className="font-body text-xs underline underline-offset-4 mt-4" style={{ color: C.muted }}>Not now</button>
+      <button type="button" onClick={close} className="font-body text-xs underline underline-offset-4 mt-2 min-h-[44px] px-1 -ml-1 pp-focus" style={{ color: C.muted }}>Not now</button>
     </section>
   );
 }

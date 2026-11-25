@@ -1,0 +1,257 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { C } from "./theme";
+import { PassportMark } from "./ui";
+import AddToList from "./AddToList";
+import { CHANGED_EVENT, appMoved, reducedMotion, type Changed } from "./appEvents";
+import { ShellContext, ViewStore, type AddTarget, type ShellApi, type ViewEntry, type ViewName } from "./shellContext";
+import { TABS, homeTabOf, inboxDot, tabOfPath, type TabId } from "@/lib/passport/shell";
+import type { BottleRequests, PassportList } from "@/lib/passport/types";
+import HomeTab from "./tabs/HomeTab";
+import MenuTab from "./tabs/MenuTab";
+import IndexTab from "./tabs/IndexTab";
+import EventsTab from "./tabs/EventsTab";
+import InboxTab from "./tabs/InboxTab";
+
+/**
+ * File 06: the Passport app frame. Five tabs along the bottom (a top bar on a wide screen): Menu · Index · CG · Events ·
+ * Inbox. Each tab, once opened, stays open in the background with its scroll position, so moving between tabs is
+ * instant and nothing reloads the whole screen. Pages (a cocktail, a bottle, a list, your account) slide over the tab
+ * they were opened from; going back reveals the list exactly where it was.
+ */
+
+const ICONS: Record<TabId, ReactNode> = {
+  menu: <><path d="M6.5 4h11l-5.5 7.5z" /><path d="M12 11.5V19M8.5 20h7" /></>,
+  index: <><path d="M5 4.5h4v15H5zM10.5 4.5h4v15h-4z" /><path d="m16 5.3 3.2-.8 3 14.2-3.2.8z" /></>,
+  home: null,
+  events: <><rect x="4" y="5.5" width="16" height="14.5" rx="1.5" /><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" /></>,
+  inbox: <><path d="M4 13.5 6.5 5h11l2.5 8.5V19H4z" /><path d="M4 13.5h4.5l1.2 2h4.6l1.2-2H20" /></>,
+};
+const VIEW_OF: Record<TabId, ViewName> = { menu: "menu", index: "index", home: "home", events: "events", inbox: "inbox" };
+const WHAT_CHANGES: Record<Changed, ViewName[]> = { marks: ["menu", "index"], lists: ["index"], inbox: ["inbox", "home"] };
+const STALE_MS = 5 * 60 * 1000;
+
+function Icon({ id, on }: { id: TabId; on: boolean }) {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={on ? 1.9 : 1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      {ICONS[id]}
+    </svg>
+  );
+}
+
+export default function AppShell({ signedIn, children }: { signedIn: boolean; children: ReactNode }) {
+  if (!signedIn) return <>{children}</>;
+  return <Frame>{children}</Frame>;
+}
+
+function Frame({ children }: { children: ReactNode }) {
+  const pathname = usePathname() || "/passport";
+  const pathTab = tabOfPath(pathname);
+  const [pending, setPending] = useState<TabId | null>(null);
+  const [under, setUnder] = useState<TabId>(() => pathTab ?? homeTabOf(pathname));
+  const overlay = !pending && !pathTab;
+  const tab: TabId = pending ?? pathTab ?? under;
+  const [visited, setVisited] = useState<Set<TabId>>(() => new Set(pathTab ? [pathTab] : []));
+  const [addTarget, setAddTarget] = useState<AddTarget | null>(null);
+  const [toastMsg, setToastMsg] = useState<{ text: string; n: number } | null>(null);
+  const [dot, setDot] = useState(false);
+  const listsCache = useRef<PassportList[] | null>(null);
+  const views = useMemo(() => new ViewStore(() => window.location.assign("/passport?signed_out=1")), []);
+
+  // The tab under the page that is open, and which tabs have been opened (they stay mounted from then on).
+  useEffect(() => { setPending(null); }, [pathname]);
+  useEffect(() => { if (pathTab) setUnder(pathTab); }, [pathTab]);
+  useEffect(() => {
+    if (overlay) return;
+    setVisited((v) => (v.has(tab) ? v : new Set(v).add(tab)));
+  }, [tab, overlay]);
+  const first = useRef(true);
+  useEffect(() => { if (first.current) { first.current = false; return; } appMoved(); }, [pathname]);
+
+  // Data: load a tab the first time it shows; refresh it quietly when it shows again after a while.
+  useEffect(() => {
+    if (overlay) return;
+    const v = VIEW_OF[tab];
+    const e = views.get(v);
+    if (!views.loaded(v)) void views.load(v);
+    else if (!e.loading && Date.now() - e.at > STALE_MS) void views.load(v, { silent: true });
+  }, [tab, overlay, views]);
+  // The Inbox dot needs My bottles from the start, whichever tab opened first.
+  useEffect(() => { if (!views.loaded("inbox")) void views.load("inbox"); }, [views]);
+  // (Read from the store directly: this component provides the context, so it can't read it.)
+  const inbox = useSyncExternalStore((fn) => views.subscribe("inbox", fn), () => views.get("inbox"), () => views.get("inbox")) as ViewEntry<BottleRequests>;
+  useEffect(() => { if (inbox.data) setDot(inboxDot(inbox.data.requests)); }, [inbox.data]);
+  // Something changed (a heart, a list, a bottle request): the tabs that show it refresh in the background.
+  useEffect(() => {
+    const on = (e: Event) => {
+      const what = (e as CustomEvent<{ what: Changed }>).detail?.what;
+      for (const v of WHAT_CHANGES[what] || []) if (views.loaded(v)) void views.load(v, { silent: true });
+      if (what === "lists") listsCache.current = null;
+    };
+    window.addEventListener(CHANGED_EVENT, on);
+    return () => window.removeEventListener(CHANGED_EVENT, on);
+  }, [views]);
+  // Back to the app after a while (phone unlocked, app reopened): refresh the tab on screen and the Inbox dot.
+  const tabRef = useRef(tab);
+  tabRef.current = tab;
+  useEffect(() => {
+    const on = () => {
+      if (document.visibilityState !== "visible") return;
+      for (const v of [VIEW_OF[tabRef.current], "inbox" as ViewName]) {
+        const e = views.get(v);
+        if (views.loaded(v) && !e.loading && Date.now() - e.at > 60_000) void views.load(v, { silent: true });
+      }
+    };
+    document.addEventListener("visibilitychange", on);
+    return () => document.removeEventListener("visibilitychange", on);
+  }, [views]);
+
+  // Scroll: each tab keeps its own place. Tabs scroll the window; a page over a tab scrolls on its own.
+  const scrollOf = useRef<Partial<Record<TabId, number>>>({});
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const overlayScroll = useRef<Record<string, number>>({});
+  const overlayOpen = useRef(overlay);
+  overlayOpen.current = overlay;
+  useEffect(() => {
+    if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+    const on = () => { if (!overlayOpen.current) scrollOf.current[tabRef.current] = window.scrollY; };
+    window.addEventListener("scroll", on, { passive: true });
+    return () => window.removeEventListener("scroll", on);
+  }, []);
+  const shownTab = useRef<TabId | null>(null);
+  useLayoutEffect(() => {
+    if (overlay || shownTab.current === tab) return;
+    shownTab.current = tab;
+    // "instant": the site scrolls smoothly by default, which would animate the jump back to where the member left off.
+    window.scrollTo({ top: scrollOf.current[tab] || 0, behavior: "instant" as ScrollBehavior });
+  }, [tab, overlay]);
+  // The page over a tab: slides in from the side when it opens from a list, a light fade between pages.
+  const wasOverlay = useRef(false);
+  useLayoutEffect(() => {
+    const el = overlayRef.current;
+    if (!overlay || !el) { wasOverlay.current = overlay; return; }
+    el.scrollTop = overlayScroll.current[pathname] || 0;
+    if (!reducedMotion() && el.animate) {
+      if (!wasOverlay.current) el.animate([{ transform: "translateX(100%)" }, { transform: "none" }], { duration: 280, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" });
+      else el.animate([{ opacity: 0.4, transform: "translateX(18px)" }, { opacity: 1, transform: "none" }], { duration: 200, easing: "ease-out" });
+    }
+    wasOverlay.current = true;
+  }, [pathname, overlay]);
+  // While a page is over a tab, the tab behind it is out of reach for keyboards and screen readers.
+  const mainRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const m = mainRef.current as (HTMLElement & { inert?: boolean }) | null;
+    if (m) { m.inert = overlay || !!addTarget; m.setAttribute("aria-hidden", overlay ? "true" : "false"); }
+    const o = overlayRef.current as (HTMLElement & { inert?: boolean }) | null;
+    if (o) o.inert = !!addTarget;
+  }, [overlay, addTarget]);
+
+  const toast = useCallback((text: string) => setToastMsg((t) => ({ text, n: (t?.n || 0) + 1 })), []);
+  useEffect(() => {
+    if (!toastMsg) return;
+    const t = setTimeout(() => setToastMsg(null), 2600);
+    return () => clearTimeout(t);
+  }, [toastMsg]);
+  const closeAdd = useCallback(() => setAddTarget(null), []);
+  const api: ShellApi = useMemo(() => ({ views, tab, openAdd: setAddTarget, toast, setInboxDot: setDot }), [views, tab, toast]);
+
+  /** A tab tap: show it at once (the address follows); tapping the tab already on screen goes back to its top. */
+  const onTab = (e: React.MouseEvent, id: TabId) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    if (id === tab && !overlay) {
+      e.preventDefault();
+      window.scrollTo({ top: 0, behavior: reducedMotion() ? "auto" : "smooth" });
+      return;
+    }
+    setPending(id);
+  };
+
+  const tabLink = (t: (typeof TABS)[number], where: "bottom" | "top") => {
+    const on = t.id === tab;
+    const label = t.id === "inbox" && dot ? "Inbox, something needs you" : t.id === "home" ? "Home" : t.label;
+    if (t.id === "home") {
+      return (
+        <Link href={t.href} scroll={false} onClick={(e) => onTab(e, t.id)} aria-current={on ? "page" : undefined} aria-label={label}
+          className={`pp-focus pp-press rounded-full flex items-center justify-center shrink-0 ${where === "bottom" ? "w-[62px] h-[62px] -mt-6 shadow-lg" : "w-12 h-12"}`}
+          style={{ background: on ? C.brass : "#1d2318", border: `1.5px solid ${C.brass}`, color: on ? C.bg : C.brass, boxShadow: where === "bottom" ? `0 6px 18px rgba(0,0,0,0.45), 0 0 0 5px ${C.bg}` : undefined }}>
+          <span className="font-display text-[22px] leading-none tracking-wide" style={{ marginTop: 2 }}>CG</span>
+        </Link>
+      );
+    }
+    return (
+      <Link href={t.href} scroll={false} onClick={(e) => onTab(e, t.id)} aria-current={on ? "page" : undefined} aria-label={label}
+        className={`pp-focus relative flex items-center rounded-lg ${where === "bottom" ? "flex-col justify-center gap-1 w-full min-h-[56px] pt-1.5" : "gap-2 px-3 min-h-[44px]"}`}
+        style={{ color: on ? C.brass : C.faint }}>
+        <span className="relative">
+          <Icon id={t.id} on={on} />
+          {t.id === "inbox" && dot && <span aria-hidden className="absolute -top-0.5 -right-1 w-2.5 h-2.5 rounded-full" style={{ background: C.accent, boxShadow: `0 0 0 2px ${C.bg}` }} />}
+        </span>
+        <span className={`font-body uppercase ${where === "bottom" ? "text-[10px] tracking-[0.14em]" : "text-[11px] tracking-[0.18em]"}`}>{t.label}</span>
+        {on && where === "bottom" && <span aria-hidden className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-[2px] rounded-full" style={{ background: C.brass }} />}
+      </Link>
+    );
+  };
+
+  const panels: Record<TabId, ReactNode> = { home: <HomeTab />, menu: <MenuTab />, index: <IndexTab />, events: <EventsTab />, inbox: <InboxTab /> };
+  return (
+    <ShellContext.Provider value={api}>
+      <div className="pp-app min-h-[100dvh]" style={{ background: C.bg, color: C.text, ["--pp-top" as string]: "calc(env(safe-area-inset-top) + 56px)" }}>
+        <header className="fixed top-0 inset-x-0 z-40 border-b backdrop-blur-md"
+          style={{ paddingTop: "env(safe-area-inset-top)", background: "rgba(19,23,15,0.94)", borderColor: C.line }}>
+          <div className="max-w-5xl mx-auto h-14 px-4 md:px-6 flex items-center justify-between gap-4">
+            <Link href="/passport" scroll={false} onClick={(e) => onTab(e, "home")} className="flex items-center gap-2.5 pp-focus rounded-lg min-h-[44px] md:w-48" aria-label="Passport home">
+              <PassportMark size={28} />
+              <span className="font-body text-[11px] tracking-[0.4em] uppercase" style={{ color: C.brass }}>Passport</span>
+            </Link>
+            <nav aria-label="Passport" className="hidden md:flex items-center gap-1">
+              {TABS.map((t) => <span key={t.id}>{tabLink(t, "top")}</span>)}
+            </nav>
+            <div className="md:w-48 flex justify-end">
+              <Link href="/passport/account" scroll={false} aria-label="Your account" aria-current={pathname.startsWith("/passport/account") ? "page" : undefined}
+                className="w-11 h-11 rounded-full flex items-center justify-center pp-focus">
+                <span className="w-9 h-9 rounded-full flex items-center justify-center border" style={{ borderColor: pathname.startsWith("/passport/account") ? C.brass : C.line }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={pathname.startsWith("/passport/account") ? C.brass : C.muted} strokeWidth="1.6" aria-hidden>
+                    <circle cx="12" cy="8.5" r="3.5" /><path d="M5 20c1.2-3.6 4-5.5 7-5.5s5.8 1.9 7 5.5" />
+                  </svg>
+                </span>
+              </Link>
+            </div>
+          </div>
+        </header>
+
+        <main ref={mainRef} id="passport-main" className="pp-main w-full max-w-xl mx-auto px-5"
+          style={{ paddingTop: "calc(var(--pp-top) + 24px)" }}>
+          {TABS.map((t) => (visited.has(t.id) ? (
+            <section key={t.id} hidden={t.id !== tab} aria-label={t.id === "home" ? "Home" : t.label}>{panels[t.id]}</section>
+          ) : null))}
+        </main>
+
+        {/* Pages that open over a tab (and, for a tab's own address, nothing: the tab is drawn above). */}
+        <div ref={overlayRef} className={overlay ? "pp-overlay fixed inset-x-0 bottom-0 z-30 overflow-y-auto" : "hidden"}
+          style={overlay ? { top: 0, background: C.bg, paddingTop: "calc(var(--pp-top) + 20px)" } : undefined}
+          onScroll={(e) => { overlayScroll.current[pathname] = (e.target as HTMLDivElement).scrollTop; }}>
+          <div className="pp-page w-full max-w-xl mx-auto px-5">{children}</div>
+        </div>
+
+        <nav aria-label="Passport tabs" className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t"
+          style={{ background: "rgba(15,19,12,0.97)", borderColor: C.line, paddingBottom: "env(safe-area-inset-bottom)" }}>
+          <ul className="max-w-xl mx-auto grid grid-cols-5 items-end px-1">
+            {TABS.map((t) => <li key={t.id} className="flex justify-center">{tabLink(t, "bottom")}</li>)}
+          </ul>
+        </nav>
+
+        <div aria-live="polite" role="status" className="sr-only">{toastMsg?.text || ""}</div>
+        {toastMsg && (
+          <div key={toastMsg.n} aria-hidden className="pp-toast fixed left-1/2 z-[80] rounded-full px-5 py-3 font-body text-sm shadow-xl max-w-[90vw] text-center"
+            style={{ transform: "translateX(-50%)", bottom: "calc(env(safe-area-inset-bottom) + 92px)", background: C.text, color: C.bg }}>
+            {toastMsg.text}
+          </div>
+        )}
+        {addTarget && <AddToList target={addTarget} onClose={closeAdd} toast={toast} cache={listsCache} />}
+      </div>
+    </ShellContext.Provider>
+  );
+}

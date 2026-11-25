@@ -1,12 +1,18 @@
 // npm run test:passport — the Menu tab's description layout, its cocktail cards, the "a tap is never lost" save queue,
-// and (file 05) what a bottle request may send to the Bible.
+// (file 05) what a bottle request may send to the Bible, and (file 06) the new shell: tabs, old addresses, search,
+// the available-now marker, the Inbox dot and reservations.
 
 import assert from "node:assert/strict";
 import { bareFlavor, descriptionParts, menuItemBody } from "../description";
 import { createSaveQueue, type SaveResult } from "../saveQueue";
 import { isAction, money, quantity, requestBody, sortRequests, NO_PRICE_LINE } from "../bottles";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import {
+  OLD_ADDRESSES, TABS, byCategory, dayLong, homeTabOf, inboxDot, isAvailable, needsMember, partyOf, reservationWord, resultCount, searchable,
+  tabOfPath, withSpirit,
+} from "../shell";
+import { LIMITS } from "../../rateLimit";
 
 let passed = 0;
 let failed = 0;
@@ -214,6 +220,131 @@ function slowServer() {
       assert.ok(src.includes("memberRequest(req, \"passport-bottles\""), f);
       assert.ok(!/member_id|memberId/.test(src), `${f} must not take a member number`);
     }
+  });
+
+
+  console.log("\nThe new shell (file 06)");
+  const APP = join(__dirname, "..", "..", "..", "app");
+  const pageOf = (path: string) => {
+    const rel = path.replace(/^\/passport\/?/, "");
+    for (const base of [join(APP, "passport", "(app)"), join(APP, "passport")]) {
+      for (const f of ["page.tsx", "route.ts"]) {
+        const file = join(base, rel, f);
+        if (existsSync(file)) return file;
+      }
+    }
+    // A one-word address with no folder of its own is answered by the old-tab route ([tab]).
+    return /^\/passport\/[a-z-]+$/.test(path) ? join(APP, "passport", "(app)", "[tab]", "page.tsx") : null;
+  };
+  await test("five tabs, left to right: Menu, Index, CG (Home), Events, Inbox", () => {
+    assert.deepEqual(TABS.map((t) => t.label), ["Menu", "Index", "Home", "Events", "Inbox"]);
+    assert.equal(TABS[2].href, "/passport", "the centre button is Home");
+  });
+  await test("a tab's own address is that tab; anything else opens over a tab", () => {
+    assert.equal(tabOfPath("/passport"), "home");
+    assert.equal(tabOfPath("/passport/menu"), "menu");
+    assert.equal(tabOfPath("/passport/library"), "index");
+    assert.equal(tabOfPath("/passport/library/"), "index");
+    assert.equal(tabOfPath("/passport/events"), "events");
+    assert.equal(tabOfPath("/passport/inbox"), "inbox");
+    for (const p of ["/passport/library/12", "/passport/spirits/4", "/passport/producers/2", "/passport/lists/9", "/passport/favorites", "/passport/account", "/passport/menus"]) {
+      assert.equal(tabOfPath(p), null, p);
+    }
+  });
+  await test("a page opened straight from a link sits over the tab it belongs to", () => {
+    assert.equal(homeTabOf("/passport/library/12"), "index");
+    assert.equal(homeTabOf("/passport/favorites"), "index");
+    assert.equal(homeTabOf("/passport/account"), "home");
+  });
+  await test("every old Passport address still has a page, and each move redirects to its new home", () => {
+    for (const a of OLD_ADDRESSES) {
+      const file = pageOf(a.path);
+      assert.ok(file, `${a.path} has no page any more`);
+      const src = readFileSync(file!, "utf8");
+      if (a.goes === "same") assert.ok(!/\bredirect\(/.test(src) || /tabPage|redirect\("\/passport"\)|redirect\("\/passport\?/.test(src) || a.path === "/passport/set-password", `${a.path} should still open its own screen`);
+      else assert.ok(src.includes(`redirect("${a.goes}")`) || src.includes(`"${a.goes}"`), `${a.path} should redirect to ${a.goes}`);
+    }
+    const tab = readFileSync(pageOf("/passport/[tab]")!, "utf8");
+    assert.ok(tab.includes('messages: "/passport/inbox"') && tab.includes("notFound()"), "the old Messages tab goes to the Inbox; any other unknown tab is not found");
+  });
+  await test("the new tab addresses exist and only check the sign-in cookie (no call to the Bible, so tabs open instantly)", () => {
+    for (const path of ["/passport/events", "/passport/inbox", "/passport/menu", "/passport/library"]) {
+      const src = readFileSync(pageOf(path)!, "utf8");
+      assert.ok(src.includes("tabPage()") && !src.includes("@/lib/passport/bible"), path);
+    }
+    const tp = readFileSync(join(__dirname, "..", "tabPage.ts"), "utf8");
+    assert.ok(tp.includes('if (!currentAuth()) redirect("/passport")'), "a tab address with no Passport cookie goes to sign-in");
+  });
+  await test("search, each tab's data and the lists for the sheet are members only and rate limited", () => {
+    const api = join(APP, "api", "passport");
+    const find = readFileSync(join(api, "find", "route.ts"), "utf8");
+    assert.ok(find.includes('memberRequest(req, "passport-search"'), "search goes through memberRequest with its own bucket");
+    assert.ok(LIMITS["passport-search"] && LIMITS["passport-search"].max > 0);
+    const view = readFileSync(join(api, "view", "[view]", "route.ts"), "utf8");
+    assert.ok(view.includes('memberRequest(req, "passport-member"'), "tab data goes through memberRequest");
+    const lists = readFileSync(join(api, "lists", "route.ts"), "utf8");
+    assert.ok(/export async function GET[\s\S]*?memberRequest\(req, "passport-member"/.test(lists));
+    for (const src of [find, view]) assert.ok(!/member_id|memberId|searchParams.get\("member/.test(src), "never a member number from the browser");
+  });
+  await test("Home sends the browser only the first name of the member's own record (and whether to ask for a phone)", () => {
+    const view = readFileSync(join(APP, "api", "passport", "view", "[view]", "route.ts"), "utf8");
+    assert.ok(view.includes("first_name: me.member.first_name") && view.includes("needs_phone: me.member.needs_phone"));
+    assert.ok(!/\.\.\.me\b|me\.member\.(email|phone|last_name)/.test(view), "no email, phone or full record on Home");
+  });
+  await test("search needs two letters before anything is sent", () => {
+    assert.deepEqual(["", " ", "a", " b ", "rye", "ab"].map(searchable), [false, false, false, false, true, true]);
+    assert.equal(resultCount({ cocktails: [1, 2], bottles: [3], producers: [] }), 3);
+    assert.equal(resultCount(null), 0);
+  });
+  await test("available now is a marker on the item, true only when the Bible says so", () => {
+    assert.equal(isAvailable({ available: true }), true);
+    assert.equal(isAvailable({ available: false }), false);
+    assert.equal(isAvailable(null), false);
+    const card = readFileSync(join(__dirname, "..", "..", "..", "components", "passport", "Library.tsx"), "utf8");
+    assert.ok(card.includes("<Avail on={c.available} />") && card.includes("<Avail on={b.available} />"), "cocktail and bottle rows carry the marker");
+    const bits = readFileSync(join(__dirname, "..", "..", "..", "components", "passport", "bits.tsx"), "utf8");
+    assert.ok(/function Avail[\s\S]*?if \(!on\) return null;[\s\S]*?rounded-full[\s\S]*?Available now/.test(bits), "a small dot with words for screen readers, nothing when not available");
+  });
+  await test("the Index's base-spirit filter answers from the keys on each cocktail", () => {
+    const cs = [{ id: 1, spirits: ["bourbon"] }, { id: 2, spirits: ["gin", "bourbon"] }, { id: 3, spirits: [] }, { id: 4 }] as never[];
+    assert.deepEqual(withSpirit(cs, "bourbon").map((c: { id: number }) => c.id), [1, 2]);
+    assert.deepEqual(withSpirit(cs, "").map((c: { id: number }) => c.id), [1, 2, 3, 4]);
+  });
+  await test("spirits group by category in the order the Bible sent (the spirits list's own order)", () => {
+    const g = byCategory([{ category: "Rum", n: 1 }, { category: "Gin", n: 2 }, { category: "Rum", n: 3 }, { category: "", n: 4 }]);
+    assert.deepEqual(g.map((x) => [x.name, x.items.length]), [["Rum", 2], ["Gin", 1], ["Other", 1]]);
+  });
+  await test("the Inbox dot: a price waiting for an answer, or a bottle ready for pickup", () => {
+    assert.equal(inboxDot([{ can_answer: false, status: "ordered" }, { can_answer: false, status: "submitted" }]), false);
+    assert.equal(inboxDot([{ can_answer: true, status: "quoted" }]), true);
+    assert.equal(inboxDot([{ can_answer: false, status: "ready" }]), true);
+    assert.equal(inboxDot([{ can_answer: false, status: "quoted" }]), false, "an expired price needs nothing from them");
+    assert.equal(inboxDot(null), false);
+    assert.equal(needsMember({ can_answer: false, status: "picked_up" }), false);
+  });
+  await test("reservations read in the member's words", () => {
+    assert.deepEqual(["requested", "approved", "guest_confirmed"].map(reservationWord), ["Request received", "Booked", "Confirmed"]);
+    assert.equal(dayLong("2026-12-04"), "Friday, December 4");
+    assert.deepEqual([partyOf(1), partyOf(4)], ["Just you", "Party of 4"]);
+  });
+  await test("the recipe book is called My Cocktails, sits in the Index under Yours with Add a cocktail, and never in the Menu", () => {
+    const comp = (f: string) => readFileSync(join(__dirname, "..", "..", "..", "components", "passport", f), "utf8");
+    const index = comp("tabs/IndexTab.tsx");
+    assert.ok(index.includes(">My Cocktails<") && index.includes('href="/passport/bespoke?new=1"') && index.includes("+ Add a cocktail"));
+    assert.ok(!/bespoke|My Cocktails/i.test(comp("tabs/MenuTab.tsx")), "not on the Menu tab");
+    const page = readFileSync(pageOf("/passport/bespoke")!, "utf8");
+    assert.ok(page.includes('title="My Cocktails"'));
+    const all = [index, comp("Personal.tsx"), page].join("\n");
+    assert.ok(!/Bespoke (recipes|cocktails)/.test(all.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "")), "the old label is shown nowhere");
+  });
+  await test("places for later files draw nothing until they have something (no empty boxes, no 'coming soon')", () => {
+    const slots = readFileSync(join(__dirname, "..", "..", "..", "components", "passport", "tabs", "Slots.tsx"), "utf8");
+    assert.ok(/function FromTheBar[\s\S]*?if \(!messages\?\.length\) return null;/.test(slots));
+    assert.ok(/function WhatsNew[\s\S]*?if \(!cards\?\.length\) return null;/.test(slots));
+    for (const f of ["SpiritOfTheDay", "SharedWithYou", "HereButtons", "HouseLists"]) assert.ok(new RegExp(`function ${f}\\(\\) \\{ return null; \\}`).test(slots), f);
+    const all = ["AppShell.tsx", "tabs/HomeTab.tsx", "tabs/MenuTab.tsx", "tabs/IndexTab.tsx", "tabs/EventsTab.tsx", "tabs/InboxTab.tsx", "tabs/Slots.tsx"]
+      .map((f) => readFileSync(join(__dirname, "..", "..", "..", "components", "passport", f), "utf8")).join("\n");
+    assert.ok(!/coming soon/i.test(all), "no 'coming soon' anywhere in the new shell");
   });
 
   console.log(`\n${passed} passed, ${failed} failed`);
