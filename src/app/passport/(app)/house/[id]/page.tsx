@@ -3,6 +3,7 @@ import Unavailable from "@/components/passport/Unavailable";
 import { HouseListPage } from "@/components/passport/HouseList";
 import { AskAboutThis } from "@/components/passport/Inbox";
 import { ShareButton } from "@/components/passport/Social";
+import Comments from "@/components/passport/Comments";
 import { getHouseList } from "@/lib/passport/bible";
 import { memberData } from "@/lib/passport/member";
 
@@ -22,6 +23,8 @@ export default async function HouseListRoute({ params }: { params: { id: string 
       <AskAboutThis kind="list" id={r.data.id} name={r.data.title} />
       {/* File 09: share the bar's list with friends. */}
       <div className="mt-3"><ShareButton kind="house_list" id={r.data.id} name={r.data.title} /></div>
+      {/* File 10: comments, only when the bar switched them on for this list. */}
+      <Comments type="list" id={r.data.id} />
     </>
   );
 }

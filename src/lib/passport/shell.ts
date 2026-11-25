@@ -28,7 +28,7 @@ export function tabOfPath(pathname: string | null | undefined): TabId | null {
 /** For a page opened straight from a link (no tab behind it yet): the tab it belongs under. */
 export function homeTabOf(pathname: string): TabId {
   if (/^\/passport\/(bottles|messages|inbox)(\/|$)/.test(pathname)) return "inbox";
-  if (/^\/passport\/(account|friends|letsgo|shared)(\/|$)/.test(pathname)) return "home";
+  if (/^\/passport\/(account|friends|letsgo|shared|from-the-bar)(\/|$)/.test(pathname)) return "home";
   if (/^\/passport\/events\/./.test(pathname)) return "events";
   if (/^\/passport\/spirits\/?$/.test(pathname)) return "menu";
   return "index";

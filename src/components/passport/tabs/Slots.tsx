@@ -7,7 +7,9 @@ import { postJson } from "../ui";
 import { PressLink } from "../bits";
 import { useShell } from "../shellContext";
 import { PAST_HREF, chartHref, discountLine, feedHref, feedKicker, flightLine, houseHref, listKicker, messageHref } from "@/lib/passport/bar";
-import type { BarMessage, Chart, FeedCard, HouseList, SpiritOfTheDay as Spirit, WelcomeAperitif as Aperitif } from "@/lib/passport/types";
+import type { BarMessage, Chart, FeedCard, HouseList, SpiritOfTheDay as Spirit, VoteCard, WelcomeAperitif as Aperitif } from "@/lib/passport/types";
+import { PAST_VOTES_HREF } from "@/lib/passport/votes";
+import { VoteCardLink } from "../Votes";
 
 /**
  * Places in the layout that file 06 kept and file 07 fills. Each draws NOTHING until it has something in it: never an
@@ -71,6 +73,8 @@ export function FromTheBar({ messages }: { messages?: BarMessage[] | null }) {
                 <p className="font-display text-[19px] leading-snug" style={{ color: C.text }}>{m.title}</p>
                 {m.body && <p className="font-body text-[15px] leading-relaxed whitespace-pre-line mt-0.5" style={{ color: C.muted }}>{m.body}</p>}
                 {href && m.link_label && <Link href={href} scroll={false} className="inline-block mt-1 min-h-[44px] py-2.5 font-body text-sm underline underline-offset-4 pp-focus" style={{ color: C.brass }}>{m.link_label}</Link>}
+                {/* File 10: when the bar switched comments on for this message, its own page holds them. */}
+                {m.comments && <Link href={`/passport/from-the-bar/${m.id}`} scroll={false} className={`inline-block mt-1 ${href && m.link_label ? "ml-4" : ""} min-h-[44px] py-2.5 font-body text-sm underline underline-offset-4 pp-focus`} style={{ color: C.muted }}>Comments</Link>}
               </div>
               <DismissButton label={m.title} onClick={() => dismiss(m.id)} />
             </li>
@@ -148,8 +152,8 @@ function ListCard({ l, big = false }: { l: HouseList; big?: boolean }) {
 }
 
 /** The Index's "From Common Good" (file 07): live house lists (staff picks marked), the charts, and the way to past lists. */
-export function HouseLists({ lists, charts, pastCount = 0 }: { lists?: HouseList[] | null; charts?: Chart[] | null; pastCount?: number }) {
-  if (!lists?.length && !charts?.length && !pastCount) return null;
+export function HouseLists({ lists, charts, pastCount = 0, votes, pastVotes = 0 }: { lists?: HouseList[] | null; charts?: Chart[] | null; pastCount?: number; votes?: VoteCard[] | null; pastVotes?: number }) {
+  if (!lists?.length && !charts?.length && !pastCount && !votes?.length && !pastVotes) return null;
   return (
     <section id="from-common-good" aria-labelledby="pp-house-lists">
       <div className="flex items-baseline justify-between mt-10 mb-3">
@@ -171,6 +175,13 @@ export function HouseLists({ lists, charts, pastCount = 0 }: { lists?: HouseList
       {pastCount > 0 && (
         <Link href={PAST_HREF} scroll={false} className="mt-2 inline-flex items-center min-h-[44px] font-body text-sm underline underline-offset-4 pp-focus" style={{ color: C.text }}>
           Past lists from Common Good
+        </Link>
+      )}
+      {/* File 10: open votes and brackets, then "Past votes". */}
+      {!!votes?.length && <ul className="space-y-3 mt-3">{votes.map((c) => <li key={`${c.kind}${c.id}`}><VoteCardLink c={c} /></li>)}</ul>}
+      {pastVotes > 0 && (
+        <Link href={PAST_VOTES_HREF} scroll={false} className="mt-2 flex items-center min-h-[44px] font-body text-sm underline underline-offset-4 pp-focus" style={{ color: C.text }}>
+          Past votes
         </Link>
       )}
     </section>

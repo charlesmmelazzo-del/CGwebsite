@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Unavailable from "@/components/passport/Unavailable";
 import { EventPage } from "@/components/passport/Events";
+import Comments from "@/components/passport/Comments";
 import { getPassportEvent } from "@/lib/passport/bible";
 import { memberData } from "@/lib/passport/member";
 
@@ -13,5 +14,11 @@ export default async function Page({ params }: { params: { id: string } }) {
   const r = await memberData((auth) => getPassportEvent(auth, id));
   if (r.notFound) notFound();
   if (!r.data) return <Unavailable />;
-  return <EventPage key={r.data.id} initial={r.data} />;
+  return (
+    <>
+      <EventPage key={r.data.id} initial={r.data} />
+      {/* File 10: comments, only when the bar switched them on for this event. */}
+      <Comments type="event" id={r.data.id} />
+    </>
+  );
 }

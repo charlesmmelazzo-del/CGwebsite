@@ -124,8 +124,8 @@ export function nextDays(now = new Date(), n = 14): { day: string; label: string
   return out;
 }
 /** The Inbox dot also lights for a friend request, an unread message from a friend, and an unread notice from the bar. */
-export const socialLit = (s: Pick<SocialInbox, "conversations" | "incoming" | "notices"> | null | undefined) =>
-  !!s && (s.incoming.length > 0 || s.conversations.some((c) => c.unread) || s.notices.some((n) => n.unread));
+export const socialLit = (s: Pick<SocialInbox, "conversations" | "incoming" | "notices" | "comment_replies"> | null | undefined) =>
+  !!s && (s.incoming.length > 0 || s.conversations.some((c) => c.unread) || s.notices.some((n) => n.unread) || (s.comment_replies || []).some((n) => n.unread));
 /** Home's "Right now" for events: a held place, or a cancellation. */
 export const eventNoticeWords = (n: EventNotice) => (n.kind === "offer"
   ? { kicker: "A place opened up for you", line: "Held for 24 hours. Tap to take it." }

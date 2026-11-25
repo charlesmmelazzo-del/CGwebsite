@@ -343,7 +343,8 @@ function slowServer() {
     assert.ok(/function WhatsNew[\s\S]*?if \(!cards\?\.length\) return null;/.test(slots));
     // File 07 fills Spirit of the Day and the Index's house lists: each still draws nothing until it has something.
     assert.ok(/function SpiritOfTheDay[\s\S]*?if \(!spirit\) return null;/.test(slots), "SpiritOfTheDay");
-    assert.ok(/function HouseLists[\s\S]*?if \(!lists\?\.length && !charts\?\.length && !pastCount\) return null;/.test(slots), "HouseLists");
+    // (file 10 adds open votes and the way to Past votes: it still draws nothing while all five are empty)
+    assert.ok(/function HouseLists[\s\S]*?if \(!lists\?\.length && !charts\?\.length && !pastCount && !votes\?\.length && !pastVotes\) return null;/.test(slots), "HouseLists");
     // File 09 fills "Shared with you" and the two round buttons (components/passport/Social.tsx): still nothing until they have something.
     const social = readFileSync(join(__dirname, "..", "..", "..", "components", "passport", "Social.tsx"), "utf8");
     assert.ok(/export \{ HereButtons, SharedWithYou \} from "\.\.\/Social";/.test(slots), "the slots point at file 09's sections");
@@ -400,7 +401,10 @@ function slowServer() {
       assert.equal(B.messageHref({ link_kind: "https://evil.example" as never, link_id: 3 }), null);
       assert.equal(B.feedHref({ link_kind: "chart", link_id: "critics" }), "/passport/house/charts/critics");
       assert.equal(B.feedHref({ link_kind: "chart", link_id: "javascript:alert(1)" }), "/passport");
-      assert.equal(B.feedHref({ link_kind: "bracket", link_id: 9 }), "/passport", "a later file's kind never makes a dead link");
+      // File 10 gave "bracket" (and file 09's "event") a page; a kind this app doesn't know yet still never makes a dead link.
+      assert.equal(B.feedHref({ link_kind: "bracket", link_id: 9 }), "/passport/brackets/9");
+      assert.equal(B.feedHref({ link_kind: "event", link_id: 4 }), "/passport/events/4");
+      assert.equal(B.feedHref({ link_kind: "raffle" as never, link_id: 9 }), "/passport", "a later file's kind never makes a dead link");
       assert.equal(B.feedKicker("season"), "New menu");
     });
     await test("prices and pours read as the bar wrote them: whole dollars, plus tax", () => {
@@ -558,6 +562,76 @@ function slowServer() {
       assert.ok(localFind(many, "rum")!.cocktails.length === 20 && localFind(many, "rum")!.bottles.length === 25, "the Bible's limits");
       const src = readFileSync(join(APP, "..", "components", "passport", "Search.tsx"), "utf8");
       assert.ok(src.includes('useView<IndexData>("index")') && src.includes("/api/passport/find"), "the Index data answers first; the Bible's answer still comes (producers, ingredients)");
+    });
+  }
+
+  // ── File 10: comments on curated content, flights to vote on, and brackets ─────────────────────────────────────────
+  console.log("File 10: comments, flights to vote on, and brackets");
+  {
+    const V = await import("../votes");
+    const B10 = await import("../bar");
+    await test("comments send only plain words and a reply's parent number; nothing else passes", () => {
+      assert.deepEqual(V.commentBody({ body: "  Lovely list  " }), { body: { body: "Lovely list" } });
+      assert.deepEqual(V.commentBody({ body: "Agreed", parent_id: "12" }), { body: { body: "Agreed", parent_id: 12 } });
+      for (const b of [{}, { body: "" }, { body: "   " }, { body: "x".repeat(501) }, { body: "ok", parent_id: "abc" }, { body: "ok", parent_id: -3 }]) assert.ok("error" in V.commentBody(b), JSON.stringify(b).slice(0, 60));
+      const got = V.commentBody({ body: "hi", member_id: 4, world: "test", name: "x" } as Record<string, unknown>);
+      assert.ok(!("error" in got) && Object.keys(got.body).join() === "body", "a member number, a world or a name never passes");
+      assert.equal(V.PG_LINE, "Please keep it PG and respectful.");
+      assert.equal(V.REMOVED_LINE, "Removed by Common Good");
+      assert.ok(V.isCommentType("list") && V.isCommentType("bracket") && !V.isCommentType("cocktail") && !V.isCommentType("bottle") && !V.isCommentType("personal"), "only the bar's curated content takes comments");
+    });
+    await test("a vote sends one slot and one option; a bracket vote one matchup and a or b", () => {
+      assert.deepEqual(V.flightVoteBody({ slot_id: 3, option_id: "9" }), { body: { slot_id: 3, option_id: 9 } });
+      for (const b of [{}, { slot_id: 3 }, { slot_id: "x", option_id: 2 }, { slot_id: 0, option_id: 2 }]) assert.ok("error" in V.flightVoteBody(b));
+      assert.deepEqual(V.bracketVoteBody({ matchup_id: "5", pick: "b" }), { body: { matchup_id: 5, pick: "b" } });
+      for (const b of [{ matchup_id: 5 }, { matchup_id: 5, pick: "c" }, { pick: "a" }]) assert.ok("error" in V.bracketVoteBody(b));
+    });
+    await test("links stay inside Passport; shares are words only when the bar sent a number", () => {
+      assert.equal(V.itemHref("list", 3), "/passport/house/3");
+      assert.equal(V.itemHref("message", 3), "/passport/from-the-bar/3");
+      assert.equal(V.itemHref("event", 3), "/passport/events/3");
+      assert.equal(V.itemHref("flight", 3), "/passport/votes/3");
+      assert.equal(V.itemHref("bracket", 3), "/passport/brackets/3");
+      assert.equal(V.itemHref("https://evil.example", 3), null);
+      assert.equal(V.itemHref("list", "javascript:alert(1)"), null);
+      assert.equal(V.voteHref({ kind: "flight", id: 7 }), "/passport/votes/7");
+      assert.equal(V.pctLabel(67), "67%");
+      assert.equal(V.pctLabel(0), "0%");
+      assert.equal(V.pctLabel(null), null, "no share unless the bar sent one");
+      assert.equal(B10.feedKicker("bracket_winner"), "We have a winner");
+      assert.equal(V.voteKicker({ kind: "flight", status: "open" }), "Voting is open");
+      assert.equal(V.voteKicker({ kind: "bracket", status: "closed" }), "We have a winner");
+    });
+    await test("editing a comment stops after its 10 minutes; a bracket opens on its current round", () => {
+      const now = Date.parse("2026-11-25T18:00:00Z");
+      assert.ok(V.canStillEdit("2026-11-25T18:05:00Z", now) && !V.canStillEdit("2026-11-25T17:59:00Z", now) && !V.canStillEdit(null, now));
+      const rounds = [1, 2, 3].map((round) => ({ round, name: "", when: "", state: "upcoming" as const, matchups: [] }));
+      assert.equal(V.startRound({ rounds, current_round: 2, status: "open" }), 1);
+      assert.equal(V.startRound({ rounds, current_round: 3, status: "closed" }), 2);
+      assert.equal(V.startRound({ rounds, current_round: 0, status: "open" }), 0);
+    });
+    await test("the comments and votes routes are members only, rate limited, and never take a member number or a count", () => {
+      const api = join(APP, "api", "passport");
+      const files = [["comments", "[type]", "[id]", "route.ts"], ["comment", "[id]", "route.ts"], ["votes", "[id]", "route.ts"], ["brackets", "[id]", "route.ts"]];
+      for (const f of files) {
+        const src = readFileSync(join(api, ...f), "utf8");
+        assert.ok(/memberRequest\(req, "passport-(comments|votes|member)"/.test(src), f.join("/"));
+        assert.ok(!/member_id|memberId|searchParams\.get\("member|world|totals|voters/.test(src), `${f.join("/")} never takes a member number, a world or a count`);
+      }
+      assert.ok(LIMITS["passport-comments"].max > 0 && LIMITS["passport-votes"].max > 0);
+      for (const p of ["/passport/votes/[id]", "/passport/votes/past", "/passport/brackets/[id]", "/passport/from-the-bar/[id]"]) assert.ok(pageOf(p), p);
+      assert.equal(homeTabOf("/passport/votes/4"), "index");
+      assert.equal(homeTabOf("/passport/brackets/4"), "index");
+      assert.equal(homeTabOf("/passport/from-the-bar/4"), "home");
+      const comments = readFileSync(join(APP, "..", "components", "passport", "Comments.tsx"), "utf8");
+      assert.ok(comments.includes("if (!loaded || !t) return null;"), "comments draw nothing while they are off: no empty box");
+      assert.ok(comments.includes("PG_LINE") && comments.includes("first_time"), "before the first comment, and under the box always: Please keep it PG and respectful.");
+      const votes = readFileSync(join(APP, "..", "components", "passport", "Votes.tsx"), "utf8");
+      assert.ok(votes.includes("if (!open?.length && !results?.length) return null;"), "Home's votes card draws nothing when there are none");
+      assert.ok(votes.includes("overflow-x-auto snap-x") && votes.includes("startRound("), "the bracket scrolls sideways by round, the current round first");
+      for (const page of ["house/[id]/page.tsx", "events/[id]/page.tsx", "votes/[id]/page.tsx", "brackets/[id]/page.tsx", "from-the-bar/[id]/page.tsx"]) {
+        assert.ok(readFileSync(join(APP, "passport", "(app)", ...page.split("/")), "utf8").includes("<Comments type="), `${page} has the comments place`);
+      }
     });
   }
 
