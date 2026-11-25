@@ -179,7 +179,7 @@ export function BracketPage({ initial }: { initial: Bracket }) {
         {b.rounds.map((r, i) => {
           const open = r.state === "open" && b.status === "open";
           return (
-            <section key={r.round} data-round={i} aria-labelledby={`pp-round-${r.round}`} className="snap-start shrink-0 w-[82%] max-w-[300px]">
+            <section key={r.round} data-round={i} aria-labelledby={`pp-round-${r.round}`} className="snap-start shrink-0 w-[82%] max-w-[300px] md:w-[260px]">
               <h2 id={`pp-round-${r.round}`} className="font-body text-[11px] tracking-[0.25em] uppercase" style={{ color: r.state === "open" ? C.brass : C.muted }}>
                 {r.name}{r.state === "open" ? " · now" : r.state === "done" ? " · done" : ""}
               </h2>
