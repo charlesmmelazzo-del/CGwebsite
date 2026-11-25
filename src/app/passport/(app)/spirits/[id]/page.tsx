@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Unavailable from "@/components/passport/Unavailable";
 import { BottlePage } from "@/components/passport/Library";
 import { ItemControls } from "@/components/passport/Personal";
+import { MyItemPhotos } from "@/components/passport/Photos";
 import { RequestBottle } from "@/components/passport/Bottles";
 import { AskAboutThis } from "@/components/passport/Inbox";
 import { ShareButton } from "@/components/passport/Social";
@@ -24,6 +25,8 @@ export default async function BottleRoute({ params }: { params: { id: string } }
     <>
       <BottlePage b={r.data.b} />
       <ItemControls key={`bottle-${id}`} kind="bottle" id={id} name={r.data.b.name} initial={r.data.mine} />
+      {/* File 11: the member's own photos (up to three here), private to them and the Common Good team. */}
+      <MyItemPhotos key={`photos-bottle-${id}`} kind="bottle" id={id} name={r.data.b.name} />
       {/* File 05: every bottle page a member can open (the Bible refuses any other). */}
       <RequestBottle key={`request-${id}`} bottleId={id} name={r.data.b.name} />
       {/* File 08: a message to the bar with this bottle attached. */}

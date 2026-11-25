@@ -6,6 +6,7 @@ import {
   type InboxData, type InboxThread, type MemberRequest, type EventInquiry, type NotifyPrefs,
   type FriendsOverview, type SocialHome, type SocialInbox, type Conversation, type ShareCard, type PassportEvent,
   type BarMessage, type Bracket, type CommentThread, type CommentType, type FlightVote, type VoteCard, type VotesData,
+  type ItemKind as PhotoKind, type PhotosData,
 } from "./types";
 
 // The shapes themselves live in ./types (no server-only code, so browser components can use them too).
@@ -189,3 +190,56 @@ export const getBracket = (auth: MemberAuth, id: number) => passport<{ bracket: 
 export const getBarMessage = (auth: MemberAuth, id: number) => passport<{ bar_message: BarMessage }>("GET", `/bar/messages/${id}`, { auth }).then((r) => r.bar_message);
 /** The comments place on one curated item, or null when comments are off there. */
 export const getComments = (auth: MemberAuth, type: CommentType, id: number) => passport<{ comments: CommentThread | null }>("GET", `/comments/${type}/${id}`, { auth }).then((r) => r.comments);
+
+// ── File 11: photos. A member's own photos (only theirs: the Bible looks each up by its code AND the member behind the
+// session) and the bar's photos (only for items this member may open). Pictures come back as bytes, never JSON. ──────
+export const getItemPhotos = (auth: MemberAuth, kind: PhotoKind, id: number) => passport<PhotosData>("GET", `/photos/item/${kind}/${id}`, { auth });
+export const getMyPhotos = (auth: MemberAuth) => passport<PhotosData>("GET", "/photos/mine", { auth });
+export const deleteMyPhoto = (auth: MemberAuth, token: string) => passport<{ ok: true }>("DELETE", `/photos/mine/${encodeURIComponent(token)}`, { auth });
+
+/** One picture through the Passport connection (a bar photo or the member's own). Null when the Bible can't be reached. */
+export async function getPhotoBytes(auth: MemberAuth, path: string): Promise<Response | null> {
+  const key = process.env.PASSPORT_SYNC_KEY;
+  if (!key) return null;
+  try {
+    return await fetch(`${baseUrl()}/api/passport-public${path}`, {
+      headers: { Authorization: `Bearer ${key}`, "X-Passport-Session": auth.token, "X-Passport-Member": String(auth.memberId) },
+      cache: "no-store",
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch {
+    return null;
+  }
+}
+
+/** Send one photo (already shrunk on the member's phone) to the Bible, which checks it and saves it fresh. */
+export async function uploadPhoto(auth: MemberAuth, kind: PhotoKind, id: number, bytes: ArrayBuffer, caption: string): Promise<PhotosData> {
+  const key = process.env.PASSPORT_SYNC_KEY;
+  if (!key) throw new PassportError(503, UNAVAILABLE);
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl()}/api/passport-public/photos/item/${kind}/${id}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`, Accept: "application/json", "Content-Type": "application/octet-stream",
+        "X-Passport-Session": auth.token, "X-Passport-Member": String(auth.memberId),
+        ...(caption ? { "X-Photo-Caption": encodeURIComponent(caption) } : {}),
+      },
+      body: bytes,
+      cache: "no-store",
+      signal: AbortSignal.timeout(30_000),
+    });
+  } catch (e) {
+    console.error(`[passport] Bible photo upload failed: ${(e as Error).name}`);
+    throw new PassportError(503, UNAVAILABLE);
+  }
+  let data: unknown = null;
+  try { data = await res.json(); } catch { /* empty */ }
+  if (!res.ok) {
+    const error = data && typeof data === "object" && typeof (data as { error?: unknown }).error === "string" ? (data as { error: string }).error : "";
+    if (res.status === 401 && error === "signed_out") throw new PassportError(401, "Please sign in again.", true);
+    if (res.status === 401 || res.status >= 500) throw new PassportError(503, UNAVAILABLE);
+    throw new PassportError(res.status, error || "That photo could not be added. Please try again.");
+  }
+  return data as PhotosData;
+}

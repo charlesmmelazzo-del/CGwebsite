@@ -21,6 +21,8 @@ const YOURS = [
   { href: "/passport/favorites", title: "Favorites", line: "Cocktails and bottles you love, and your ratings" },
   { href: "/passport/notes", title: "Notes", line: "Your tasting notes" },
   { href: "/passport/history", title: "History", line: "What you've ordered, and how often" },
+  // File 11: the member's own photos of our cocktails and bottles.
+  { href: "/passport/photos", title: "My photos", line: "Your own photos, only for you and our team" },
 ];
 
 /**

@@ -27,7 +27,7 @@ export interface SignedIn { member: Member; session_token: string; expires_at: s
 /** Sign-up answers "check your email", or (a personal invitation sent to that same email) signs in at once. */
 export type SignUpResult = { ok: true; check_email: true } | (SignedIn & { signed_in: true })
 export interface CocktailCard { id: number; name: string; flavor: string; menu_name: string; menu_status: "current" | "past"; passport: "current" | "past" | null }
-export interface Cocktail extends CocktailCard { ingredients: string; tagline: string; notes: string; bottles?: DrinkBottle[]; home_recipe?: boolean }
+export interface Cocktail extends CocktailCard { ingredients: string; tagline: string; notes: string; bottles?: DrinkBottle[]; home_recipe?: boolean; photo?: string | null; photo_alt?: string }
 /**
  * "Bottles in this drink" (Nov 25, 2026): from the Bible's own recipe, names and categories only, in recipe order.
  * id is the bottle page; null for a recipe placeholder, which arrives as a plain spirit word ("Bourbon"). Absent when
@@ -37,7 +37,7 @@ export interface DrinkBottle { id: number | null; name: string; category: string
 export interface ArchivedBottle { id: number; name: string; category: string; producer: string; description: string; status_label: string | null }
 /** Toast menus as the Bible's approved list sends them (menu reader). */
 export interface MenuPrice { label: string | null; price: number }
-export interface MenuItem { name: string; description: string; prices: MenuPrice[]; cocktail_id: number | null; bottle_id: number | null; unavailable: boolean; card?: MenuCard }
+export interface MenuItem { name: string; description: string; prices: MenuPrice[]; cocktail_id: number | null; bottle_id: number | null; unavailable: boolean; card?: MenuCard; photo?: string | null }
 /**
  * The matched library cocktail's tagline, ingredients and flavor line, sent with the menu item (no call per cocktail).
  * Only when the Toast item has that cocktail's own name; a variant ("… - Free Spirited") has none and keeps its own
@@ -49,7 +49,7 @@ export interface ToastMenu { name: string; groups: MenuGroup[] }
 export interface MenuInfo { available: boolean; updated_at: string | null }
 export interface Fact { label: string; value: string }
 export interface BottleCocktail { id: number; name: string; menu_name: string; menu_status: "current" | "past" }
-export interface Bottle extends ArchivedBottle { producer_id: number | null; passport_description?: string; prices: MenuPrice[]; facts: Fact[]; cocktails: BottleCocktail[] }
+export interface Bottle extends ArchivedBottle { producer_id: number | null; passport_description?: string; prices: MenuPrice[]; facts: Fact[]; cocktails: BottleCocktail[]; photo?: string | null; photo_alt?: string }
 export interface ProducerBottle { id: number; name: string; category: string; status_label: string | null }
 /** passport_description: the approved Passport text (Part 6), or "" when there is none yet. */
 export interface Producer { id: number; name: string; based_in: string; passport_description?: string; bottles: ProducerBottle[] }
@@ -111,9 +111,9 @@ export interface BottleRequest {
 export interface BottleRequests { requests: BottleRequest[]; open_count: number; max_open: number }
 // ── File 06: the new shell (Index tab, search, the member's own upcoming reservations) ──────────────────────────
 /** A cocktail in the Index or in search. available: on a ticked Toast menu today. spirits: base-spirit keys (Index only). */
-export interface IndexCocktail extends CocktailCard { available: boolean; spirits?: string[] }
+export interface IndexCocktail extends CocktailCard { available: boolean; spirits?: string[]; photo?: string | null }
 /** A bottle a member may open. available: on the shown spirits list and not out. */
-export interface IndexBottle { id: number; name: string; category: string; status_label: string | null; available: boolean }
+export interface IndexBottle { id: number; name: string; category: string; status_label: string | null; available: boolean; photo?: string | null }
 /** A beer, wine or cider sold on the list (past or present). It has no page of its own. */
 export interface IndexDrink { name: string; kind: "Beer" | "Wine" | "Other"; description: string; status_label: string | null; available: boolean }
 export interface FoundProducer { id: number; name: string; based_in: string }
@@ -123,7 +123,20 @@ export interface FindResults { cocktails: IndexCocktail[]; bottles: IndexBottle[
 export interface Reservation { date: string; time: string; party_size: number; status: "requested" | "approved" | "guest_confirmed" }
 // ── File 07: From the bar (house lists, the two charts, Spirit of the Day, the Welcome Aperitif, messages, What's new) ──
 /** One cocktail or bottle on a house list or a chart. id is null (name only) when it can no longer be opened. */
-export interface HouseItem { kind: ItemKind; id: number | null; name: string; label: string | null; opens: boolean; note?: string; pour_oz?: number | null }
+export interface HouseItem { kind: ItemKind; id: number | null; name: string; label: string | null; opens: boolean; note?: string; pour_oz?: number | null; photo?: string | null }
+
+// ── File 11: photos. The bar's photo is an opaque code (`photo`) on items a member may open; the picture itself comes
+// only through /passport/photo/… for the signed-in member. A member's own photos reach only that member.
+export interface MemberPhoto {
+  id: string | null; caption: string; at: string; width?: number; height?: number
+  removed?: boolean; kind?: ItemKind; item_id?: number | null; item_name?: string; opens?: boolean
+}
+export interface PhotoLimits { per_item: number; left_here: number; left_today: number; left_total: number; caption_max: number }
+export interface PhotosData { photos: MemberPhoto[]; photo_limits: PhotoLimits }
+/** Where the bar's photo of an item is shown from (the code changes when the photo does, so a long browser cache is safe). */
+export const barPhotoSrc = (kind: ItemKind, id: number, photo: string, size: "thumb" | "full" = "thumb") => `/passport/photo/bar/${kind}/${id}/${size}?v=${encodeURIComponent(photo)}`;
+/** A member's own photo (only they get it; never cached anywhere shared). */
+export const myPhotoSrc = (token: string, size: "thumb" | "full" = "thumb") => `/passport/photo/mine/${encodeURIComponent(token)}/${size}`;
 /** A house list: playlist or ranked; a staff pick carries the team member's first name; a flight carries a price in whole dollars. */
 export interface HouseList {
   id: number; title: string; intro: string; kind: ItemKind; ranked: boolean; by: string | null; staff_pick: boolean; price: number | null; count: number;

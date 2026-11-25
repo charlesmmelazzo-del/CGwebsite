@@ -1,6 +1,6 @@
 // npm run test:passport — the Menu tab's description layout, its cocktail cards, the "a tap is never lost" save queue,
 // (file 05) what a bottle request may send to the Bible, and (file 06) the new shell: tabs, old addresses, search,
-// the available-now marker, the Inbox dot and reservations.
+// the available-now marker, the Inbox dot and reservations; (file 11) photos.
 
 import assert from "node:assert/strict";
 import { bareFlavor, descriptionParts, menuItemBody } from "../description";
@@ -632,6 +632,49 @@ function slowServer() {
       for (const page of ["house/[id]/page.tsx", "events/[id]/page.tsx", "votes/[id]/page.tsx", "brackets/[id]/page.tsx", "from-the-bar/[id]/page.tsx"]) {
         assert.ok(readFileSync(join(APP, "passport", "(app)", ...page.split("/")), "utf8").includes("<Comments type="), `${page} has the comments place`);
       }
+    });
+  }
+
+  {
+    console.log("\nPhotos (file 11)");
+    const T11 = await import("../types");
+    const { BarPhoto, Thumb } = await import("../../../components/passport/PhotoBits");
+    const comp11 = (f: string) => readFileSync(join(APP, "..", "components", "passport", f), "utf8");
+    await test("a photo is shown only from the member's own signed-in address, never a public one or the image optimizer", () => {
+      assert.equal(T11.barPhotoSrc("cocktail", 12, "abc123", "thumb"), "/passport/photo/bar/cocktail/12/thumb?v=abc123");
+      assert.equal(T11.myPhotoSrc("0123456789abcdef01234567", "full"), "/passport/photo/mine/0123456789abcdef01234567/full");
+      for (const f of ["PhotoBits.tsx", "Photos.tsx"]) assert.ok(!/next\/image|_next\/image|\/uploads\/|\/public\//.test(comp11(f)), f);
+    });
+    await test("the photo routes ask the Bible for the signed-in member only, and never let a shared cache keep a picture", () => {
+      const lib = readFileSync(join(__dirname, "..", "photoRoute.ts"), "utf8");
+      assert.ok(lib.includes("currentAuth()") && lib.includes('limited(req, "passport-photo-read")') && lib.includes('.startsWith("image/jpeg")'), "signed in, rate limited, only a JPEG the Bible made goes on");
+      const bar = readFileSync(join(APP, "passport", "(app)", "photo", "bar", "[kind]", "[id]", "[size]", "route.ts"), "utf8");
+      const mine = readFileSync(join(APP, "passport", "(app)", "photo", "mine", "[token]", "[size]", "route.ts"), "utf8");
+      assert.ok(bar.includes('"private, max-age=31536000, immutable"'), "the bar's photos: long cache, in the member's own browser only");
+      assert.ok(mine.includes('"private, no-store"') && mine.includes("/^[a-f0-9]{24}$/"), "a member's own photo: never stored by a cache; only a real photo code is passed on");
+      for (const src of [bar, mine, lib]) assert.ok(!/public,|s-maxage|member_id|memberId/.test(src), "never public, never a member number");
+    });
+    await test("adding and deleting photos: same site, rate limited, only the signed-in member's, over 15 MB refused before the Bible", () => {
+      const api = readFileSync(join(APP, "api", "passport", "photos", "route.ts"), "utf8");
+      assert.ok(api.includes("sameOrigin(req)") && api.includes('limited(req, "passport-photos")') && api.includes('memberRequest(req, "passport-photos"') && api.includes("15 * 1024 * 1024"));
+      assert.ok(!/member_id|memberId/.test(api), "never takes a member number");
+      assert.ok(LIMITS["passport-photos"].max > 0 && LIMITS["passport-photo-read"].max > 0);
+    });
+    await test("the privacy line shows where a member adds a photo; My photos is under Index → Yours", () => {
+      const photos = comp11("Photos.tsx");
+      assert.ok(photos.includes('"Only you and the Common Good team can see your photos."') && /MyItemPhotos[\s\S]*PHOTO_PRIVATE_LINE/.test(photos));
+      assert.ok(photos.includes("MAX_SIDE = 1600") && photos.includes("TARGET = 400 * 1024") && photos.includes('"image/jpeg"'), "shrunk on the device: 1600px, JPEG, under 400 KB");
+      assert.ok(photos.includes("Removed by Common Good"));
+      assert.ok(pageOf("/passport/photos"), "My photos page");
+      assert.equal(homeTabOf("/passport/photos"), "index");
+      assert.ok(readFileSync(join(APP, "..", "components", "passport", "tabs", "IndexTab.tsx"), "utf8").includes('href: "/passport/photos"'));
+      for (const page of ["library/[id]/page.tsx", "spirits/[id]/page.tsx"]) assert.ok(readFileSync(join(APP, "passport", "(app)", ...page.split("/")), "utf8").includes("<MyItemPhotos"), page);
+    });
+    await test("a page or card without a photo draws nothing for it (it looks finished, not missing something)", () => {
+      assert.equal(BarPhoto({ kind: "cocktail", id: 3, photo: null, name: "X" }), null);
+      assert.equal(Thumb({ kind: "bottle", id: 3, photo: undefined }), null);
+      assert.equal(Thumb({ kind: "bottle", id: null, photo: "abc" }), null);
+      assert.ok(BarPhoto({ kind: "cocktail", id: 3, photo: "abc", name: "X" }) !== null);
     });
   }
 
