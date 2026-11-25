@@ -137,3 +137,32 @@ export interface SpiritOfTheDay { id: number; name: string; category: string; di
 export interface WelcomeAperitif { name: string; description: string }
 export interface BarHome { messages: BarMessage[]; feed: FeedCard[]; spirit_of_the_day: SpiritOfTheDay | null; welcome_aperitif: WelcomeAperitif | null; newest_list: HouseList | null }
 export interface BarLists { house_lists: HouseList[]; charts: Chart[]; past_count: number }
+// ── File 08: the Inbox (messages with the bar, general requests, event inquiries). The member's own only. ─────────
+/** One message in a conversation. by: a staff member's first name on the bar's messages, else null. */
+export interface InboxPost { id: number; from: "member" | "bar"; by: string | null; body: string; at: string; kind: "message" | "question" | "answer" }
+/** "Ask about this": the cocktail, bottle or house list attached to a thread. id is null (name only) once it no longer opens. */
+export interface InboxRef { kind: "cocktail" | "bottle" | "list"; id: number | null; name: string; opens: boolean }
+export interface InboxThread {
+  id: number; subject: string; status: "open" | "answered" | "closed"; status_label: string; unread: boolean; ref: InboxRef | null;
+  last_at: string | null; last_from: "member" | "bar"; preview: string; count: number; posts?: InboxPost[];
+}
+export type RequestKind = "cocktail" | "celebration" | "access" | "other";
+export interface MemberRequest {
+  id: number; kind: RequestKind; kind_label: string; date: string | null; details: string;
+  status: "submitted" | "seen" | "in_progress" | "done" | "declined" | "cancelled"; status_label: string; decline_reason: string;
+  question: boolean; unread: boolean; posts: InboxPost[]; can_cancel: boolean; can_answer: boolean; created_at: string; updated_at: string;
+}
+export type EventKind = "private_party" | "tasting" | "buyout" | "other";
+export interface EventInquiry {
+  id: number; kind: EventKind; kind_label: string; preferred_date: string; backup_date: string | null; time_of_day: string; time_label: string;
+  guests: number; budget: string | null; budget_label: string | null; details: string;
+  status: "submitted" | "in_conversation" | "proposal_sent" | "confirmed" | "declined" | "cancelled"; status_label: string; decline_reason: string;
+  unread: boolean; posts: InboxPost[]; can_cancel: boolean; can_reply: boolean; created_at: string; updated_at: string;
+}
+export interface InboxLimits {
+  open_threads: number; max_open_threads: number; messages_today: number; max_messages_day: number;
+  open_requests: number; max_open_requests: number; open_inquiries: number; max_open_inquiries: number;
+}
+export interface InboxData { threads: InboxThread[]; member_requests: MemberRequest[]; inquiries: EventInquiry[]; limits: InboxLimits }
+/** Account → Notifications. news is the member's marketing choice. digest_hour: bar time, 6 to 22. */
+export interface NotifyPrefs { messages: boolean; requests: boolean; bottles: boolean; news: boolean; digest: boolean; digest_hour: number }

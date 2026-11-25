@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
-  getBarHome, getBarLists, getBottleRequests, getIndex, getLists, getMarksSafe, getMe, getMenus, getPassportCocktails, getReservations, getSpirits,
+  getBarHome, getBarLists, getBottleRequests, getInbox, getIndex, getLists, getMarksSafe, getMe, getMenus, getPassportCocktails, getReservations, getSpirits,
   type MemberAuth,
 } from "@/lib/passport/bible";
 import { memberRequest } from "@/lib/passport/route";
@@ -19,12 +19,13 @@ const VIEWS: Record<string, (auth: MemberAuth) => Promise<unknown>> = {
   // Home: their first name, the Passport exclusives, what needs them right now, and (file 07) From the bar: messages,
   // What's new, Spirit of the Day, the Welcome Aperitif and the newest house list. A section that can't load is left out.
   home: async (auth) => {
-    const [me, exclusives, bottles, reservations, bar] = await Promise.all([
+    const [me, exclusives, bottles, reservations, bar, inbox] = await Promise.all([
       getMe(auth),
       getPassportCocktails(auth).catch(() => []),
       getBottleRequests(auth).catch(() => null),
       getReservations(auth).catch(() => []),
       getBarHome(auth).catch(() => null),
+      getInbox(auth).catch(() => null),
     ]);
     return {
       // Only what Home shows of their own record.
@@ -38,6 +39,8 @@ const VIEWS: Record<string, (auth: MemberAuth) => Promise<unknown>> = {
       spirit_of_the_day: bar?.spirit_of_the_day ?? null,
       welcome_aperitif: bar?.welcome_aperitif ?? null,
       newest_list: bar?.newest_list ?? null,
+      // File 08: an unread reply from the bar, a question on a request, a reply about an event (for "Right now").
+      inbox: inbox ? { threads: inbox.threads.filter((t) => t.unread), member_requests: inbox.member_requests.filter((r) => r.question || r.unread), inquiries: inbox.inquiries.filter((q) => q.unread) } : null,
     };
   },
   // Menu: the Passport exclusives, the Toast menus an admin ticked, the spirits list, and the member's own hearts and stars.
@@ -55,10 +58,11 @@ const VIEWS: Record<string, (auth: MemberAuth) => Promise<unknown>> = {
     const [reservations, book] = await Promise.all([getReservations(auth), reserveEnabled().catch(() => false)]);
     return { reservations, book };
   },
-  // Inbox: My bottles (file 05).
+  // Inbox: My bottles (file 05) and (file 08) the member's conversations with the bar, requests and event inquiries.
+  // My bottles keeps its own shape at the top (requests, open_count, max_open); the rest arrives as `inbox`.
   inbox: async (auth) => {
-    const r = await getBottleRequests(auth);
-    return { ...r, requests: sortRequests(r.requests) };
+    const [r, inbox] = await Promise.all([getBottleRequests(auth), getInbox(auth).catch(() => null)]);
+    return { ...r, requests: sortRequests(r.requests), inbox };
   },
 };
 

@@ -9,7 +9,8 @@ import AddToList from "./AddToList";
 import { CHANGED_EVENT, appMoved, reducedMotion, type Changed } from "./appEvents";
 import { ShellContext, ViewStore, type AddTarget, type ShellApi, type ViewEntry, type ViewName } from "./shellContext";
 import { TABS, homeTabOf, inboxDot, tabOfPath, type TabId } from "@/lib/passport/shell";
-import type { BottleRequests, PassportList } from "@/lib/passport/types";
+import type { BottleRequests, InboxData, PassportList } from "@/lib/passport/types";
+import { needsYou } from "@/lib/passport/inbox";
 import HomeTab from "./tabs/HomeTab";
 import MenuTab from "./tabs/MenuTab";
 import IndexTab from "./tabs/IndexTab";
@@ -57,7 +58,10 @@ function Frame({ children }: { children: ReactNode }) {
   const [visited, setVisited] = useState<Set<TabId>>(() => new Set(pathTab ? [pathTab] : []));
   const [addTarget, setAddTarget] = useState<AddTarget | null>(null);
   const [toastMsg, setToastMsg] = useState<{ text: string; n: number } | null>(null);
-  const [dot, setDot] = useState(false);
+  // The Inbox dot: lit while a bottle needs the member (file 05) or a reply or question waits (file 08).
+  const [bottleDot, setDot] = useState(false);
+  const [messagesDot, setMessagesDot] = useState(false);
+  const dot = bottleDot || messagesDot;
   const listsCache = useRef<PassportList[] | null>(null);
   const views = useMemo(() => new ViewStore(() => window.location.assign("/passport?signed_out=1")), []);
 
@@ -82,8 +86,12 @@ function Frame({ children }: { children: ReactNode }) {
   // The Inbox dot needs My bottles from the start, whichever tab opened first.
   useEffect(() => { if (!views.loaded("inbox")) void views.load("inbox"); }, [views]);
   // (Read from the store directly: this component provides the context, so it can't read it.)
-  const inbox = useSyncExternalStore((fn) => views.subscribe("inbox", fn), () => views.get("inbox"), () => views.get("inbox")) as ViewEntry<BottleRequests>;
-  useEffect(() => { if (inbox.data) setDot(inboxDot(inbox.data.requests)); }, [inbox.data]);
+  const inbox = useSyncExternalStore((fn) => views.subscribe("inbox", fn), () => views.get("inbox"), () => views.get("inbox")) as ViewEntry<BottleRequests & { inbox?: InboxData | null }>;
+  useEffect(() => {
+    if (!inbox.data) return;
+    setDot(inboxDot(inbox.data.requests));
+    setMessagesDot(needsYou(inbox.data.inbox, []).length > 0);
+  }, [inbox.data]);
   // Something changed (a heart, a list, a bottle request): the tabs that show it refresh in the background.
   useEffect(() => {
     const on = (e: Event) => {
@@ -156,7 +164,7 @@ function Frame({ children }: { children: ReactNode }) {
     return () => clearTimeout(t);
   }, [toastMsg]);
   const closeAdd = useCallback(() => setAddTarget(null), []);
-  const api: ShellApi = useMemo(() => ({ views, tab, openAdd: setAddTarget, toast, setInboxDot: setDot }), [views, tab, toast]);
+  const api: ShellApi = useMemo(() => ({ views, tab, openAdd: setAddTarget, toast, setInboxDot: setDot, setMessagesDot }), [views, tab, toast]);
 
   /** A tab tap: show it at once (the address follows); tapping the tab already on screen goes back to its top. */
   const onTab = (e: React.MouseEvent, id: TabId) => {

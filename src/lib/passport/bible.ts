@@ -3,6 +3,7 @@ import { setDefaultResultOrder } from "node:dns";
 import {
   markKey, type MemberAuth, type Me, type Config, type CocktailCard, type Cocktail, type ArchivedBottle, type MenuGroup, type ToastMenu, type MenuInfo, type Bottle, type Producer, type BaseSpirit, type ItemKind, type FavoriteItem, type RatingItem, type NoteItem, type Mark, type Marks, type Mine, type PassportList, type Bespoke, type History, type BottleRequests,
   type IndexData, type FindResults, type Reservation, type BarHome, type BarLists, type HouseList, type Chart,
+  type InboxData, type InboxThread, type MemberRequest, type EventInquiry, type NotifyPrefs,
 } from "./types";
 
 // The shapes themselves live in ./types (no server-only code, so browser components can use them too).
@@ -157,3 +158,11 @@ export const getBarLists = (auth: MemberAuth) => passport<BarLists>("GET", "/bar
 export const getPastLists = (auth: MemberAuth) => passport<{ past_lists: HouseList[] }>("GET", "/bar/lists/past", { auth }).then((r) => r.past_lists);
 export const getHouseList = (auth: MemberAuth, id: number) => passport<{ house_list: HouseList }>("GET", `/bar/lists/${id}`, { auth }).then((r) => r.house_list);
 export const getChart = (auth: MemberAuth, key: string) => passport<{ chart: Chart }>("GET", `/bar/charts/${encodeURIComponent(key)}`, { auth }).then((r) => r.chart);
+
+// ── File 08: the Inbox. Only the signed-in member's own threads, requests and inquiries (the Bible looks each one up by
+// its number AND the member behind the session). Staff appear by first name only; nothing staff-only is ever sent. ──
+export const getInbox = (auth: MemberAuth) => passport<InboxData>("GET", "/inbox", { auth });
+export const getThread = (auth: MemberAuth, id: number) => passport<{ thread: InboxThread }>("GET", `/inbox/threads/${id}`, { auth }).then((r) => r.thread);
+export const getMemberRequest = (auth: MemberAuth, id: number) => passport<{ member_request: MemberRequest }>("GET", `/inbox/requests/${id}`, { auth }).then((r) => r.member_request);
+export const getInquiry = (auth: MemberAuth, id: number) => passport<{ inquiry: EventInquiry }>("GET", `/inbox/events/${id}`, { auth }).then((r) => r.inquiry);
+export const getNotifyPrefs = (auth: MemberAuth) => passport<{ notify_prefs: NotifyPrefs }>("GET", "/notifications", { auth }).then((r) => r.notify_prefs);

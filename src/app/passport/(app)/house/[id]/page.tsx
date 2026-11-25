@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Unavailable from "@/components/passport/Unavailable";
 import { HouseListPage } from "@/components/passport/HouseList";
+import { AskAboutThis } from "@/components/passport/Inbox";
 import { getHouseList } from "@/lib/passport/bible";
 import { memberData } from "@/lib/passport/member";
 
@@ -13,5 +14,11 @@ export default async function HouseListRoute({ params }: { params: { id: string 
   const r = await memberData((auth) => getHouseList(auth, id));
   if (r.notFound) notFound();
   if (!r.data) return <Unavailable />;
-  return <HouseListPage key={r.data.id} list={r.data} />;
+  return (
+    <>
+      <HouseListPage key={r.data.id} list={r.data} />
+      {/* File 08: a message to the bar with this list attached. */}
+      <AskAboutThis kind="list" id={r.data.id} name={r.data.title} />
+    </>
+  );
 }

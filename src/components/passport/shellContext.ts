@@ -66,6 +66,8 @@ export interface ShellApi {
   toast: (message: string) => void;
   /** Ask for the Inbox dot to be recomputed from this list (My bottles after an answer). */
   setInboxDot: (on: boolean) => void;
+  /** File 08: the same for messages, requests and event inquiries (an unread reply, a question waiting). */
+  setMessagesDot: (on: boolean) => void;
 }
 
 export const ShellContext = createContext<ShellApi | null>(null);

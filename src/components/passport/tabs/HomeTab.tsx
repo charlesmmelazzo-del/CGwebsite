@@ -10,6 +10,7 @@ import TabView from "./TabView";
 import { FromTheBar, HereButtons, NewestList, SharedWithYou, SpiritOfTheDay, WelcomeAperitif, WhatsNew } from "./Slots";
 import { dayLong, partyOf, reservationWord } from "@/lib/passport/shell";
 import { money } from "@/lib/passport/bottles";
+import type { InboxData } from "@/lib/passport/types";
 import type { BarMessage, BottleRequest, Cocktail, FeedCard, HouseList, Reservation, SpiritOfTheDay as Spirit, WelcomeAperitif as Aperitif } from "@/lib/passport/types";
 
 /** What the Home view sends (api/passport/view/home). */
@@ -17,6 +18,8 @@ export interface HomeView {
   first_name: string; needs_phone: boolean; exclusives: Cocktail[]; attention: BottleRequest[]; reservations: Reservation[];
   // File 07: From the bar.
   messages?: BarMessage[]; feed?: FeedCard[]; spirit_of_the_day?: Spirit | null; welcome_aperitif?: Aperitif | null; newest_list?: HouseList | null;
+  // File 08: what waits on the member in the Inbox (an unread reply, a question on a request, a reply about an event).
+  inbox?: Pick<InboxData, "threads" | "member_requests" | "inquiries"> | null;
 }
 
 function greeting() {
@@ -62,7 +65,10 @@ export default function HomeTab() {
         const ready = d.attention.filter((r) => r.status === "ready");
         const prices = d.attention.filter((r) => r.can_answer);
         const next = d.reservations[0];
-        const anyNow = ready.length + prices.length + (next ? 1 : 0) > 0;
+        const replies = d.inbox?.threads.filter((t) => t.unread) ?? [];
+        const questions = d.inbox?.member_requests.filter((r) => r.question || r.unread) ?? [];
+        const events = d.inbox?.inquiries.filter((q) => q.unread) ?? [];
+        const anyNow = ready.length + prices.length + (next ? 1 : 0) + replies.length + questions.length + events.length > 0;
         return (
           <div>
             {d.needs_phone && <PhonePrompt />}
@@ -76,6 +82,9 @@ export default function HomeTab() {
               <section aria-labelledby="pp-now" className="mt-8">
                 <h2 id="pp-now" className="font-body text-[11px] tracking-[0.3em] uppercase mb-3" style={{ color: C.brass }}>Right now</h2>
                 <ul className="space-y-3">
+                  {questions.map((r) => <NowCard key={`q${r.id}`} href={`/passport/inbox/requests/${r.id}`} kicker={r.question ? "A question about your request" : "A note about your request"} title={r.kind_label} line={r.question ? "Answer it in your Inbox." : r.status_label} />)}
+                  {replies.map((t) => <NowCard key={`t${t.id}`} href={`/passport/inbox/messages/${t.id}`} kicker="A reply from the bar" title={t.subject || (t.ref ? `About ${t.ref.name}` : "Your message")} line={t.preview} />)}
+                  {events.map((q) => <NowCard key={`e${q.id}`} href={`/passport/inbox/events/${q.id}`} kicker="About your event" title={`${q.kind_label} · ${dayLong(q.preferred_date)}`} line={q.status_label} />)}
                   {ready.map((r) => <NowCard key={`r${r.id}`} href="/passport/inbox" kicker="Ready for pickup" title={r.name} line={r.quantity > 1 ? `${r.quantity} bottles, set aside for you at the bar` : "Set aside for you at the bar"} />)}
                   {prices.map((r) => (
                     <NowCard key={`p${r.id}`} href="/passport/inbox" kicker="A price is waiting for you" title={r.name}
