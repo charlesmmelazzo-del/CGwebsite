@@ -10,6 +10,7 @@ import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, v
 import { CSS } from "@dnd-kit/utilities";
 import { C, Notice, inputCls, postJson } from "./ui";
 import { PRIVATE_LINE, itemHref } from "./personalShared";
+import { createSaveQueue } from "@/lib/passport/saveQueue";
 import type { Bespoke, BespokeLine, ItemKind, ListItem, Mine, PassportList, Pick } from "@/lib/passport/bible";
 
 /**
@@ -41,42 +42,46 @@ function longDate(d: string | null) {
 const smallBtn = "rounded-full border px-3 py-1.5 font-body text-[12px] tracking-[0.08em] transition-colors disabled:opacity-50";
 
 // ── A cocktail or bottle page: favorite, stars, note, and whether they've ordered it ──
+// No tap is ever lost (lib/passport/saveQueue.ts): each tap shows at once and the saves go to the server in order.
 export function ItemControls({ kind, id, initial }: { kind: ItemKind; id: number; initial: Mine }) {
-  const { run, error } = useAct();
+  const router = useRouter();
+  const [error, setError] = useState("");
   const [mine, setMine] = useState(initial);
-  const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState(initial.note);
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState(false);
-  const save = async (url: string, body: Record<string, unknown>, optimistic: Partial<Mine>) => {
-    const before = mine;
-    setMine({ ...mine, ...optimistic });
-    setBusy(true);
-    const out = await run<{ mine: Mine | null }>(url, body, "PUT");
-    setBusy(false);
-    if (!out) { setMine(before); return false; }
-    if (out.mine) setMine(out.mine);
-    return true;
+  const [queue] = useState(() => createSaveQueue<Mine>(initial, { view: setMine, error: setError, signedOut: () => router.refresh() }));
+  const save = (url: string, body: Record<string, unknown>, patch: Partial<Mine>, what: string) => {
+    setError("");
+    return queue.push({
+      patch, what,
+      send: async () => {
+        const r = await postJson<{ mine: Mine | null }>(url, body, "PUT");
+        if (r.ok) return { ok: true, state: r.data.mine };
+        return { ok: false, signedOut: !!r.data.signed_out, error: r.data.error };
+      },
+    });
   };
-  const toggleFav = () => save("/api/passport/favorite", { kind, id, on: !mine.favorite }, { favorite: !mine.favorite });
-  const rate = (n: number | null) => save("/api/passport/rating", { id, stars: n }, { rating: n });
+  // Each tap starts from what the screen shows now (including taps still waiting), never from a stale copy.
+  const toggleFav = () => { const on = !queue.current().favorite; return save("/api/passport/favorite", { kind, id, on }, { favorite: on }, "your favorite"); };
+  const rate = (n: number | null) => save("/api/passport/rating", { id, stars: n }, { rating: n }, "your rating");
   const saveNote = async (text: string) => {
-    if (await save("/api/passport/note", { kind, id, body: text }, { note: text.trim() })) { setEditing(false); setSaved(true); setTimeout(() => setSaved(false), 2500); }
+    if (await save("/api/passport/note", { kind, id, body: text }, { note: text.trim() }, "your note")) { setEditing(false); setSaved(true); setTimeout(() => setSaved(false), 2500); }
   };
   return (
     <section className="mt-8 rounded-xl border p-5 space-y-5" style={{ borderColor: C.line, background: C.card }} aria-label="Yours">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <button type="button" onClick={toggleFav} disabled={busy} aria-pressed={mine.favorite}
+        <button type="button" onClick={toggleFav} aria-pressed={mine.favorite}
           className={smallBtn} style={mine.favorite ? { borderColor: C.accent, color: C.accent } : { borderColor: C.line, color: C.text }}>
           <span aria-hidden>{mine.favorite ? "♥" : "♡"}</span> {mine.favorite ? "Favorite" : "Add to favorites"}
         </button>
         {kind === "cocktail" && (
           <div className="flex items-center gap-1" role="group" aria-label="Your rating">
             {[1, 2, 3, 4, 5].map((n) => (
-              <button key={n} type="button" disabled={busy} onClick={() => rate(mine.rating === n ? null : n)} aria-label={`${n} star${n === 1 ? "" : "s"}`} aria-pressed={mine.rating === n}
+              <button key={n} type="button" onClick={() => rate(mine.rating === n ? null : n)} aria-label={`${n} star${n === 1 ? "" : "s"}`} aria-pressed={mine.rating === n}
                 className="w-9 h-9 text-[22px] leading-none" style={{ color: mine.rating && n <= mine.rating ? C.brass : C.line }}>★</button>
             ))}
-            {mine.rating ? <button type="button" disabled={busy} onClick={() => rate(null)} className="font-body text-[11px] underline ml-1" style={{ color: C.faint }}>Clear</button> : null}
+            {mine.rating ? <button type="button" onClick={() => rate(null)} className="font-body text-[11px] underline ml-1" style={{ color: C.faint }}>Clear</button> : null}
           </div>
         )}
       </div>
@@ -95,7 +100,7 @@ export function ItemControls({ kind, id, initial }: { kind: ItemKind; id: number
               placeholder={kind === "cocktail" ? "What did you think? Ask for it differently next time?" : "Nose, palate, how you like it poured…"} aria-label="Your tasting note" />
             <p className="font-body text-xs" style={{ color: C.faint }}>{PRIVATE_LINE}</p>
             <div className="flex gap-2">
-              <button type="button" className={smallBtn} style={{ borderColor: C.brass, color: C.brass }} disabled={busy || !draft.trim() || draft.trim() === mine.note} onClick={() => saveNote(draft)}>Save note</button>
+              <button type="button" className={smallBtn} style={{ borderColor: C.brass, color: C.brass }} disabled={!draft.trim() || draft.trim() === mine.note} onClick={() => saveNote(draft)}>Save note</button>
               {editing && <button type="button" className={smallBtn} style={{ borderColor: C.line, color: C.muted }} onClick={() => { setDraft(mine.note); setEditing(false); }}>Cancel</button>}
             </div>
           </div>
@@ -105,7 +110,7 @@ export function ItemControls({ kind, id, initial }: { kind: ItemKind; id: number
             <p className="font-body text-xs mt-1" style={{ color: C.faint }}>{PRIVATE_LINE}</p>
             <div className="flex gap-3 mt-2 font-body text-xs">
               <button type="button" className="underline" style={{ color: C.muted }} onClick={() => { setDraft(mine.note); setEditing(true); }}>Edit</button>
-              <button type="button" className="underline" style={{ color: C.muted }} disabled={busy} onClick={() => { if (confirm("Delete this note?")) { setDraft(""); saveNote(""); } }}>Delete</button>
+              <button type="button" className="underline" style={{ color: C.muted }} onClick={() => { if (confirm("Delete this note?")) { setDraft(""); saveNote(""); } }}>Delete</button>
               {saved && <span style={{ color: C.faint }}>Saved.</span>}
             </div>
           </div>

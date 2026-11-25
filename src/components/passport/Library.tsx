@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { C } from "./theme";
+import { bareFlavor, descriptionParts } from "@/lib/passport/description";
 import { markKey, type ArchivedBottle, type Bottle, type Cocktail, type CocktailCard, type Mark, type Marks, type MenuGroup, type MenuItem, type MenuPrice, type Producer } from "@/lib/passport/bible";
 
 /** File 03a: the library pieces (server-rendered). Only fields from the Bible's approved list. */
@@ -75,7 +76,7 @@ export function CocktailFeature({ c, prices, mark }: { c: Cocktail; prices?: Men
       </div>
       {c.tagline && <p className="font-display italic text-[17px] mt-1" style={{ color: C.muted }}>{c.tagline}</p>}
       {c.ingredients && <p className="font-body text-sm mt-3 leading-relaxed" style={{ color: C.text }}>{c.ingredients}</p>}
-      {c.flavor && <p className="font-body text-[11px] tracking-[0.15em] uppercase mt-3" style={{ color: C.brass }}>{c.flavor}</p>}
+      {bareFlavor(c.flavor) && <p className="font-body text-[11px] tracking-[0.15em] uppercase mt-3" style={{ color: C.brass }}>{bareFlavor(c.flavor)}</p>}
     </Link>
   );
 }
@@ -154,7 +155,7 @@ export function BottlePage({ b }: { b: Bottle | ArchivedBottle }) {
       {r.prices && r.prices.length > 0 && <p className="mt-3"><Prices prices={r.prices} /></p>}
       <div className="w-14 h-px my-6" style={{ background: C.brass, opacity: 0.6 }} />
       {/* The Toast description leads; the approved Passport text (Part 6) follows. Either alone reads as complete. */}
-      {b.description && <p className="font-body text-[16px] leading-relaxed" style={{ color: C.text }}>{b.description}</p>}
+      {b.description && <Description text={b.description} large />}
       {r.passport_description && <LongText text={r.passport_description} className={b.description ? "mt-4" : ""} />}
       {r.facts && r.facts.length > 0 && (
         <dl className="mt-6 grid grid-cols-[auto,1fr] gap-x-6 gap-y-2">
@@ -241,25 +242,54 @@ function markOf(it: MenuItem, marks?: Marks): Mark | undefined {
   return it.cocktail_id ? marks[markKey("cocktail", it.cocktail_id)] : it.bottle_id ? marks[markKey("bottle", it.bottle_id)] : undefined;
 }
 
-function ItemBody({ it, mark }: { it: MenuItem; mark?: Mark }) {
+// ── Toast descriptions in the bar's house layout (parsed in lib/passport/description.ts) ──
+/** The small flavor line, as on a Passport cocktail's card. */
+function FlavorLine({ text, className = "" }: { text: string; className?: string }) {
+  return <p className={`font-body text-[11px] tracking-[0.15em] uppercase ${className}`} style={{ color: C.brass }}>{text}</p>;
+}
+
+/** A Toast description laid out by line (Menu tab and bottle pages). */
+export function Description({ text, large = false }: { text: string; large?: boolean }) {
+  const parts = descriptionParts(text);
+  if (!parts.length) return null;
+  return (
+    <div className={large ? "space-y-3" : "mt-1 space-y-1.5"}>
+      {parts.map((p, i) => p.kind === "flavor"
+        ? <FlavorLine key={i} text={p.text} className={large ? "" : "pt-0.5"} />
+        : <p key={i} className={`font-body leading-relaxed ${large ? "text-[16px]" : "text-sm"}`} style={{ color: large ? C.text : C.muted }}>{p.text}</p>)}
+    </div>
+  );
+}
+
+function ItemBody({ it, mark, c }: { it: MenuItem; mark?: Mark; c?: Cocktail }) {
+  // Matched to a library cocktail: its tagline, ingredients and flavor line, as on a Passport cocktail's card. The
+  // long notes paragraph stays on the cocktail's own page.
+  const structured = c && (c.tagline || c.ingredients || c.flavor) ? c : null;
   return (
     <>
       <div className="flex items-baseline justify-between gap-3">
         <span className="font-display text-[20px] leading-tight flex items-baseline gap-2" style={{ color: C.text }}>{it.name}<MarkBadge mark={mark} /></span>
         {it.prices.length > 0 && <Prices prices={it.prices} />}
       </div>
-      {it.description && <p className="font-body text-sm mt-1 leading-relaxed" style={{ color: C.muted }}>{it.description}</p>}
+      {structured ? (
+        <div className="mt-1 space-y-1.5">
+          {structured.tagline && <p className="font-display italic text-[16px] leading-snug" style={{ color: C.muted }}>{structured.tagline}</p>}
+          {structured.ingredients && <p className="font-body text-sm leading-relaxed" style={{ color: C.text }}>{structured.ingredients}</p>}
+          {bareFlavor(structured.flavor) && <FlavorLine text={bareFlavor(structured.flavor)} className="pt-0.5" />}
+        </div>
+      ) : it.description ? <Description text={it.description} /> : null}
     </>
   );
 }
 
 /** One menu item: opens its library cocktail when there is one. Cocktails are never marked unavailable. */
-export function MenuItemRow({ it, marks }: { it: MenuItem; marks?: Marks }) {
+export function MenuItemRow({ it, marks, cocktails }: { it: MenuItem; marks?: Marks; cocktails?: Map<number, Cocktail> }) {
   const href = it.cocktail_id ? `/passport/library/${it.cocktail_id}` : it.bottle_id ? `/passport/spirits/${it.bottle_id}` : null;
   const mark = markOf(it, marks);
+  const c = it.cocktail_id && cocktails ? cocktails.get(it.cocktail_id) : undefined;
   return (
     <li className="border-b" style={{ borderColor: C.line }}>
-      {href ? <Link href={href} className="block py-3"><ItemBody it={it} mark={mark} /></Link> : <div className="py-3"><ItemBody it={it} mark={mark} /></div>}
+      {href ? <Link href={href} className="block py-3"><ItemBody it={it} mark={mark} c={c} /></Link> : <div className="py-3"><ItemBody it={it} mark={mark} c={c} /></div>}
     </li>
   );
 }
@@ -278,11 +308,11 @@ function SpiritRow({ it, marks }: { it: MenuItem; marks?: Marks }) {
   return <li className="border-b" style={{ borderColor: C.line }}>{it.bottle_id ? <Link href={`/passport/spirits/${it.bottle_id}`} className="block">{body}</Link> : body}</li>;
 }
 
-export function MenuGroupBlock({ g, spirits = false, marks }: { g: MenuGroup; spirits?: boolean; marks?: Marks }) {
+export function MenuGroupBlock({ g, spirits = false, marks, cocktails }: { g: MenuGroup; spirits?: boolean; marks?: Marks; cocktails?: Map<number, Cocktail> }) {
   return (
     <section className="mt-6">
       <h3 className="font-body text-[12px] tracking-[0.2em] uppercase" style={{ color: C.muted }}>{g.name}</h3>
-      <ul className="mt-1">{g.items.map((it, i) => (spirits ? <SpiritRow key={i} it={it} marks={marks} /> : <MenuItemRow key={i} it={it} marks={marks} />))}</ul>
+      <ul className="mt-1">{g.items.map((it, i) => (spirits ? <SpiritRow key={i} it={it} marks={marks} /> : <MenuItemRow key={i} it={it} marks={marks} cocktails={cocktails} />))}</ul>
     </section>
   );
 }
