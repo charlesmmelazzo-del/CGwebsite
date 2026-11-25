@@ -341,11 +341,88 @@ function slowServer() {
     const slots = readFileSync(join(__dirname, "..", "..", "..", "components", "passport", "tabs", "Slots.tsx"), "utf8");
     assert.ok(/function FromTheBar[\s\S]*?if \(!messages\?\.length\) return null;/.test(slots));
     assert.ok(/function WhatsNew[\s\S]*?if \(!cards\?\.length\) return null;/.test(slots));
-    for (const f of ["SpiritOfTheDay", "SharedWithYou", "HereButtons", "HouseLists"]) assert.ok(new RegExp(`function ${f}\\(\\) \\{ return null; \\}`).test(slots), f);
+    // File 07 fills Spirit of the Day and the Index's house lists: each still draws nothing until it has something.
+    assert.ok(/function SpiritOfTheDay[\s\S]*?if \(!spirit\) return null;/.test(slots), "SpiritOfTheDay");
+    assert.ok(/function HouseLists[\s\S]*?if \(!lists\?\.length && !charts\?\.length && !pastCount\) return null;/.test(slots), "HouseLists");
+    for (const f of ["SharedWithYou", "HereButtons"]) assert.ok(new RegExp(`function ${f}\\(\\) \\{ return null; \\}`).test(slots), f);
     const all = ["AppShell.tsx", "tabs/HomeTab.tsx", "tabs/MenuTab.tsx", "tabs/IndexTab.tsx", "tabs/EventsTab.tsx", "tabs/InboxTab.tsx", "tabs/Slots.tsx"]
       .map((f) => readFileSync(join(__dirname, "..", "..", "..", "components", "passport", f), "utf8")).join("\n");
     assert.ok(!/coming soon/i.test(all), "no 'coming soon' anywhere in the new shell");
   });
+
+  console.log("File 07: From the bar (Home sections, the Index's house lists, list pages)");
+  {
+    const React = await import("react");
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    // The components are compiled here without Next's JSX setup, so React must be in scope for them.
+    (globalThis as { React?: unknown }).React = React;
+    const S = await import("../../../components/passport/tabs/Slots");
+    const B = await import("../bar");
+    const html = (el: unknown) => renderToStaticMarkup(el as never);
+    const msg = { id: 7, title: "A new list", body: "Five for winter.", link_kind: "list" as const, link_id: 12, link_label: "Top 5 for winter", posted_at: "2026-11-25" };
+    const card = { key: "list:12", kind: "list", title: "Top 5 for winter", link_kind: "list", link_id: 12, at: "2026-11-25" };
+    const list = { id: 12, title: "Rye flight", intro: "Three pours.", kind: "bottle" as const, ranked: false, by: "Sam", staff_pick: true, price: 28, count: 3, past: false };
+    await test("every new Home section draws nothing when empty (no empty boxes)", () => {
+      for (const [name, el] of [
+        ["From the bar", React.createElement(S.FromTheBar, { messages: [] })], ["From the bar (none sent)", React.createElement(S.FromTheBar, {})],
+        ["What's new", React.createElement(S.WhatsNew, { cards: [] })], ["Spirit of the Day", React.createElement(S.SpiritOfTheDay, { spirit: null })],
+        ["Welcome Aperitif", React.createElement(S.WelcomeAperitif, { aperitif: null })], ["Welcome Aperitif (blank name)", React.createElement(S.WelcomeAperitif, { aperitif: { name: "", description: "x" } })],
+        ["Newest list", React.createElement(S.NewestList, { list: null })], ["From Common Good", React.createElement(S.HouseLists, { lists: [], charts: [], pastCount: 0 })],
+      ] as const) assert.equal(html(el), "", name);
+    });
+    await test("… and shows when filled", () => {
+      const m = html(React.createElement(S.FromTheBar, { messages: [msg] }));
+      assert.ok(m.includes("From the bar") && m.includes("Five for winter.") && m.includes('href="/passport/house/12"') && m.includes("Dismiss A new list"), m);
+      const w = html(React.createElement(S.WhatsNew, { cards: [card] }));
+      assert.ok(w.includes("What&#x27;s new") || w.includes("What’s new"), w);
+      assert.ok(w.includes("A new list") && w.includes('href="/passport/house/12"') && w.includes("Dismiss Top 5 for winter"), w);
+      const sp = html(React.createElement(S.SpiritOfTheDay, { spirit: { id: 4, name: "Rittenhouse Rye", category: "Rye", discount_pct: 10 } }));
+      assert.ok(sp.includes("Spirit of the Day") && sp.includes('href="/passport/spirits/4"') && sp.includes("10% off for members today"), sp);
+      const sp0 = html(React.createElement(S.SpiritOfTheDay, { spirit: { id: 4, name: "Rittenhouse Rye", category: "Rye", discount_pct: null } }));
+      assert.ok(sp0.includes("Rittenhouse Rye") && !sp0.includes("% off"), "at 0% there is no discount line");
+      const ap = html(React.createElement(S.WelcomeAperitif, { aperitif: { name: "Amaro spritz", description: "On us." } }));
+      assert.ok(ap.includes("Welcome Aperitif") && ap.includes("Amaro spritz") && ap.includes("On us."), ap);
+      const nl = html(React.createElement(S.NewestList, { list }));
+      assert.ok(nl.includes("Rye flight") && nl.includes("Staff pick · by Sam") && nl.includes("Flight · $28"), nl);
+      const hl = html(React.createElement(S.HouseLists, { lists: [list], charts: [{ key: "top", title: "Top of the Charts", season_name: "Winter 2026", items: [] }], pastCount: 2 }));
+      assert.ok(hl.includes("From Common Good") && hl.includes('href="/passport/house/charts/top"') && hl.includes("Past lists from Common Good") && hl.includes('href="/passport/house/past"'), hl);
+    });
+    await test("links from the bar only ever open pages inside Passport", () => {
+      assert.equal(B.messageHref({ link_kind: "list", link_id: 3 }), "/passport/house/3");
+      assert.equal(B.messageHref({ link_kind: "cocktail", link_id: 3 }), "/passport/library/3");
+      assert.equal(B.messageHref({ link_kind: "bottle", link_id: 3 }), "/passport/spirits/3");
+      assert.equal(B.messageHref({ link_kind: "events", link_id: null }), "/passport/events");
+      assert.equal(B.messageHref({ link_kind: null, link_id: null }), null);
+      assert.equal(B.messageHref({ link_kind: "https://evil.example" as never, link_id: 3 }), null);
+      assert.equal(B.feedHref({ link_kind: "chart", link_id: "critics" }), "/passport/house/charts/critics");
+      assert.equal(B.feedHref({ link_kind: "chart", link_id: "javascript:alert(1)" }), "/passport");
+      assert.equal(B.feedHref({ link_kind: "bracket", link_id: 9 }), "/passport", "a later file's kind never makes a dead link");
+      assert.equal(B.feedKicker("season"), "New menu");
+    });
+    await test("prices and pours read as the bar wrote them: whole dollars, plus tax", () => {
+      assert.equal(B.flightLine(28), "Flight · $28");
+      assert.equal(B.flightLine(null), null);
+      assert.equal(B.TAX_LINE, "plus tax");
+      assert.equal(B.pourLabel(0.75), "0.75 oz");
+      assert.equal(B.discountLine(0), null);
+      assert.equal(B.listKicker({ chart: "top", season_name: "Fall 2026", staff_pick: false, by: null, ranked: true, past: true }), "Final chart · Fall 2026");
+    });
+    await test("dismiss only ever sends a message number or a card key the Bible made", () => {
+      assert.deepEqual(B.dismissBody("message", 7), { what: "message", key: 7 });
+      assert.deepEqual(B.dismissBody("feed", "chart:3:top"), { what: "feed", key: "chart:3:top" });
+      for (const [w, k] of [["message", "x"], ["message", -1], ["feed", "<script>"], ["feed", ""], ["other", 1]] as const) assert.equal(B.dismissBody(w, k), null, `${w} ${k}`);
+    });
+    await test("Home and the Index get From the bar through the one tab call; saving and dismissing are members only and rate limited", () => {
+      const view = readFileSync(join(APP, "api", "passport", "view", "[view]", "route.ts"), "utf8");
+      assert.ok(view.includes("getBarHome(auth)") && view.includes("getBarLists(auth)"));
+      for (const f of [join(APP, "api", "passport", "dismiss", "route.ts"), join(APP, "api", "passport", "house", "save", "route.ts")]) {
+        const src = readFileSync(f, "utf8");
+        assert.ok(src.includes('memberRequest(req, "passport-personal"') && !/member_id|memberId/.test(src), f);
+      }
+      const page = readFileSync(join(__dirname, "..", "..", "..", "components", "passport", "HouseList.tsx"), "utf8");
+      assert.ok(page.includes("Save a copy to my lists") && page.includes("<ItemRow") && page.includes("function ListComments() { return null; }"), "the list page: save a copy, + on every item, and the place for comments");
+    });
+  }
 
   console.log(`\n${passed} passed, ${failed} failed`);
   if (failed) process.exit(1);

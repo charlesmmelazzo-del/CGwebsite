@@ -2,7 +2,7 @@ import "server-only";
 import { setDefaultResultOrder } from "node:dns";
 import {
   markKey, type MemberAuth, type Me, type Config, type CocktailCard, type Cocktail, type ArchivedBottle, type MenuGroup, type ToastMenu, type MenuInfo, type Bottle, type Producer, type BaseSpirit, type ItemKind, type FavoriteItem, type RatingItem, type NoteItem, type Mark, type Marks, type Mine, type PassportList, type Bespoke, type History, type BottleRequests,
-  type IndexData, type FindResults, type Reservation,
+  type IndexData, type FindResults, type Reservation, type BarHome, type BarLists, type HouseList, type Chart,
 } from "./types";
 
 // The shapes themselves live in ./types (no server-only code, so browser components can use them too).
@@ -148,3 +148,12 @@ export const getIndex = (auth: MemberAuth) => passport<IndexData>("GET", "/index
 export const findAll = (auth: MemberAuth, q: string) => passport<FindResults>("GET", `/find?${new URLSearchParams({ q: q.slice(0, 100) }).toString()}`, { auth });
 /** The member's own upcoming reservations (Guest Book link by confirmed email). */
 export const getReservations = (auth: MemberAuth) => passport<{ reservations: Reservation[] }>("GET", "/reservations", { auth }).then((r) => r.reservations);
+
+// ── File 07: From the bar. Only what the signed-in member may see (the Bible decides audience and status). ──────────
+/** Home's From the bar, What's new, Spirit of the Day, Welcome Aperitif and the newest house list, in one call. */
+export const getBarHome = (auth: MemberAuth) => passport<BarHome>("GET", "/bar/home", { auth });
+/** The Index's "From Common Good": live house lists, the charts showing now, and how many past lists there are. */
+export const getBarLists = (auth: MemberAuth) => passport<BarLists>("GET", "/bar/lists", { auth });
+export const getPastLists = (auth: MemberAuth) => passport<{ past_lists: HouseList[] }>("GET", "/bar/lists/past", { auth }).then((r) => r.past_lists);
+export const getHouseList = (auth: MemberAuth, id: number) => passport<{ house_list: HouseList }>("GET", `/bar/lists/${id}`, { auth }).then((r) => r.house_list);
+export const getChart = (auth: MemberAuth, key: string) => passport<{ chart: Chart }>("GET", `/bar/charts/${encodeURIComponent(key)}`, { auth }).then((r) => r.chart);

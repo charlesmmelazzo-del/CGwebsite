@@ -121,3 +121,19 @@ export interface IndexData { cocktails: IndexCocktail[]; bottles: IndexBottle[];
 export interface FindResults { cocktails: IndexCocktail[]; bottles: IndexBottle[]; producers: FoundProducer[] }
 /** One of the member's own upcoming reservations: date (YYYY-MM-DD), start time as the bar shows it, party size, status. */
 export interface Reservation { date: string; time: string; party_size: number; status: "requested" | "approved" | "guest_confirmed" }
+// ── File 07: From the bar (house lists, the two charts, Spirit of the Day, the Welcome Aperitif, messages, What's new) ──
+/** One cocktail or bottle on a house list or a chart. id is null (name only) when it can no longer be opened. */
+export interface HouseItem { kind: ItemKind; id: number | null; name: string; label: string | null; opens: boolean; note?: string; pour_oz?: number | null }
+/** A house list: playlist or ranked; a staff pick carries the team member's first name; a flight carries a price in whole dollars. */
+export interface HouseList {
+  id: number; title: string; intro: string; kind: ItemKind; ranked: boolean; by: string | null; staff_pick: boolean; price: number | null; count: number;
+  past: boolean; ended_on?: string | null; chart?: "top" | "critics" | null; season_name?: string | null; items?: HouseItem[];
+}
+/** Top of the Charts or Critics' Choice: five cocktails in order. Never a number but the cocktails' own page numbers. */
+export interface Chart { key: "top" | "critics"; title: string; season_name: string; items: HouseItem[] }
+export interface BarMessage { id: number; title: string; body: string; link_kind: "list" | "cocktail" | "bottle" | "events" | null; link_id: number | null; link_label: string | null; posted_at: string | null }
+export interface FeedCard { key: string; kind: string; title: string; link_kind: "list" | "chart" | "menu" | string; link_id: number | string | null; at: string }
+export interface SpiritOfTheDay { id: number; name: string; category: string; discount_pct: number | null }
+export interface WelcomeAperitif { name: string; description: string }
+export interface BarHome { messages: BarMessage[]; feed: FeedCard[]; spirit_of_the_day: SpiritOfTheDay | null; welcome_aperitif: WelcomeAperitif | null; newest_list: HouseList | null }
+export interface BarLists { house_lists: HouseList[]; charts: Chart[]; past_count: number }

@@ -7,13 +7,17 @@ import { CocktailFeature } from "../Library";
 import InstallHint from "../InstallHint";
 import PhonePrompt from "../PhonePrompt";
 import TabView from "./TabView";
-import { FromTheBar, HereButtons, SharedWithYou, SpiritOfTheDay, WhatsNew } from "./Slots";
+import { FromTheBar, HereButtons, NewestList, SharedWithYou, SpiritOfTheDay, WelcomeAperitif, WhatsNew } from "./Slots";
 import { dayLong, partyOf, reservationWord } from "@/lib/passport/shell";
 import { money } from "@/lib/passport/bottles";
-import type { BottleRequest, Cocktail, Reservation } from "@/lib/passport/types";
+import type { BarMessage, BottleRequest, Cocktail, FeedCard, HouseList, Reservation, SpiritOfTheDay as Spirit, WelcomeAperitif as Aperitif } from "@/lib/passport/types";
 
 /** What the Home view sends (api/passport/view/home). */
-export interface HomeView { first_name: string; needs_phone: boolean; exclusives: Cocktail[]; attention: BottleRequest[]; reservations: Reservation[] }
+export interface HomeView {
+  first_name: string; needs_phone: boolean; exclusives: Cocktail[]; attention: BottleRequest[]; reservations: Reservation[];
+  // File 07: From the bar.
+  messages?: BarMessage[]; feed?: FeedCard[]; spirit_of_the_day?: Spirit | null; welcome_aperitif?: Aperitif | null; newest_list?: HouseList | null;
+}
 
 function greeting() {
   const h = new Date().getHours();
@@ -47,8 +51,9 @@ function NowCard({ href, kicker, title, line }: { href: string; kicker: string; 
 }
 
 /**
- * File 06: Home (the CG button). Top to bottom, each section only when it has something in it: the welcome, From the
- * bar, Right now, What's new, Passport exclusives, then the places kept for Spirit of the Day and Shared with you.
+ * File 06: Home (the CG button). Top to bottom, each section only when it has something in it: the welcome, (file 07) the
+ * Welcome Aperitif, From the bar, Right now, What's new, the newest house list, Passport exclusives, Spirit of the Day,
+ * then the place kept for Shared with you.
  */
 export default function HomeTab() {
   return (
@@ -64,8 +69,9 @@ export default function HomeTab() {
             <InstallHint />
             <p className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }} suppressHydrationWarning>{greeting()}</p>
             <h1 className="font-display text-[30px] leading-tight mt-1" style={{ color: C.text }}>Welcome, {d.first_name}</h1>
+            <WelcomeAperitif aperitif={d.welcome_aperitif} />
             <HereButtons />
-            <FromTheBar />
+            <FromTheBar messages={d.messages} />
             {anyNow && (
               <section aria-labelledby="pp-now" className="mt-8">
                 <h2 id="pp-now" className="font-body text-[11px] tracking-[0.3em] uppercase mb-3" style={{ color: C.brass }}>Right now</h2>
@@ -79,14 +85,15 @@ export default function HomeTab() {
                 </ul>
               </section>
             )}
-            <WhatsNew />
+            <WhatsNew cards={d.feed} />
+            <NewestList list={d.newest_list} />
             {d.exclusives.length > 0 && (
               <section aria-labelledby="pp-exclusives" className="mt-10">
                 <h2 id="pp-exclusives" className="font-body text-[11px] tracking-[0.3em] uppercase mb-3" style={{ color: C.brass }}>Passport exclusives · members only</h2>
                 <div className="space-y-4">{d.exclusives.map((c) => <CocktailFeature key={c.id} c={c} />)}</div>
               </section>
             )}
-            <SpiritOfTheDay />
+            <SpiritOfTheDay spirit={d.spirit_of_the_day} />
             <SharedWithYou />
           </div>
         );
