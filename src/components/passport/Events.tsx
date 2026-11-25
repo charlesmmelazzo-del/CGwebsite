@@ -66,7 +66,7 @@ export function EventPage({ initial }: { initial: PassportEvent }) {
     if (!r.ok) { setError(r.data.error || "Couldn't save that. Please try again."); return; }
     setE(r.data.event);
     const x = r.data.event.answered;
-    const msg = x === "going" ? "You're going. See you there." : x === "waitlist" ? "It's full, so you're on the waitlist. Your place isn't guaranteed; if one opens, we'll hold it for you for 24 hours." : "Thanks for letting us know.";
+    const msg = x === "going" ? "You're going. See you there." : x === "waitlist" ? "" : "Thanks for letting us know.";
     setSaid(msg);
     shell?.toast(x === "going" ? "You're going." : x === "waitlist" ? "You're on the waitlist." : "Saved.");
     notifyChanged("inbox");
@@ -118,14 +118,16 @@ export function EventPage({ initial }: { initial: PassportEvent }) {
             </label>
           )}
           <div className="flex flex-wrap gap-2 mt-4">
-            <button type="button" disabled={busy} onClick={() => answer("going")} className={smallBtn} aria-pressed={r?.status === "going"}
+            <button type="button" disabled={busy || (r?.status === "waitlist" && guests === r.guests)} onClick={() => answer("going")} className={smallBtn} aria-pressed={r?.status === "going" || r?.status === "waitlist"}
               style={{ borderColor: C.brass, background: r?.status === "going" ? C.brass : "transparent", color: r?.status === "going" ? C.bg : C.brass }}>
-              {r?.status === "going" ? (guests !== r.guests ? "Update guests" : "Going") : e.status === "full" && r?.status !== "offered" ? "Join the waitlist" : "Going"}
+              {r?.status === "going" || r?.status === "waitlist"
+                ? (guests !== r.guests ? "Update guests" : r.status === "going" ? "Going" : "On the waitlist")
+                : e.status === "full" && r?.status !== "offered" ? "Join the waitlist" : "Going"}
             </button>
             <button type="button" disabled={busy} onClick={() => answer("cant")} className={smallBtn} aria-pressed={r?.status === "cant"}
               style={{ borderColor: C.line, background: r?.status === "cant" ? C.line : "transparent", color: C.text }}>Can&rsquo;t make it</button>
           </div>
-          {said && <div className="mt-3"><Notice kind="ok">{said}</Notice></div>}
+          {said && r?.status !== "waitlist" && <div className="mt-3"><Notice kind="ok">{said}</Notice></div>}
           {error && <div className="mt-3"><Notice>{error}</Notice></div>}
         </section>
       )}

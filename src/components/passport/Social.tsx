@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { C, Check, Notice, inputCls, postJson } from "./ui";
 import { BackLink } from "./bits";
 import { notifyChanged } from "./appEvents";
@@ -48,14 +49,20 @@ function Pill({ on, children, onClick, disabled }: { on: boolean; children: Reac
       style={{ borderColor: on ? C.brass : C.line, color: on ? C.bg : C.text, background: on ? C.brass : "transparent" }}>{children}</button>
   );
 }
-/** A sheet that slides up over the app (phones) or sits in the middle (wide screens). */
+/**
+ * A sheet that slides up over the app (phones) or sits in the middle (wide screens). Drawn at the top of the page (a
+ * portal), so it sits above the tab bar even when it opens from a page that slides over a tab.
+ */
 function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  const [host, setHost] = useState<HTMLElement | null>(null);
+  useEffect(() => { setHost(document.body); }, []);
   useEffect(() => {
     const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", k);
     return () => window.removeEventListener("keydown", k);
   }, [onClose]);
-  return (
+  if (!host) return null;
+  return createPortal(
     <div className="fixed inset-0 z-[70] flex items-end md:items-center justify-center" role="dialog" aria-modal="true" aria-label={title}>
       <button type="button" aria-label="Close" className="absolute inset-0 bg-black/60" onClick={onClose} />
       <div className="relative w-full max-w-md max-h-[85dvh] overflow-y-auto rounded-t-2xl md:rounded-2xl border p-5 pb-[calc(env(safe-area-inset-bottom)+20px)]" style={{ background: C.bg, borderColor: C.line }}>
@@ -67,7 +74,8 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
         </div>
         <div className="mt-3">{children}</div>
       </div>
-    </div>
+    </div>,
+    host,
   );
 }
 
