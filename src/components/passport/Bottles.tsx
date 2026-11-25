@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { C, Notice, inputCls, postJson } from "./ui";
 import { MAX_QTY, MIN_QTY, NAME_MAX, NOTE_MAX, NO_PRICE_LINE, longDay, money, sortRequests } from "@/lib/passport/bottles";
-import type { BottleRequest, BottleRequests } from "@/lib/passport/bible";
+import type { BottleRequest, BottleRequests } from "@/lib/passport/types";
+import { notifyChanged } from "./appEvents";
+import { useShell } from "./shellContext";
+import { inboxDot } from "@/lib/passport/shell";
 
 /**
  * File 05: bottle requests, the member's side. Everything goes through /api/passport/bottles, which only ever acts for
@@ -64,7 +67,7 @@ export function RequestBottle({ bottleId, name }: { bottleId: number; name: stri
     return (
       <section className="mt-8 rounded-xl border p-5" style={{ borderColor: `${C.brass}66`, background: C.card }}>
         <p className="font-display text-xl" style={{ color: C.text }}>We have your request.</p>
-        <p className="font-body text-sm mt-2 leading-relaxed" style={{ color: C.muted }}>{NO_PRICE_LINE} You can follow it in <Link href="/passport/bottles" className="underline" style={{ color: C.text }}>My bottles</Link>.</p>
+        <p className="font-body text-sm mt-2 leading-relaxed" style={{ color: C.muted }}>{NO_PRICE_LINE} You can follow it in <Link href="/passport/inbox" scroll={false} className="underline" style={{ color: C.text }}>your Inbox, under My bottles</Link>.</p>
       </section>
     );
   }
@@ -76,7 +79,7 @@ export function RequestBottle({ bottleId, name }: { bottleId: number; name: stri
         <form className="space-y-4" onSubmit={async (e) => {
           e.preventDefault();
           const out = await send<{ request: BottleRequest }>("/api/passport/bottles", { bottle_id: bottleId, quantity: qty, note });
-          if (out) setDone(true);
+          if (out) { setDone(true); notifyChanged("inbox"); }
         }}>
           <p className="font-display text-xl" style={{ color: C.text }}>A bottle of {name} for home</p>
           <QuantityPicker value={qty} onChange={setQty} />
@@ -111,7 +114,7 @@ function RequestCard({ r, onChange }: { r: BottleRequest; onChange: (r: BottleRe
     <li className="rounded-xl border p-5" style={{ borderColor: r.status === "ready" ? `${C.brass}99` : C.line, background: C.card, opacity: closed ? 0.75 : 1 }}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          {r.bottle_id ? <Link href={`/passport/spirits/${r.bottle_id}`}>{title}</Link> : title}
+          {r.bottle_id ? <Link href={`/passport/spirits/${r.bottle_id}`} scroll={false}>{title}</Link> : title}
           <p className="font-body text-xs mt-1" style={{ color: C.faint }}>{r.quantity} {r.quantity === 1 ? "bottle" : "bottles"}{r.kind === "other" ? " · something we don't carry" : ""}</p>
         </div>
         <Label brass={r.status === "ready" || r.can_answer}>{r.status_label}</Label>
@@ -208,9 +211,17 @@ function SomethingElse({ disabled, onAdded }: { disabled: boolean; onAdded: (r: 
 
 export function MyBottles({ initial }: { initial: BottleRequests }) {
   const [list, setList] = useState(initial.requests);
+  // File 06: the Inbox dot follows the member's answers at once (a price answered, a pickup no longer waiting).
+  const shell = useShell();
+  useEffect(() => { shell?.setInboxDot(inboxDot(list)); }, [list, shell]);
+  // A fresh copy from the Bible (a request made on a bottle page, or the app reopened) replaces the one on screen.
+  useEffect(() => { setList(initial.requests); }, [initial]);
   const open = list.filter((r) => ["submitted", "quoted", "accepted", "ordered", "ready"].includes(r.status)).length;
   const full = open >= initial.max_open;
-  const replace = (r: BottleRequest) => setList((cur) => sortRequests(cur.some((x) => x.id === r.id) ? cur.map((x) => (x.id === r.id ? r : x)) : [r, ...cur]));
+  const replace = (r: BottleRequest) => {
+    setList((cur) => sortRequests(cur.some((x) => x.id === r.id) ? cur.map((x) => (x.id === r.id ? r : x)) : [r, ...cur]));
+    notifyChanged("inbox");
+  };
   return (
     <div>
       <p className="font-body text-[15px] leading-relaxed" style={{ color: C.muted }}>

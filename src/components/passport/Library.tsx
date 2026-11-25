@@ -2,9 +2,14 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { C } from "./theme";
 import { bareFlavor, descriptionParts, menuItemBody } from "@/lib/passport/description";
-import { markKey, type ArchivedBottle, type Bottle, type Cocktail, type CocktailCard, type Mark, type Marks, type MenuGroup, type MenuItem, type MenuPrice, type Producer } from "@/lib/passport/bible";
+import { markKey, type ArchivedBottle, type Bottle, type Cocktail, type CocktailCard, type Mark, type Marks, type MenuGroup, type MenuItem, type MenuPrice, type Producer } from "@/lib/passport/types";
+import { AddButton, Avail, BackLink, ItemRow, PressLink } from "./bits";
 
-/** File 03a: the library pieces (server-rendered). Only fields from the Bible's approved list. */
+/**
+ * File 03a: the library pieces. Only fields from the Bible's approved list. File 06: shared by the server-rendered pages
+ * and the tabs in the browser, so nothing here may import server-only code; each card has "+ add to list" (and
+ * long-press), and pages over a tab go "Back".
+ */
 
 export function PageTitle({ kicker, title, children }: { kicker: string; title: string; children?: ReactNode }) {
   return (
@@ -49,27 +54,45 @@ function menuLine(c: CocktailCard) {
   return c.menu_status === "past" ? `Past menu · ${c.menu_name}` : c.menu_name;
 }
 
-export function CocktailRow({ c, mark }: { c: CocktailCard; mark?: Mark }) {
+/** A cocktail in a list. File 06: the available-now marker when the list knows it, "+", and long-press. */
+export function CocktailRow({ c, mark, lazy = false }: { c: CocktailCard & { available?: boolean }; mark?: Mark; lazy?: boolean }) {
   return (
-    <li>
-      <Link href={`/passport/library/${c.id}`} className="block py-4 border-b" style={{ borderColor: C.line }}>
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-display text-[22px] leading-tight" style={{ color: C.text }}>{c.name}</span>
-          {c.passport === "current" && <Label brass>Passport</Label>}
-          {c.passport === "past" && <Label>Past Passport cocktail</Label>}
-          <MarkBadge mark={mark} />
-        </div>
-        {c.flavor && <p className="font-body text-sm mt-1" style={{ color: C.muted }}>{c.flavor}</p>}
-        <p className="font-body text-[11px] tracking-[0.12em] uppercase mt-1.5" style={{ color: C.faint }}>{menuLine(c)}</p>
-      </Link>
-    </li>
+    <ItemRow item={{ kind: "cocktail", id: c.id, name: c.name }} href={`/passport/library/${c.id}`} pad="py-3.5" lazy={lazy}>
+      <span className="flex items-center gap-2 flex-wrap">
+        <span className="font-display text-[22px] leading-tight" style={{ color: C.text }}>{c.name}</span>
+        <Avail on={c.available} />
+        {c.passport === "current" && <Label brass>Passport</Label>}
+        {c.passport === "past" && <Label>Past Passport cocktail</Label>}
+        <MarkBadge mark={mark} />
+      </span>
+      {c.flavor && <span className="block font-body text-sm mt-1" style={{ color: C.muted }}>{c.flavor}</span>}
+      <span className="block font-body text-[11px] tracking-[0.12em] uppercase mt-1.5" style={{ color: C.faint }}>{menuLine(c)}</span>
+    </ItemRow>
   );
 }
 
 /** A Passport cocktail as a feature: everything on its menu card. */
 export function CocktailFeature({ c, prices, mark }: { c: Cocktail; prices?: MenuPrice[]; mark?: Mark }) {
   return (
-    <Link href={`/passport/library/${c.id}`} className="block rounded-xl border p-5" style={{ borderColor: `${C.brass}66`, background: "#1a1f14" }}>
+    <div className="relative">
+      <FeatureLink c={c}>
+        <FeatureBody c={c} prices={prices} mark={mark} />
+      </FeatureLink>
+      <AddButton item={{ kind: "cocktail", id: c.id, name: c.name }} className="absolute bottom-2 right-2" />
+    </div>
+  );
+}
+function FeatureLink({ c, children }: { c: Cocktail; children: ReactNode }) {
+  return (
+    <PressLink item={{ kind: "cocktail", id: c.id, name: c.name }} href={`/passport/library/${c.id}`}
+      className="block rounded-xl border p-5 pb-6 pr-12 pp-row pp-focus" style={{ borderColor: `${C.brass}66`, background: "#1a1f14" }}>
+      {children}
+    </PressLink>
+  );
+}
+function FeatureBody({ c, prices, mark }: { c: Cocktail; prices?: MenuPrice[]; mark?: Mark }) {
+  return (
+    <>
       <div className="flex items-baseline justify-between gap-3">
         <div className="font-display text-2xl flex items-center gap-2" style={{ color: C.text }}>{c.name}<MarkBadge mark={mark} /></div>
         {prices && prices.length > 0 && <Prices prices={prices} />}
@@ -77,15 +100,15 @@ export function CocktailFeature({ c, prices, mark }: { c: Cocktail; prices?: Men
       {c.tagline && <p className="font-display italic text-[17px] mt-1" style={{ color: C.muted }}>{c.tagline}</p>}
       {c.ingredients && <p className="font-body text-sm mt-3 leading-relaxed" style={{ color: C.text }}>{c.ingredients}</p>}
       {bareFlavor(c.flavor) && <p className="font-body text-[11px] tracking-[0.15em] uppercase mt-3" style={{ color: C.brass }}>{bareFlavor(c.flavor)}</p>}
-    </Link>
+    </>
   );
 }
 
 export function CocktailPage({ c }: { c: Cocktail }) {
   return (
     <article>
-      <Link href="/passport/library" className="font-body text-xs tracking-[0.2em] uppercase" style={{ color: C.muted }}>← Library</Link>
-      <div className="mt-5 flex items-center gap-2 flex-wrap">
+      <BackLink fallback="/passport/library" label="Index" />
+      <div className="mt-3 flex items-center gap-2 flex-wrap">
         {c.passport === "current" && <Label brass>Passport cocktail</Label>}
         {c.passport === "past" && <Label>Past Passport cocktail</Label>}
         <Label>{menuLine(c)}</Label>
@@ -113,7 +136,7 @@ export function CocktailPage({ c }: { c: Cocktail }) {
               return (
                 <li key={`${b.id ?? "word"}-${i}`}>
                   {b.id
-                    ? <Link href={`/passport/spirits/${b.id}`} className="flex items-baseline justify-between gap-3 py-2.5 border-b" style={{ borderColor: C.line }}>{body}</Link>
+                    ? <Link href={`/passport/spirits/${b.id}`} scroll={false} className="flex items-baseline justify-between gap-3 py-2.5 border-b" style={{ borderColor: C.line }}>{body}</Link>
                     : <div className="flex items-baseline justify-between gap-3 py-2.5 border-b" style={{ borderColor: C.line }}>{body}</div>}
                 </li>
               );
@@ -137,14 +160,17 @@ export function CocktailPage({ c }: { c: Cocktail }) {
   );
 }
 
-export function BottleRow({ b, mark }: { b: ArchivedBottle; mark?: Mark }) {
+/** A bottle in a list. File 06: the available-now marker when the list knows it, "+", and long-press. */
+export function BottleRow({ b, mark, lazy = false }: { b: Pick<ArchivedBottle, "id" | "name" | "status_label"> & { available?: boolean }; mark?: Mark; lazy?: boolean }) {
   return (
-    <li>
-      <Link href={`/passport/spirits/${b.id}`} className="flex items-baseline justify-between gap-3 py-3 border-b" style={{ borderColor: C.line }}>
-        <span className="font-body text-[15px] flex items-baseline gap-2" style={{ color: C.text }}>{b.name}<MarkBadge mark={mark} /></span>
-        <span className="font-body text-[10px] tracking-[0.15em] uppercase whitespace-nowrap" style={{ color: C.faint }}>{b.status_label}</span>
-      </Link>
-    </li>
+    <ItemRow item={{ kind: "bottle", id: b.id, name: b.name }} href={`/passport/spirits/${b.id}`} lazy={lazy}>
+      <span className="flex items-baseline justify-between gap-3">
+        <span className="font-body text-[15px] flex items-center gap-2 min-w-0" style={{ color: C.text }}>
+          <span className="min-w-0">{b.name}</span><Avail on={b.available} /><MarkBadge mark={mark} />
+        </span>
+        {b.status_label && <span className="font-body text-[10px] tracking-[0.15em] uppercase text-right shrink-0" style={{ color: C.faint }}>{b.status_label}</span>}
+      </span>
+    </ItemRow>
   );
 }
 
@@ -152,17 +178,18 @@ export function BottleRow({ b, mark }: { b: ArchivedBottle; mark?: Mark }) {
 export function BottlePage({ b }: { b: Bottle | ArchivedBottle }) {
   const r = b as Partial<Bottle>;
   const archived = b.status_label === "No longer carried";
-  // Back to where this bottle lives: the archive, the spirits list (it has pour prices there), else the Library.
-  const back = archived ? { href: "/passport/library#archive", label: "Spirits archive" } : r.prices && r.prices.length ? { href: "/passport/spirits", label: "Spirits list" } : { href: "/passport/library", label: "Library" };
+  // Back to where this bottle lives when opened straight from a link: the spirits list on the Menu (it has pour
+  // prices there), else the Index (the archive and every other bottle).
+  const back = !archived && r.prices && r.prices.length ? { href: "/passport/menu", label: "Menu" } : { href: "/passport/library", label: "Index" };
   return (
     <article>
-      <Link href={back.href} className="font-body text-xs tracking-[0.2em] uppercase" style={{ color: C.muted }}>← {back.label}</Link>
-      {b.status_label && <div className="mt-5"><Label>{b.status_label}</Label></div>}
-      <h1 className={`font-display text-[38px] leading-[1.05] ${b.status_label ? "mt-3" : "mt-5"}`} style={{ color: C.text }}>{b.name}</h1>
+      <BackLink fallback={back.href} label={back.label} />
+      {b.status_label && <div className="mt-3"><Label>{b.status_label}</Label></div>}
+      <h1 className={`font-display text-[38px] leading-[1.05] ${b.status_label ? "mt-3" : "mt-3"}`} style={{ color: C.text }}>{b.name}</h1>
       <p className="font-body text-sm mt-2" style={{ color: C.muted }}>
         {b.category}{b.category && b.producer ? " · " : ""}
         {b.producer && (r.producer_id
-          ? <Link href={`/passport/producers/${r.producer_id}`} className="underline decoration-1 underline-offset-4" style={{ textDecorationColor: `${C.brass}99` }}>{b.producer}</Link>
+          ? <Link href={`/passport/producers/${r.producer_id}`} scroll={false} className="underline decoration-1 underline-offset-4" style={{ textDecorationColor: `${C.brass}99` }}>{b.producer}</Link>
           : b.producer)}
       </p>
       {r.prices && r.prices.length > 0 && <p className="mt-3"><Prices prices={r.prices} /></p>}
@@ -186,7 +213,7 @@ export function BottlePage({ b }: { b: Bottle | ArchivedBottle }) {
           <ul className="mt-2">
             {r.cocktails.map((c) => (
               <li key={c.id}>
-                <Link href={`/passport/library/${c.id}`} className="flex items-baseline justify-between gap-3 py-3 border-b" style={{ borderColor: C.line }}>
+                <Link href={`/passport/library/${c.id}`} scroll={false} className="flex items-baseline justify-between gap-3 py-3 border-b" style={{ borderColor: C.line }}>
                   <span className="font-display text-[19px]" style={{ color: C.text }}>{c.name}</span>
                   <span className="font-body text-[10px] tracking-[0.15em] uppercase whitespace-nowrap" style={{ color: C.faint }}>{c.menu_status === "past" ? `Past menu · ${c.menu_name}` : c.menu_name}</span>
                 </Link>
@@ -213,8 +240,8 @@ function LongText({ text, className = "" }: { text: string; className?: string }
 export function ProducerPage({ p }: { p: Producer }) {
   return (
     <article>
-      <Link href="/passport/library" className="font-body text-xs tracking-[0.2em] uppercase" style={{ color: C.muted }}>← Library</Link>
-      <p className="font-body text-[11px] tracking-[0.3em] uppercase mt-5" style={{ color: C.brass }}>Producer</p>
+      <BackLink fallback="/passport/library" label="Index" />
+      <p className="font-body text-[11px] tracking-[0.3em] uppercase mt-3" style={{ color: C.brass }}>Producer</p>
       <h1 className="font-display text-[38px] leading-[1.05] mt-2" style={{ color: C.text }}>{p.name}</h1>
       {p.based_in && <p className="font-body text-sm mt-2" style={{ color: C.muted }}>{p.based_in}</p>}
       <div className="w-14 h-px my-6" style={{ background: C.brass, opacity: 0.6 }} />
@@ -223,12 +250,12 @@ export function ProducerPage({ p }: { p: Producer }) {
         <h2 className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>Their bottles</h2>
         <ul className="mt-2">
           {p.bottles.map((b) => (
-            <li key={b.id}>
-              <Link href={`/passport/spirits/${b.id}`} className="flex items-baseline justify-between gap-3 py-3 border-b" style={{ borderColor: C.line }}>
+            <ItemRow key={b.id} item={{ kind: "bottle", id: b.id, name: b.name }} href={`/passport/spirits/${b.id}`}>
+              <span className="flex items-baseline justify-between gap-3">
                 <span className="font-body text-[15px]" style={{ color: C.text }}>{b.name}</span>
-                <span className="font-body text-[10px] tracking-[0.15em] uppercase whitespace-nowrap" style={{ color: C.faint }}>{b.status_label || b.category}</span>
-              </Link>
-            </li>
+                <span className="font-body text-[10px] tracking-[0.15em] uppercase text-right" style={{ color: C.faint }}>{b.status_label || b.category}</span>
+              </span>
+            </ItemRow>
           ))}
         </ul>
       </section>
@@ -299,26 +326,26 @@ function ItemBody({ it, mark }: { it: MenuItem; mark?: Mark }) {
 /** One menu item: opens its library cocktail when there is one. Cocktails are never marked unavailable. */
 export function MenuItemRow({ it, marks }: { it: MenuItem; marks?: Marks }) {
   const href = it.cocktail_id ? `/passport/library/${it.cocktail_id}` : it.bottle_id ? `/passport/spirits/${it.bottle_id}` : null;
-  const mark = markOf(it, marks);
-  return (
-    <li className="border-b" style={{ borderColor: C.line }}>
-      {href ? <Link href={href} className="block py-3"><ItemBody it={it} mark={mark} /></Link> : <div className="py-3"><ItemBody it={it} mark={mark} /></div>}
-    </li>
-  );
+  const item = it.cocktail_id ? { kind: "cocktail" as const, id: it.cocktail_id, name: it.name } : it.bottle_id ? { kind: "bottle" as const, id: it.bottle_id, name: it.name } : null;
+  return <ItemRow item={item} href={href}><ItemBody it={it} mark={markOf(it, marks)} /></ItemRow>;
 }
 
 /** A spirit on the spirits list: name, pour prices and 86 status; the description is on its bottle page. */
-function SpiritRow({ it, marks }: { it: MenuItem; marks?: Marks }) {
+export function SpiritRow({ it, marks, lazy = false }: { it: MenuItem; marks?: Marks; lazy?: boolean }) {
   const body = (
-    <div className="flex items-baseline justify-between gap-3 py-2.5">
-      <span className="font-body text-[15px]" style={{ color: it.unavailable ? C.faint : C.text }}>
+    <span className="flex items-baseline justify-between gap-3">
+      <span className="font-body text-[15px] min-w-0" style={{ color: it.unavailable ? C.faint : C.text }}>
         {it.name}{it.unavailable && <span className="ml-2 align-middle"><Label>Out right now</Label></span>}
         <span className="ml-2"><MarkBadge mark={markOf(it, marks)} /></span>
       </span>
       {it.prices.length > 0 && <Prices prices={it.prices} />}
-    </div>
+    </span>
   );
-  return <li className="border-b" style={{ borderColor: C.line }}>{it.bottle_id ? <Link href={`/passport/spirits/${it.bottle_id}`} className="block">{body}</Link> : body}</li>;
+  return (
+    <ItemRow item={it.bottle_id ? { kind: "bottle", id: it.bottle_id, name: it.name } : null} href={it.bottle_id ? `/passport/spirits/${it.bottle_id}` : null} pad="py-2.5" lazy={lazy}>
+      {body}
+    </ItemRow>
+  );
 }
 
 export function MenuGroupBlock({ g, spirits = false, marks }: { g: MenuGroup; spirits?: boolean; marks?: Marks }) {

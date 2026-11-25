@@ -1,8 +1,13 @@
 import type { NextRequest } from "next/server";
-import { passport } from "@/lib/passport/bible";
+import { getLists, passport } from "@/lib/passport/bible";
 import { bad, isKind, memberRequest, posInt, text } from "@/lib/passport/route";
 
 export const dynamic = "force-dynamic";
+
+/** File 06: the member's own lists, for the "+ add to list" sheet. */
+export async function GET(req: NextRequest) {
+  return memberRequest(req, "passport-member", async (auth) => ({ lists: await getLists(auth) }));
+}
 
 /** File 04: make a list (cocktails or bottles; a playlist, or a top 10). Private to the member. */
 export async function POST(req: NextRequest) {
