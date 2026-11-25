@@ -8,9 +8,11 @@ import InstallHint from "../InstallHint";
 import PhonePrompt from "../PhonePrompt";
 import TabView from "./TabView";
 import { FromTheBar, HereButtons, NewestList, SharedWithYou, SpiritOfTheDay, WelcomeAperitif, WhatsNew } from "./Slots";
+import { FriendsHere, LetsGoCards } from "../Social";
+import { eventNoticeWords } from "@/lib/passport/social";
 import { dayLong, partyOf, reservationWord } from "@/lib/passport/shell";
 import { money } from "@/lib/passport/bottles";
-import type { InboxData } from "@/lib/passport/types";
+import type { InboxData, SocialHome } from "@/lib/passport/types";
 import type { BarMessage, BottleRequest, Cocktail, FeedCard, HouseList, Reservation, SpiritOfTheDay as Spirit, WelcomeAperitif as Aperitif } from "@/lib/passport/types";
 
 /** What the Home view sends (api/passport/view/home). */
@@ -20,6 +22,8 @@ export interface HomeView {
   messages?: BarMessage[]; feed?: FeedCard[]; spirit_of_the_day?: Spirit | null; welcome_aperitif?: Aperitif | null; newest_list?: HouseList | null;
   // File 08: what waits on the member in the Inbox (an unread reply, a question on a request, a reply about an event).
   inbox?: Pick<InboxData, "threads" | "member_requests" | "inquiries"> | null;
+  // File 09: I'm here and friends here, Let's go, Shared with you, a held place or a cancelled event.
+  social?: SocialHome | null;
 }
 
 function greeting() {
@@ -55,8 +59,9 @@ function NowCard({ href, kicker, title, line }: { href: string; kicker: string; 
 
 /**
  * File 06: Home (the CG button). Top to bottom, each section only when it has something in it: the welcome, (file 07) the
- * Welcome Aperitif, From the bar, Right now, What's new, the newest house list, Passport exclusives, Spirit of the Day,
- * then the place kept for Shared with you.
+ * Welcome Aperitif, (file 09) the "I'm here" and "Let's go" buttons and friends at Common Good now, From the bar, Right
+ * now (file 09 adds a held event place or a cancelled event), Let's go plans, What's new, the newest house list,
+ * Passport exclusives, Spirit of the Day, then (file 09) Shared with you.
  */
 export default function HomeTab() {
   return (
@@ -68,7 +73,8 @@ export default function HomeTab() {
         const replies = d.inbox?.threads.filter((t) => t.unread) ?? [];
         const questions = d.inbox?.member_requests.filter((r) => r.question || r.unread) ?? [];
         const events = d.inbox?.inquiries.filter((q) => q.unread) ?? [];
-        const anyNow = ready.length + prices.length + (next ? 1 : 0) + replies.length + questions.length + events.length > 0;
+        const eventNotes = d.social?.event_notices ?? [];
+        const anyNow = ready.length + prices.length + (next ? 1 : 0) + replies.length + questions.length + events.length + eventNotes.length > 0;
         return (
           <div>
             {d.needs_phone && <PhonePrompt />}
@@ -76,12 +82,14 @@ export default function HomeTab() {
             <p className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }} suppressHydrationWarning>{greeting()}</p>
             <h1 className="font-display text-[30px] leading-tight mt-1" style={{ color: C.text }}>Welcome, {d.first_name}</h1>
             <WelcomeAperitif aperitif={d.welcome_aperitif} />
-            <HereButtons />
+            <HereButtons presence={d.social?.presence} hasFriends={d.social?.has_friends} />
+            <FriendsHere friends={d.social?.friends_here} />
             <FromTheBar messages={d.messages} />
             {anyNow && (
               <section aria-labelledby="pp-now" className="mt-8">
                 <h2 id="pp-now" className="font-body text-[11px] tracking-[0.3em] uppercase mb-3" style={{ color: C.brass }}>Right now</h2>
                 <ul className="space-y-3">
+                  {eventNotes.map((n) => { const w = eventNoticeWords(n); return <NowCard key={`ev${n.kind}${n.id}`} href={`/passport/events/${n.id}`} kicker={w.kicker} title={`${n.title} · ${dayLong(n.date)}`} line={w.line} />; })}
                   {questions.map((r) => <NowCard key={`q${r.id}`} href={`/passport/inbox/requests/${r.id}`} kicker={r.question ? "A question about your request" : "A note about your request"} title={r.kind_label} line={r.question ? "Answer it in your Inbox." : r.status_label} />)}
                   {replies.map((t) => <NowCard key={`t${t.id}`} href={`/passport/inbox/messages/${t.id}`} kicker="A reply from the bar" title={t.subject || (t.ref ? `About ${t.ref.name}` : "Your message")} line={t.preview} />)}
                   {events.map((q) => <NowCard key={`e${q.id}`} href={`/passport/inbox/events/${q.id}`} kicker="About your event" title={`${q.kind_label} · ${dayLong(q.preferred_date)}`} line={q.status_label} />)}
@@ -94,6 +102,7 @@ export default function HomeTab() {
                 </ul>
               </section>
             )}
+            <LetsGoCards plans={d.social?.letsgo} />
             <WhatsNew cards={d.feed} />
             <NewestList list={d.newest_list} />
             {d.exclusives.length > 0 && (
@@ -103,7 +112,7 @@ export default function HomeTab() {
               </section>
             )}
             <SpiritOfTheDay spirit={d.spirit_of_the_day} />
-            <SharedWithYou />
+            <SharedWithYou shared={d.social?.shared} />
           </div>
         );
       }}

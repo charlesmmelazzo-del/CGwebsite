@@ -1,28 +1,35 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { C } from "./theme";
 import { Avail, ItemRow, Skel } from "./bits";
-import { resultCount, searchable } from "@/lib/passport/shell";
-import type { FindResults } from "@/lib/passport/types";
+import { useView } from "./shellContext";
+import { localFind, resultCount, searchable } from "@/lib/passport/shell";
+import type { FindResults, IndexData } from "@/lib/passport/types";
 
 /**
  * File 06: the one search bar, the same on Menu and Index. Cocktails, bottles and producers, grouped under those three
- * headings with the available-now marker. Results appear as the member types, after a short pause, without leaving
- * the tab; clearing the box brings the tab back exactly as it was. Only things the member may open (the Bible decides).
+ * headings with the available-now marker. Results appear as the member types, without leaving the tab; clearing the box
+ * brings the tab back exactly as it was. Only things the member may open (the Bible decides).
+ *
+ * File 09 fix: when the Index tab's data is already in the browser, cocktails and bottles matching by name show at once
+ * from it (the Index holds only what the member may open, in the Bible's own order). The Bible's answer still comes,
+ * in the background, and replaces it: producers, and drinks found by an ingredient word or a producer's name.
  */
 export default function SearchArea({ initial = "", children }: { initial?: string; children: ReactNode }) {
   const inputId = useId();
   const [q, setQ] = useState(initial);
-  const [results, setResults] = useState<FindResults | null>(null);
+  const [server, setServer] = useState<{ q: string; results: FindResults } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const seq = useRef(0);
   const active = searchable(q);
+  const index = useView<IndexData>("index").data;
+  const local = useMemo(() => (active ? localFind(index, q) : null), [active, index, q]);
   useEffect(() => {
     const n = ++seq.current;
-    if (!searchable(q)) { setResults(null); setBusy(false); setError(""); return; }
+    if (!searchable(q)) { setServer(null); setBusy(false); setError(""); return; }
     setBusy(true);
     const t = setTimeout(async () => {
       try {
@@ -33,13 +40,20 @@ export default function SearchArea({ initial = "", children }: { initial?: strin
         if (res.status === 401 && data.signed_out) { window.location.assign("/passport?signed_out=1"); return; }
         if (!res.ok) { setError(data.error || "Search is unavailable right now. Please try again."); return; }
         setError("");
-        setResults(data as FindResults);
+        setServer({ q: q.trim(), results: data as FindResults });
       } catch {
         if (n === seq.current) { setBusy(false); setError("You seem to be offline."); }
       }
-    }, 260);
+    }, local ? 120 : 260);
     return () => clearTimeout(t);
+    // local only changes when q or the Index does; the request is about q.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
+  // The Bible's answer for exactly what is typed wins; until it arrives, the Index's name matches (no producers yet).
+  const fresh = server && server.q === q.trim() ? server.results : null;
+  // Without the Index loaded (the Menu tab first), the last answer stays on screen, dimmed, as before.
+  const results: FindResults | null = fresh ?? (local ? { ...local, producers: [] } : server?.results ?? null);
+  const waiting = !fresh && busy;
 
   return (
     <div>
@@ -57,7 +71,7 @@ export default function SearchArea({ initial = "", children }: { initial?: strin
           </button>
         )}
       </form>
-      {active ? <Results q={q.trim()} results={results} busy={busy} error={error} /> : children}
+      {active ? <Results q={q.trim()} results={results} busy={waiting} partial={!fresh && !!local} error={error} /> : children}
     </div>
   );
 }
@@ -70,7 +84,7 @@ function Heading({ children, n }: { children: ReactNode; n: number }) {
   );
 }
 
-function Results({ q, results, busy, error }: { q: string; results: FindResults | null; busy: boolean; error: string }) {
+function Results({ q, results, busy, partial, error }: { q: string; results: FindResults | null; busy: boolean; partial: boolean; error: string }) {
   const n = resultCount(results);
   return (
     <div className="mt-2" aria-busy={busy}>
@@ -80,7 +94,7 @@ function Results({ q, results, busy, error }: { q: string; results: FindResults 
         <div className="mt-8 space-y-4" aria-hidden><Skel w="30%" h={10} /><Skel w="70%" h={18} /><Skel w="55%" h={18} /><Skel w="62%" h={18} /></div>
       )}
       {results && (
-        <div style={{ opacity: busy ? 0.55 : 1, transition: "opacity 0.15s" }}>
+        <div style={{ opacity: busy && !partial ? 0.55 : 1, transition: "opacity 0.15s" }}>
           {results.cocktails.length > 0 && (
             <section>
               <Heading n={results.cocktails.length}>Cocktails</Heading>
@@ -132,7 +146,8 @@ function Results({ q, results, busy, error }: { q: string; results: FindResults 
               </ul>
             </section>
           )}
-          {n === 0 && !busy && <p className="mt-8 font-body text-sm" style={{ color: C.faint }}>Nothing matches “{q}”. Try one word, like a spirit or a producer.</p>}
+          {partial && busy && <p className="mt-6 font-body text-xs" role="status" style={{ color: C.faint }}>Looking for producers and ingredients…</p>}
+          {n === 0 && !busy && !partial && <p className="mt-8 font-body text-sm" style={{ color: C.faint }}>Nothing matches “{q}”. Try one word, like a spirit or a producer.</p>}
         </div>
       )}
     </div>

@@ -177,7 +177,9 @@ export function HouseLists({ lists, charts, pastCount = 0 }: { lists?: HouseList
   );
 }
 
-/** "Shared with you" (friends and sharing). Its place in Home's order is kept; it draws nothing yet. */
-export function SharedWithYou() { return null; }
-/** The two round buttons "I'm at Common Good" and "Let's go" (the meetups file). No dead buttons now. */
-export function HereButtons() { return null; }
+/**
+ * File 09 fills the two places file 06 kept on Home: "Shared with you" and the two round buttons ("I'm at Common Good"
+ * and "Let's go"). They live with the rest of friends and sharing (../Social.tsx); each still draws nothing until it has
+ * something to show.
+ */
+export { HereButtons, SharedWithYou } from "../Social";

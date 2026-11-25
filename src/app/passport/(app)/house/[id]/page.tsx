@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Unavailable from "@/components/passport/Unavailable";
 import { HouseListPage } from "@/components/passport/HouseList";
 import { AskAboutThis } from "@/components/passport/Inbox";
+import { ShareButton } from "@/components/passport/Social";
 import { getHouseList } from "@/lib/passport/bible";
 import { memberData } from "@/lib/passport/member";
 
@@ -19,6 +20,8 @@ export default async function HouseListRoute({ params }: { params: { id: string 
       <HouseListPage key={r.data.id} list={r.data} />
       {/* File 08: a message to the bar with this list attached. */}
       <AskAboutThis kind="list" id={r.data.id} name={r.data.title} />
+      {/* File 09: share the bar's list with friends. */}
+      <div className="mt-3"><ShareButton kind="house_list" id={r.data.id} name={r.data.title} /></div>
     </>
   );
 }

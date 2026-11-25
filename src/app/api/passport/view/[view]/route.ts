@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
   getBarHome, getBarLists, getBottleRequests, getInbox, getIndex, getLists, getMarksSafe, getMe, getMenus, getPassportCocktails, getReservations, getSpirits,
+  getPassportEvents, getSocialHome, getSocialInbox,
   type MemberAuth,
 } from "@/lib/passport/bible";
 import { memberRequest } from "@/lib/passport/route";
@@ -19,13 +20,14 @@ const VIEWS: Record<string, (auth: MemberAuth) => Promise<unknown>> = {
   // Home: their first name, the Passport exclusives, what needs them right now, and (file 07) From the bar: messages,
   // What's new, Spirit of the Day, the Welcome Aperitif and the newest house list. A section that can't load is left out.
   home: async (auth) => {
-    const [me, exclusives, bottles, reservations, bar, inbox] = await Promise.all([
+    const [me, exclusives, bottles, reservations, bar, inbox, social] = await Promise.all([
       getMe(auth),
       getPassportCocktails(auth).catch(() => []),
       getBottleRequests(auth).catch(() => null),
       getReservations(auth).catch(() => []),
       getBarHome(auth).catch(() => null),
       getInbox(auth).catch(() => null),
+      getSocialHome(auth).catch(() => null),
     ]);
     return {
       // Only what Home shows of their own record.
@@ -41,6 +43,8 @@ const VIEWS: Record<string, (auth: MemberAuth) => Promise<unknown>> = {
       newest_list: bar?.newest_list ?? null,
       // File 08: an unread reply from the bar, a question on a request, a reply about an event (for "Right now").
       inbox: inbox ? { threads: inbox.threads.filter((t) => t.unread), member_requests: inbox.member_requests.filter((r) => r.question || r.unread), inquiries: inbox.inquiries.filter((q) => q.unread) } : null,
+      // File 09: "I'm here" and friends at Common Good, Let's go plans, Shared with you, and a held place or a cancellation.
+      social,
     };
   },
   // Menu: the Passport exclusives, the Toast menus an admin ticked, the spirits list, and the member's own hearts and stars.
@@ -53,16 +57,17 @@ const VIEWS: Record<string, (auth: MemberAuth) => Promise<unknown>> = {
     const [index, lists, marks, bar] = await Promise.all([getIndex(auth), getLists(auth), getMarksSafe(auth), getBarLists(auth).catch(() => null)]);
     return { ...index, lists, marks, house_lists: bar?.house_lists ?? [], charts: bar?.charts ?? [], past_count: bar?.past_count ?? 0 };
   },
-  // Events: their own upcoming reservations, and whether the public booking page is open.
+  // File 09: upcoming Passport events first (the member's own answers and friends going), then the same as before.
   events: async (auth) => {
-    const [reservations, book] = await Promise.all([getReservations(auth), reserveEnabled().catch(() => false)]);
-    return { reservations, book };
+    const [events, reservations, book] = await Promise.all([getPassportEvents(auth).catch(() => null), getReservations(auth), reserveEnabled().catch(() => false)]);
+    return { events, reservations, book };
   },
   // Inbox: My bottles (file 05) and (file 08) the member's conversations with the bar, requests and event inquiries.
   // My bottles keeps its own shape at the top (requests, open_count, max_open); the rest arrives as `inbox`.
+  // File 09 adds `social`: conversations with friends, friend requests waiting, and notices from the bar.
   inbox: async (auth) => {
-    const [r, inbox] = await Promise.all([getBottleRequests(auth), getInbox(auth).catch(() => null)]);
-    return { ...r, requests: sortRequests(r.requests), inbox };
+    const [r, inbox, social] = await Promise.all([getBottleRequests(auth), getInbox(auth).catch(() => null), getSocialInbox(auth).catch(() => null)]);
+    return { ...r, requests: sortRequests(r.requests), inbox, social };
   },
 };
 
