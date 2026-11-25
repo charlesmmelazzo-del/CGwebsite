@@ -24,6 +24,11 @@ export default function Home({ me, featured = [] }: { me: Me; featured?: Cocktai
         This is your Common Good Passport. Soon it will hold the menus, every cocktail we&rsquo;ve poured, your favorites and notes,
         and a direct line to the bar. More is coming.
       </p>
+      <Link href="/passport/bottles" className="block mt-8 rounded-xl border p-5" style={{ borderColor: C.line, background: "#1a1f14" }}>
+        <p className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>For home</p>
+        <h2 className="font-display text-2xl mt-1" style={{ color: C.text }}>My bottles</h2>
+        <p className="font-body text-sm mt-1" style={{ color: C.muted }}>Ask us to order a bottle for home, and follow it to pickup. →</p>
+      </Link>
       {featured.length > 0 && (
         <Link href="/passport/menu" className="block mt-8 rounded-xl border p-5" style={{ borderColor: `${C.brass}66`, background: "#1a1f14" }}>
           <p className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>Members only</p>

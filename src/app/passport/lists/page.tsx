@@ -14,6 +14,7 @@ const PLACES = [
   { href: "/passport/notes", title: "My notes", line: "Your tasting notes" },
   { href: "/passport/bespoke", title: "Bespoke recipes", line: "Drinks made for you, and your own" },
   { href: "/passport/history", title: "Your history", line: "What you've ordered, and how often" },
+  { href: "/passport/bottles", title: "My bottles", line: "Bottles you've asked us to order for home" },
 ];
 
 /** File 04: the Lists tab. The member's own corner: favorites, notes, recipes, history, and their lists and top 10s. */
