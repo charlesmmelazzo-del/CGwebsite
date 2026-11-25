@@ -24,6 +24,8 @@ export const LIMITS = {
   "passport-member": { max: 300, windowMs: HOUR },
   // File 04: a member changing their own favorites, ratings, notes, lists and recipes (reordering by buttons is one tap each).
   "passport-personal": { max: 600, windowMs: HOUR },
+  // File 05: a member asking for bottles and answering prices (the Bible also caps open requests at ten).
+  "passport-bottles": { max: 60,  windowMs: HOUR },
   // Invitation codes typed in or opened from a link: few, so a code can't be guessed (the Bible also caps wrong codes overall).
   "passport-code":   { max: 10,  windowMs: HOUR },
 } as const;

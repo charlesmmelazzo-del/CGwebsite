@@ -3,6 +3,7 @@ import Shell from "@/components/passport/Shell";
 import Unavailable from "@/components/passport/Unavailable";
 import { BottlePage } from "@/components/passport/Library";
 import { ItemControls } from "@/components/passport/Personal";
+import { RequestBottle } from "@/components/passport/Bottles";
 import { getBottle, getMine } from "@/lib/passport/bible";
 import { memberData } from "@/lib/passport/member";
 
@@ -22,6 +23,8 @@ export default async function BottleRoute({ params }: { params: { id: string } }
     <Shell tab="library">
       <BottlePage b={r.data.b} />
       <ItemControls key={`bottle-${id}`} kind="bottle" id={id} initial={r.data.mine} />
+      {/* File 05: every bottle page a member can open (the Bible refuses any other). */}
+      <RequestBottle key={`request-${id}`} bottleId={id} name={r.data.b.name} />
     </Shell>
   );
 }

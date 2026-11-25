@@ -1,8 +1,12 @@
-// npm run test:passport — the Menu tab's description layout, its cocktail cards, and the "a tap is never lost" save queue.
+// npm run test:passport — the Menu tab's description layout, its cocktail cards, the "a tap is never lost" save queue,
+// and (file 05) what a bottle request may send to the Bible.
 
 import assert from "node:assert/strict";
 import { bareFlavor, descriptionParts, menuItemBody } from "../description";
 import { createSaveQueue, type SaveResult } from "../saveQueue";
+import { isAction, money, quantity, requestBody, sortRequests, NO_PRICE_LINE } from "../bottles";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 let passed = 0;
 let failed = 0;
@@ -162,6 +166,54 @@ function slowServer() {
     assert.equal(out, 1);
     assert.equal(s.calls.length, 1);
     assert.deepEqual(q.current(), { favorite: false, rating: null, note: "" });
+  });
+
+  console.log("\nBottle requests (file 05)");
+  await test("a quantity is a whole number from 1 to 12", () => {
+    assert.deepEqual([1, 12, "3", " 7 "].map(quantity), [1, 12, 3, 7]);
+    for (const bad of [0, 13, -1, 2.5, "two", "", null, undefined, "1e1", "012"]) assert.equal(quantity(bad), null, String(bad));
+  });
+  await test("from a bottle page: only the bottle, quantity and note go to the Bible", () => {
+    assert.deepEqual(requestBody({ bottle_id: 5, quantity: 2, note: "gift" }), { body: { bottle_id: 5, quantity: 2, note: "gift" } });
+  });
+  await test("a price, status, date, cost or member number sent by the browser never reaches the Bible", () => {
+    const r = requestBody({ bottle_id: "5", quantity: 1, note: "", price_cents: 1, total_cents: 1, status: "ready", eta: "2026-12-01", member_id: 99, cost_cents: 1, quote: { price_cents: 1 } });
+    assert.ok("body" in r);
+    assert.deepEqual(Object.keys(r.body).sort(), ["bottle_id", "note", "quantity"]);
+  });
+  await test("something the bar doesn't carry: a name, quantity and note", () => {
+    assert.deepEqual(requestBody({ name: "  Kentucky   Owl  Rye ", quantity: 1 }), { body: { name: "Kentucky Owl Rye", quantity: 1, note: "" } });
+    assert.ok("error" in requestBody({ name: "  ", quantity: 1 }));
+    assert.ok("error" in requestBody({ name: "x".repeat(121), quantity: 1 }));
+  });
+  await test("a bad bottle number or quantity is stopped before it leaves the website", () => {
+    assert.deepEqual(requestBody({ bottle_id: "abc", quantity: 1 }), { error: "Not found" });
+    assert.deepEqual(requestBody({ bottle_id: -3, quantity: 1 }), { error: "Not found" });
+    assert.ok("error" in requestBody({ bottle_id: 5, quantity: 13 }));
+    assert.ok("error" in requestBody({ bottle_id: 5, quantity: 0 }));
+    assert.ok("error" in requestBody({ bottle_id: 5, quantity: 1, note: "n".repeat(501) }));
+  });
+  await test("a member can only accept, decline or cancel", () => {
+    assert.deepEqual(["accept", "decline", "cancel"].map(isAction), [true, true, true]);
+    for (const bad of ["picked_up", "ready", "quote", "order", "", null, 1]) assert.equal(isAction(bad), false, String(bad));
+  });
+  await test("prices are whole cents shown as dollars", () => {
+    assert.deepEqual([money(5200), money(5199), money(10400), money(5)], ["$52", "$51.99", "$104", "$0.05"]);
+  });
+  await test("the no-price promise is worded as the file says", () => {
+    assert.equal(NO_PRICE_LINE, "We'll send you a price before anything is ordered.");
+  });
+  await test("open requests first, newest first; closed ones after", () => {
+    const list = [{ id: 1, status: "picked_up" }, { id: 2, status: "ready" }, { id: 3, status: "cancelled" }, { id: 4, status: "submitted" }];
+    assert.deepEqual(sortRequests(list).map((x) => x.id), [4, 2, 3, 1]);
+  });
+  await test("every bottle route acts only for the signed-in member (memberRequest), never by a member number", () => {
+    const root = join(__dirname, "..", "..", "..", "app", "api", "passport", "bottles");
+    for (const f of [join(root, "route.ts"), join(root, "[id]", "route.ts")]) {
+      const src = readFileSync(f, "utf8");
+      assert.ok(src.includes("memberRequest(req, \"passport-bottles\""), f);
+      assert.ok(!/member_id|memberId/.test(src), `${f} must not take a member number`);
+    }
   });
 
   console.log(`\n${passed} passed, ${failed} failed`);

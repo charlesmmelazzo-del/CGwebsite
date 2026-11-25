@@ -200,3 +200,42 @@ export const getLists = (auth: MemberAuth) => passport<{ lists: PassportList[] }
 export const getList = (auth: MemberAuth, id: number) => passport<{ list: PassportList }>("GET", `/lists/${id}`, { auth }).then((r) => r.list);
 export const getRecipes = (auth: MemberAuth) => passport<{ recipes: Bespoke[]; units: string[] }>("GET", "/bespoke", { auth });
 export const getHistory = (auth: MemberAuth) => passport<{ history: History }>("GET", "/history", { auth }).then((r) => r.history);
+
+// ── File 05: bottle requests. Only the signed-in member's own requests (the Bible looks each one up by its number
+// AND the member behind the session). Prices are whole cents, never including tax. Never a cost or markup. ──────
+export type BottleRequestStatus =
+  | "submitted" | "quoted" | "accepted" | "ordered" | "ready" | "picked_up" | "declined" | "cancelled" | "quote_declined" | "pickup_declined";
+/** A confirmed price only (a price a manager has not confirmed is never sent). */
+export interface BottleQuote {
+  id: number;
+  price_cents: number;
+  total_cents: number;
+  quantity: number;
+  message: string;
+  expires_on: string | null;
+  expired: boolean;
+  state: "waiting" | "accepted" | "declined";
+}
+export interface BottleRequest {
+  id: number;
+  kind: "carried" | "other";
+  /** The bottle page it opens, only while the member may open it. */
+  bottle_id: number | null;
+  name: string;
+  quantity: number;
+  note: string;
+  status: BottleRequestStatus;
+  status_label: string;
+  quote: BottleQuote | null;
+  eta: string | null;
+  ready_since: string | null;
+  message: string;
+  message_at: string | null;
+  decline_reason: string;
+  can_cancel: boolean;
+  can_answer: boolean;
+  created_at: string;
+  updated_at: string;
+}
+export interface BottleRequests { requests: BottleRequest[]; open_count: number; max_open: number }
+export const getBottleRequests = (auth: MemberAuth) => passport<BottleRequests>("GET", "/bottles/requests", { auth });
