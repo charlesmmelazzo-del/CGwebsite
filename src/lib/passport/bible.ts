@@ -35,7 +35,7 @@ function baseUrl(): string {
 }
 
 export async function passport<T>(
-  method: "GET" | "POST" | "PUT",
+  method: "GET" | "POST" | "PUT" | "DELETE",
   path: string,
   opts: { body?: Record<string, unknown>; auth?: MemberAuth } = {},
 ): Promise<T> {
@@ -155,3 +155,38 @@ export async function getHomeRecipe(auth: MemberAuth, cocktailId: number): Promi
   }
 }
 
+
+// ── File 04: the personal layer. Only the signed-in member's own records (the Bible scopes every one by
+// the member behind the session; a number here only ever names one of their own records). ──────────────
+export type ItemKind = "cocktail" | "bottle";
+/** An item in the member's records. opens=false: it can no longer be opened, so show its name only (id is null). */
+export interface MyItem { ref: number; kind: ItemKind; id: number | null; name: string; label: string | null; opens: boolean }
+export interface FavoriteItem extends MyItem { added_at: string }
+export interface RatingItem extends MyItem { stars: number; rated_at: string }
+export interface NoteItem extends MyItem { body: string; updated_at: string }
+export interface ListItem extends MyItem { position: number }
+export interface HistoryItem extends Omit<MyItem, "ref"> { count: number; last_ordered: string }
+/** The member's own heart and stars on a card. */
+export interface Mark { kind: ItemKind; id: number; favorite: boolean; rating: number | null }
+export type Marks = Record<string, Mark>;
+export const markKey = (kind: ItemKind, id: number) => `${kind}:${id}`;
+/** The member's own marks on the page they're looking at. */
+export interface Mine { favorite: boolean; rating: number | null; note: string; ordered_count: number; last_ordered: string | null }
+export interface PassportList { id: number; name: string; kind: ItemKind; ranked: boolean; count: number; cap: number | null; items?: ListItem[] }
+export interface Pick { kind: ItemKind; id: number; name: string; label: string | null }
+export interface BespokeLine { quantity: string; unit: string; name: string; sub_recipe: string }
+/** made_by: the first name of the staff member who added it, or null when the member wrote it. */
+export interface Bespoke { id: number; name: string; notes: string; lines: BespokeLine[]; made_by: string | null; by_staff: boolean; created_at: string; updated_at: string }
+export interface History { empty: boolean; cocktails: HistoryItem[]; spirits: HistoryItem[] }
+
+export const getMarks = (auth: MemberAuth) =>
+  passport<{ marks: Mark[] }>("GET", "/personal/marks", { auth }).then((r) => Object.fromEntries(r.marks.map((m) => [markKey(m.kind, m.id), m])) as Marks);
+/** Never breaks a page: no hearts and stars is fine. */
+export const getMarksSafe = (auth: MemberAuth) => getMarks(auth).catch(() => ({}) as Marks);
+export const getMine = (auth: MemberAuth, kind: ItemKind, id: number) => passport<{ mine: Mine }>("GET", `/personal/item/${kind}/${id}`, { auth }).then((r) => r.mine);
+export const getFavorites = (auth: MemberAuth) => passport<{ favorites: FavoriteItem[]; ratings: RatingItem[] }>("GET", "/personal/favorites", { auth });
+export const getNotes = (auth: MemberAuth) => passport<{ notes: NoteItem[] }>("GET", "/personal/notes", { auth }).then((r) => r.notes);
+export const getLists = (auth: MemberAuth) => passport<{ lists: PassportList[] }>("GET", "/lists", { auth }).then((r) => r.lists);
+export const getList = (auth: MemberAuth, id: number) => passport<{ list: PassportList }>("GET", `/lists/${id}`, { auth }).then((r) => r.list);
+export const getRecipes = (auth: MemberAuth) => passport<{ recipes: Bespoke[]; units: string[] }>("GET", "/bespoke", { auth });
+export const getHistory = (auth: MemberAuth) => passport<{ history: History }>("GET", "/history", { auth }).then((r) => r.history);

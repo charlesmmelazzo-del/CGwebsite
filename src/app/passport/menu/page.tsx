@@ -2,7 +2,7 @@ import Shell from "@/components/passport/Shell";
 import Unavailable from "@/components/passport/Unavailable";
 import { CocktailFeature, MenuGroupBlock, PageTitle, Quiet, SectionTitle } from "@/components/passport/Library";
 import { C } from "@/components/passport/theme";
-import { getMenus, getPassportCocktails } from "@/lib/passport/bible";
+import { getMarksSafe, getMenus, getPassportCocktails, markKey } from "@/lib/passport/bible";
 import { memberData } from "@/lib/passport/member";
 
 export const dynamic = "force-dynamic";
@@ -12,11 +12,11 @@ const STALE_MS = 2 * 24 * 3600 * 1000;
 /** The Menu tab: the members-only Passport cocktails first, then the Toast menus an admin ticked, in their order. */
 export default async function MenuPage() {
   const r = await memberData(async (auth) => {
-    const [pc, menus] = await Promise.all([getPassportCocktails(auth), getMenus(auth)]);
-    return { pc, menus };
+    const [pc, menus, marks] = await Promise.all([getPassportCocktails(auth), getMenus(auth), getMarksSafe(auth)]);
+    return { pc, menus, marks };
   });
   if (!r.data) return <Unavailable />;
-  const { pc, menus } = r.data;
+  const { pc, menus, marks } = r.data;
   const updated = menus.menu_info.updated_at ? new Date(menus.menu_info.updated_at) : null;
   // Toast's price for each Passport cocktail, from the group an admin marked as the Passport cocktails.
   const priceFor = new Map((menus.passport_group?.items || []).filter((i) => i.cocktail_id).map((i) => [i.cocktail_id as number, i.prices]));
@@ -26,12 +26,12 @@ export default async function MenuPage() {
       <PageTitle kicker="What we're pouring" title="Menu" />
       <SectionTitle>Passport cocktails · members only</SectionTitle>
       {pc.length
-        ? <div className="space-y-4">{pc.map((c) => <CocktailFeature key={c.id} c={c} prices={priceFor.get(c.id)} />)}</div>
+        ? <div className="space-y-4">{pc.map((c) => <CocktailFeature key={c.id} c={c} prices={priceFor.get(c.id)} mark={marks[markKey("cocktail", c.id)]} />)}</div>
         : <Quiet>This month&rsquo;s Passport cocktails will appear here.</Quiet>}
       {shown.length ? shown.map((m) => (
         <section key={m.name}>
           <SectionTitle>{m.name}</SectionTitle>
-          {m.groups.map((g) => <MenuGroupBlock key={g.name} g={g} />)}
+          {m.groups.map((g) => <MenuGroupBlock key={g.name} g={g} marks={marks} />)}
         </section>
       )) : (
         <>

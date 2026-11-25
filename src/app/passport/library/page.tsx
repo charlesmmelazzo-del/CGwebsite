@@ -1,7 +1,7 @@
 import Shell from "@/components/passport/Shell";
 import Unavailable from "@/components/passport/Unavailable";
 import { BottleRow, CocktailRow, PageTitle, Quiet, SectionTitle } from "@/components/passport/Library";
-import { getArchive, getBaseSpirits, getLibrary } from "@/lib/passport/bible";
+import { getArchive, getBaseSpirits, getLibrary, getMarksSafe, markKey } from "@/lib/passport/bible";
 import { memberData } from "@/lib/passport/member";
 
 export const dynamic = "force-dynamic";
@@ -11,11 +11,11 @@ export default async function LibraryPage({ searchParams }: { searchParams: { q?
   const q = typeof searchParams.q === "string" ? searchParams.q.trim().slice(0, 100) : "";
   const spirit = typeof searchParams.spirit === "string" ? searchParams.spirit.trim().slice(0, 40) : "";
   const r = await memberData(async (auth) => {
-    const [cocktails, archive, spirits] = await Promise.all([getLibrary(auth, q, spirit), q || spirit ? Promise.resolve([]) : getArchive(auth), getBaseSpirits(auth)]);
-    return { cocktails, archive, spirits };
+    const [cocktails, archive, spirits, marks] = await Promise.all([getLibrary(auth, q, spirit), q || spirit ? Promise.resolve([]) : getArchive(auth), getBaseSpirits(auth), getMarksSafe(auth)]);
+    return { cocktails, archive, spirits, marks };
   });
   if (!r.data) return <Unavailable />;
-  const { cocktails, archive, spirits } = r.data;
+  const { cocktails, archive, spirits, marks } = r.data;
   const chosen = spirits.find((s) => s.key === spirit);
   const href = (key: string) => { const p = new URLSearchParams(); if (q) p.set("q", q); if (key) p.set("spirit", key); const s = p.toString(); return `/passport/library${s ? `?${s}` : ""}`; };
   return (
@@ -44,7 +44,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: { q?
         {q ? `Cocktails matching “${q}”${chosen ? ` · ${chosen.label}` : ""}` : chosen ? `${chosen.label} cocktails` : "Cocktails"}
       </SectionTitle>
       {cocktails.length
-        ? <ul>{cocktails.map((c) => <CocktailRow key={c.id} c={c} />)}</ul>
+        ? <ul>{cocktails.map((c) => <CocktailRow key={c.id} c={c} mark={marks[markKey("cocktail", c.id)]} />)}</ul>
         : <Quiet>{q ? "Nothing matches that. Try one ingredient, like “mezcal”." : spirit ? "No cocktails under that spirit yet." : "The library is being filled in."}</Quiet>}
       {!q && !spirit && (
         <>
@@ -55,7 +55,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: { q?
           <span id="archive" />
           <SectionTitle>Spirits archive</SectionTitle>
           <Quiet>Bottles we no longer carry. Your history with them stays here.</Quiet>
-          {archive.length ? <ul className="mt-2">{archive.map((b) => <BottleRow key={b.id} b={b} />)}</ul> : null}
+          {archive.length ? <ul className="mt-2">{archive.map((b) => <BottleRow key={b.id} b={b} mark={marks[markKey("bottle", b.id)]} />)}</ul> : null}
         </>
       )}
     </Shell>

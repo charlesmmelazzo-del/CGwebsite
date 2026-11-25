@@ -5,9 +5,8 @@ import { loadMe } from "@/lib/passport/page";
 
 export const dynamic = "force-dynamic";
 
-/** The bottom bar's other tabs. Only Home works in file 01; these say what's coming. */
+/** The bottom bar's tabs still to come (Lists has its own page since file 04). */
 const SOON: Record<string, { title: string; line: string }> = {
-  lists: { title: "Lists", line: "Your favorites, ratings, tasting notes and top tens, all in one place." },
   messages: { title: "Messages", line: "A direct line to the bar, and a way to tell friends you're on your way." },
 };
 

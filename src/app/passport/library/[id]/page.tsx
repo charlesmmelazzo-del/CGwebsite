@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import Shell from "@/components/passport/Shell";
 import Unavailable from "@/components/passport/Unavailable";
 import { CocktailPage } from "@/components/passport/Library";
-import { getCocktail } from "@/lib/passport/bible";
+import { ItemControls } from "@/components/passport/Personal";
+import { getCocktail, getMine } from "@/lib/passport/bible";
 import { memberData } from "@/lib/passport/member";
 
 export const dynamic = "force-dynamic";
@@ -10,8 +11,16 @@ export const dynamic = "force-dynamic";
 export default async function CocktailRoute({ params }: { params: { id: string } }) {
   const id = Number(params.id);
   if (!Number.isInteger(id) || id <= 0) notFound();
-  const r = await memberData((auth) => getCocktail(auth, id));
+  const r = await memberData(async (auth) => {
+    const [c, mine] = await Promise.all([getCocktail(auth, id), getMine(auth, "cocktail", id)]);
+    return { c, mine };
+  });
   if (r.notFound) notFound();
   if (!r.data) return <Unavailable />;
-  return <Shell tab="library"><CocktailPage c={r.data} /></Shell>;
+  return (
+    <Shell tab="library">
+      <CocktailPage c={r.data.c} />
+      <ItemControls key={`cocktail-${id}`} kind="cocktail" id={id} initial={r.data.mine} />
+    </Shell>
+  );
 }

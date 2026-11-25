@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import Shell from "@/components/passport/Shell";
 import Unavailable from "@/components/passport/Unavailable";
 import { BottlePage } from "@/components/passport/Library";
-import { getBottle } from "@/lib/passport/bible";
+import { ItemControls } from "@/components/passport/Personal";
+import { getBottle, getMine } from "@/lib/passport/bible";
 import { memberData } from "@/lib/passport/member";
 
 export const dynamic = "force-dynamic";
@@ -11,8 +12,16 @@ export const dynamic = "force-dynamic";
 export default async function BottleRoute({ params }: { params: { id: string } }) {
   const id = Number(params.id);
   if (!Number.isInteger(id) || id <= 0) notFound();
-  const r = await memberData((auth) => getBottle(auth, id));
+  const r = await memberData(async (auth) => {
+    const [b, mine] = await Promise.all([getBottle(auth, id), getMine(auth, "bottle", id)]);
+    return { b, mine };
+  });
   if (r.notFound) notFound();
   if (!r.data) return <Unavailable />;
-  return <Shell tab="library"><BottlePage b={r.data} /></Shell>;
+  return (
+    <Shell tab="library">
+      <BottlePage b={r.data.b} />
+      <ItemControls key={`bottle-${id}`} kind="bottle" id={id} initial={r.data.mine} />
+    </Shell>
+  );
 }
