@@ -107,7 +107,7 @@ export default function Comments({ type, id }: { type: CommentType; id: number }
           <textarea id={`pp-c-${type}-${id}`} rows={3} maxLength={COMMENT_MAX} value={text} onChange={(e) => setText(e.target.value)} className={inputCls} placeholder={replyTo ? "Write a reply" : "Add a comment"} />
           <div className="flex items-center justify-between gap-3">
             <span className="font-body text-[11px] leading-snug" style={{ color: C.faint }}>{text.length > COMMENT_MAX - 80 ? `${COMMENT_MAX - text.length} left · ` : ""}{t.note || PG_LINE}</span>
-            <button type="submit" disabled={busy || !text.trim()} className={smallBtn} style={{ borderColor: C.brass, color: C.bg, background: C.brass }}>{busy ? "Posting…" : editing ? "Save" : "Post"}</button>
+            <button type="submit" disabled={busy || !text.trim()} className={smallBtn} style={{ borderColor: C.brass, color: C.bg, background: C.brass }}>{busy ? "Posting…" : editing ? "Save" : replyTo ? "Reply" : "Post"}</button>
           </div>
           {error && <Notice>{error}</Notice>}
         </form>

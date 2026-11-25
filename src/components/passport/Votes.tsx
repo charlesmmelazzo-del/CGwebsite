@@ -186,7 +186,7 @@ export function BracketPage({ initial }: { initial: Bracket }) {
               <p className="font-body text-[11px] mt-0.5 mb-2" style={{ color: C.faint }}>{r.when}</p>
               <ul className="space-y-3">
                 {r.matchups.map((m, k) => (
-                  <li key={m.id ?? `p${k}`} className="rounded-xl border overflow-hidden divide-y" style={{ borderColor: open && m.id ? `${C.brass}66` : C.line, background: C.card }}>
+                  <li key={m.id ?? `p${k}`} className="rounded-xl border overflow-hidden divide-y divide-[#323B29]" style={{ borderColor: open && m.id ? `${C.brass}66` : C.line, background: C.card }}>
                     <EntryRow e={m.a} side="a" m={m} open={open && !!m.id} busy={busy === m.id} onPick={(s) => vote(m, s)} />
                     <EntryRow e={m.b} side="b" m={m} open={open && !!m.id} busy={busy === m.id} onPick={(s) => vote(m, s)} />
                   </li>
