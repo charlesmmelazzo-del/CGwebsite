@@ -1,7 +1,7 @@
-// npm run test:passport — the Menu tab's description layout and the "a tap is never lost" save queue.
+// npm run test:passport — the Menu tab's description layout, its cocktail cards, and the "a tap is never lost" save queue.
 
 import assert from "node:assert/strict";
-import { bareFlavor, descriptionParts } from "../description";
+import { bareFlavor, descriptionParts, menuItemBody } from "../description";
 import { createSaveQueue, type SaveResult } from "../saveQueue";
 
 let passed = 0;
@@ -60,6 +60,35 @@ function slowServer() {
   await test("a library flavor line stored with brackets is shown without them", () => {
     assert.equal(bareFlavor("[Bright, Bitter]"), "Bright, Bitter");
     assert.equal(bareFlavor("Bright, Bitter"), "Bright, Bitter");
+  });
+
+  console.log("Menu items and their cocktail cards");
+  // As the Bible sends them: three Toast variants that all open the library cocktail "Pear Thee Well", and only an
+  // item with the cocktail's own name carries its card.
+  const pear = { tagline: "Pear tagline", ingredients: "Bourbon, Red Pear, Lemon, Cinnamon", flavor: "[Spiced, Bright]" };
+  const free = { name: "Pear Thee Well - Free Spirited", description: "Red Pear, Lemon, Soda\n\n[Bright, Crisp]\n\nNo alcohol, all the fall.", cocktail_id: 7 };
+  const bourbon = { name: "Pear Thee Well - Boozy With Bourbon", description: "Bourbon, Red Pear, Lemon", cocktail_id: 7 };
+  const tequila = { name: "Pear Thee Well - Boozy With Tequila", description: "Tequila, Red Pear, Lemon", cocktail_id: 7 };
+  await test("Pear Thee Well - Free Spirited shows its own description, by line, and never bourbon", () => {
+    const b = menuItemBody(free);
+    assert.equal(b.kind, "description");
+    assert.deepEqual(b.kind === "description" ? b.parts : [], [
+      { kind: "text", text: "Red Pear, Lemon, Soda" }, { kind: "flavor", text: "Bright, Crisp" }, { kind: "text", text: "No alcohol, all the fall." },
+    ]);
+    assert.ok(!/bourbon/i.test(JSON.stringify(b)));
+  });
+  await test("… the Boozy With Bourbon and Boozy With Tequila variants show their own descriptions", () => {
+    assert.deepEqual(menuItemBody(bourbon), { kind: "description", parts: [{ kind: "text", text: "Bourbon, Red Pear, Lemon" }] });
+    const t = menuItemBody(tequila);
+    assert.deepEqual(t, { kind: "description", parts: [{ kind: "text", text: "Tequila, Red Pear, Lemon" }] });
+    assert.ok(!/bourbon/i.test(JSON.stringify(t)));
+  });
+  await test("an item with the cocktail's own name shows the card the Bible sent (flavor without brackets)", () => {
+    assert.deepEqual(menuItemBody({ name: "Pear Thee Well", description: "Toast text", card: pear }), { kind: "card", tagline: "Pear tagline", ingredients: "Bourbon, Red Pear, Lemon, Cinnamon", flavor: "Spiced, Bright" });
+  });
+  await test("an empty card falls back to the description; nothing at all shows nothing", () => {
+    assert.equal(menuItemBody({ description: "Just this", card: { tagline: "", ingredients: "", flavor: "" } }).kind, "description");
+    assert.equal(menuItemBody({ description: "" }).kind, "none");
   });
 
   console.log("A tap is never lost");

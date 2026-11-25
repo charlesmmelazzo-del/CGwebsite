@@ -104,13 +104,23 @@ export const getMe = (auth: MemberAuth) => passport<Me>("GET", "/me", { auth });
 // ── File 03a: the library, Passport cocktails, the spirits archive, Toast menus ──
 // Exactly the fields the Bible's approved list sends (server/passport/guestSafe.js).
 export interface CocktailCard { id: number; name: string; flavor: string; menu_name: string; menu_status: "current" | "past"; passport: "current" | "past" | null }
-export interface Cocktail extends CocktailCard { ingredients: string; tagline: string; notes: string; ingredient_items?: IngredientItem[]; home_recipe?: boolean }
-/** File 03b: one word of the published ingredient list; bottle_id only for a link the bar approved. */
-export interface IngredientItem { text: string; bottle_id: number | null }
+export interface Cocktail extends CocktailCard { ingredients: string; tagline: string; notes: string; bottles?: DrinkBottle[]; home_recipe?: boolean }
+/**
+ * "Bottles in this drink" (Nov 25, 2026): from the Bible's own recipe, names and categories only, in recipe order.
+ * id is the bottle page; null for a recipe placeholder, which arrives as a plain spirit word ("Bourbon"). Absent when
+ * the cocktail has no bottles to list or the bar keeps its bottles secret.
+ */
+export interface DrinkBottle { id: number | null; name: string; category: string }
 export interface ArchivedBottle { id: number; name: string; category: string; producer: string; description: string; status_label: string | null }
 /** Toast menus as the Bible's approved list sends them (menu reader). */
 export interface MenuPrice { label: string | null; price: number }
-export interface MenuItem { name: string; description: string; prices: MenuPrice[]; cocktail_id: number | null; bottle_id: number | null; unavailable: boolean }
+export interface MenuItem { name: string; description: string; prices: MenuPrice[]; cocktail_id: number | null; bottle_id: number | null; unavailable: boolean; card?: MenuCard }
+/**
+ * The matched library cocktail's tagline, ingredients and flavor line, sent with the menu item (no call per cocktail).
+ * Only when the Toast item has that cocktail's own name; a variant ("… - Free Spirited") has none and keeps its own
+ * Toast description.
+ */
+export interface MenuCard { tagline: string; ingredients: string; flavor: string }
 export interface MenuGroup { name: string; items: MenuItem[] }
 export interface ToastMenu { name: string; groups: MenuGroup[] }
 export interface MenuInfo { available: boolean; updated_at: string | null }
