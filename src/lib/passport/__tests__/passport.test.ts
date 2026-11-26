@@ -820,6 +820,50 @@ function slowServer() {
     });
   }
 
+  console.log("File 15, Part G: the public website's events in the Events tab");
+  {
+    const PE = await import("../publicEvents");
+    const pev = (id: number, date: string, start = "7:00 PM") => ({ id, title: `P${id}`, description: "", date, start, end: null, price_text: "", ticket_url: null, rsvp: true, guest_limit: 0, status: "announced" as const, status_label: "", cancel_note: "", my_rsvp: null, friends_going: null });
+    const raw = { id: "abc-123", title: "Jazz Night", start: "2026-12-05", description: "Live trio\nSecond line", imageUrl: "https://x.supabase.co/storage/v1/object/public/e.jpg", linkUrl: "https://tickets.example/j", linkLabel: "Tickets", location: "Main bar",
+      visibleFrom: "2026-11-01", recurrence: "none", internal: "STAFF NOTE", capacity: 80 } as never;
+    await test("a public event carries only what the public page shows (never anything else from its row)", () => {
+      const e = PE.toPublicEvent(raw, "open")!;
+      assert.deepEqual(Object.keys(e).sort(), [...PE.PUBLIC_EVENT_KEYS].sort());
+      assert.ok(!JSON.stringify(e).includes("STAFF NOTE") && !JSON.stringify(e).includes("80"));
+      assert.equal(e.line, "Live trio");
+      assert.equal(e.book, true, "the public page offers booking when the Bible says the event is open");
+      assert.equal(PE.publicBookHref(e), "/events?event=abc-123");
+      assert.equal(PE.toPublicEvent({ ...(raw as object), linkUrl: "http://insecure.example" } as never)!.link_url, null, "only an https link");
+      assert.equal(PE.toPublicEvent({ ...(raw as object), id: "../x" } as never), null);
+      assert.ok(PE.isPublicEventId("abc-123::2026-12-05") && !PE.isPublicEventId("a/b"));
+    });
+    await test("Passport shows exactly the public page's list: the same function and the same booking state", () => {
+      const srv = readFileSync(join(__dirname, "..", "publicEventsServer.ts"), "utf8");
+      assert.ok(srv.includes("getEventsData()") && srv.includes("getEventStatuses(") && srv.includes("TTL_MS = 5 * 60 * 1000"));
+      assert.ok(/catch \{\s*return cache\?\.events \?\? \[\];/.test(srv), "unavailable: Passport events only, no error");
+      const ev = readFileSync(join(__dirname, "..", "..", "eventsdata.ts"), "utf8");
+      assert.ok(ev.includes("visible_from") && ev.includes("visibleUntil") && ev.includes("start_date.gte."), "hidden (outside its window) and past events never come through");
+    });
+    await test("the two tabs: All events mixes both kinds by date (soonest first); Passport exclusives has only Passport events", () => {
+      const pub = [PE.toPublicEvent({ ...(raw as object), id: "w1", start: "2026-12-03" } as never)!, PE.toPublicEvent({ ...(raw as object), id: "w2", start: "2026-12-10T18:30" } as never)!];
+      const pass = [pev(1, "2026-12-05"), pev(2, "2026-12-10", "6:00 PM"), pev(3, "2026-12-01")];
+      const all = PE.eventRows(pass as never, pub, "all");
+      assert.deepEqual(all.map((r) => r.key), ["p3", "ww1", "p1", "p2", "ww2"]);
+      assert.ok(all.filter((r) => r.kind === "passport").every((r) => r.members_only) && all.filter((r) => r.kind === "public").every((r) => !r.members_only));
+      assert.deepEqual(PE.eventRows(pass as never, pub, "exclusives").map((r) => r.key), ["p3", "p1", "p2"]);
+      assert.deepEqual(PE.EVENTS_TABS.map((t) => t.label), ["All events", "Passport exclusives"]);
+      assert.deepEqual(PE.eventRows(null, null, "all"), []);
+    });
+    await test("a public event opens its own page with a way back; a share opens it too", async () => {
+      const nav = readFileSync(join(__dirname, "..", "nav.ts"), "utf8");
+      assert.ok(nav.includes('route: "events/public/[id]"'));
+      const { shareHref } = await import("../social");
+      assert.equal(shareHref({ id: 1, kind: "event", ref_id: null, opens: true, public_event_id: "w1::2026-12-05" }), "/passport/events/public/w1%3A%3A2026-12-05");
+      const route = readFileSync(join(__dirname, "..", "..", "..", "app", "api", "passport", "share", "route.ts"), "utf8");
+      assert.ok(route.includes("findPublicEvent(") && route.includes('public: { id: e.id, title: e.title, date: e.date }'), "only an event the public page shows, and only its id, title and date");
+    });
+  }
+
   console.log(`\n${passed} passed, ${failed} failed`);
   if (failed) process.exit(1);
 })();

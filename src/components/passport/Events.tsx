@@ -34,7 +34,7 @@ function StatusTag({ e }: { e: PassportEvent }) {
 }
 
 /** An event in the Events tab. */
-export function EventCard({ e }: { e: PassportEvent }) {
+export function EventCard({ e, membersOnly = false }: { e: PassportEvent; membersOnly?: boolean }) {
   const friends = friendsGoingLine(e.friends_going);
   return (
     <li>
@@ -42,7 +42,11 @@ export function EventCard({ e }: { e: PassportEvent }) {
         {/* File 12: the day leads (every card here is a members-only Passport event, so it no longer says so on each). */}
         <span className="flex items-start justify-between gap-3">
           <span className="font-body text-[0.75rem] tracking-[0.25em] uppercase" style={{ color: C.brass }}>{dayLong(e.date)}</span>
-          <StatusTag e={e} />
+          <span className="flex items-center gap-1.5">
+            {/* File 15, Part G: in "All events", a Passport event says it is members only. */}
+            {membersOnly && <span className="font-body text-[0.75rem] tracking-[0.14em] uppercase rounded-full px-2 py-0.5 border whitespace-nowrap" style={{ color: C.brass, borderColor: `${C.brass}80` }}>Members only</span>}
+            <StatusTag e={e} />
+          </span>
         </span>
         <span className="block font-display text-[1.4375rem] leading-tight mt-1.5" style={{ color: C.text }}>{e.title}</span>
         <span className="block font-body text-sm mt-1" style={{ color: C.muted }}>{time(e)}{e.price_text ? ` · ${e.price_text}` : ""}</span>

@@ -559,6 +559,7 @@ export const PAGE_PARENTS: { route: string; test: RegExp; parent: Parent }[] = [
   { route: "shared/[id]", test: /^\/passport\/shared\/\d+\/?$/, parent: { href: "/passport", label: "Home", tab: "home" } },
   { route: "from-the-bar/[id]", test: /^\/passport\/from-the-bar\/\d+\/?$/, parent: { href: "/passport", label: "Home", tab: "home" } },
   { route: "events/[id]", test: /^\/passport\/events\/\d+\/?$/, parent: { href: "/passport/events", label: "Events", tab: "events" } },
+  { route: "events/public/[id]", test: /^\/passport\/events\/public\/[^/]+\/?$/, parent: { href: "/passport/events", label: "Events", tab: "events" } },
   { route: "inbox/new", test: /^\/passport\/inbox\/new\/?$/, parent: { href: "/passport/inbox", label: "Inbox", tab: "inbox" } },
   { route: "inbox/messages/[id]", test: /^\/passport\/inbox\/messages\/\d+\/?$/, parent: { href: "/passport/inbox", label: "Inbox", tab: "inbox" } },
   { route: "inbox/requests/[id]", test: /^\/passport\/inbox\/requests\/\d+\/?$/, parent: { href: "/passport/inbox", label: "Inbox", tab: "inbox" } },

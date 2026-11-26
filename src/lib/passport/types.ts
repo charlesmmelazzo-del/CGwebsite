@@ -229,6 +229,8 @@ export type ShareKind = "cocktail" | "bottle" | "house_list" | "list" | "recipe"
 export interface SharedListItem { kind: ItemKind; id: number | null; name: string; opens: boolean }
 export interface ShareCard {
   id: number; kind: ShareKind; name: string; note: string; from: "me" | "friend"; from_name: string | null; ref_id: number | null; opens: boolean; saved: boolean; at: string;
+  /** File 15, Part G: an event from the public website (its id there), opening its page in Passport. */
+  public_event_id?: string;
   list?: { kind: ItemKind; ranked: boolean; items: SharedListItem[] };
   recipe?: { name: string; notes: string; lines: BespokeLine[]; made_by: string | null };
 }
