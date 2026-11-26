@@ -7,6 +7,7 @@
  */
 import type { Album, BaseSpirit, Chart, HouseItem, HouseList, IndexBottle, IndexCocktail, IndexDrink, ItemKind, Marks, MenuGroup, MenuItem, MenuTabDef, PassportList, Recommendation, ToastMenu, VoteCard } from "./types";
 import type { SectionId } from "./accents";
+import { stripMarks } from "./description";
 
 /** About a dozen rows before the member has chosen something. */
 export const ROW_LIMIT = 12;
@@ -522,7 +523,7 @@ export function shortLine(it: { card?: { flavor?: string; tagline?: string; ingr
   const c = it.card;
   if (c?.flavor && clean(c.flavor)) return clean(c.flavor);
   if (c?.tagline) return clean(c.tagline);
-  const lines = String(it.description || "").split(/\n+/).map((l) => l.trim()).filter(Boolean);
+  const lines = stripMarks(String(it.description || "")).split(/\n+/).map((l) => l.trim()).filter(Boolean);
   const flavor = lines.find((l) => /^\[[^[\]]+\]$/.test(l));
   return clean(flavor || lines[0] || "");
 }
