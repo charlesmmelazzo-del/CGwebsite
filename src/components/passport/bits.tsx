@@ -187,3 +187,24 @@ export function Collapsible({ title, count, children, id }: { title: string; cou
     </section>
   );
 }
+
+/**
+ * File 12: a list of cards that shows its first three and keeps the rest behind "See all", so a long Home stays
+ * scannable. Nothing when empty.
+ */
+export function SeeAll<T>({ items, render, keyOf, max = 3, what = "" }: { items: T[]; render: (item: T) => ReactNode; keyOf: (item: T) => string; max?: number; what?: string }) {
+  const [all, setAll] = useState(false);
+  if (!items.length) return null;
+  const shown = all ? items : items.slice(0, max);
+  return (
+    <>
+      <ul className="space-y-3">{shown.map((x) => <li key={keyOf(x)}>{render(x)}</li>)}</ul>
+      {items.length > max && (
+        <button type="button" onClick={() => setAll(!all)} aria-expanded={all}
+          className="mt-2 inline-flex items-center min-h-[44px] font-body text-sm underline underline-offset-4 pp-focus rounded" style={{ color: C.muted }}>
+          {all ? "Show fewer" : `See all ${items.length}${what ? ` ${what}` : ""}`}
+        </button>
+      )}
+    </>
+  );
+}

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { C, Notice, postJson } from "./ui";
-import { BackLink } from "./bits";
+import { BackLink, SeeAll } from "./bits";
 import { useShell } from "./shellContext";
 import { notifyChanged } from "./appEvents";
 import { PAST_VOTES_HREF, pctLabel, startRound, voteHref, voteKicker } from "@/lib/passport/votes";
@@ -34,10 +34,9 @@ export function VotesHome({ open, results }: { open?: VoteCard[] | null; results
   return (
     <section aria-labelledby="pp-votes-home" className="mt-10">
       <h2 id="pp-votes-home" className={heading} style={{ color: C.brass }}>{open?.length ? "Voting is open" : "The results are in"}</h2>
-      <ul className="space-y-3">
-        {(open || []).map((c) => <li key={`${c.kind}${c.id}`}><VoteCardLink c={c} big /></li>)}
-        {(results || []).map((c) => <li key={`r${c.kind}${c.id}`}><VoteCardLink c={c} /></li>)}
-      </ul>
+      {/* File 12: three at most on Home, the rest behind "See all". */}
+      <SeeAll items={[...(open || []).map((c) => ({ c, big: true })), ...(results || []).map((c) => ({ c, big: false }))]}
+        keyOf={(x) => `${x.big ? "" : "r"}${x.c.kind}${x.c.id}`} render={(x) => <VoteCardLink c={x.c} big={x.big} />} />
     </section>
   );
 }
