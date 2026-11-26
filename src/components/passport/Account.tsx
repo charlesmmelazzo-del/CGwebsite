@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import InstallHint from "./InstallHint";
 import { markPromptDone, pushState, turnOff, turnOn, type PushState } from "./pushClient";
 import { notifyChanged } from "./appEvents";
+import { forgetRecent } from "./recent";
 import { Button, C, Check, Field, Notice, inputCls, postJson, useBotFields } from "./ui";
 import type { FriendsOverview, Me, NotifyPrefs } from "@/lib/passport/bible";
 import Link from "next/link";
@@ -56,6 +57,8 @@ export default function Account({ me: initial, prefs, friends }: { me: Me; prefs
 
   const signOut = async () => {
     await postJson("/api/passport/signout", {});
+    // File 14: "Jump back in" is kept on this device only; it goes when the member signs out.
+    forgetRecent();
     router.replace("/passport");
     router.refresh();
   };

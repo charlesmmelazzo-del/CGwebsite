@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** File 06: the member's lists now live at the top of the Index tab (with Favorites, Notes, Recipes and History). */
+/** File 06: the member's lists live in the Index tab; file 14: at their own level of the drill-down (Index › Lists). */
 export default function ListsRoute() {
-  redirect("/passport/library#lists");
+  redirect("/passport/library?at=lists");
 }

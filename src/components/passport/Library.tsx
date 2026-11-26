@@ -5,6 +5,8 @@ import { bareFlavor, descriptionParts, menuItemBody } from "@/lib/passport/descr
 import { markKey, type ArchivedBottle, type Bottle, type Cocktail, type CocktailCard, type Mark, type Marks, type MenuGroup, type MenuItem, type MenuPrice, type Producer } from "@/lib/passport/types";
 import { AddButton, Avail, BackLink, ItemRow, PressLink } from "./bits";
 import { BarPhoto, Thumb } from "./PhotoBits";
+import Remember from "./Remember";
+import { ACCENTS, type SectionId } from "@/lib/passport/accents";
 
 /**
  * File 03a: the library pieces. Only fields from the Bible's approved list. File 06: shared by the server-rendered pages
@@ -12,20 +14,22 @@ import { BarPhoto, Thumb } from "./PhotoBits";
  * long-press), and pages over a tab go "Back".
  */
 
+/** File 14, Part 8: the page title (h1, the display serif, large) under its small-caps eyebrow. */
 export function PageTitle({ kicker, title, children }: { kicker: string; title: string; children?: ReactNode }) {
   return (
     <div className="mb-6">
-      <p className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>{kicker}</p>
-      <h1 className="font-display text-4xl mt-1" style={{ color: C.text }}>{title}</h1>
+      <p className="pp-t-eyebrow" style={{ color: C.brass }}>{kicker}</p>
+      <h1 className="pp-t-page mt-1" style={{ color: C.text, overflowWrap: "anywhere" }}>{title}</h1>
       {children}
     </div>
   );
 }
 
-export function SectionTitle({ children, aside }: { children: ReactNode; aside?: ReactNode }) {
+/** File 14, Part 8: a section heading (h2): the display serif, clearly larger than body, in its section's colour. */
+export function SectionTitle({ children, aside, section }: { children: ReactNode; aside?: ReactNode; section?: SectionId }) {
   return (
-    <div className="flex items-baseline justify-between mt-10 mb-3">
-      <h2 className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>{children}</h2>
+    <div className="flex items-baseline justify-between gap-3">
+      <h2 className="pp-t-section" style={{ color: section ? ACCENTS[section].ink : C.text }}>{children}</h2>
       {aside}
     </div>
   );
@@ -110,6 +114,7 @@ function FeatureBody({ c, prices, mark }: { c: Cocktail; prices?: MenuPrice[]; m
 export function CocktailPage({ c }: { c: Cocktail }) {
   return (
     <article>
+      <Remember kind="cocktail" id={c.id} name={c.name} />
       <BackLink fallback="/passport/library" label="Index" />
       <div className="mt-3 flex items-center gap-2 flex-wrap">
         {c.passport === "current" && <Label brass>Passport cocktail</Label>}
@@ -188,6 +193,7 @@ export function BottlePage({ b }: { b: Bottle | ArchivedBottle }) {
   const back = !archived && r.prices && r.prices.length ? { href: "/passport/menu", label: "Menu" } : { href: "/passport/library", label: "Index" };
   return (
     <article>
+      <Remember kind="bottle" id={b.id} name={b.name} />
       <BackLink fallback={back.href} label={back.label} />
       {b.status_label && <div className="mt-3"><Label>{b.status_label}</Label></div>}
       <h1 className={`font-display text-[38px] leading-[1.05] ${b.status_label ? "mt-3" : "mt-3"}`} style={{ color: C.text }}>{b.name}</h1>
@@ -275,7 +281,7 @@ const money = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
 /** A price, or pour sizes and prices, as Toast shows them. */
 export function Prices({ prices }: { prices: MenuPrice[] }) {
   return (
-    <span className="font-body text-[14px] whitespace-nowrap text-right" style={{ color: C.text }}>
+    <span className="font-body text-[0.9375rem] whitespace-nowrap text-right pp-num" style={{ color: C.text }}>
       {prices.map((p, i) => (
         <span key={i} className={i ? "ml-3" : ""}>{p.label && <span style={{ color: C.faint }}>{p.label} </span>}{money(p.price)}</span>
       ))}
