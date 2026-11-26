@@ -16,6 +16,8 @@ export interface Member {
   can_invite_household: boolean;
   /** Their number was already on another Passport when they joined: the app asks for a different one. */
   needs_phone: boolean;
+  /** File 12: their own "Suggest things for me" switch (on by default). */
+  suggest?: boolean;
 }
 export interface HouseholdMember { first_name: string; last_name: string; status: "invited" | "active" }
 export interface Me { member: Member; household: HouseholdMember[] }
@@ -117,7 +119,18 @@ export interface IndexBottle { id: number; name: string; category: string; statu
 /** A beer, wine or cider sold on the list (past or present). It has no page of its own. */
 export interface IndexDrink { name: string; kind: "Beer" | "Wine" | "Other"; description: string; status_label: string | null; available: boolean }
 export interface FoundProducer { id: number; name: string; based_in: string }
-export interface IndexData { cocktails: IndexCocktail[]; bottles: IndexBottle[]; drinks: IndexDrink[]; base_spirits: BaseSpirit[] }
+export interface IndexData { cocktails: IndexCocktail[]; bottles: IndexBottle[]; drinks: IndexDrink[]; base_spirits: BaseSpirit[]; recommendations?: Recommendation[]; enough?: boolean; suggest?: boolean }
+// ── File 12: "For you" ────────────────────────────────────────────────────────
+/**
+ * One suggestion, built by the Bible only from the member's own favorites, ratings, orders, lists and notes (never
+ * anyone else's): something being served right now, with one plain reason ("Because you love …").
+ */
+export interface Recommendation {
+  kind: ItemKind; id: number; name: string; reason: string; available: boolean; photo?: string | null;
+  flavor?: string; menu_name?: string; menu_status?: "current" | "past"; passport?: "current" | "past" | null; category?: string;
+}
+/** What "For you" holds: suggest false (switched off in Account), enough false (too little of their own history yet). */
+export interface ForYou { recommendations: Recommendation[]; enough: boolean; suggest: boolean }
 export interface FindResults { cocktails: IndexCocktail[]; bottles: IndexBottle[]; producers: FoundProducer[] }
 /** One of the member's own upcoming reservations: date (YYYY-MM-DD), start time as the bar shows it, party size, status. */
 export interface Reservation { date: string; time: string; party_size: number; status: "requested" | "approved" | "guest_confirmed" }

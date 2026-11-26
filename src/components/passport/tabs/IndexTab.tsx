@@ -10,6 +10,7 @@ import { ListsManager } from "../Personal";
 import SearchArea from "../Search";
 import TabView from "./TabView";
 import { HouseLists } from "./Slots";
+import { ForYouIndex } from "../ForYou";
 import { byCategory, withSpirit } from "@/lib/passport/shell";
 import { markKey, type Chart, type HouseList, type IndexData, type IndexDrink, type Marks, type PassportList, type VoteCard } from "@/lib/passport/types";
 import { scrollToId } from "../appEvents";
@@ -106,6 +107,7 @@ function Index({ d, version }: { d: IndexView; version: number }) {
               </li>
             ))}
           </ul>
+          <ForYouIndex items={d.recommendations} enough={d.enough} suggest={d.suggest} />
         </section>
 
         {anyAvailable && (

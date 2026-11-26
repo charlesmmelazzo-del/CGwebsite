@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import InstallHint from "./InstallHint";
+import { notifyChanged } from "./appEvents";
 import { Button, C, Check, Field, Notice, inputCls, postJson, useBotFields } from "./ui";
 import type { FriendsOverview, Me, NotifyPrefs } from "@/lib/passport/bible";
 import Link from "next/link";
@@ -28,6 +29,17 @@ export default function Account({ me: initial, prefs, friends }: { me: Me; prefs
     if (r.ok) setMe(r.data);
     else if (r.data.signed_out) router.refresh();
     else setError(r.data.error || "Couldn't save that. Please try again.");
+  };
+
+  // File 12: "Suggest things for me" (on by default). Shown at once; put back if the bar can't be reached.
+  const setSuggest = async (on: boolean) => {
+    const before = me;
+    setMe({ ...me, member: { ...m, suggest: on } });
+    setError("");
+    const r = await postJson<Me>("/api/passport/me", { suggest: on }, "PUT");
+    if (r.ok) { setMe(r.data); notifyChanged("recs"); }
+    else if (r.data.signed_out) router.refresh();
+    else { setMe(before); setError(r.data.error || "Couldn't save that. Please try again."); }
   };
 
   const signOut = async () => {
@@ -72,6 +84,12 @@ export default function Account({ me: initial, prefs, friends }: { me: Me; prefs
       </Block>
 
       {friends && <FriendsBlock initial={friends} />}
+
+      <Block title="Suggestions">
+        <Check checked={m.suggest !== false} onChange={setSuggest}>Suggest things for me</Check>
+        <p className="font-body text-xs leading-relaxed" style={{ color: C.faint }}>&ldquo;For you&rdquo; on Home and in the Index, built only from your own favorites, ratings, orders and lists. Never from anyone else&rsquo;s.</p>
+        {error && prefs && <Notice>{error}</Notice>}
+      </Block>
 
       {prefs ? <Notifications initial={prefs} onNews={(on) => setMe({ ...me, member: { ...m, marketing_consent: on } })} /> : (
         <Block title="Email from Common Good">

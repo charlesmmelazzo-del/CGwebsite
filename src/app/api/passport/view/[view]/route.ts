@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
   getBarHome, getBarLists, getBottleRequests, getInbox, getIndex, getLists, getMarksSafe, getMe, getMenus, getPassportCocktails, getReservations, getSpirits,
-  getPassportEvents, getSocialHome, getSocialInbox, getVotes,
+  getPassportEvents, getSocialHome, getSocialInbox, getVotes, getForYou,
   type MemberAuth,
 } from "@/lib/passport/bible";
 import { memberRequest } from "@/lib/passport/route";
@@ -20,7 +20,7 @@ const VIEWS: Record<string, (auth: MemberAuth) => Promise<unknown>> = {
   // Home: their first name, the Passport exclusives, what needs them right now, and (file 07) From the bar: messages,
   // What's new, Spirit of the Day, the Welcome Aperitif and the newest house list. A section that can't load is left out.
   home: async (auth) => {
-    const [me, exclusives, bottles, reservations, bar, inbox, social, votes] = await Promise.all([
+    const [me, exclusives, bottles, reservations, bar, inbox, social, votes, forYou] = await Promise.all([
       getMe(auth),
       getPassportCocktails(auth).catch(() => []),
       getBottleRequests(auth).catch(() => null),
@@ -29,6 +29,7 @@ const VIEWS: Record<string, (auth: MemberAuth) => Promise<unknown>> = {
       getInbox(auth).catch(() => null),
       getSocialHome(auth).catch(() => null),
       getVotes(auth).catch(() => null),
+      getForYou(auth, 4).catch(() => null),
     ]);
     return {
       // Only what Home shows of their own record.
@@ -48,6 +49,8 @@ const VIEWS: Record<string, (auth: MemberAuth) => Promise<unknown>> = {
       social,
       // File 10: any open vote or bracket ("Voting is open"), and results during their window.
       votes: votes ? { open: votes.votes, results: votes.vote_results } : null,
+      // File 12: "For you", up to four, from the member's own record only (nothing when too little history or off).
+      for_you: forYou?.recommendations ?? [],
     };
   },
   // Menu: the Passport exclusives, the Toast menus an admin ticked, the spirits list, and the member's own hearts and stars.

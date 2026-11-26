@@ -678,6 +678,36 @@ function slowServer() {
     });
   }
 
+  console.log("File 12: For you");
+  {
+    const comp12 = (f: string) => readFileSync(join(APP, "..", "components", "passport", f), "utf8");
+    const view12 = readFileSync(join(APP, "api", "passport", "view", "[view]", "route.ts"), "utf8");
+    await test("Home asks the Bible for four suggestions in its one tab call; the Index's own answer carries up to twelve", () => {
+      assert.ok(view12.includes("getForYou(auth, 4).catch(() => null)") && view12.includes("for_you: forYou?.recommendations ?? []"));
+      const lib = readFileSync(join(__dirname, "..", "bible.ts"), "utf8");
+      assert.ok(lib.includes('/recommendations?limit=') && lib.includes("Math.min(12"), "never more than twelve");
+      assert.ok(comp12("tabs/IndexTab.tsx").includes("<ForYouIndex items={d.recommendations} enough={d.enough} suggest={d.suggest} />"));
+    });
+    await test("Home draws nothing for For you when there is nothing; the Index says one quiet line for too little history", () => {
+      const fy = comp12("ForYou.tsx");
+      assert.ok(fy.includes("if (!shown.length) return null;"), "Home: nothing empty");
+      assert.ok(fy.includes("Favorite or rate a few things and we&rsquo;ll suggest what to try next."));
+      assert.ok(fy.includes(".slice(0, 4)") && fy.includes(".slice(0, 12)"));
+    });
+    await test("\"Not for me\" responds at once, puts it back if the bar can't be reached, and sends only kind and number", () => {
+      const fy = comp12("ForYou.tsx");
+      assert.ok(/setHidden\(new Set\(hidden\)\.add\(k\)\)[\s\S]*postJson\("\/api\/passport\/recommendations\/dismiss", \{ kind: r\.kind, id: r\.id \}\)[\s\S]*n\.delete\(k\)/.test(fy));
+      const api = readFileSync(join(APP, "api", "passport", "recommendations", "dismiss", "route.ts"), "utf8");
+      assert.ok(api.includes('memberRequest(req, "passport-personal"') && api.includes("isKind(b.kind)") && api.includes("posInt(b.id)"));
+      assert.ok(!/member_id|memberId/.test(api), "never takes a member number");
+    });
+    await test("Account has the \"Suggest things for me\" switch, and it goes to the member's own record only", () => {
+      assert.ok(comp12("Account.tsx").includes(">Suggest things for me</Check>"));
+      const me = readFileSync(join(APP, "api", "passport", "me", "route.ts"), "utf8");
+      assert.ok(me.includes('if (typeof body.suggest === "boolean") change.suggest = body.suggest;'));
+    });
+  }
+
   console.log(`\n${passed} passed, ${failed} failed`);
   if (failed) process.exit(1);
 })();

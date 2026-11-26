@@ -10,10 +10,11 @@ import TabView from "./TabView";
 import { FromTheBar, HereButtons, NewestList, SharedWithYou, SpiritOfTheDay, WelcomeAperitif, WhatsNew } from "./Slots";
 import { FriendsHere, LetsGoCards } from "../Social";
 import { VotesHome } from "../Votes";
+import { ForYouHome } from "../ForYou";
 import { eventNoticeWords } from "@/lib/passport/social";
 import { dayLong, partyOf, reservationWord } from "@/lib/passport/shell";
 import { money } from "@/lib/passport/bottles";
-import type { InboxData, SocialHome, VoteCard } from "@/lib/passport/types";
+import type { InboxData, Recommendation, SocialHome, VoteCard } from "@/lib/passport/types";
 import type { BarMessage, BottleRequest, Cocktail, FeedCard, HouseList, Reservation, SpiritOfTheDay as Spirit, WelcomeAperitif as Aperitif } from "@/lib/passport/types";
 
 /** What the Home view sends (api/passport/view/home). */
@@ -27,6 +28,8 @@ export interface HomeView {
   social?: SocialHome | null;
   // File 10: open votes and brackets, and results during their window.
   votes?: { open: VoteCard[]; results: VoteCard[] } | null;
+  // File 12: "For you", up to four, from the member's own record only.
+  for_you?: Recommendation[];
 }
 
 function greeting() {
@@ -107,6 +110,7 @@ export default function HomeTab() {
             )}
             <LetsGoCards plans={d.social?.letsgo} />
             <VotesHome open={d.votes?.open} results={d.votes?.results} />
+            <ForYouHome items={d.for_you} />
             <WhatsNew cards={d.feed} />
             <NewestList list={d.newest_list} />
             {d.exclusives.length > 0 && (
