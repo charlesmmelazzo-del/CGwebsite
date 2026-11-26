@@ -65,7 +65,7 @@ export function ForYouHome({ items }: { items?: Recommendation[] | null }) {
       <h2 id="pp-for-you" className="font-body text-[11px] tracking-[0.3em] uppercase mb-3" style={{ color: C.brass }}>For you</h2>
       <ul className="pp-hscroll -mx-5 px-5 flex gap-3 overflow-x-auto pb-2 snap-x">
         {shown.map((r) => (
-          <li key={keyOf(r)} className="snap-start shrink-0 w-[72%] max-w-[270px] flex flex-col rounded-xl border" style={{ borderColor: C.line, background: C.card }}>
+          <li key={keyOf(r)} className="relative snap-start shrink-0 w-[72%] max-w-[270px] flex flex-col rounded-xl border" style={{ borderColor: C.line, background: C.card }}>
             <PressLink item={{ kind: r.kind, id: r.id, name: r.name }} href={hrefOf(r)} className="block flex-1 p-4 pb-1 rounded-t-xl pp-focus pp-row">
               <span className="flex items-start justify-between gap-3">
                 <span className="min-w-0">

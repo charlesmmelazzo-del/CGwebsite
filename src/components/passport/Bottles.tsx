@@ -16,7 +16,7 @@ import { inboxDot } from "@/lib/passport/shell";
  */
 
 const OFFLINE = "Couldn't send that. Please try again.";
-const smallBtn = "rounded-full border px-4 py-2 font-body text-[12px] tracking-[0.12em] uppercase transition-colors disabled:opacity-50";
+const smallBtn = "rounded-full border px-4 min-h-[44px] font-body text-[12px] tracking-[0.12em] uppercase transition-colors disabled:opacity-50 pp-focus pp-press";
 
 /** A small status label (Library.tsx has one too, but it is server-only through its imports). */
 function Label({ children, brass = false }: { children: ReactNode; brass?: boolean }) {

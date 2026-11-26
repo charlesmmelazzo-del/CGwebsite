@@ -708,6 +708,31 @@ function slowServer() {
     });
   }
 
+  console.log("File 12: the polish pass");
+  {
+    const compP = (f: string) => readFileSync(join(APP, "..", "components", "passport", f), "utf8");
+    await test("Home reads in the agreed order: welcome and buttons, Right now, Tonight, votes, For you, From the bar, What's new, Shared, newest list, exclusives", () => {
+      const home = compP("tabs/HomeTab.tsx");
+      const order = ["Welcome, {d.first_name}", "<HereButtons", "pp-now", "<LetsGoCards", "<Tonight", "<VotesHome", "<ForYouHome", "<FromTheBar", "<WhatsNew", "<SharedWithYou", "<NewestList", "pp-exclusives"];
+      const at = order.map((x) => home.indexOf(x));
+      assert.ok(at.every((n) => n > 0), `all present: ${order.filter((_, i) => at[i] < 0)}`);
+      assert.deepEqual([...at].sort((x, y) => x - y), at, "in this order");
+      assert.ok(home.includes("<SeeAll items={now}") && home.includes("<SeeAll items={d.exclusives}") && compP("Votes.tsx").includes("<SeeAll"), "more than three behind See all");
+    });
+    await test("\"Keep it handy\": Not now lasts 30 days; never once installed", () => {
+      const ih = compP("InstallHint.tsx");
+      assert.ok(ih.includes("30 * 24 * 60 * 60 * 1000") && ih.includes('"appinstalled"') && ih.includes("store(INSTALLED, \"1\")"));
+    });
+    await test("the faint text passes WCAG AA on the background; the Index's jump chips stick; Back slides the page out", async () => {
+      const { C } = await import("../../../components/passport/theme");
+      const lum = (h: string) => { const c = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((x) => (x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+      const ratio = (a: string, b: string) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+      for (const bg of [C.bg, C.card]) assert.ok(ratio(C.faint, bg) >= 4.5, `faint on ${bg}: ${ratio(C.faint, bg).toFixed(2)}`);
+      assert.ok(compP("tabs/IndexTab.tsx").includes("pp-jump sticky"));
+      assert.ok(compP("AppShell.tsx").includes('{ transform: "translateX(100%)" }'));
+    });
+  }
+
   console.log(`\n${passed} passed, ${failed} failed`);
   if (failed) process.exit(1);
 })();

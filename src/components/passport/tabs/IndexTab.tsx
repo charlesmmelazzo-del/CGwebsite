@@ -75,7 +75,7 @@ function Index({ d, version }: { d: IndexView; version: number }) {
       <SearchArea initial={initialQ}>
         {/* File 12: the jump chips stay reachable while the long Index scrolls (they stick under the top bar). */}
         <nav aria-label="Jump to" className="pp-jump sticky z-20 -mx-5 px-5 mt-4 py-2 flex gap-2 overflow-x-auto border-b"
-          style={{ top: "var(--pp-top)", background: "rgba(19,23,15,0.96)", borderColor: C.line }}>
+          style={{ top: "var(--pp-top)", background: C.bg, borderColor: C.line }}>
           {sections.map((s) => (
             <button key={s.id} type="button" onClick={() => jump(s.id)} className="shrink-0 rounded-full border px-3.5 min-h-[44px] font-body text-xs whitespace-nowrap pp-focus pp-press"
               style={{ borderColor: C.line, color: C.muted }}>{s.label}</button>

@@ -80,7 +80,7 @@ export default function Account({ me: initial, prefs, friends }: { me: Me; prefs
         {full && m.can_invite_household && <p className="font-body text-xs" style={{ color: C.faint }}>A household can have up to 3 people.</p>}
         {m.can_invite_household && !full && (inviting
           ? <InviteForm onDone={(first) => { setSentTo(first); setInviting(false); }} onCancel={() => setInviting(false)} />
-          : <button type="button" className="font-body text-sm underline underline-offset-4" style={{ color: C.text }} onClick={() => setInviting(true)}>+ Add someone in your household</button>)}
+          : <button type="button" className="inline-flex items-center min-h-[44px] font-body text-sm underline underline-offset-4 pp-focus rounded" style={{ color: C.text }} onClick={() => setInviting(true)}>+ Add someone in your household</button>)}
       </Block>
 
       {friends && <FriendsBlock initial={friends} />}
@@ -103,7 +103,7 @@ export default function Account({ me: initial, prefs, friends }: { me: Me; prefs
 
       {showInstall
         ? <InstallHint force onClose={() => setShowInstall(false)} />
-        : <button type="button" onClick={() => setShowInstall(true)} className="font-body text-sm underline underline-offset-4" style={{ color: C.text }}>Save Passport to your home screen</button>}
+        : <button type="button" onClick={() => setShowInstall(true)} className="inline-flex items-center min-h-[44px] font-body text-sm underline underline-offset-4 pp-focus rounded" style={{ color: C.text }}>Save Passport to your home screen</button>}
 
       <div className="pt-2">
         <Button type="button" kind="quiet" onClick={signOut}>Sign out</Button>
@@ -199,8 +199,8 @@ function FriendsBlock({ initial }: { initial: FriendsOverview }) {
         <span className="block font-body text-[11px] tracking-[0.2em] uppercase mb-1.5" style={{ color: C.muted }}>Your friend code</span>
         <div className="flex items-center gap-3 flex-wrap">
           <span className="font-display text-[28px] tracking-[0.12em]" style={{ color: C.text }}>{s.friend_code}</span>
-          <button type="button" onClick={copy} className="font-body text-sm underline" style={{ color: C.text }}>{copied ? "Link copied" : "Copy my link"}</button>
-          <button type="button" disabled={busy} onClick={() => { if (confirm("Reset your friend code? The old code and link stop working.")) void call({ action: "code_reset" }); }} className="font-body text-sm underline" style={{ color: C.muted }}>Reset</button>
+          <button type="button" onClick={copy} className="inline-flex items-center min-h-[44px] font-body text-sm underline underline-offset-4 pp-focus rounded" style={{ color: C.text }}>{copied ? "Link copied" : "Copy my link"}</button>
+          <button type="button" disabled={busy} onClick={() => { if (confirm("Reset your friend code? The old code and link stop working.")) void call({ action: "code_reset" }); }} className="inline-flex items-center min-h-[44px] px-1 font-body text-sm underline underline-offset-4 pp-focus rounded" style={{ color: C.muted }}>Reset</button>
         </div>
         <p className="font-body text-xs mt-1" style={{ color: C.faint }}>Share it with people you want as friends on Passport. Anyone with it can send you a request.</p>
       </div>

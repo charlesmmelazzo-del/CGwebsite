@@ -93,9 +93,10 @@ export default function HomeTab() {
         return (
           <div>
             {d.needs_phone && <PhonePrompt />}
-            <InstallHint />
             <p className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }} suppressHydrationWarning>{greeting()}</p>
             <h1 className="font-display text-[30px] leading-tight mt-1" style={{ color: C.text }}>Welcome, {d.first_name}</h1>
+            {/* File 12: under the welcome, so the page's heading comes first. */}
+            <div className="mt-6 -mb-6"><InstallHint /></div>
             <HereButtons presence={d.social?.presence} hasFriends={d.social?.has_friends} />
             <FriendsHere friends={d.social?.friends_here} />
             {now.length > 0 && (
