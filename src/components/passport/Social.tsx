@@ -286,9 +286,35 @@ function ShareSheet({ kind, id, name, onClose, publicId }: { kind: ShareKind; id
     return () => { off = true; };
   }, [setError]);
   const toggle = (fid: number) => setPick((p) => { const n = new Set(p); if (n.has(fid)) n.delete(fid); else n.add(fid); return n; });
+  // File 16: a cocktail, bottle, house list or Passport event can also go into a group or a channel the member is in.
+  const roomsOk = !publicId && ["cocktail", "bottle", "house_list", "event"].includes(kind);
+  const [rooms, setRooms] = useState<{ key: string; room: "group" | "channel"; id: number; name: string }[]>([]);
+  const [roomPick, setRoomPick] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    if (!roomsOk) return;
+    let off = false;
+    fetch("/api/passport/chat", { cache: "no-store" }).then((r) => r.json()).then((d) => {
+      if (off || !d || !Array.isArray(d.chats)) return;
+      setRooms([
+        ...d.chats.filter((c: { kind: string }) => c.kind === "group").map((c: { id: number; name: string }) => ({ key: `group:${c.id}`, room: "group" as const, id: c.id, name: c.name })),
+        ...(d.channels || []).filter((c: { bar_only: boolean; locked: boolean }) => !c.bar_only && !c.locked).map((c: { id: number; name: string }) => ({ key: `channel:${c.id}`, room: "channel" as const, id: c.id, name: `# ${c.name}` })),
+      ]);
+    }).catch(() => {});
+    return () => { off = true; };
+  }, [roomsOk]);
   const go = async () => {
-    const out = await send<{ count: number }>("/api/passport/share", publicId ? { kind: "public_event", public_id: publicId, to: Array.from(pick), note } : { kind, id, to: Array.from(pick), note });
-    if (out) { shell?.toast(`Shared with ${out.count} friend${out.count === 1 ? "" : "s"}.`); notifyChanged("inbox"); onClose(); }
+    let count = 0;
+    if (pick.size) {
+      const out = await send<{ count: number }>("/api/passport/share", publicId ? { kind: "public_event", public_id: publicId, to: Array.from(pick), note } : { kind, id, to: Array.from(pick), note });
+      if (!out) return;
+      count += out.count;
+    }
+    for (const r of rooms.filter((x) => roomPick.has(x.key))) {
+      const out = await send(`/api/passport/chat/${r.room}/${r.id}`, { action: "send", body: note, share: { kind, id } });
+      if (!out) return;
+      count++;
+    }
+    shell?.toast(`Shared in ${count} place${count === 1 ? "" : "s"}.`); notifyChanged("inbox"); onClose();
   };
   return (
     <Sheet title={kind === "event" ? "Invite friends" : "Share with a friend"} onClose={onClose}>
@@ -309,14 +335,29 @@ function ShareSheet({ kind, id, name, onClose, publicId }: { kind: ShareKind; id
               </li>
             ))}
           </ul>
+          {rooms.length > 0 && (
+            <>
+              <p className={`${labelCls} mt-4`} style={{ color: C.muted }}>Groups and channels</p>
+              <ul className="divide-y rounded-xl border" style={{ borderColor: C.line }}>
+                {rooms.map((r) => (
+                  <li key={r.key} style={{ borderColor: C.line }}>
+                    <label className="flex items-center gap-3 px-4 min-h-[52px] cursor-pointer font-body text-[1rem]" style={{ color: C.text }}>
+                      <input type="checkbox" className="w-[18px] h-[18px] accent-[#C9A96E]" checked={roomPick.has(r.key)} onChange={() => setRoomPick((p) => { const n = new Set(p); if (n.has(r.key)) n.delete(r.key); else n.add(r.key); return n; })} />
+                      <span className="flex-1">{r.name}</span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
           <label className="block mt-4">
             <span className={labelCls} style={{ color: C.muted }}>A note (optional)</span>
             <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={NOTE_MAX} className={inputCls} placeholder="You have to try this" />
           </label>
           <p className="font-body text-[0.875rem] mt-2" style={{ color: C.faint }}>{PRIVATE_LINE}</p>
           {error && <div className="mt-3"><Notice>{error}</Notice></div>}
-          <button type="button" disabled={busy || !pick.size} onClick={go} className={`${smallBtn} w-full mt-4`} style={{ borderColor: C.brass, background: C.brass, color: C.bg }}>
-            {busy ? "Sharing…" : `Share${pick.size ? ` with ${pick.size}` : ""}`}
+          <button type="button" disabled={busy || !(pick.size + roomPick.size)} onClick={go} className={`${smallBtn} w-full mt-4`} style={{ borderColor: C.brass, background: C.brass, color: C.bg }}>
+            {busy ? "Sharing…" : `Share${pick.size + roomPick.size ? ` with ${pick.size + roomPick.size}` : ""}`}
           </button>
         </>
       )}
