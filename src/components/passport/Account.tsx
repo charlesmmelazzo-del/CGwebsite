@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import InstallHint from "./InstallHint";
+import { InstallHelpButton } from "./WelcomeSheet";
 import { markPromptDone, pushState, turnOff, turnOn, type PushState } from "./pushClient";
 import { notifyChanged } from "./appEvents";
 import { forgetRecent } from "./recent";
@@ -17,7 +17,6 @@ export default function Account({ me: initial, prefs, friends }: { me: Me; prefs
   const [me, setMe] = useState(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [showInstall, setShowInstall] = useState(false);
   const [inviting, setInviting] = useState(false);
   const [sentTo, setSentTo] = useState("");
   // Up to 3 people in a household, counting anyone invited who hasn't joined.
@@ -125,9 +124,8 @@ export default function Account({ me: initial, prefs, friends }: { me: Me; prefs
         </Block>
       )}
 
-      {showInstall
-        ? <InstallHint force onClose={() => setShowInstall(false)} />
-        : <button type="button" onClick={() => setShowInstall(true)} className="inline-flex items-center min-h-[44px] font-body text-sm underline underline-offset-4 pp-focus rounded" style={{ color: C.text }}>Save Passport to your home screen</button>}
+      {/* File 16, Part 8: reopens the pop-up's install step any time. */}
+      <InstallHelpButton>Add Passport to your home screen</InstallHelpButton>
 
       <div className="pt-2">
         <Button type="button" kind="quiet" onClick={signOut}>Sign out</Button>
@@ -197,7 +195,6 @@ function ThisDevice() {
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
-  const [showInstall, setShowInstall] = useState(false);
   useEffect(() => { let live = true; pushState().then((s) => { if (live) setState(s); }); return () => { live = false; }; }, []);
   const flip = async (on: boolean) => {
     setBusy(true);
@@ -215,9 +212,7 @@ function ThisDevice() {
       {state === "needs-install" ? (
         <>
           <p className="font-body text-sm leading-relaxed" style={{ color: C.text }}>On iPhone, notifications work once Passport is on your home screen. Add it, open Passport from there, then turn them on here.</p>
-          {showInstall
-            ? <InstallHint force onClose={() => setShowInstall(false)} />
-            : <button type="button" onClick={() => setShowInstall(true)} className="inline-flex items-center min-h-[44px] font-body text-sm underline underline-offset-4 pp-focus rounded" style={{ color: C.text }}>How to add Passport to your home screen</button>}
+          <InstallHelpButton>How to add Passport to your home screen</InstallHelpButton>
         </>
       ) : state === "unsupported" ? (
         <p className="font-body text-sm leading-relaxed" style={{ color: C.muted }}>This browser can&rsquo;t show notifications from Passport. Emails still come through.</p>

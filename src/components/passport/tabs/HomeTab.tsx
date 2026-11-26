@@ -7,8 +7,7 @@ import { SeeAll, Skel } from "../bits";
 import { KindLabel, SectionHeading, accentCardStyle } from "../Drill";
 import { ACCENTS, sectionOf, type CardKind } from "@/lib/passport/accents";
 import { CocktailFeature } from "../Library";
-import InstallHint from "../InstallHint";
-import PushPrompt from "../PushPrompt";
+import { WelcomePopup } from "../WelcomeSheet";
 import PhonePrompt from "../PhonePrompt";
 import TabView from "./TabView";
 import { FromTheBar, HereButtons, NewestList, SharedWithYou, Tonight, WhatsNew } from "./Slots";
@@ -103,10 +102,8 @@ export default function HomeTab() {
             {d.needs_phone && <PhonePrompt />}
             <p className="pp-t-eyebrow" style={{ color: C.brass }} suppressHydrationWarning>{greeting()}</p>
             <h1 className="pp-t-page mt-1" style={{ color: C.text }}>Welcome, {d.first_name}</h1>
-            {/* File 12: under the welcome, so the page's heading comes first. */}
-            <div className="mt-6 -mb-6"><InstallHint /></div>
-            {/* File 13: once, after the member has used Passport for a bit: notifications on this phone. */}
-            <PushPrompt />
+            {/* File 16, Part 8: "Add Passport to your home screen" and notifications are a pop-up over Home, never a card in the page. */}
+            <WelcomePopup />
             <HereButtons presence={d.social?.presence} hasFriends={d.social?.has_friends} />
             <FriendsHere friends={d.social?.friends_here} />
             {now.length > 0 && (

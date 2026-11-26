@@ -7,7 +7,7 @@
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
 
-const ICON = "/passport/icon-192.png";
+const ICON = "/passport/icons/icon-192.png";
 /** Only a Passport address on this site; anything else opens Passport's Home. */
 function safeUrl(u) {
   return typeof u === "string" && /^\/passport(\/[A-Za-z0-9/_?=&.-]*)?$/.test(u) && !u.includes("..") && !u.includes("//") ? u : "/passport";

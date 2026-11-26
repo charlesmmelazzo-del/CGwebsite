@@ -133,6 +133,63 @@ const overview = (): ChatOverview => ({
     assert.ok(rooms.includes("Everyone in this channel and the Common Good team can read this.") && rooms.includes("Private between the people in this group."));
   });
 
+  console.log("File 16, Part 8: the home screen and notifications pop-up");
+  const W = await import("../welcomePrompt");
+  const base = { homeRendered: true, sinceVisit: 5000, installed: false, push: "off" as const, ios: false, now: 1_800_000_000_000, lastShown: null, snoozed: null };
+  await test("the first visit after signing in: it shows, once Home has rendered, never in the visit's first second", () => {
+    assert.equal(W.welcomePlan(base).show, true);
+    assert.equal(W.welcomePlan({ ...base, homeRendered: false }).show, false, "not over a loading screen");
+    assert.equal(W.welcomePlan({ ...base, sinceVisit: 600 }).show, false, "never in the first second");
+  });
+  await test("at most once a day; after Not now, not for 30 days", () => {
+    assert.equal(W.welcomePlan({ ...base, lastShown: base.now - 3 * 3600_000 }).show, false);
+    assert.equal(W.welcomePlan({ ...base, lastShown: base.now - 25 * 3600_000 }).show, true);
+    assert.equal(W.welcomePlan({ ...base, lastShown: base.now - 3 * W.DAY_MS, snoozed: base.now - 29 * W.DAY_MS }).show, false);
+    assert.equal(W.welcomePlan({ ...base, lastShown: base.now - 31 * W.DAY_MS, snoozed: base.now - 31 * W.DAY_MS }).show, true);
+  });
+  await test("never once installed and notifications on", () => {
+    assert.equal(W.welcomePlan({ ...base, installed: true, push: "on" }).show, false);
+  });
+  await test("only the missing steps: install then notifications; iPhone Safari gets the install step only", () => {
+    assert.deepEqual(W.welcomePlan(base).steps, ["install", "notify"], "Android or desktop Chrome, not installed");
+    assert.deepEqual(W.welcomePlan({ ...base, installed: true }).steps, ["notify"]);
+    assert.deepEqual(W.welcomePlan({ ...base, push: "on" }).steps, ["install"]);
+    assert.deepEqual(W.welcomePlan({ ...base, ios: true, push: "needs-install" }).steps, ["install"], "iPhone in Safari: notifications come after adding");
+    assert.equal(W.iosInstallNote({ installed: false, ios: true, push: "needs-install" }), true);
+    assert.deepEqual(W.welcomePlan({ ...base, ios: true, installed: true }).steps, ["notify"], "iPhone, opened from the home screen");
+    assert.equal(W.welcomePlan({ ...base, installed: true, push: "blocked" }).show, false, "nothing it can do: nothing shows");
+  });
+  await test("no card in the page any more: Home has only the pop-up; the old cards are gone", () => {
+    const home = readFileSync(join(ROOT, "components", "passport", "tabs", "HomeTab.tsx"), "utf8");
+    assert.ok(home.includes("<WelcomePopup />") && !/InstallHint|PushPrompt/.test(home));
+    assert.ok(!existsSync(join(ROOT, "components", "passport", "InstallHint.tsx")) && !existsSync(join(ROOT, "components", "passport", "PushPrompt.tsx")));
+    const sheet = readFileSync(join(ROOT, "components", "passport", "WelcomeSheet.tsx"), "utf8");
+    assert.ok(sheet.includes('role="dialog" aria-modal="true"') && sheet.includes('e.key === "Escape"') && sheet.includes("Not now") && sheet.includes('style.overflow = "hidden"') && sheet.includes("reducedMotion()"), "a proper dialog");
+    assert.ok(readFileSync(join(ROOT, "components", "passport", "Account.tsx"), "utf8").includes("Add Passport to your home screen"));
+  });
+
+  console.log("File 16, Part 10: the home-screen icon, a small passport");
+  await test("the manifest lists the booklet icons (any and maskable); name and short name stay", async () => {
+    const route = await import("../../../app/passport/manifest.webmanifest/route");
+    const m = JSON.parse(await route.GET().text());
+    assert.equal(m.name, "Common Good Passport");
+    assert.equal(m.short_name, "Passport");
+    const by = (p: string) => m.icons.filter((i: { purpose: string }) => i.purpose === p).map((i: { src: string; sizes: string }) => `${i.src} ${i.sizes}`);
+    assert.deepEqual(by("any"), ["/passport/icons/icon-192.png 192x192", "/passport/icons/icon-512.png 512x512"]);
+    assert.deepEqual(by("maskable"), ["/passport/icons/icon-maskable-512.png 512x512"]);
+    const pub = join(ROOT, "..", "public", "passport", "icons");
+    for (const f of ["icon.svg", "icon-maskable.svg", "apple-touch-icon.png", "icon-192.png", "icon-512.png", "icon-maskable-512.png"]) assert.ok(existsSync(join(pub, f)), f);
+    const png = readFileSync(join(pub, "apple-touch-icon.png"));
+    assert.equal(png.readUInt32BE(16), 180, "180 wide");
+    assert.equal(png[25], 2, "colour type 2: RGB, no transparency (iOS rounds the corners itself)");
+  });
+  await test("the apple-touch-icon is on Passport pages only, never the public site's own pages", () => {
+    const pl = readFileSync(join(ROOT, "app", "passport", "layout.tsx"), "utf8");
+    assert.ok(pl.includes('apple: [{ url: "/passport/icons/apple-touch-icon.png"'));
+    const root = readFileSync(join(ROOT, "app", "layout.tsx"), "utf8");
+    assert.ok(!root.includes("/passport/icons") && !root.includes("passport/apple-touch-icon"));
+  });
+
   console.log(`\n${passed} passed, ${failed} failed`);
   if (failed) process.exit(1);
 })();
