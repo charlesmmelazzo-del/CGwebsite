@@ -100,8 +100,8 @@ function TileLink({ t, onPick, eager }: { t: Tile; onPick?: () => void; eager?: 
         {t.cover && <span aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(19,23,15,0) 45%, rgba(19,23,15,0.55) 100%)" }} />}
       </span>
       <span className="block px-3 pt-2.5 pb-3 border-t-2" style={{ borderTopColor: a.edge, background: a.tint }}>
-        <span className="flex items-baseline justify-between gap-2">
-          <span className="pp-t-card block min-w-0" style={{ color: C.text, overflowWrap: "anywhere" }}>{t.label}</span>
+        <span className="flex flex-wrap items-baseline justify-between gap-x-2">
+          <span className="pp-t-card block min-w-0" style={{ color: C.text, overflowWrap: "break-word", hyphens: "auto" }}>{t.label}</span>
           {t.count !== undefined && t.count > 0 && <span className="pp-t-secondary pp-num shrink-0" style={{ color: a.ink }}>{t.count}</span>}
         </span>
         {t.line && <span className="pp-t-secondary block mt-0.5" style={{ color: C.muted }}>{t.line}</span>}
