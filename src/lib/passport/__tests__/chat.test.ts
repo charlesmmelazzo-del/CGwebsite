@@ -89,6 +89,21 @@ const overview = (): ChatOverview => ({
     assert.ok(LIMITS["passport-chat-read"].max >= 3600 / 5 + 120);
   });
 
+  console.log("File 16 (review fix): the composer never sits under the tab bar");
+  await test("above the tab bar and the safe area; directly on the keyboard when it is open", async () => {
+    const X = await import("../chat");
+    assert.equal(X.composerBottom(0), "calc(var(--pp-tabbar) + env(safe-area-inset-bottom))");
+    assert.equal(X.composerBottom(40), "calc(var(--pp-tabbar) + env(safe-area-inset-bottom))", "a browser bar settling is not the keyboard");
+    assert.equal(X.composerBottom(291.6), "292px");
+    const css = readFileSync(join(ROOT, "app", "globals.css"), "utf8");
+    assert.ok(/--pp-tabbar: 57px/.test(css) && /min-width: 768px\) \{ \.pp-app \{ --pp-tabbar: 0px; \} \}/.test(css) && css.includes('html[data-pp-keyboard="open"] .pp-tabbar { display: none; }'));
+    const shell = readFileSync(join(ROOT, "components", "passport", "AppShell.tsx"), "utf8");
+    assert.ok(shell.includes('className="pp-tabbar md:hidden') && shell.includes('height: "calc(var(--pp-tabbar) - 1px)"'), "the tab bar is drawn at the same height");
+    const chat = readFileSync(join(ROOT, "components", "passport", "Chat.tsx"), "utf8");
+    assert.ok(chat.indexOf("data-pp-line") < chat.indexOf('id="pp-chat-compose"'), "who can read it sits above the box");
+    assert.ok(chat.includes("paddingBottom: composerH + 12"), "the list leaves room for the composer");
+  });
+
   console.log("File 16: mentions");
   await test("typing @ starts a mention; picking one puts the name in; only names still in the text are sent", () => {
     assert.equal(mentionQuery("hi @Sa", 6), "Sa");

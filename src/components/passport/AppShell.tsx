@@ -297,9 +297,10 @@ function Frame({ children }: { children: ReactNode }) {
           <div className="pp-page w-full max-w-xl mx-auto px-5">{exiting ? lastPage.current : children}</div>
         </div>
 
-        <nav aria-label="Passport tabs" className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t"
+        <nav aria-label="Passport tabs" className="pp-tabbar md:hidden fixed bottom-0 inset-x-0 z-40 border-t"
           style={{ background: "rgba(15,19,12,0.97)", borderColor: C.line, paddingBottom: "env(safe-area-inset-bottom)" }}>
-          <ul className="max-w-xl mx-auto grid grid-cols-5 items-end px-1">
+          {/* File 16: drawn at --pp-tabbar (the border included), the same height the conversation composer clears. */}
+          <ul className="max-w-xl mx-auto grid grid-cols-5 items-end px-1" style={{ height: "calc(var(--pp-tabbar) - 1px)" }}>
             {TABS.map((t) => <li key={t.id} className="flex justify-center">{tabLink(t, "bottom")}</li>)}
           </ul>
         </nav>

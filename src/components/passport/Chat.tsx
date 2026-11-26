@@ -5,7 +5,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNo
 import { C, Notice } from "./ui";
 import { reducedMotion } from "./appEvents";
 import {
-  BODY_MAX, REACTIONS, ROOM_POLL_MS, chatLines, hiddenWords, insertMention, mentionQuery, mentionsLeft, timeOf,
+  BODY_MAX, REACTIONS, ROOM_POLL_MS, chatLines, composerBottom, hiddenWords, insertMention, keyboardOpen, mentionQuery, mentionsLeft, timeOf,
   type ChatReaction, type MentionOption,
 } from "@/lib/passport/chat";
 
@@ -63,11 +63,16 @@ function useKeyboardInset() {
   useEffect(() => {
     const vv = typeof window !== "undefined" ? window.visualViewport : null;
     if (!vv) return;
-    const on = () => setInset(Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)));
+    const on = () => {
+      const i = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+      setInset(i);
+      // With the keyboard open the composer sits right on it and the tab bar is not shown underneath (globals.css).
+      if (keyboardOpen(i)) document.documentElement.dataset.ppKeyboard = "open"; else delete document.documentElement.dataset.ppKeyboard;
+    };
     vv.addEventListener("resize", on);
     vv.addEventListener("scroll", on);
     on();
-    return () => { vv.removeEventListener("resize", on); vv.removeEventListener("scroll", on); };
+    return () => { vv.removeEventListener("resize", on); vv.removeEventListener("scroll", on); delete document.documentElement.dataset.ppKeyboard; };
   }, []);
   return inset;
 }
@@ -106,6 +111,8 @@ export function ChatScreen(p: ChatScreenProps) {
   const [replyTo, setReplyTo] = useState<UiPost | null>(null);
   const [newBelow, setNewBelow] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
+  // The composer is fixed above the tab bar (or the keyboard); the list leaves room for all of it below the last message.
+  const [composerH, setComposerH] = useState(120);
   const lastId = p.posts.length ? p.posts[p.posts.length - 1].id : 0;
   const firstId = p.posts.length ? p.posts[0].id : 0;
   const prevLast = useRef(0);
@@ -155,7 +162,7 @@ export function ChatScreen(p: ChatScreenProps) {
 
   const lines = chatLines(p.posts);
   return (
-    <div className="pb-2" ref={listRef}>
+    <div ref={listRef} style={{ paddingBottom: composerH + 12 }}>
       {p.header}
       {p.above}
       {p.hasMore && <p className="text-center pp-t-secondary mt-4" style={{ color: C.faint }}>{loadingOlder ? "Loading earlier messages…" : <button type="button" className="underline pp-focus rounded min-h-[44px] px-2" onClick={() => { if (!p.onOlder) return; heightBefore.current = boxRef.current?.scrollHeight || 0; setLoadingOlder(true); void p.onOlder().finally(() => setLoadingOlder(false)); }}>Load earlier messages</button>}</p>}
@@ -172,12 +179,8 @@ export function ChatScreen(p: ChatScreenProps) {
             onBlock={p.onBlock ? () => { setSelected(null); p.onBlock!(l.post); } : undefined} onDelete={p.onDelete ? () => { setSelected(null); void p.onDelete!(l.post); } : undefined} />
         ))}
       </ol>
-      {newBelow && (
-        <div className="sticky z-10 flex justify-center pointer-events-none" style={{ bottom: 150 }}>
-          <button type="button" onClick={() => toBottom(true)} className="pointer-events-auto rounded-full px-4 min-h-[40px] pp-t-secondary shadow-lg pp-focus" style={{ background: C.brass, color: C.bg }}>New messages ↓</button>
-        </div>
-      )}
-      <Composer {...p} replyTo={replyTo} clearReply={() => setReplyTo(null)} />
+      <Composer {...p} replyTo={replyTo} clearReply={() => setReplyTo(null)} onHeight={setComposerH}
+        jump={newBelow ? <button type="button" onClick={() => toBottom(true)} className="pointer-events-auto rounded-full px-4 min-h-[40px] pp-t-secondary shadow-lg pp-focus" style={{ background: C.brass, color: C.bg }}>New messages ↓</button> : null} />
     </div>
   );
 }
@@ -241,12 +244,13 @@ function ActBtn({ children, onClick, warn = false }: { children: ReactNode; onCl
   return <button type="button" onClick={onClick} className="rounded-full border px-3 min-h-[40px] pp-t-secondary pp-focus" style={{ borderColor: C.line, color: warn ? C.accent : C.text }}>{children}</button>;
 }
 
-function Composer({ canWrite, whyNot, placeholder, max = BODY_MAX, line, onSend, mentionSource, busy, error, replyTo, clearReply }: ChatScreenProps & { replyTo: UiPost | null; clearReply: () => void }) {
+function Composer({ canWrite, whyNot, placeholder, max = BODY_MAX, line, onSend, mentionSource, busy, error, replyTo, clearReply, onHeight, jump }: ChatScreenProps & { replyTo: UiPost | null; clearReply: () => void; onHeight: (h: number) => void; jump: ReactNode }) {
   const [text, setText] = useState("");
   const [picked, setPicked] = useState<MentionOption[]>([]);
   const [options, setOptions] = useState<MentionOption[]>([]);
   const [q, setQ] = useState<string | null>(null);
   const ta = useRef<HTMLTextAreaElement>(null);
+  const block = useRef<HTMLDivElement>(null);
   const kb = useKeyboardInset();
   useEffect(() => {
     if (q === null || !mentionSource) { setOptions([]); return; }
@@ -255,9 +259,17 @@ function Composer({ canWrite, whyNot, placeholder, max = BODY_MAX, line, onSend,
     return () => { off = true; clearTimeout(t); };
   }, [q, mentionSource]);
   useEffect(() => { if (replyTo) ta.current?.focus(); }, [replyTo]);
-  if (!canWrite) {
-    return <div className="sticky bottom-0 py-3 mt-4" style={{ background: C.bg }}><Notice>{whyNot || "You can't write here right now."}</Notice><p className="pp-t-secondary mt-2" style={{ color: C.faint }}>{line}</p></div>;
-  }
+  // Tell the list how tall the composer block is, so the last message and its reactions are never under it.
+  useEffect(() => {
+    const el = block.current;
+    if (!el) return;
+    const report = () => onHeight(Math.ceil(el.getBoundingClientRect().height));
+    report();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(report);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [onHeight, canWrite]);
   const submit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!text.trim() || busy) return;
@@ -273,31 +285,40 @@ function Composer({ canWrite, whyNot, placeholder, max = BODY_MAX, line, onSend,
     setQ(null);
     requestAnimationFrame(() => { if (el) { el.focus(); el.setSelectionRange(next.caret, next.caret); } });
   };
+  // File 16: the whole block (who can read it, then the box and Send) is fixed above the tab bar and the safe area, or
+  // directly on top of the keyboard while it is open: never under the tab bar on any phone.
   return (
-    <form onSubmit={submit} className="sticky z-20 -mx-5 px-5 pt-2 mt-4 border-t" style={{ bottom: kb, background: "rgba(19,23,15,0.97)", borderColor: C.line, paddingBottom: kb ? 8 : "calc(env(safe-area-inset-bottom) + 10px)" }}>
-      {replyTo && (
-        <div className="flex items-start gap-2 mb-2 border-l-2 pl-2" style={{ borderColor: C.brass }}>
-          <span className="flex-1 min-w-0 pp-t-secondary truncate" style={{ color: C.muted }}>Replying to <span style={{ color: C.text }}>{replyTo.mine ? "yourself" : replyTo.author}</span>: {(replyTo.body || "").slice(0, 80)}</span>
-          <button type="button" onClick={clearReply} aria-label="Cancel the reply" className="w-9 h-9 rounded-full pp-focus" style={{ color: C.muted }}>×</button>
-        </div>
-      )}
-      {options.length > 0 && q !== null && (
-        <ul className="mb-2 rounded-xl border max-h-48 overflow-y-auto" style={{ borderColor: C.line, background: C.card }} role="listbox" aria-label="People in this conversation">
-          {options.map((o) => <li key={o.seat}><button type="button" role="option" aria-selected={false} onClick={() => pick(o)} className="w-full text-left px-4 min-h-[44px] font-body pp-focus" style={{ color: C.text }}>@{o.name}</button></li>)}
-        </ul>
-      )}
-      <div className="flex items-end gap-2">
-        <label className="sr-only" htmlFor="pp-chat-compose">{placeholder}</label>
-        <textarea id="pp-chat-compose" ref={ta} rows={1} maxLength={max} value={text} placeholder={placeholder}
-          onChange={(e) => { setText(e.target.value); setQ(mentionSource ? mentionQuery(e.target.value, e.target.selectionStart) : null); }}
-          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && window.matchMedia?.("(pointer: fine)").matches) { e.preventDefault(); void submit(); } }}
-          className="flex-1 rounded-2xl border px-4 py-2.5 font-body text-[1rem] leading-snug resize-none max-h-36 pp-focus" style={{ background: C.card, borderColor: C.line, color: C.text, fieldSizing: "content" } as React.CSSProperties} />
-        <button type="submit" disabled={busy || !text.trim()} aria-label="Send" className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 disabled:opacity-40 pp-focus pp-press" style={{ background: C.brass, color: C.bg }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M5 12h14M13 6l6 6-6 6" /></svg>
-        </button>
+    <div ref={block} data-pp-composer className="fixed inset-x-0 z-30 border-t" style={{ bottom: composerBottom(kb), background: "rgba(19,23,15,0.97)", borderColor: C.line }}>
+      {jump && <div className="absolute inset-x-0 bottom-full flex justify-center pb-3 pointer-events-none">{jump}</div>}
+      <div className="max-w-xl mx-auto px-5 pt-2 pb-2.5">
+        <p data-pp-line className="pp-t-secondary leading-snug mb-1.5" style={{ color: C.faint }}>{canWrite && text.length > max - 150 ? `${max - text.length} characters left` : line}</p>
+        {!canWrite ? <Notice>{whyNot || "You can't write here right now."}</Notice> : (
+          <form onSubmit={submit}>
+            {replyTo && (
+              <div className="flex items-start gap-2 mb-2 border-l-2 pl-2" style={{ borderColor: C.brass }}>
+                <span className="flex-1 min-w-0 pp-t-secondary truncate" style={{ color: C.muted }}>Replying to <span style={{ color: C.text }}>{replyTo.mine ? "yourself" : replyTo.author}</span>: {(replyTo.body || "").slice(0, 80)}</span>
+                <button type="button" onClick={clearReply} aria-label="Cancel the reply" className="w-9 h-9 rounded-full pp-focus" style={{ color: C.muted }}>×</button>
+              </div>
+            )}
+            {options.length > 0 && q !== null && (
+              <ul className="mb-2 rounded-xl border max-h-48 overflow-y-auto" style={{ borderColor: C.line, background: C.card }} role="listbox" aria-label="People in this conversation">
+                {options.map((o) => <li key={o.seat}><button type="button" role="option" aria-selected={false} onClick={() => pick(o)} className="w-full text-left px-4 min-h-[44px] font-body pp-focus" style={{ color: C.text }}>@{o.name}</button></li>)}
+              </ul>
+            )}
+            <div className="flex items-end gap-2">
+              <label className="sr-only" htmlFor="pp-chat-compose">{placeholder}</label>
+              <textarea id="pp-chat-compose" ref={ta} rows={1} maxLength={max} value={text} placeholder={placeholder}
+                onChange={(e) => { setText(e.target.value); setQ(mentionSource ? mentionQuery(e.target.value, e.target.selectionStart) : null); }}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && window.matchMedia?.("(pointer: fine)").matches) { e.preventDefault(); void submit(); } }}
+                className="flex-1 rounded-2xl border px-4 py-2.5 font-body text-[1rem] leading-snug resize-none max-h-36 pp-focus" style={{ background: C.card, borderColor: C.line, color: C.text, fieldSizing: "content" } as React.CSSProperties} />
+              <button type="submit" disabled={busy || !text.trim()} aria-label="Send" className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 disabled:opacity-40 pp-focus pp-press" style={{ background: C.brass, color: C.bg }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+              </button>
+            </div>
+            {error && <div className="mt-2"><Notice>{error}</Notice></div>}
+          </form>
+        )}
       </div>
-      <p className="pp-t-secondary mt-1.5 leading-snug" style={{ color: C.faint }}>{text.length > max - 150 ? `${max - text.length} characters left` : line}</p>
-      {error && <div className="mt-2"><Notice>{error}</Notice></div>}
-    </form>
+    </div>
   );
 }

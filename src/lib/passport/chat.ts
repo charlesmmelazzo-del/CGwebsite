@@ -155,6 +155,19 @@ export function mergePosts<P extends { id: number }>(have: P[], incoming: P[], {
   return Array.from(by.values()).sort((a, b) => a.id - b.id);
 }
 
+// ── Where the composer sits ──────────────────────────────────────────────────
+/** An inset of the visual viewport larger than this is the on-screen keyboard (not a browser bar settling). */
+export const KEYBOARD_MIN = 80;
+export const keyboardOpen = (inset: number) => inset > KEYBOARD_MIN;
+/**
+ * The composer's distance from the bottom of the screen: directly on top of the keyboard when it is open (the tab bar
+ * is hidden then), otherwise above the bottom tab bar and the phone's safe area. --pp-tabbar is the tab bar's own height
+ * (globals.css; 0 on a wide screen, where the tabs are at the top).
+ */
+export function composerBottom(inset: number): string {
+  return keyboardOpen(inset) ? `${Math.round(inset)}px` : "calc(var(--pp-tabbar) + env(safe-area-inset-bottom))";
+}
+
 // ── Mentions ─────────────────────────────────────────────────────────────────
 /** The word being typed after an "@" at the caret, or null when the caret is not in one. */
 export function mentionQuery(text: string, caret: number): string | null {
