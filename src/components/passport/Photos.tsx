@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 import { C, Notice, inputCls, postJson } from "./ui";
 import { itemHref } from "./personalShared";
 import { myPhotoSrc, type ItemKind, type MemberPhoto, type PhotoLimits, type PhotosData } from "@/lib/passport/types";
@@ -84,9 +85,10 @@ function Viewer({ p, onClose, onDelete, itemLink }: { p: MemberPhoto; onClose: (
     document.addEventListener("keydown", esc);
     return () => document.removeEventListener("keydown", esc);
   }, [onClose]);
-  if (!p.id) return null;
-  return (
-    <div role="dialog" aria-modal="true" aria-label="Your photo" className="fixed inset-0 z-[80] flex flex-col" style={{ background: "rgba(8,10,6,0.96)" }}>
+  if (!p.id || typeof document === "undefined") return null;
+  // Over everything, the app's bars included: a page that slides over a tab is its own layer, so this goes to <body>.
+  return createPortal(
+    <div role="dialog" aria-modal="true" aria-label="Your photo" className="fixed inset-0 z-[90] flex flex-col" style={{ background: "rgba(8,10,6,0.97)" }}>
       <div className="flex items-center justify-between px-4 pt-[max(env(safe-area-inset-top),12px)] pb-2">
         <span className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>Your photo</span>
         <button ref={close} type="button" onClick={onClose} className="min-w-[44px] min-h-[44px] font-body text-sm pp-focus rounded" style={{ color: C.text }}>Close</button>
@@ -107,7 +109,8 @@ function Viewer({ p, onClose, onDelete, itemLink }: { p: MemberPhoto; onClose: (
           <button type="button" onClick={() => setSure(true)} className={smallBtn} style={{ borderColor: C.line, color: C.muted }}>Delete</button>
         ))}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
