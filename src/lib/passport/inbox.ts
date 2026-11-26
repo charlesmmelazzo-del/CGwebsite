@@ -115,8 +115,8 @@ export function needsYou(inbox: Pick<InboxData, "threads" | "member_requests" | 
   const out: NeedsItem[] = [];
   for (const r of inbox?.member_requests || []) if (r.question) out.push({ key: `q${r.id}`, kind: "question", request: r, href: `/passport/inbox/requests/${r.id}` });
   for (const b of bottles || []) {
-    if (b.can_answer) out.push({ key: `p${b.id}`, kind: "price", bottle: b, href: "/passport/inbox#pp-my-bottles" });
-    else if (b.status === "ready") out.push({ key: `b${b.id}`, kind: "ready", bottle: b, href: "/passport/inbox#pp-my-bottles" });
+    if (b.can_answer) out.push({ key: `p${b.id}`, kind: "price", bottle: b, href: "/passport/inbox?tab=bottles" });
+    else if (b.status === "ready") out.push({ key: `b${b.id}`, kind: "ready", bottle: b, href: "/passport/inbox?tab=bottles" });
   }
   for (const t of inbox?.threads || []) if (t.unread) out.push({ key: `t${t.id}`, kind: "reply", thread: t, href: `/passport/inbox/messages/${t.id}` });
   for (const q of inbox?.inquiries || []) if (q.unread) out.push({ key: `e${q.id}`, kind: "event", inquiry: q, href: `/passport/inbox/events/${q.id}` });

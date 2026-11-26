@@ -236,8 +236,9 @@ function slowServer() {
     // A one-word address with no folder of its own is answered by the old-tab route ([tab]).
     return /^\/passport\/[a-z-]+$/.test(path) ? join(APP, "passport", "(app)", "[tab]", "page.tsx") : null;
   };
-  await test("five tabs, left to right: Menu, Index, CG (Home), Events, Inbox", () => {
-    assert.deepEqual(TABS.map((t) => t.label), ["Menu", "Index", "Home", "Events", "Inbox"]);
+  // File 16 renamed the fifth tab "Messages" (same address, /passport/inbox).
+  await test("five tabs, left to right: Menu, Index, CG (Home), Events, Messages", () => {
+    assert.deepEqual(TABS.map((t) => t.label), ["Menu", "Index", "Home", "Events", "Messages"]);
     assert.equal(TABS[2].href, "/passport", "the centre button is Home");
   });
   await test("a tab's own address is that tab; anything else opens over a tab", () => {

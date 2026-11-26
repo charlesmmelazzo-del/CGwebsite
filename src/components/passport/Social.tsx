@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { C, Check, Notice, inputCls, postJson } from "./ui";
 import { BackLink, SeeAll } from "./bits";
@@ -12,11 +12,12 @@ import { whenShort } from "@/lib/passport/inbox";
 import { dayLong } from "@/lib/passport/shell";
 import { itemHref } from "@/lib/passport/votes";
 import {
-  ANSWERS, DM_MAX, LETSGO_NOTE_MAX, LETSGO_TIMES, LOOKUP_LINE, NOTE_MAX, POLL_MS, PRIVATE_LINE, SHARE_WORDS, answerWord, nextDays, shareHref, sortPlans,
+  ANSWERS, DM_MAX, LETSGO_NOTE_MAX, LETSGO_TIMES, LOOKUP_LINE, NOTE_MAX, PRIVATE_LINE, SHARE_WORDS, answerWord, nextDays, shareHref, sortPlans,
 } from "@/lib/passport/social";
 import type { Conversation, DmPost, Friend, FriendsOverview, LetsGo, MemberNotice, Presence, ShareCard, ShareKind, SocialInbox } from "@/lib/passport/types";
 import { ACCENTS } from "@/lib/passport/accents";
 import { KindLabel, SectionIcon, accentCardStyle } from "./Drill";
+import { ChatScreen, useRoomPoll, type UiPost } from "./Chat";
 
 /**
  * File 09: friends, direct messages, sharing, "Let's go" and "I'm here". Everything goes through the website's own
@@ -375,9 +376,10 @@ export function SharedView({ initial }: { initial: ShareCard }) {
 
 // ── Friends (the page, from Account and the Inbox) ───────────────────────────
 type FindHow = "email" | "phone" | "code";
-export function FriendsPage({ initial, code = "" }: { initial: FriendsOverview; code?: string }) {
+export function FriendsPage({ initial, code = "", embedded = false }: { initial: FriendsOverview; code?: string; embedded?: boolean }) {
   const shell = useShell();
   const [d, setD] = useState(initial);
+  useEffect(() => { setD(initial); }, [initial]);
   const [how, setHow] = useState<FindHow>(code ? "code" : "email");
   const [value, setValue] = useState(code);
   const [sentMsg, setSentMsg] = useState("");
@@ -399,13 +401,18 @@ export function FriendsPage({ initial, code = "" }: { initial: FriendsOverview; 
   };
   const confirmDo = (msg: string, body: Record<string, unknown>, done: string) => { if (confirm(msg)) void act(body, done); };
   return (
-    <div className="pb-16 space-y-8">
+    <div className={embedded ? "pb-6 space-y-8" : "pb-16 space-y-8"}>
+      {embedded ? (
+        // File 16: the Friends top tab of Messages (friends, requests received and sent, suggested, add a friend, friend code).
+        <p className="font-body text-sm leading-relaxed" style={{ color: C.muted }}>Friends see your display name ({d.settings.shown_as}). Your friend code: <span className="pp-num" style={{ color: C.text }}>{d.settings.friend_code}</span></p>
+      ) : (
       <div>
         <BackLink fallback="/passport/account" label="Account" />
         <p className="font-body text-[0.75rem] tracking-[0.3em] uppercase mt-2" style={{ color: C.brass }}>Passport</p>
         <h1 className="font-display text-4xl mt-1" style={{ color: C.text }}>Friends</h1>
         <p className="font-body text-sm mt-2 leading-relaxed" style={{ color: C.muted }}>Friends see your display name ({d.settings.shown_as}), can message you, share with you, and see your plans and when you&rsquo;re here. Never your email, phone, history or notes.</p>
       </div>
+      )}
 
       {d.incoming.length > 0 && (
         <section aria-labelledby="pp-requests">
@@ -550,98 +557,73 @@ function ReportSheet({ target, messageId, conversationId, name, onClose }: { tar
 }
 
 // ── One conversation with a friend ───────────────────────────────────────────
+/**
+ * File 16: a direct message with a friend in the one conversation screen: bubbles, day separators, replies that quote a
+ * message, the five reactions, report and block. It asks for news every 5 seconds while it is on screen.
+ */
 export function ConversationView({ initial, friendId, friendName = "" }: { initial: Conversation | null; friendId?: number; friendName?: string }) {
   const router = useRouter();
   const [c, setC] = useState(initial);
-  const [text, setText] = useState("");
   const [reporting, setReporting] = useState<{ id?: number } | null>(null);
   const { send, busy, error } = useSend();
-  const end = useRef<HTMLLIElement>(null);
   const id = c?.id;
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!id) return;
-    notifyChanged("inbox");
-    let off = false;
-    const load = async () => {
-      if (document.visibilityState !== "visible") return;
-      try {
-        const res = await fetch(`/api/passport/conversations/${id}`, { cache: "no-store" });
-        if (!res.ok) return;
-        const d = await res.json();
-        if (!off && d.conversation) setC(d.conversation);
-      } catch { /* offline */ }
-    };
-    const t = setInterval(load, POLL_MS);
-    const vis = () => { if (document.visibilityState === "visible") void load(); };
-    document.addEventListener("visibilitychange", vis);
-    return () => { off = true; clearInterval(t); document.removeEventListener("visibilitychange", vis); };
+    try {
+      const res = await fetch(`/api/passport/conversations/${id}`, { cache: "no-store" });
+      if (!res.ok) return;
+      const d = await res.json();
+      if (d.conversation) setC(d.conversation);
+    } catch { /* offline */ }
   }, [id]);
-  const count = c?.posts?.length || 0;
-  useEffect(() => { if (count) end.current?.scrollIntoView({ block: "nearest" }); }, [count]);
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const out = c
-      ? await send<{ conversation: Conversation }>(`/api/passport/conversations/${c.id}`, { action: "send", body: text })
-      : await send<{ conversation: Conversation }>("/api/passport/conversations", { friend_id: friendId, body: text });
-    if (out) {
-      setText("");
-      if (!c) router.replace(`/passport/inbox/friends/${out.conversation.id}`, { scroll: false });
-      setC(out.conversation);
-      notifyChanged("inbox");
-    }
-  };
+  useRoomPoll(load, undefined, !!id);
+  useEffect(() => { if (id) notifyChanged("inbox"); }, [id]);
   if (c && !c.available) {
     return (
       <div className="pb-16">
-        <BackLink fallback="/passport/inbox" label="Inbox" />
+        <BackLink fallback="/passport/inbox" label="Messages" />
         <h1 className="font-display text-3xl mt-3" style={{ color: C.text }}>Conversation</h1>
         <p className="font-body text-[1rem] mt-4" style={{ color: C.muted }}>This conversation is no longer available.</p>
       </div>
     );
   }
-  return (
-    <div className="pb-16">
-      <BackLink fallback="/passport/inbox" label="Inbox" />
-      <p className="font-body text-[0.75rem] tracking-[0.3em] uppercase mt-2" style={{ color: C.brass }}>Friend{c?.here ? " · at Common Good now" : ""}</p>
+  const name = c?.name || friendName || "your friend";
+  const posts: UiPost[] = (c?.posts || []).map((p: DmPost) => ({
+    id: p.id, at: p.at, mine: p.from === "me", author: p.from === "me" ? "You" : name, body: p.body, gone: p.removed ? "This message was removed." : null,
+    quote: p.reply_to ? { name: p.reply_to.name, text: p.reply_to.text } : null, reactions: p.reactions || [], share: p.share ? <ShareCardView s={p.share} inThread /> : null,
+    canReport: p.from !== "me" && !p.removed,
+  }));
+  const header = (
+    <div>
+      <BackLink fallback="/passport/inbox" label="Messages" />
+      <p className="pp-t-eyebrow mt-2" style={{ color: C.brass }}>Friend{c?.here ? " · at Common Good now" : ""}</p>
       <div className="flex items-start justify-between gap-3">
         <h1 className="font-display text-3xl leading-tight mt-1" style={{ color: C.text }}>{c?.name || friendName || "New message"}</h1>
-        {c && <button type="button" onClick={() => setReporting({})} className="font-body text-[0.875rem] underline mt-3 shrink-0" style={{ color: C.muted }}>Report</button>}
+        {c && <button type="button" onClick={() => setReporting({})} className="pp-t-secondary underline mt-3 shrink-0 min-h-[44px] pp-focus rounded px-1" style={{ color: C.muted }}>Report</button>}
       </div>
-      <ul className="space-y-3 mt-6" aria-live="polite">
-        {(c?.posts || []).map((p: DmPost) => {
-          const mine = p.from === "me";
-          return (
-            <li key={p.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-              <div className="max-w-[85%] rounded-2xl px-4 py-2.5" style={mine ? { background: "#2a3220", color: C.text } : { background: C.card, color: C.text, border: `1px solid ${C.line}` }}>
-                {p.removed ? <p className="font-body text-[0.875rem] italic" style={{ color: C.faint }}>This message was removed.</p> : (
-                  <>
-                    {p.share && <div className="mb-2 min-w-[200px]"><ShareCardView s={p.share} inThread /></div>}
-                    {p.body && <p className="font-body text-[1rem] leading-relaxed whitespace-pre-wrap break-words">{p.body}</p>}
-                  </>
-                )}
-                <p className="font-body text-[0.75rem] mt-1 flex items-center gap-2" style={{ color: C.faint }}>
-                  {mine ? "You" : c?.name} · {whenShort(p.at)}
-                  {!mine && !p.removed && <button type="button" onClick={() => setReporting({ id: p.id })} className="underline">Report</button>}
-                </p>
-              </div>
-            </li>
-          );
-        })}
-        <li ref={end} aria-hidden />
-      </ul>
-      {c && c.can_write === false ? <div className="mt-6"><Notice>You can&rsquo;t send messages to friends right now.</Notice></div> : (
-        <form className="mt-6 space-y-2" onSubmit={submit}>
-          <label className="sr-only" htmlFor="pp-dm">Write to {c?.name || "your friend"}</label>
-          <textarea id="pp-dm" rows={3} maxLength={DM_MAX} value={text} onChange={(e) => setText(e.target.value)} className={inputCls} placeholder={`Write to ${c?.name || friendName || "your friend"}`} />
-          <div className="flex items-center justify-between gap-3">
-            <span className="font-body text-[0.75rem] leading-snug" style={{ color: C.faint }}>{text.length > DM_MAX - 150 ? `${DM_MAX - text.length} left` : PRIVATE_LINE}</span>
-            <button type="submit" disabled={busy || !text.trim()} className={smallBtn} style={{ borderColor: C.brass, color: C.bg, background: C.brass }}>{busy ? "Sending…" : "Send"}</button>
-          </div>
-          {error && <Notice>{error}</Notice>}
-        </form>
-      )}
-      {reporting && c && <ReportSheet conversationId={c.id} messageId={reporting.id} name={c.name || "them"} onClose={() => setReporting(null)} />}
     </div>
+  );
+  return (
+    <>
+      <ChatScreen header={header} posts={posts} line={PRIVATE_LINE} canWrite={!c || c.can_write !== false} whyNot="You can't send messages to friends right now."
+        placeholder={`Write to ${name}`} max={DM_MAX} replies={!!c} reactions={!!c} busy={busy} error={error}
+        onSend={async (text, x) => {
+          const out = c
+            ? await send<{ conversation: Conversation }>(`/api/passport/conversations/${c.id}`, { action: "send", body: text, reply_to: x.replyTo })
+            : await send<{ conversation: Conversation }>("/api/passport/conversations", { friend_id: friendId, body: text });
+          if (!out) return false;
+          if (!c) router.replace(`/passport/inbox/friends/${out.conversation.id}`, { scroll: false });
+          setC(out.conversation);
+          notifyChanged("inbox");
+          return true;
+        }}
+        onReact={c ? async (pid, emoji) => {
+          const o = await postJson<{ reactions: DmPost["reactions"] }>("/api/passport/chat", { action: "react", kind: "dm", post_id: pid, emoji });
+          if (o.ok) setC((x) => (x ? { ...x, posts: (x.posts || []).map((p) => (p.id === pid ? { ...p, reactions: o.data.reactions } : p)) } : x));
+        } : undefined}
+        onReport={(p) => setReporting({ id: p.id })} />
+      {reporting && c && <ReportSheet conversationId={c.id} messageId={reporting.id} name={c.name || "them"} onClose={() => setReporting(null)} />}
+    </>
   );
 }
 

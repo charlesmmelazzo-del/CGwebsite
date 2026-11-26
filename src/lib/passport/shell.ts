@@ -6,14 +6,14 @@ import type { BottleRequest, IndexBottle, IndexCocktail, Reservation } from "./t
 // ── The five tabs ─────────────────────────────────────────────────────────────
 export type TabId = "menu" | "index" | "home" | "events" | "inbox";
 export interface TabDef { id: TabId; label: string; href: string }
-/** Left to right along the bottom: Menu · Index · CG (Home) · Events · Inbox. */
+/** Left to right along the bottom: Menu · Index · CG (Home) · Events · Messages (file 16: the Inbox, renamed; same address). */
 export const TABS: TabDef[] = [
   { id: "menu", label: "Menu", href: "/passport/menu" },
   // The Index keeps the Library's address, so every old Library link still lands on it.
   { id: "index", label: "Index", href: "/passport/library" },
   { id: "home", label: "Home", href: "/passport" },
   { id: "events", label: "Events", href: "/passport/events" },
-  { id: "inbox", label: "Inbox", href: "/passport/inbox" },
+  { id: "inbox", label: "Messages", href: "/passport/inbox" },
 ];
 const BY_PATH = new Map(TABS.map((t) => [t.href, t.id]));
 export const tabHref = (id: TabId) => TABS.find((t) => t.id === id)!.href;
@@ -53,15 +53,18 @@ export const OLD_ADDRESSES: { path: string; goes: string; note: string }[] = [
   { path: "/passport/notes", goes: "same", note: "My notes, from the Index" },
   { path: "/passport/bespoke", goes: "same", note: "My Cocktails (the recipe book), from the Index" },
   { path: "/passport/history", goes: "same", note: "Your history, from the Index" },
-  { path: "/passport/bottles", goes: "/passport/inbox", note: "My bottles now lives in the Inbox tab" },
-  { path: "/passport/messages", goes: "/passport/inbox", note: "the old Messages tab is the Inbox" },
+  { path: "/passport/bottles", goes: "/passport/inbox", note: "My bottles lives in Messages (its Bottles tab)" },
+  { path: "/passport/messages", goes: "/passport/inbox", note: "the old Messages tab is Messages again (file 16: the Inbox renamed; same address)" },
   { path: "/passport/account", goes: "same", note: "your account (the round button at the top)" },
-  { path: "/passport/inbox/new", goes: "same", note: "file 08: Message the bar, Make a request, Plan an event (over the Inbox)" },
+  { path: "/passport/inbox/new", goes: "same", note: "file 08: Message the bar, Make a request, Plan an event (over Messages)" },
   { path: "/passport/inbox/messages/[id]", goes: "same", note: "file 08: one conversation with the bar" },
   { path: "/passport/inbox/requests/[id]", goes: "same", note: "file 08: one request" },
   { path: "/passport/inbox/events/[id]", goes: "same", note: "file 08: one event inquiry" },
   { path: "/passport/friends", goes: "same", note: "file 09: Friends (requests, add a friend, friends, blocked); ?code= fills in a friend code" },
-  { path: "/passport/inbox/friends/[id]", goes: "same", note: "file 09: a conversation with a friend (over the Inbox)" },
+  { path: "/passport/inbox/friends/[id]", goes: "same", note: "file 09: a conversation with a friend (over Messages)" },
+  { path: "/passport/inbox/groups/[id]", goes: "same", note: "file 16: a friend group (over Messages); /passport/inbox/groups/new starts one" },
+  { path: "/passport/inbox/channels/[id]", goes: "same", note: "file 16: a channel (over Messages); /passport/inbox/channels/new proposes one" },
+  { path: "/passport/inbox/channels/[id]/threads/[key]", goes: "same", note: "file 16: a thread in a channel" },
   { path: "/passport/events/[id]", goes: "same", note: "file 09: one Passport event (over the Events tab)" },
   { path: "/passport/letsgo", goes: "same", note: "file 09: Let's go, plan a visit with friends (over Home)" },
   { path: "/passport/shared/[id]", goes: "same", note: "file 09: a friend's list or recipe shared with the member" },

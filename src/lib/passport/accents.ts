@@ -70,7 +70,7 @@ export const ACCENTS: Record<SectionId, Accent> = {
   spirits: make("spirits", "Spirits", "amber", 0.3, "muted"),
   "beer-wine": make("beer-wine", "Beer & wine", "plum", 0.45), // deep plum
   events: make("events", "Events", "blue", 0.45), // steel blue
-  inbox: make("inbox", "Inbox", "teal", 0.5), // dark teal
+  inbox: make("inbox", "Messages", "teal", 0.5), // dark teal (file 16: the Inbox is now Messages)
   friends: make("friends", "Friends", "green", 0.4), // forest green
   // File 15: "From the bar" cream stays on CG Picks (the bar's curated lists) and the bar's messages.
   bar: make("bar", "CG Picks", "cream"), // cream

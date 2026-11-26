@@ -10,7 +10,8 @@ export async function GET(req: NextRequest) {
 }
 
 // File 10 adds "comments" (a reply to my comment) and "votes" (a bracket I voted in moved on).
-const SWITCHES = ["messages", "requests", "bottles", "friends", "comments", "votes", "news", "digest"] as const;
+// File 16 adds "chats" (Friend chats and groups) and "channels" (Channels).
+const SWITCHES = ["messages", "requests", "bottles", "friends", "comments", "votes", "chats", "channels", "news", "digest"] as const;
 export async function PUT(req: NextRequest) {
   return memberRequest(req, "passport-personal", async (auth, b) => {
     const body: Record<string, boolean | number> = {};

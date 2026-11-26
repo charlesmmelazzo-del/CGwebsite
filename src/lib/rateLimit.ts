@@ -31,13 +31,15 @@ export const LIMITS = {
   // File 08: the Inbox. Writing to the bar, requests and event inquiries (the Bible also caps 30 messages a day, five open
   // threads and ten open requests), and reading one open conversation, which asks again every 30 seconds while on screen.
   "passport-inbox":      { max: 80,  windowMs: HOUR },
-  "passport-inbox-read": { max: 900, windowMs: HOUR },
+  "passport-inbox-read": { max: 2400, windowMs: HOUR }, // file 16: an open conversation with the bar asks every 5 seconds
   // File 09: friends. Looking someone up (the Bible also caps ten lookups an hour per member), and everything else a
   // member does with friends: messages, shares, plans, answers (the Bible caps 100 messages a day), and reading an open
   // conversation, which asks again every 30 seconds while on screen.
   "passport-friends":      { max: 40,  windowMs: HOUR },
   "passport-social":       { max: 300, windowMs: HOUR },
   "passport-social-read":  { max: 900, windowMs: HOUR },
+  // File 16: an open conversation asks for news every 5 seconds while on screen (720 an hour), plus the lists.
+  "passport-chat-read":    { max: 2400, windowMs: HOUR },
   // File 10: comments (the Bible also caps 30 a day per member and 500 per item; edits, deletes and reports count here
   // too) and votes (one tap each; a member may change a pick until voting closes).
   "passport-comments":     { max: 120, windowMs: HOUR },

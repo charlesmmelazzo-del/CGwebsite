@@ -13,6 +13,7 @@ import { TABS, homeTabOf, inboxDot, tabHref, tabOfPath, type TabId } from "@/lib
 import type { BottleRequests, InboxData, PassportList, SocialInbox } from "@/lib/passport/types";
 import { needsYou } from "@/lib/passport/inbox";
 import { socialLit } from "@/lib/passport/social";
+import { messagesBadges, messagesLit, type ChatOverview } from "@/lib/passport/chat";
 import HomeTab from "./tabs/HomeTab";
 import MenuTab from "./tabs/MenuTab";
 import IndexTab from "./tabs/IndexTab";
@@ -22,7 +23,7 @@ import { countOpen } from "./pushClient";
 
 /**
  * File 06: the Passport app frame. Five tabs along the bottom (a top bar on a wide screen): Menu · Index · CG · Events ·
- * Inbox. Each tab, once opened, stays open in the background with its scroll position, so moving between tabs is
+ * Messages (file 16: the Inbox, renamed, with a chat-bubble icon). Each tab, once opened, stays open in the background with its scroll position, so moving between tabs is
  * instant and nothing reloads the whole screen. Pages (a cocktail, a bottle, a list, your account) slide over the tab
  * they were opened from; going back reveals the list exactly where it was.
  */
@@ -32,7 +33,8 @@ const ICONS: Record<TabId, ReactNode> = {
   index: <><path d="M5 4.5h4v15H5zM10.5 4.5h4v15h-4z" /><path d="m16 5.3 3.2-.8 3 14.2-3.2.8z" /></>,
   home: null,
   events: <><rect x="4" y="5.5" width="16" height="14.5" rx="1.5" /><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" /></>,
-  inbox: <><path d="M4 13.5 6.5 5h11l2.5 8.5V19H4z" /><path d="M4 13.5h4.5l1.2 2h4.6l1.2-2H20" /></>,
+  // File 16: Messages, a chat bubble.
+  inbox: <><path d="M4.5 6.5A2.5 2.5 0 0 1 7 4h10a2.5 2.5 0 0 1 2.5 2.5v7A2.5 2.5 0 0 1 17 16h-6.5L6 19.5V16H7a2.5 2.5 0 0 1-2.5-2.5z" /><path d="M8.5 9h7M8.5 12h4.5" /></>,
 };
 const VIEW_OF: Record<TabId, ViewName> = { menu: "menu", index: "index", home: "home", events: "events", inbox: "inbox" };
 // File 12: a heart, a star or a list also changes "For you" (Home and the Index); so does "Not for me".
@@ -102,12 +104,14 @@ function Frame({ children }: { children: ReactNode }) {
   // The Inbox dot needs My bottles from the start, whichever tab opened first.
   useEffect(() => { if (!views.loaded("inbox")) void views.load("inbox"); }, [views]);
   // (Read from the store directly: this component provides the context, so it can't read it.)
-  const inbox = useSyncExternalStore((fn) => views.subscribe("inbox", fn), () => views.get("inbox"), () => views.get("inbox")) as ViewEntry<BottleRequests & { inbox?: InboxData | null; social?: SocialInbox | null }>;
+  const inbox = useSyncExternalStore((fn) => views.subscribe("inbox", fn), () => views.get("inbox"), () => views.get("inbox")) as ViewEntry<BottleRequests & { inbox?: InboxData | null; social?: SocialInbox | null; chat?: ChatOverview | null; friends?: { incoming: unknown[] } | null }>;
   useEffect(() => {
     if (!inbox.data) return;
     setDot(inboxDot(inbox.data.requests));
     // File 09: a friend request, an unread message from a friend, or a note from the bar light it too.
-    setMessagesDot(needsYou(inbox.data.inbox, []).length > 0 || socialLit(inbox.data.social));
+    // File 16: any of the Messages top tabs with something waiting (a chat, a channel, a request, a bottle, a friend request).
+    const b = messagesBadges({ chat: inbox.data.chat, requests: inbox.data.inbox?.member_requests, inquiries: inbox.data.inbox?.inquiries, bottles: inbox.data.requests, friendRequests: inbox.data.friends?.incoming.length ?? inbox.data.social?.incoming.length ?? 0 });
+    setMessagesDot(needsYou(inbox.data.inbox, []).length > 0 || socialLit(inbox.data.social) || messagesLit(b));
   }, [inbox.data]);
   // Something changed (a heart, a list, a bottle request): the tabs that show it refresh in the background.
   useEffect(() => {
@@ -226,7 +230,7 @@ function Frame({ children }: { children: ReactNode }) {
 
   const tabLink = (t: (typeof TABS)[number], where: "bottom" | "top") => {
     const on = t.id === tab;
-    const label = t.id === "inbox" && dot ? "Inbox, something needs you" : t.id === "home" ? "Home" : t.label;
+    const label = t.id === "inbox" && dot ? "Messages, something is waiting" : t.id === "home" ? "Home" : t.label;
     if (t.id === "home") {
       return (
         <Link href={t.href} scroll={false} onClick={(e) => onTab(e, t.id)} aria-current={on ? "page" : undefined} aria-label={label}

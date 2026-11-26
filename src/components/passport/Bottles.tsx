@@ -67,7 +67,7 @@ export function RequestBottle({ bottleId, name }: { bottleId: number; name: stri
     return (
       <section className="mt-8 rounded-xl border p-5" style={{ borderColor: `${C.brass}66`, background: C.card }}>
         <p className="font-display text-xl" style={{ color: C.text }}>We have your request.</p>
-        <p className="font-body text-sm mt-2 leading-relaxed" style={{ color: C.muted }}>{NO_PRICE_LINE} You can follow it in <Link href="/passport/inbox" scroll={false} className="underline" style={{ color: C.text }}>your Inbox, under My bottles</Link>.</p>
+        <p className="font-body text-sm mt-2 leading-relaxed" style={{ color: C.muted }}>{NO_PRICE_LINE} You can follow it in <Link href="/passport/inbox?tab=bottles" scroll={false} className="underline" style={{ color: C.text }}>Messages, under Bottles</Link>.</p>
       </section>
     );
   }

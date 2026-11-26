@@ -91,11 +91,11 @@ export default function HomeTab() {
         const eventNotes = d.social?.event_notices ?? [];
         const now: { key: string; card: ReactNode }[] = [
           ...eventNotes.map((n) => { const w = eventNoticeWords(n); return { key: `ev${n.kind}${n.id}`, card: <NowCard kind="event-notice" href={`/passport/events/${n.id}`} kicker={w.kicker} title={`${n.title} · ${dayLong(n.date)}`} line={w.line} /> }; }),
-          ...questions.map((r) => ({ key: `q${r.id}`, card: <NowCard kind="request-question" href={`/passport/inbox/requests/${r.id}`} kicker={r.question ? "A question about your request" : "A note about your request"} title={r.kind_label} line={r.question ? "Answer it in your Inbox." : r.status_label} /> })),
+          ...questions.map((r) => ({ key: `q${r.id}`, card: <NowCard kind="request-question" href={`/passport/inbox/requests/${r.id}`} kicker={r.question ? "A question about your request" : "A note about your request"} title={r.kind_label} line={r.question ? "Answer it in your messages." : r.status_label} /> })),
           ...replies.map((t) => ({ key: `t${t.id}`, card: <NowCard kind="bar-reply" href={`/passport/inbox/messages/${t.id}`} kicker="A reply from the bar" title={t.subject || (t.ref ? `About ${t.ref.name}` : "Your message")} line={t.preview} /> })),
           ...events.map((q) => ({ key: `e${q.id}`, card: <NowCard kind="event-reply" href={`/passport/inbox/events/${q.id}`} kicker="About your event" title={`${q.kind_label} · ${dayLong(q.preferred_date)}`} line={q.status_label} /> })),
           ...ready.map((r) => ({ key: `r${r.id}`, card: <NowCard kind="bottle-ready" href="/passport/inbox" kicker="Ready for pickup" title={r.name} line={r.quantity > 1 ? `${r.quantity} bottles, set aside for you at the bar` : "Set aside for you at the bar"} /> })),
-          ...prices.map((r) => ({ key: `p${r.id}`, card: <NowCard kind="bottle-price" href="/passport/inbox" kicker="A price is waiting for you" title={r.name} line={r.quote ? `${money(r.quote.price_cents)} a bottle, plus tax. Accept or decline in your Inbox.` : "Accept or decline in your Inbox."} /> })),
+          ...prices.map((r) => ({ key: `p${r.id}`, card: <NowCard kind="bottle-price" href="/passport/inbox?tab=bottles" kicker="A price is waiting for you" title={r.name} line={r.quote ? `${money(r.quote.price_cents)} a bottle, plus tax. Accept or decline in your messages.` : "Accept or decline in your messages."} /> })),
           ...(next ? [{ key: "res", card: <NowCard kind="reservation" href="/passport/events" kicker={`Your table · ${reservationWord(next.status)}`} title={dayLong(next.date)} line={`${next.time} · ${partyOf(next.party_size)}`} /> }] : []),
         ];
         return (
