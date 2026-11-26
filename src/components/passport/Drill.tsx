@@ -93,13 +93,13 @@ export function TileGrid({ tiles, onPick, big = false }: { tiles: Tile[]; onPick
 function TileLink({ t, onPick, eager }: { t: Tile; onPick?: () => void; eager?: boolean }) {
   const a = ACCENTS[t.section];
   return (
-    <Link href={t.href} scroll={false} onClick={onPick} className="block h-full rounded-xl overflow-hidden border pp-focus pp-row pp-card"
+    <Link href={t.href} scroll={false} onClick={onPick} className="flex flex-col h-full rounded-xl overflow-hidden border pp-focus pp-row pp-card"
       style={{ borderColor: `${a.edge}40` }}>
       <span className="block relative aspect-[4/3] overflow-hidden">
         <CoverArt cover={t.cover} label={t.label} section={t.section} eager={eager} />
         {t.cover && <span aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(19,23,15,0) 45%, rgba(19,23,15,0.55) 100%)" }} />}
       </span>
-      <span className="block px-3 pt-2.5 pb-3 border-t-2" style={{ borderTopColor: a.edge, background: a.tint }}>
+      <span className="block flex-1 px-3 pt-2.5 pb-3 border-t-2" style={{ borderTopColor: a.edge, background: a.tint }}>
         <span className="flex flex-wrap items-baseline justify-between gap-x-2">
           <span className="pp-t-card block min-w-0" style={{ color: C.text, overflowWrap: "break-word", hyphens: "auto" }}>{t.label}</span>
           {t.count !== undefined && t.count > 0 && <span className="pp-t-secondary pp-num shrink-0" style={{ color: a.ink }}>{t.count}</span>}
