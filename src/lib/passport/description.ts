@@ -6,8 +6,23 @@
  */
 export type DescriptionPart = { kind: "flavor" | "text"; text: string };
 
+/**
+ * Drop formatting marks that sometimes arrive inside plain descriptions (written elsewhere in Markdown): **bold**,
+ * __bold__, *emphasis*, a leading "#" heading mark, and a leading "- " or "* " list mark. The words are kept; nothing
+ * is ever rendered as HTML.
+ */
+export function stripMarks(text: string): string {
+  return String(text || "")
+    .replace(/\*\*([^*\n]+)\*\*/g, "$1")
+    .replace(/__([^_\n]+)__/g, "$1")
+    .replace(/(^|[\s(])\*([^*\s][^*\n]*?)\*(?=[\s.,;:!?)]|$)/gm, "$1$2")
+    .replace(/^\s{0,3}#{1,6}\s+/gm, "")
+    .replace(/^\s{0,3}[-*]\s+/gm, "")
+    .replace(/\*\*|__/g, "");
+}
+
 export function descriptionParts(text: string): DescriptionPart[] {
-  const t = String(text || "").replace(/\r\n?/g, "\n").trim();
+  const t = stripMarks(String(text || "").replace(/\r\n?/g, "\n")).trim();
   if (!t) return [];
   let lines = t.split("\n").map((l) => l.trim()).filter(Boolean);
   // A description whose line breaks were lost before it reached us: split it around its one "[...]" flavor list,
