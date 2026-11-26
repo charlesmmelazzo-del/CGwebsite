@@ -212,7 +212,7 @@ function Frame({ children }: { children: ReactNode }) {
         <Link href={t.href} scroll={false} onClick={(e) => onTab(e, t.id)} aria-current={on ? "page" : undefined} aria-label={label}
           className={`pp-focus pp-press rounded-full flex items-center justify-center shrink-0 ${where === "bottom" ? "w-[62px] h-[62px] -mt-6 shadow-lg" : "w-12 h-12"}`}
           style={{ background: on ? C.brass : "#1d2318", border: `1.5px solid ${C.brass}`, color: on ? C.bg : C.brass, boxShadow: where === "bottom" ? `0 6px 18px rgba(0,0,0,0.45), 0 0 0 5px ${C.bg}` : undefined }}>
-          <span className="font-display text-[22px] leading-none tracking-wide" style={{ marginTop: 2 }}>CG</span>
+          <span className="font-display text-[1.375rem] leading-none tracking-wide" style={{ marginTop: 2 }}>CG</span>
         </Link>
       );
     }
@@ -224,7 +224,7 @@ function Frame({ children }: { children: ReactNode }) {
           <Icon id={t.id} on={on} />
           {t.id === "inbox" && dot && <span aria-hidden className="absolute -top-0.5 -right-1 w-2.5 h-2.5 rounded-full" style={{ background: C.accent, boxShadow: `0 0 0 2px ${C.bg}` }} />}
         </span>
-        <span className={`font-body uppercase ${where === "bottom" ? "text-[10px] tracking-[0.14em]" : "text-[11px] tracking-[0.18em]"}`}>{t.label}</span>
+        <span className={`font-body uppercase ${where === "bottom" ? "text-[0.75rem] tracking-[0.14em]" : "text-[0.75rem] tracking-[0.18em]"}`}>{t.label}</span>
         {on && where === "bottom" && <span aria-hidden className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-[2px] rounded-full" style={{ background: C.brass }} />}
       </Link>
     );
@@ -239,7 +239,7 @@ function Frame({ children }: { children: ReactNode }) {
           <div className="max-w-5xl mx-auto h-14 px-4 md:px-6 flex items-center justify-between gap-4">
             <Link href="/passport" scroll={false} onClick={(e) => onTab(e, "home")} className="flex items-center gap-2.5 pp-focus rounded-lg min-h-[44px] md:w-48" aria-label="Passport home">
               <PassportMark size={28} />
-              <span className="font-body text-[11px] tracking-[0.4em] uppercase" style={{ color: C.brass }}>Passport</span>
+              <span className="font-body text-[0.75rem] tracking-[0.4em] uppercase" style={{ color: C.brass }}>Passport</span>
             </Link>
             <nav aria-label="Passport" className="hidden md:flex items-center gap-1">
               {TABS.map((t) => <span key={t.id}>{tabLink(t, "top")}</span>)}

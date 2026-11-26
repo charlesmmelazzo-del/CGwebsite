@@ -13,14 +13,14 @@ const day = (d: string) => new Date(`${d.slice(0, 10)}T12:00:00`).toLocaleDateSt
 
 function Row({ h, rank }: { h: HistoryItem; rank: number }) {
   const href = h.opens ? itemHref(h.kind, h.id) : null;
-  const name = <span className={h.kind === "cocktail" ? "font-display text-[20px] leading-tight" : "font-body text-[15px]"} style={{ color: href ? C.text : C.muted }}>{h.name}</span>;
+  const name = <span className={h.kind === "cocktail" ? "font-display text-[1.25rem] leading-tight" : "font-body text-[1rem]"} style={{ color: href ? C.text : C.muted }}>{h.name}</span>;
   return (
     <li className="flex items-baseline gap-3 py-3 border-b" style={{ borderColor: C.line }}>
       <span className="font-display text-lg w-6 text-right shrink-0" style={{ color: C.faint }}>{rank}</span>
       <div className="flex-1 min-w-0">
         {href ? <Link href={href}>{name}</Link> : name}
-        {h.label && <span className="ml-2 font-body text-[10px] tracking-[0.15em] uppercase whitespace-nowrap" style={{ color: C.faint }}>{h.label}</span>}
-        <span className="block font-body text-xs mt-0.5" style={{ color: C.faint }}>{h.last_ordered ? `Last had ${day(h.last_ordered)}` : "Ordered by your household"}</span>
+        {h.label && <span className="ml-2 font-body text-[0.75rem] tracking-[0.15em] uppercase whitespace-nowrap" style={{ color: C.faint }}>{h.label}</span>}
+        <span className="block font-body text-[0.875rem] mt-0.5" style={{ color: C.faint }}>{h.last_ordered ? `Last had ${day(h.last_ordered)}` : "Ordered by your household"}</span>
       </div>
       <span className="font-body text-sm whitespace-nowrap" style={{ color: C.brass }}>{h.count}×</span>
     </li>
@@ -46,12 +46,12 @@ export default async function HistoryPage({ searchParams }: { searchParams?: { v
         <nav aria-label="Whose orders" className="flex gap-2 mt-4 mb-2">
           {([["household", "Me and my household", "/passport/history"], ["me", "Just me", "/passport/history?view=me"]] as const).map(([v, label, href]) => (
             <Link key={v} href={href} replace scroll={false} aria-current={h.view === v ? "page" : undefined}
-              className="rounded-full px-4 min-h-[44px] inline-flex items-center font-body text-[12px] tracking-[0.12em] uppercase pp-focus border"
+              className="rounded-full px-4 min-h-[44px] inline-flex items-center font-body text-[0.875rem] tracking-[0.12em] uppercase pp-focus border"
               style={h.view === v ? { background: C.brass, color: "#13170F", borderColor: C.brass } : { color: C.muted, borderColor: C.line }}>{label}</Link>
           ))}
         </nav>
       )}
-      {h.household && h.view === "household" && <p className="font-body text-xs leading-relaxed mb-2" style={{ color: C.faint }}>Counts include checks paid by someone in your household. Change this in Account.</p>}
+      {h.household && h.view === "household" && <p className="font-body text-[0.875rem] leading-relaxed mb-2" style={{ color: C.faint }}>Counts include checks paid by someone in your household. Change this in Account.</p>}
       {h.empty ? (
         <Quiet>Your order history will appear here after your visits.</Quiet>
       ) : (

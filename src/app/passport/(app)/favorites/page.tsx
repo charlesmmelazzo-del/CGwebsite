@@ -39,7 +39,7 @@ export default async function FavoritesPage() {
           <ul>
             {ratings.map((x) => (
               <ItemLine key={x.ref} kind={x.kind} id={x.id} name={x.name} label={x.label} opens={x.opens} aside={<RemoveRecord what="rating" refId={x.ref} label="Clear" />}>
-                <span className="block font-body text-[15px] mt-0.5" style={{ color: C.brass }} aria-label={`${x.stars} of 5 stars`}>
+                <span className="block font-body text-[1rem] mt-0.5" style={{ color: C.brass }} aria-label={`${x.stars} of 5 stars`}>
                   {"★".repeat(x.stars)}<span style={{ color: C.line }}>{"★".repeat(5 - x.stars)}</span>
                 </span>
               </ItemLine>

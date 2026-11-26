@@ -16,6 +16,7 @@ import type { Bespoke, BespokeLine, ItemKind, ListItem, Mine, PassportList, Pick
 import { notifyChanged } from "./appEvents";
 import { BackLink } from "./bits";
 import { useShell } from "./shellContext";
+import { ACCENTS } from "@/lib/passport/accents";
 
 /**
  * File 04: the member's own favorites, ratings, notes, lists and bespoke recipes (client pieces).
@@ -43,7 +44,7 @@ function longDate(d: string | null) {
   return new Date(`${d.slice(0, 10)}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-const smallBtn = "rounded-full border px-3.5 min-h-[44px] font-body text-[12px] tracking-[0.08em] transition-colors disabled:opacity-50 pp-focus";
+const smallBtn = "rounded-full border px-3.5 min-h-[44px] font-body text-[0.875rem] tracking-[0.08em] transition-colors disabled:opacity-50 pp-focus";
 
 // ── A cocktail or bottle page: favorite, stars, note, and whether they've ordered it ──
 // No tap is ever lost (lib/passport/saveQueue.ts): each tap shows at once and the saves go to the server in order.
@@ -92,9 +93,9 @@ export function ItemControls({ kind, id, name, initial }: { kind: ItemKind; id: 
           <div className="flex items-center gap-1" role="group" aria-label="Your rating">
             {[1, 2, 3, 4, 5].map((n) => (
               <button key={n} type="button" onClick={() => rate(mine.rating === n ? null : n)} aria-label={`${n} star${n === 1 ? "" : "s"}`} aria-pressed={mine.rating === n}
-                className="w-10 h-11 text-[24px] leading-none pp-focus rounded" style={{ color: mine.rating && n <= mine.rating ? C.brass : C.line }}>★</button>
+                className="w-10 h-11 text-[1.5rem] leading-none pp-focus rounded" style={{ color: mine.rating && n <= mine.rating ? C.brass : C.line }}>★</button>
             ))}
-            {mine.rating ? <button type="button" onClick={() => rate(null)} className="font-body text-[11px] underline ml-1" style={{ color: C.faint }}>Clear</button> : null}
+            {mine.rating ? <button type="button" onClick={() => rate(null)} className="font-body text-[0.75rem] underline ml-1" style={{ color: C.faint }}>Clear</button> : null}
           </div>
         )}
       </div>
@@ -109,12 +110,12 @@ export function ItemControls({ kind, id, name, initial }: { kind: ItemKind; id: 
       </p>
 
       <div>
-        <h2 className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>Your note</h2>
+        <h2 className="pp-t-section mb-3" style={{ color: ACCENTS["yours"].ink }}>Your note</h2>
         {editing || !mine.note ? (
           <div className="mt-2 space-y-2">
             <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={3} maxLength={2000} className={inputCls}
               placeholder={kind === "cocktail" ? "What did you think? Ask for it differently next time?" : "Nose, palate, how you like it poured…"} aria-label="Your tasting note" />
-            <p className="font-body text-xs" style={{ color: C.faint }}>{PRIVATE_LINE}</p>
+            <p className="font-body text-[0.875rem]" style={{ color: C.faint }}>{PRIVATE_LINE}</p>
             <div className="flex gap-2">
               <button type="button" className={smallBtn} style={{ borderColor: C.brass, color: C.brass }} disabled={!draft.trim() || draft.trim() === mine.note} onClick={() => saveNote(draft)}>Save note</button>
               {editing && <button type="button" className={smallBtn} style={{ borderColor: C.line, color: C.muted }} onClick={() => { setDraft(mine.note); setEditing(false); }}>Cancel</button>}
@@ -122,9 +123,9 @@ export function ItemControls({ kind, id, name, initial }: { kind: ItemKind; id: 
           </div>
         ) : (
           <div className="mt-2">
-            <p className="font-body text-[15px] leading-relaxed whitespace-pre-line" style={{ color: C.text }}>{mine.note}</p>
-            <p className="font-body text-xs mt-1" style={{ color: C.faint }}>{PRIVATE_LINE}</p>
-            <div className="flex gap-3 mt-2 font-body text-xs">
+            <p className="font-body text-[1rem] leading-relaxed whitespace-pre-line" style={{ color: C.text }}>{mine.note}</p>
+            <p className="font-body text-[0.875rem] mt-1" style={{ color: C.faint }}>{PRIVATE_LINE}</p>
+            <div className="flex gap-3 mt-2 font-body text-[0.875rem]">
               <button type="button" className="underline" style={{ color: C.muted }} onClick={() => { setDraft(mine.note); setEditing(true); }}>Edit</button>
               <button type="button" className="underline" style={{ color: C.muted }} onClick={() => { if (confirm("Delete this note?")) { setDraft(""); saveNote(""); } }}>Delete</button>
               {saved && <span style={{ color: C.faint }}>Saved.</span>}
@@ -143,13 +144,13 @@ export function RemoveRecord({ what, refId, label = "Remove" }: { what: "favorit
   const [busy, setBusy] = useState(false);
   return (
     <span className="inline-flex flex-col items-end">
-      <button type="button" disabled={busy} className="font-body text-xs underline whitespace-nowrap" style={{ color: C.faint }} onClick={async () => {
+      <button type="button" disabled={busy} className="font-body text-[0.875rem] underline whitespace-nowrap" style={{ color: C.faint }} onClick={async () => {
         setBusy(true);
         const ok = await run(`/api/passport/${what}`, { ref: refId }, "DELETE");
         setBusy(false);
         if (ok) { if (what !== "note") notifyChanged("marks"); router.refresh(); }
       }}>{busy ? "…" : label}</button>
-      {error && <span className="font-body text-xs" style={{ color: "#f0c4b2" }}>{error}</span>}
+      {error && <span className="font-body text-[0.875rem]" style={{ color: "#f0c4b2" }}>{error}</span>}
     </span>
   );
 }
@@ -157,12 +158,12 @@ export function RemoveRecord({ what, refId, label = "Remove" }: { what: "favorit
 /** An item in the member's records: a link when it still opens, otherwise its name only. */
 export function ItemLine({ kind, id, name, label, opens, children, aside }: { kind: ItemKind; id: number | null; name: string; label: string | null; opens: boolean; children?: ReactNode; aside?: ReactNode }) {
   const href = opens ? itemHref(kind, id) : null;
-  const title = <span className={kind === "cocktail" ? "font-display text-[20px] leading-tight" : "font-body text-[15px]"} style={{ color: href ? C.text : C.muted }}>{name}</span>;
+  const title = <span className={kind === "cocktail" ? "font-display text-[1.25rem] leading-tight" : "font-body text-[1rem]"} style={{ color: href ? C.text : C.muted }}>{name}</span>;
   return (
     <li className="py-3 border-b flex items-start gap-3" style={{ borderColor: C.line }}>
       <div className="flex-1 min-w-0">
         {href ? <Link href={href} scroll={false}>{title}</Link> : title}
-        {label && <span className="ml-2 font-body text-[10px] tracking-[0.15em] uppercase whitespace-nowrap" style={{ color: C.faint }}>{label}</span>}
+        {label && <span className="ml-2 font-body text-[0.75rem] tracking-[0.15em] uppercase whitespace-nowrap" style={{ color: C.faint }}>{label}</span>}
         {children}
       </div>
       {aside}
@@ -199,8 +200,8 @@ export function ListsManager({ initial }: { initial: PassportList[] }) {
           {lists.map((l, i) => (
             <li key={l.id} className="flex items-center gap-2 py-3 border-b" style={{ borderColor: C.line }}>
               <Link href={`/passport/lists/${l.id}`} scroll={false} className="flex-1 min-w-0 pp-focus rounded-sm">
-                <span className="font-display text-[20px] leading-tight block truncate" style={{ color: C.text }}>{l.name}</span>
-                <span className="font-body text-[11px] tracking-[0.12em] uppercase" style={{ color: C.faint }}>
+                <span className="font-display text-[1.25rem] leading-tight block truncate" style={{ color: C.text }}>{l.name}</span>
+                <span className="font-body text-[0.75rem] tracking-[0.12em] uppercase" style={{ color: C.faint }}>
                   {l.ranked ? "Top 10" : "Playlist"} · {l.count} {l.kind === "cocktail" ? "cocktail" : "bottle"}{l.count === 1 ? "" : "s"}
                 </span>
               </Link>
@@ -216,7 +217,7 @@ export function ListsManager({ initial }: { initial: PassportList[] }) {
           <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} placeholder="Name, e.g. Top 10 rums" className={inputCls} aria-label="List name" autoFocus />
           <Choice options={[["cocktail", "Cocktails"], ["bottle", "Bottles"]]} value={kind} onChange={(v) => setKind(v as ItemKind)} label="What it holds" />
           <Choice options={[["playlist", "Playlist"], ["top", "Top 10"]]} value={ranked ? "top" : "playlist"} onChange={(v) => setRanked(v === "top")} label="Kind of list" />
-          <p className="font-body text-xs" style={{ color: C.faint }}>{ranked ? "Ranked, up to ten. Drag or use the arrows to order it." : "Unranked, as long as you like."} Lists are private.</p>
+          <p className="font-body text-[0.875rem]" style={{ color: C.faint }}>{ranked ? "Ranked, up to ten. Drag or use the arrows to order it." : "Unranked, as long as you like."} Lists are private.</p>
           <div className="flex gap-2">
             <button type="button" className={smallBtn} style={{ borderColor: C.brass, color: C.brass }} disabled={!name.trim()} onClick={create}>Make list</button>
             <button type="button" className={smallBtn} style={{ borderColor: C.line, color: C.muted }} onClick={() => setMaking(false)}>Cancel</button>
@@ -298,7 +299,7 @@ export function ListEditor({ initial }: { initial: PassportList }) {
   return (
     <div>
       <BackLink fallback="/passport/library" label="Index" />
-      <p className="font-body text-[11px] tracking-[0.3em] uppercase mt-3" style={{ color: C.brass }}>
+      <p className="font-body text-[0.75rem] tracking-[0.3em] uppercase mt-3" style={{ color: C.brass }}>
         {list.ranked ? "Top 10" : "Playlist"} · {list.kind === "cocktail" ? "Cocktails" : "Bottles"}
       </p>
       {renaming ? (
@@ -309,7 +310,7 @@ export function ListEditor({ initial }: { initial: PassportList }) {
       ) : (
         <h1 className="font-display text-4xl mt-1" style={{ color: C.text }}>{list.name}</h1>
       )}
-      <div className="flex gap-4 mt-2 font-body text-xs">
+      <div className="flex gap-4 mt-2 font-body text-[0.875rem]">
         {!renaming && <button type="button" className="underline" style={{ color: C.muted }} onClick={() => setRenaming(true)}>Rename</button>}
         <button type="button" className="underline" style={{ color: C.muted }} onClick={del}>Delete list</button>
         {/* File 09: friends get a copy they can save (names and order only; never your stars or notes). */}
@@ -332,11 +333,11 @@ export function ListEditor({ initial }: { initial: PassportList }) {
         ) : (
           <p className="font-body text-sm" style={{ color: C.faint }}>Nothing on this list yet. Search below to add {list.kind === "cocktail" ? "cocktails from the Library" : "bottles from the spirits list and archive"}.</p>
         )}
-        {items.length > 1 && <p className="font-body text-xs mt-3" style={{ color: C.faint }}>Drag the handle, or use the arrows, to change the order.</p>}
+        {items.length > 1 && <p className="font-body text-[0.875rem] mt-3" style={{ color: C.faint }}>Drag the handle, or use the arrows, to change the order.</p>}
       </div>
 
       <div className="mt-8">
-        <h2 className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>Add {list.kind === "cocktail" ? "a cocktail" : "a bottle"}</h2>
+        <h2 className="pp-t-section mb-3" style={{ color: ACCENTS["yours"].ink }}>Add {list.kind === "cocktail" ? "a cocktail" : "a bottle"}</h2>
         {full ? <p className="font-body text-sm mt-2" style={{ color: C.faint }}>A top 10 holds ten. Remove one to add another.</p>
           : <ListSearch kind={list.kind} have={new Set(items.map((x) => x.id).filter((x): x is number => x !== null))} onAdd={add} />}
       </div>
@@ -347,7 +348,7 @@ export function ListEditor({ initial }: { initial: PassportList }) {
 function SortableRow({ it, index, ranked, first, last, onMove, onRemove }: { it: ListItem; index: number; ranked: boolean; first: boolean; last: boolean; onMove: (d: number) => void; onRemove: () => void }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: it.ref });
   const href = it.opens ? itemHref(it.kind, it.id) : null;
-  const name = <span className={it.kind === "cocktail" ? "font-display text-[19px] leading-tight" : "font-body text-[15px]"} style={{ color: href ? C.text : C.muted }}>{it.name}</span>;
+  const name = <span className={it.kind === "cocktail" ? "font-display text-[1.1875rem] leading-tight" : "font-body text-[1rem]"} style={{ color: href ? C.text : C.muted }}>{it.name}</span>;
   return (
     <li ref={setNodeRef} className="flex items-center gap-2 py-2.5 border-b" style={{ borderColor: C.line, transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.6 : 1, background: isDragging ? C.card : undefined }}>
       <button type="button" ref={setActivatorNodeRef} {...attributes} {...listeners} aria-label={`Drag to move ${it.name}`} className="w-8 h-10 flex items-center justify-center touch-none cursor-grab shrink-0" style={{ color: C.faint }}>
@@ -356,7 +357,7 @@ function SortableRow({ it, index, ranked, first, last, onMove, onRemove }: { it:
       {ranked && <span className="font-display text-xl w-7 text-right shrink-0" style={{ color: C.brass }}>{index + 1}</span>}
       <div className="flex-1 min-w-0">
         {href ? <Link href={href} scroll={false}>{name}</Link> : name}
-        {it.label && <span className="ml-2 font-body text-[10px] tracking-[0.15em] uppercase whitespace-nowrap" style={{ color: C.faint }}>{it.label}</span>}
+        {it.label && <span className="ml-2 font-body text-[0.75rem] tracking-[0.15em] uppercase whitespace-nowrap" style={{ color: C.faint }}>{it.label}</span>}
       </div>
       <MoveButtons label={it.name} first={first} last={last} onMove={onMove} />
       <button type="button" onClick={onRemove} aria-label={`Remove ${it.name}`} className="w-9 h-10 flex items-center justify-center shrink-0" style={{ color: C.faint }}>✕</button>
@@ -389,16 +390,16 @@ function ListSearch({ kind, have, onAdd }: { kind: ItemKind; have: Set<number>; 
     <div className="mt-2">
       <input value={q} onChange={(e) => setQ(e.target.value)} type="search" className={inputCls} aria-label={kind === "cocktail" ? "Search the Library" : "Search the spirits"}
         placeholder={kind === "cocktail" ? "Search the Library by name or ingredient" : "Search bottles by name or producer"} />
-      {error && <p className="font-body text-xs mt-2" style={{ color: "#f0c4b2" }}>{error}</p>}
+      {error && <p className="font-body text-[0.875rem] mt-2" style={{ color: "#f0c4b2" }}>{error}</p>}
       {results && (
         <ul className="mt-2">
           {results.map((p) => (
             <li key={p.id} className="flex items-center gap-3 py-2.5 border-b" style={{ borderColor: C.line }}>
-              <span className="flex-1 min-w-0 font-body text-[15px]" style={{ color: C.text }}>
-                {p.name}{p.label && <span className="ml-2 text-[10px] tracking-[0.15em] uppercase" style={{ color: C.faint }}>{p.label}</span>}
+              <span className="flex-1 min-w-0 font-body text-[1rem]" style={{ color: C.text }}>
+                {p.name}{p.label && <span className="ml-2 text-[0.75rem] tracking-[0.15em] uppercase" style={{ color: C.faint }}>{p.label}</span>}
               </span>
               {have.has(p.id)
-                ? <span className="font-body text-xs" style={{ color: C.faint }}>On the list</span>
+                ? <span className="font-body text-[0.875rem]" style={{ color: C.faint }}>On the list</span>
                 : <button type="button" className={smallBtn} style={{ borderColor: C.brass, color: C.brass }} onClick={() => onAdd(p)}>Add</button>}
             </li>
           ))}
@@ -435,15 +436,15 @@ export function BespokeBook({ initial, units, startNew = false }: { initial: Bes
           <li key={r.id} className="rounded-xl border p-5" style={{ borderColor: r.by_staff ? `${C.brass}66` : C.line, background: C.card }}>
             <div className="flex items-baseline justify-between gap-3">
               <h3 className="font-display text-2xl" style={{ color: C.text }}>{r.name}</h3>
-              <span className="flex gap-3 font-body text-xs shrink-0">
+              <span className="flex gap-3 font-body text-[0.875rem] shrink-0">
                 {!r.by_staff && <button type="button" className="underline" style={{ color: C.muted }} onClick={() => setEditing(r)}>Edit</button>}
                 <button type="button" className="underline" style={{ color: C.muted }} onClick={() => remove(r)}>{r.by_staff ? "Remove" : "Delete"}</button>
               </span>
             </div>
-            {r.by_staff && <p className="font-body text-[11px] tracking-[0.15em] uppercase mt-1" style={{ color: C.brass }}>Made for you by {r.made_by} at Common Good</p>}
+            {r.by_staff && <p className="font-body text-[0.75rem] tracking-[0.15em] uppercase mt-1" style={{ color: C.brass }}>Made for you by {r.made_by} at Common Good</p>}
             <ul className="mt-3 space-y-1.5">
               {r.lines.map((l, i) => (
-                <li key={i} className="font-body text-[15px]" style={{ color: C.text }}>
+                <li key={i} className="font-body text-[1rem]" style={{ color: C.text }}>
                   {(l.quantity || l.unit) && <span style={{ color: C.brass }}>{[l.quantity, l.unit].filter(Boolean).join(" ")} </span>}{l.name}
                   {l.sub_recipe && <span className="block text-sm mt-0.5 ml-4 whitespace-pre-line" style={{ color: C.muted }}>{l.sub_recipe}</span>}
                 </li>
@@ -475,12 +476,12 @@ function RecipeForm({ recipe, units, onCancel, onSaved }: { recipe: Bespoke | nu
     setBusy(false);
     if (out) onSaved(out.recipe);
   };
-  const field = "rounded-lg px-3 py-2.5 font-body text-[16px] bg-[#0E120B] border border-[#323B29] text-[#EDE6D3] placeholder:text-[#5d6a52] focus:outline-none focus:border-[#C9A96E]";
+  const field = "rounded-lg px-3 py-2.5 font-body text-[1rem] bg-[#0E120B] border border-[#323B29] text-[#EDE6D3] placeholder:text-[#5d6a52] focus:outline-none focus:border-[#C9A96E]";
   return (
     <div className="rounded-xl border p-4 space-y-4" style={{ borderColor: C.line, background: C.card }}>
       <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} placeholder="Cocktail name" className={inputCls} aria-label="Cocktail name" />
       <div>
-        <p className="font-body text-[11px] tracking-[0.2em] uppercase mb-2" style={{ color: C.muted }}>Ingredients</p>
+        <p className="font-body text-[0.75rem] tracking-[0.2em] uppercase mb-2" style={{ color: C.muted }}>Ingredients</p>
         <ul className="space-y-3">
           {lines.map((l, i) => (
             <li key={i} className="space-y-1.5">
@@ -495,14 +496,14 @@ function RecipeForm({ recipe, units, onCancel, onSaved }: { recipe: Bespoke | nu
               </div>
               {sub[i]
                 ? <textarea value={l.sub_recipe} onChange={(e) => set(i, { sub_recipe: e.target.value })} rows={2} maxLength={1000} className={`${field} w-full`} placeholder="Sub-recipe, e.g. house syrup: 1:1 demerara, stirred" aria-label="Sub-recipe" />
-                : <button type="button" className="font-body text-xs underline" style={{ color: C.faint }} onClick={() => setSub((s) => ({ ...s, [i]: true }))}>+ sub-recipe</button>}
+                : <button type="button" className="font-body text-[0.875rem] underline" style={{ color: C.faint }} onClick={() => setSub((s) => ({ ...s, [i]: true }))}>+ sub-recipe</button>}
             </li>
           ))}
         </ul>
         <button type="button" className="font-body text-sm underline mt-3" style={{ color: C.muted }} onClick={() => setLines((ls) => [...ls, blankLine()])}>+ Add a line</button>
       </div>
       <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} maxLength={2000} className={inputCls} placeholder="Notes (optional): glass, garnish, who made it for you" aria-label="Notes" />
-      <p className="font-body text-xs" style={{ color: C.faint }}>{PRIVATE_LINE}</p>
+      <p className="font-body text-[0.875rem]" style={{ color: C.faint }}>{PRIVATE_LINE}</p>
       {error && <Notice>{error}</Notice>}
       <div className="flex gap-2">
         <button type="button" className={smallBtn} style={{ borderColor: C.brass, color: C.brass }} disabled={busy || !name.trim()} onClick={save}>{busy ? "Saving…" : recipe ? "Save" : "Add cocktail"}</button>

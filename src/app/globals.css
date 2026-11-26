@@ -516,7 +516,7 @@ body[data-zone="passport"] #cg-main {
 }
 .pp-t-page, .pp-t-section, .pp-t-card { font-family: KorinthSerial, var(--font-korinth-fallback), Georgia, serif; font-synthesis-weight: none; font-synthesis: none; }
 .pp-t-page { font-size: var(--pp-fs-page); font-weight: 500; line-height: 1.08; letter-spacing: 0; }
-.pp-t-section { font-size: var(--pp-fs-section); font-weight: 600; line-height: 1.2; margin-top: 2.5rem; margin-bottom: 0.75rem; }
+.pp-t-section { font-size: var(--pp-fs-section); font-weight: 600; line-height: 1.2; letter-spacing: 0; text-transform: none; }
 .pp-t-card { font-size: var(--pp-fs-card); font-weight: 500; line-height: 1.2; }
 .pp-t-body { font-family: Futura, var(--font-futura-fallback), system-ui, sans-serif; font-size: var(--pp-fs-body); font-weight: 400; line-height: 1.5; }
 .pp-t-secondary { font-family: Futura, var(--font-futura-fallback), system-ui, sans-serif; font-size: var(--pp-fs-secondary); font-weight: 400; line-height: 1.45; }

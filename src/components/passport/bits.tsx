@@ -59,7 +59,7 @@ export function ViewError({ message, onRetry }: { message: string; onRetry: () =
   return (
     <div className="pt-8 text-center" role="alert">
       <p className="font-body text-sm leading-relaxed" style={{ color: C.muted }}>{message}</p>
-      <button type="button" onClick={onRetry} className="mt-4 rounded-full border px-5 min-h-[44px] font-body text-[12px] tracking-[0.18em] uppercase pp-focus"
+      <button type="button" onClick={onRetry} className="mt-4 rounded-full border px-5 min-h-[44px] font-body text-[0.875rem] tracking-[0.18em] uppercase pp-focus"
         style={{ borderColor: C.brass, color: C.brass }}>Try again</button>
     </div>
   );
@@ -78,7 +78,7 @@ export function BackLink({ fallback, label }: { fallback: string; label: string 
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
       e.preventDefault();
       if (hasAppHistory() && window.history.length > 1) router.back(); else router.push(fallback, { scroll: false });
-    }} className="inline-flex items-center gap-1.5 -ml-1 px-1 min-h-[44px] font-body text-xs tracking-[0.2em] uppercase pp-focus rounded" style={{ color: C.muted }}>
+    }} className="inline-flex items-center gap-1.5 -ml-1 px-1 min-h-[44px] font-body text-[0.875rem] tracking-[0.2em] uppercase pp-focus rounded" style={{ color: C.muted }}>
       <span aria-hidden>←</span> {inApp ? "Back" : label}
     </a>
   );
@@ -172,9 +172,9 @@ export function Collapsible({ title, count, children, id }: { title: string; cou
       <h3>
         <button type="button" onClick={toggle} aria-expanded={open} aria-controls={regionId}
           className="w-full flex items-center justify-between gap-3 min-h-[52px] py-2 text-left pp-focus rounded-sm">
-          <span className="font-body text-[13px] tracking-[0.16em] uppercase" style={{ color: C.text }}>{title}</span>
+          <span className="font-body text-[0.875rem] tracking-[0.16em] uppercase" style={{ color: C.text }}>{title}</span>
           <span className="flex items-center gap-3 shrink-0">
-            <span className="font-body text-[13px] tabular-nums" style={{ color: C.faint }}>{count}</span>
+            <span className="font-body text-[0.875rem] tabular-nums" style={{ color: C.faint }}>{count}</span>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2" aria-hidden className="pp-chev" style={{ transform: open ? "rotate(180deg)" : "none" }}>
               <path d="m6 9 6 6 6-6" />
             </svg>
@@ -189,22 +189,30 @@ export function Collapsible({ title, count, children, id }: { title: string; cou
 }
 
 /**
- * File 12: a list of cards that shows its first three and keeps the rest behind "See all", so a long Home stays
- * scannable. Nothing when empty.
+ * File 12: a list of cards that stays scannable on Home. File 14: three or fewer stack; more than three scroll sideways
+ * (each card most of the screen wide, the next one peeking in), with "See all" opening where they all live (the right
+ * Index level, the Inbox, the Menu's tab). Without an address, "See all" opens them here as before. Nothing when empty.
  */
-export function SeeAll<T>({ items, render, keyOf, max = 3, what = "" }: { items: T[]; render: (item: T) => ReactNode; keyOf: (item: T) => string; max?: number; what?: string }) {
+export function SeeAll<T>({ items, render, keyOf, max = 3, what = "", href }: { items: T[]; render: (item: T) => ReactNode; keyOf: (item: T) => string; max?: number; what?: string; href?: string }) {
   const [all, setAll] = useState(false);
   if (!items.length) return null;
-  const shown = all ? items : items.slice(0, max);
+  if (items.length <= max || all) {
+    return (
+      <>
+        <ul className="space-y-3">{items.map((x) => <li key={keyOf(x)}>{render(x)}</li>)}</ul>
+        {all && <button type="button" onClick={() => setAll(false)} className="mt-2 inline-flex items-center min-h-[44px] pp-t-secondary underline underline-offset-4 pp-focus rounded" style={{ color: C.muted }}>Show fewer</button>}
+      </>
+    );
+  }
+  const label = `See all ${items.length}${what ? ` ${what}` : ""}`;
   return (
     <>
-      <ul className="space-y-3">{shown.map((x) => <li key={keyOf(x)}>{render(x)}</li>)}</ul>
-      {items.length > max && (
-        <button type="button" onClick={() => setAll(!all)} aria-expanded={all}
-          className="mt-2 inline-flex items-center min-h-[44px] font-body text-sm underline underline-offset-4 pp-focus rounded" style={{ color: C.muted }}>
-          {all ? "Show fewer" : `See all ${items.length}${what ? ` ${what}` : ""}`}
-        </button>
-      )}
+      <ul className="pp-tabs -mx-5 px-5 flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory" aria-label={what ? `${items.length} ${what}, scroll sideways` : undefined}>
+        {items.map((x) => <li key={keyOf(x)} className="snap-start shrink-0 w-[80%] max-w-[340px] [&>*]:h-full">{render(x)}</li>)}
+      </ul>
+      {href
+        ? <Link href={href} scroll={false} className="mt-1 inline-flex items-center min-h-[44px] pp-t-secondary underline underline-offset-4 pp-focus rounded" style={{ color: C.text }}>{label} <span aria-hidden className="ml-1">→</span></Link>
+        : <button type="button" onClick={() => setAll(true)} aria-expanded={false} className="mt-1 inline-flex items-center min-h-[44px] pp-t-secondary underline underline-offset-4 pp-focus rounded" style={{ color: C.text }}>{label}</button>}
     </>
   );
 }

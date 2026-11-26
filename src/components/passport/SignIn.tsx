@@ -32,7 +32,7 @@ export default function SignIn({ signupOpen, notice }: { signupOpen: boolean; no
         <div className="space-y-3">
           <p><TextLink href="/passport/forgot">Forgot your password?</TextLink></p>
           {signupOpen && <p>New here? <TextLink href="/passport/signup">Create your Passport</TextLink></p>}
-          <p className="pt-4"><a href="/" className="text-xs tracking-[0.2em] uppercase opacity-70 hover:opacity-100">← commongoodcocktailhouse.com</a></p>
+          <p className="pt-4"><a href="/" className="text-[0.875rem] tracking-[0.2em] uppercase opacity-70 hover:opacity-100">← commongoodcocktailhouse.com</a></p>
         </div>
       }>
       <form onSubmit={submit} className="space-y-4 relative" noValidate>

@@ -28,7 +28,7 @@ export function PageTitle({ kicker, title, children }: { kicker: string; title: 
 /** File 14, Part 8: a section heading (h2): the display serif, clearly larger than body, in its section's colour. */
 export function SectionTitle({ children, aside, section }: { children: ReactNode; aside?: ReactNode; section?: SectionId }) {
   return (
-    <div className="flex items-baseline justify-between gap-3">
+    <div className="flex items-baseline justify-between gap-3 mt-10 mb-3">
       <h2 className="pp-t-section" style={{ color: section ? ACCENTS[section].ink : C.text }}>{children}</h2>
       {aside}
     </div>
@@ -37,7 +37,7 @@ export function SectionTitle({ children, aside, section }: { children: ReactNode
 
 export function Label({ children, brass = false }: { children: ReactNode; brass?: boolean }) {
   return (
-    <span className="font-body text-[10px] tracking-[0.18em] uppercase rounded px-1.5 py-0.5 border whitespace-nowrap"
+    <span className="font-body text-[0.75rem] tracking-[0.18em] uppercase rounded px-1.5 py-0.5 border whitespace-nowrap"
       style={{ color: brass ? C.brass : C.muted, borderColor: brass ? `${C.brass}80` : C.line }}>
       {children}
     </span>
@@ -48,7 +48,7 @@ export function Label({ children, brass = false }: { children: ReactNode; brass?
 export function MarkBadge({ mark }: { mark?: Mark }) {
   if (!mark || (!mark.favorite && !mark.rating)) return null;
   return (
-    <span className="inline-flex items-center gap-1.5 font-body text-[12px] whitespace-nowrap">
+    <span className="inline-flex items-center gap-1.5 font-body text-[0.875rem] whitespace-nowrap">
       {mark.favorite && <span style={{ color: C.accent }} aria-label="One of your favorites" title="One of your favorites">♥</span>}
       {mark.rating ? <span style={{ color: C.brass }} aria-label={`You rated it ${mark.rating} of 5`} title={`You rated it ${mark.rating} of 5`}>★ {mark.rating}</span> : null}
     </span>
@@ -65,14 +65,14 @@ export function CocktailRow({ c, mark, lazy = false }: { c: CocktailCard & { ava
     <ItemRow item={{ kind: "cocktail", id: c.id, name: c.name }} href={`/passport/library/${c.id}`} pad="py-3.5" lazy={lazy}>
       <span className="flex items-start gap-3"><span className="flex-1 min-w-0 block">
       <span className="flex items-center gap-2 flex-wrap">
-        <span className="font-display text-[22px] leading-tight" style={{ color: C.text }}>{c.name}</span>
+        <span className="font-display text-[1.375rem] leading-tight" style={{ color: C.text }}>{c.name}</span>
         <Avail on={c.available} />
         {c.passport === "current" && <Label brass>Passport</Label>}
         {c.passport === "past" && <Label>Past Passport cocktail</Label>}
         <MarkBadge mark={mark} />
       </span>
       {c.flavor && <span className="block font-body text-sm mt-1" style={{ color: C.muted }}>{c.flavor}</span>}
-      <span className="block font-body text-[11px] tracking-[0.12em] uppercase mt-1.5" style={{ color: C.faint }}>{menuLine(c)}</span>
+      <span className="block font-body text-[0.75rem] tracking-[0.12em] uppercase mt-1.5" style={{ color: C.faint }}>{menuLine(c)}</span>
       </span><Thumb kind="cocktail" id={c.id} photo={c.photo} size={52} /></span>
     </ItemRow>
   );
@@ -104,9 +104,9 @@ function FeatureBody({ c, prices, mark }: { c: Cocktail; prices?: MenuPrice[]; m
         <div className="font-display text-2xl flex items-center gap-2" style={{ color: C.text }}>{c.name}<MarkBadge mark={mark} /></div>
         {prices && prices.length > 0 && <Prices prices={prices} />}
       </div>
-      {c.tagline && <p className="font-display italic text-[17px] mt-1" style={{ color: C.muted }}>{c.tagline}</p>}
+      {c.tagline && <p className="font-display italic text-[1.0625rem] mt-1" style={{ color: C.muted }}>{c.tagline}</p>}
       {c.ingredients && <p className="font-body text-sm mt-3 leading-relaxed" style={{ color: C.text }}>{c.ingredients}</p>}
-      {bareFlavor(c.flavor) && <p className="font-body text-[11px] tracking-[0.15em] uppercase mt-3" style={{ color: C.brass }}>{bareFlavor(c.flavor)}</p>}
+      {bareFlavor(c.flavor) && <p className="font-body text-[0.75rem] tracking-[0.15em] uppercase mt-3" style={{ color: C.brass }}>{bareFlavor(c.flavor)}</p>}
     </>
   );
 }
@@ -121,25 +121,25 @@ export function CocktailPage({ c }: { c: Cocktail }) {
         {c.passport === "past" && <Label>Past Passport cocktail</Label>}
         <Label>{menuLine(c)}</Label>
       </div>
-      <h1 className="font-display text-[40px] leading-[1.05] mt-3" style={{ color: C.text }}>{c.name}</h1>
+      <h1 className="font-display text-[2.5rem] leading-[1.05] mt-3" style={{ color: C.text }}>{c.name}</h1>
       {c.tagline && <p className="font-display italic text-xl mt-2" style={{ color: C.muted }}>{c.tagline}</p>}
       <BarPhoto kind="cocktail" id={c.id} photo={c.photo} alt={c.photo_alt} name={c.name} />
       <div className="w-14 h-px my-6" style={{ background: C.brass, opacity: 0.6 }} />
       {c.ingredients && (
         <section>
-          <h2 className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>In the glass</h2>
-          <p className="font-body text-[16px] mt-2 leading-relaxed" style={{ color: C.text }}>{c.ingredients}</p>
+          <h2 className="pp-t-section mb-3" style={{ color: ACCENTS["cocktails"].ink }}>In the glass</h2>
+          <p className="font-body text-[1rem] mt-2 leading-relaxed" style={{ color: C.text }}>{c.ingredients}</p>
         </section>
       )}
       {c.bottles && c.bottles.length > 0 && (
         <section className="mt-6">
-          <h2 className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>Bottles in this drink</h2>
+          <h2 className="pp-t-section mb-3" style={{ color: ACCENTS["cocktails"].ink }}>Bottles in this drink</h2>
           <ul className="mt-1">
             {c.bottles.map((b, i) => {
               const body = (
                 <>
-                  <span className="font-body text-[15px]" style={{ color: C.text }}>{b.name}</span>
-                  {b.category && <span className="font-body text-[10px] tracking-[0.15em] uppercase whitespace-nowrap" style={{ color: C.faint }}>{b.category}</span>}
+                  <span className="font-body text-[1rem]" style={{ color: C.text }}>{b.name}</span>
+                  {b.category && <span className="font-body text-[0.75rem] tracking-[0.15em] uppercase whitespace-nowrap" style={{ color: C.faint }}>{b.category}</span>}
                 </>
               );
               return (
@@ -155,11 +155,11 @@ export function CocktailPage({ c }: { c: Cocktail }) {
       )}
       {c.flavor && (
         <section className="mt-6">
-          <h2 className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>Tastes like</h2>
-          <p className="font-body text-[16px] mt-2" style={{ color: C.text }}>{c.flavor}</p>
+          <h2 className="pp-t-section mb-3" style={{ color: ACCENTS["cocktails"].ink }}>Tastes like</h2>
+          <p className="font-body text-[1rem] mt-2" style={{ color: C.text }}>{c.flavor}</p>
         </section>
       )}
-      {c.notes && <p className="font-body text-[15px] mt-6 leading-relaxed" style={{ color: C.muted }}>{c.notes}</p>}
+      {c.notes && <p className="font-body text-[1rem] mt-6 leading-relaxed" style={{ color: C.muted }}>{c.notes}</p>}
       {c.home_recipe && (
         <a href={`/passport/library/${c.id}/home-recipe`} className="mt-8 inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 font-body text-sm" style={{ borderColor: `${C.brass}80`, color: C.brass }}>
           Make it at home <span aria-hidden>↓</span><span className="sr-only">(PDF download)</span>
@@ -174,10 +174,10 @@ export function BottleRow({ b, mark, lazy = false }: { b: Pick<ArchivedBottle, "
   return (
     <ItemRow item={{ kind: "bottle", id: b.id, name: b.name }} href={`/passport/spirits/${b.id}`} lazy={lazy}>
       <span className={`flex ${b.photo ? "items-center" : "items-baseline"} justify-between gap-3`}>
-        <span className="font-body text-[15px] flex items-center gap-2 min-w-0" style={{ color: C.text }}>
+        <span className="font-body text-[1rem] flex items-center gap-2 min-w-0" style={{ color: C.text }}>
           <span className="min-w-0">{b.name}</span><Avail on={b.available} /><MarkBadge mark={mark} />
         </span>
-        {b.status_label && <span className="font-body text-[10px] tracking-[0.15em] uppercase text-right shrink-0" style={{ color: C.faint }}>{b.status_label}</span>}
+        {b.status_label && <span className="font-body text-[0.75rem] tracking-[0.15em] uppercase text-right shrink-0" style={{ color: C.faint }}>{b.status_label}</span>}
         <Thumb kind="bottle" id={b.id} photo={b.photo} size={40} />
       </span>
     </ItemRow>
@@ -196,7 +196,7 @@ export function BottlePage({ b }: { b: Bottle | ArchivedBottle }) {
       <Remember kind="bottle" id={b.id} name={b.name} />
       <BackLink fallback={back.href} label={back.label} />
       {b.status_label && <div className="mt-3"><Label>{b.status_label}</Label></div>}
-      <h1 className={`font-display text-[38px] leading-[1.05] ${b.status_label ? "mt-3" : "mt-3"}`} style={{ color: C.text }}>{b.name}</h1>
+      <h1 className={`font-display text-[2.375rem] leading-[1.05] ${b.status_label ? "mt-3" : "mt-3"}`} style={{ color: C.text }}>{b.name}</h1>
       <p className="font-body text-sm mt-2" style={{ color: C.muted }}>
         {b.category}{b.category && b.producer ? " · " : ""}
         {b.producer && (r.producer_id
@@ -213,21 +213,21 @@ export function BottlePage({ b }: { b: Bottle | ArchivedBottle }) {
         <dl className="mt-6 grid grid-cols-[auto,1fr] gap-x-6 gap-y-2">
           {r.facts.map((f) => (
             <div key={f.label} className="contents">
-              <dt className="font-body text-[11px] tracking-[0.2em] uppercase pt-0.5" style={{ color: C.brass }}>{f.label}</dt>
-              <dd className="font-body text-[15px]" style={{ color: C.text }}>{f.value}</dd>
+              <dt className="font-body text-[0.75rem] tracking-[0.2em] uppercase pt-0.5" style={{ color: C.brass }}>{f.label}</dt>
+              <dd className="font-body text-[1rem]" style={{ color: C.text }}>{f.value}</dd>
             </div>
           ))}
         </dl>
       )}
       {r.cocktails && r.cocktails.length > 0 && (
         <section className="mt-8">
-          <h2 className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>In our cocktails</h2>
+          <h2 className="pp-t-section mb-3" style={{ color: ACCENTS["spirits"].ink }}>In our cocktails</h2>
           <ul className="mt-2">
             {r.cocktails.map((c) => (
               <li key={c.id}>
                 <Link href={`/passport/library/${c.id}`} scroll={false} className="flex items-baseline justify-between gap-3 py-3 border-b" style={{ borderColor: C.line }}>
-                  <span className="font-display text-[19px]" style={{ color: C.text }}>{c.name}</span>
-                  <span className="font-body text-[10px] tracking-[0.15em] uppercase whitespace-nowrap" style={{ color: C.faint }}>{c.menu_status === "past" ? `Past menu · ${c.menu_name}` : c.menu_name}</span>
+                  <span className="font-display text-[1.1875rem]" style={{ color: C.text }}>{c.name}</span>
+                  <span className="font-body text-[0.75rem] tracking-[0.15em] uppercase whitespace-nowrap" style={{ color: C.faint }}>{c.menu_status === "past" ? `Past menu · ${c.menu_name}` : c.menu_name}</span>
                 </Link>
               </li>
             ))}
@@ -243,7 +243,7 @@ function LongText({ text, className = "" }: { text: string; className?: string }
   const paras = text.split(/\n\s*\n/).map((t) => t.replace(/^#+\s*/gm, "").replace(/\*\*|__/g, "").trim()).filter(Boolean);
   return (
     <div className={`space-y-3 ${className}`}>
-      {paras.map((t, i) => <p key={i} className="font-body text-[15px] leading-relaxed whitespace-pre-line" style={{ color: C.muted }}>{t}</p>)}
+      {paras.map((t, i) => <p key={i} className="font-body text-[1rem] leading-relaxed whitespace-pre-line" style={{ color: C.muted }}>{t}</p>)}
     </div>
   );
 }
@@ -253,19 +253,19 @@ export function ProducerPage({ p }: { p: Producer }) {
   return (
     <article>
       <BackLink fallback="/passport/library" label="Index" />
-      <p className="font-body text-[11px] tracking-[0.3em] uppercase mt-3" style={{ color: C.brass }}>Producer</p>
-      <h1 className="font-display text-[38px] leading-[1.05] mt-2" style={{ color: C.text }}>{p.name}</h1>
+      <p className="font-body text-[0.75rem] tracking-[0.3em] uppercase mt-3" style={{ color: C.brass }}>Producer</p>
+      <h1 className="font-display text-[2.375rem] leading-[1.05] mt-2" style={{ color: C.text }}>{p.name}</h1>
       {p.based_in && <p className="font-body text-sm mt-2" style={{ color: C.muted }}>{p.based_in}</p>}
       <div className="w-14 h-px my-6" style={{ background: C.brass, opacity: 0.6 }} />
       {p.passport_description && <LongText text={p.passport_description} className="mb-8" />}
       <section>
-        <h2 className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>Their bottles</h2>
+        <h2 className="pp-t-section mb-3" style={{ color: ACCENTS["spirits"].ink }}>Their bottles</h2>
         <ul className="mt-2">
           {p.bottles.map((b) => (
             <ItemRow key={b.id} item={{ kind: "bottle", id: b.id, name: b.name }} href={`/passport/spirits/${b.id}`}>
               <span className="flex items-baseline justify-between gap-3">
-                <span className="font-body text-[15px]" style={{ color: C.text }}>{b.name}</span>
-                <span className="font-body text-[10px] tracking-[0.15em] uppercase text-right" style={{ color: C.faint }}>{b.status_label || b.category}</span>
+                <span className="font-body text-[1rem]" style={{ color: C.text }}>{b.name}</span>
+                <span className="font-body text-[0.75rem] tracking-[0.15em] uppercase text-right" style={{ color: C.faint }}>{b.status_label || b.category}</span>
               </span>
             </ItemRow>
           ))}
@@ -297,7 +297,7 @@ function markOf(it: MenuItem, marks?: Marks): Mark | undefined {
 // ── Toast descriptions in the bar's house layout (parsed in lib/passport/description.ts) ──
 /** The small flavor line, as on a Passport cocktail's card. */
 function FlavorLine({ text, className = "" }: { text: string; className?: string }) {
-  return <p className={`font-body text-[11px] tracking-[0.15em] uppercase ${className}`} style={{ color: C.brass }}>{text}</p>;
+  return <p className={`font-body text-[0.75rem] tracking-[0.15em] uppercase ${className}`} style={{ color: C.brass }}>{text}</p>;
 }
 
 /** A Toast description laid out by line (Menu tab and bottle pages). */
@@ -308,7 +308,7 @@ export function Description({ text, large = false }: { text: string; large?: boo
     <div className={large ? "space-y-3" : "mt-1 space-y-1.5"}>
       {parts.map((p, i) => p.kind === "flavor"
         ? <FlavorLine key={i} text={p.text} className={large ? "" : "pt-0.5"} />
-        : <p key={i} className={`font-body leading-relaxed ${large ? "text-[16px]" : "text-sm"}`} style={{ color: large ? C.text : C.muted }}>{p.text}</p>)}
+        : <p key={i} className={`font-body leading-relaxed ${large ? "text-[1rem]" : "text-sm"}`} style={{ color: large ? C.text : C.muted }}>{p.text}</p>)}
     </div>
   );
 }
@@ -321,7 +321,7 @@ function ItemBody({ it, mark }: { it: MenuItem; mark?: Mark }) {
   return (
     <>
       <div className="flex items-baseline justify-between gap-3">
-        <span className="font-display text-[20px] leading-tight flex items-baseline gap-2" style={{ color: C.text }}>{it.name}<MarkBadge mark={mark} /></span>
+        <span className="font-display text-[1.25rem] leading-tight flex items-baseline gap-2" style={{ color: C.text }}>{it.name}<MarkBadge mark={mark} /></span>
         <span className="flex items-center gap-3 shrink-0">
           {it.prices.length > 0 && <Prices prices={it.prices} />}
           <Thumb kind={it.cocktail_id ? "cocktail" : "bottle"} id={it.cocktail_id || it.bottle_id} photo={it.photo} size={48} />
@@ -329,7 +329,7 @@ function ItemBody({ it, mark }: { it: MenuItem; mark?: Mark }) {
       </div>
       {body.kind === "card" ? (
         <div className="mt-1 space-y-1.5">
-          {body.tagline && <p className="font-display italic text-[16px] leading-snug" style={{ color: C.muted }}>{body.tagline}</p>}
+          {body.tagline && <p className="font-display italic text-[1rem] leading-snug" style={{ color: C.muted }}>{body.tagline}</p>}
           {body.ingredients && <p className="font-body text-sm leading-relaxed" style={{ color: C.text }}>{body.ingredients}</p>}
           {body.flavor && <FlavorLine text={body.flavor} className="pt-0.5" />}
         </div>
@@ -349,7 +349,7 @@ export function MenuItemRow({ it, marks }: { it: MenuItem; marks?: Marks }) {
 export function SpiritRow({ it, marks, lazy = false }: { it: MenuItem; marks?: Marks; lazy?: boolean }) {
   const body = (
     <span className="flex items-baseline justify-between gap-3">
-      <span className="font-body text-[15px] min-w-0" style={{ color: it.unavailable ? C.faint : C.text }}>
+      <span className="font-body text-[1rem] min-w-0" style={{ color: it.unavailable ? C.faint : C.text }}>
         {it.name}{it.unavailable && <span className="ml-2 align-middle"><Label>Out right now</Label></span>}
         <span className="ml-2"><MarkBadge mark={markOf(it, marks)} /></span>
       </span>
@@ -369,7 +369,7 @@ export function SpiritRow({ it, marks, lazy = false }: { it: MenuItem; marks?: M
 export function MenuGroupBlock({ g, spirits = false, marks }: { g: MenuGroup; spirits?: boolean; marks?: Marks }) {
   return (
     <section className="mt-6">
-      <h3 className="font-body text-[12px] tracking-[0.2em] uppercase" style={{ color: C.muted }}>{g.name}</h3>
+      <h3 className="font-body text-[0.875rem] tracking-[0.2em] uppercase" style={{ color: C.muted }}>{g.name}</h3>
       <ul className="mt-1">{g.items.map((it, i) => (spirits ? <SpiritRow key={i} it={it} marks={marks} /> : <MenuItemRow key={i} it={it} marks={marks} />))}</ul>
     </section>
   );

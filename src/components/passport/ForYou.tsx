@@ -9,6 +9,8 @@ import { Thumb } from "./PhotoBits";
 import { useShell } from "./shellContext";
 import { notifyChanged } from "./appEvents";
 import type { Recommendation } from "@/lib/passport/types";
+import { ACCENTS } from "@/lib/passport/accents";
+import { KindLabel, accentCardStyle } from "./Drill";
 
 /**
  * File 12: "For you". Suggestions the Bible builds only from the member's own favorites, ratings, orders, lists and
@@ -48,7 +50,7 @@ function useNotForMe() {
 function NotForMe({ r, onClick, className = "" }: { r: Recommendation; onClick: () => void; className?: string }) {
   return (
     <button type="button" onClick={onClick} aria-label={`Not for me: ${r.name}`}
-      className={`inline-flex items-center min-h-[44px] px-1 -ml-1 font-body text-xs underline underline-offset-4 pp-focus rounded ${className}`} style={{ color: C.muted }}>
+      className={`inline-flex items-center min-h-[44px] px-1 -ml-1 font-body text-[0.875rem] underline underline-offset-4 pp-focus rounded ${className}`} style={{ color: C.muted }}>
       Not for me
     </button>
   );
@@ -62,19 +64,22 @@ export function ForYouHome({ items }: { items?: Recommendation[] | null }) {
   if (!shown.length) return null;
   return (
     <section aria-labelledby="pp-for-you" className="mt-10">
-      <h2 id="pp-for-you" className="font-body text-[11px] tracking-[0.3em] uppercase mb-3" style={{ color: C.brass }}>For you</h2>
+      <div className="flex items-baseline justify-between gap-3 mb-3">
+        <h2 id="pp-for-you" className="pp-t-section" style={{ color: ACCENTS["yours"].ink }}>For you</h2>
+        <Link href="/passport/library?at=yours%2Ffor-you" scroll={false} className="pp-t-secondary underline underline-offset-4 min-h-[44px] inline-flex items-center pp-focus rounded" style={{ color: C.text }}>See all</Link>
+      </div>
       <ul className="pp-hscroll -mx-5 px-5 flex gap-3 overflow-x-auto pb-2 snap-x">
         {shown.map((r) => (
-          <li key={keyOf(r)} className="relative snap-start shrink-0 w-[72%] max-w-[270px] flex flex-col rounded-xl border" style={{ borderColor: C.line, background: C.card }}>
+          <li key={keyOf(r)} className="relative snap-start shrink-0 w-[72%] max-w-[270px] flex flex-col rounded-xl border pp-card pp-accent-card" style={accentCardStyle("yours")}>
             <PressLink item={{ kind: r.kind, id: r.id, name: r.name }} href={hrefOf(r)} className="block flex-1 p-4 pb-1 rounded-t-xl pp-focus pp-row">
               <span className="flex items-start justify-between gap-3">
                 <span className="min-w-0">
-                  <span className="flex items-center gap-2 font-body text-[10px] tracking-[0.25em] uppercase" style={{ color: C.brass }}>{kickerOf(r)} <Avail on={r.available} /></span>
-                  <span className="block font-display text-[21px] leading-tight mt-1.5" style={{ color: C.text }}>{r.name}</span>
+                  <span className="flex items-center gap-2"><KindLabel section="yours">For you · {kickerOf(r)}</KindLabel> <Avail on={r.available} /></span>
+                  <span className="block font-display text-[1.3125rem] leading-tight mt-1.5" style={{ color: C.text }}>{r.name}</span>
                 </span>
                 <Thumb kind={r.kind} id={r.id} photo={r.photo} size={44} />
               </span>
-              <span className="block font-body text-[13px] leading-snug mt-2" style={{ color: C.muted }}>{r.reason}</span>
+              <span className="block font-body text-[0.875rem] leading-snug mt-2" style={{ color: C.muted }}>{r.reason}</span>
             </PressLink>
             <span className="px-4 pb-1"><NotForMe r={r} onClick={() => void notForMe(r)} /></span>
           </li>
@@ -95,7 +100,7 @@ export function ForYouIndex({ items, enough, suggest }: { items?: Recommendation
   if (suggest === false) {
     return (
       <div className="mt-6">
-        <h3 className="font-body text-[11px] tracking-[0.3em] uppercase mb-2" style={{ color: C.brass }}>For you</h3>
+        <h3 className="font-body text-[0.75rem] tracking-[0.3em] uppercase mb-2" style={{ color: C.brass }}>For you</h3>
         <p className="font-body text-sm leading-relaxed" style={{ color: C.faint }}>
           Suggestions are off. <Link href="/passport/account" scroll={false} className="underline underline-offset-4 pp-focus rounded" style={{ color: C.muted }}>Turn them on in your account</Link>.
         </p>
@@ -105,7 +110,7 @@ export function ForYouIndex({ items, enough, suggest }: { items?: Recommendation
   if (!shown.length && enough) return null;
   return (
     <div className="mt-6" id="for-you">
-      <h3 className="font-body text-[11px] tracking-[0.3em] uppercase mb-1" style={{ color: C.brass }}>For you</h3>
+      <h3 className="font-body text-[0.75rem] tracking-[0.3em] uppercase mb-1" style={{ color: C.brass }}>For you</h3>
       {!shown.length ? (
         <p className="font-body text-sm leading-relaxed mt-2" style={{ color: C.faint }}>Favorite or rate a few things and we&rsquo;ll suggest what to try next.</p>
       ) : (
@@ -117,10 +122,10 @@ export function ForYouIndex({ items, enough, suggest }: { items?: Recommendation
                   <span className="flex items-start gap-3">
                     <span className="flex-1 min-w-0 block">
                       <span className="flex items-center gap-2 flex-wrap">
-                        <span className={r.kind === "cocktail" ? "font-display text-[21px] leading-tight" : "font-body text-[15px]"} style={{ color: C.text }}>{r.name}</span>
+                        <span className={r.kind === "cocktail" ? "font-display text-[1.3125rem] leading-tight" : "font-body text-[1rem]"} style={{ color: C.text }}>{r.name}</span>
                         <Avail on={r.available} />
                       </span>
-                      <span className="block font-body text-[11px] tracking-[0.12em] uppercase mt-1" style={{ color: C.faint }}>{kickerOf(r)}</span>
+                      <span className="block font-body text-[0.75rem] tracking-[0.12em] uppercase mt-1" style={{ color: C.faint }}>{kickerOf(r)}</span>
                       <span className="block font-body text-sm mt-1 leading-snug" style={{ color: C.muted }}>{r.reason}</span>
                     </span>
                     <Thumb kind={r.kind} id={r.id} photo={r.photo} size={r.kind === "cocktail" ? 52 : 40} />

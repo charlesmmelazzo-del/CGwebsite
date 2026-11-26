@@ -22,13 +22,13 @@ import type { BottleRequest, EventInquiry, InboxData, InboxPost, InboxRef, Inbox
  */
 
 const OFFLINE = "Couldn't send that. Please try again.";
-const smallBtn = "rounded-full border px-4 min-h-[44px] font-body text-[12px] tracking-[0.12em] uppercase transition-colors disabled:opacity-50 pp-focus pp-press";
-const labelCls = "block font-body text-[11px] tracking-[0.2em] uppercase mb-1.5";
+const smallBtn = "rounded-full border px-4 min-h-[44px] font-body text-[0.875rem] tracking-[0.12em] uppercase transition-colors disabled:opacity-50 pp-focus pp-press";
+const labelCls = "block font-body text-[0.75rem] tracking-[0.2em] uppercase mb-1.5";
 export const REPLY_LINE = "Replies can take a day. For anything during service, just ask us at the bar.";
 
 function Tag({ children, brass = false }: { children: ReactNode; brass?: boolean }) {
   return (
-    <span className="font-body text-[10px] tracking-[0.18em] uppercase rounded px-1.5 py-0.5 border whitespace-nowrap"
+    <span className="font-body text-[0.75rem] tracking-[0.18em] uppercase rounded px-1.5 py-0.5 border whitespace-nowrap"
       style={{ color: brass ? C.brass : C.muted, borderColor: brass ? `${C.brass}80` : C.line }}>
       {children}
     </span>
@@ -89,7 +89,7 @@ function usePoll<T>(url: string, pick: (d: Record<string, unknown>) => T | undef
 export function InboxActions() {
   const a = (kind: string, short: string, label: string) => (
     <Link href={`/passport/inbox/new?kind=${kind}`} scroll={false} aria-label={label}
-      className="inline-flex items-center justify-center gap-1.5 rounded-full border px-3 min-h-[44px] font-body text-[13px] whitespace-nowrap pp-focus pp-press"
+      className="inline-flex items-center justify-center gap-1.5 rounded-full border px-3 min-h-[44px] font-body text-[0.875rem] whitespace-nowrap pp-focus pp-press"
       style={{ borderColor: kind === "message" ? C.brass : C.line, color: kind === "message" ? C.bg : C.text, background: kind === "message" ? C.brass : "transparent" }}>
       <span aria-hidden>+</span> {short}
     </Link>
@@ -112,9 +112,9 @@ function NeedsCard({ n, onAnswered }: { n: NeedsItem; onAnswered: (r: MemberRequ
     <li>
       <Link href={n.href} scroll={false} className="flex items-center gap-3 rounded-xl border px-4 py-3.5 pp-focus pp-row" style={{ borderColor: `${C.brass}80`, background: "#1a1f14" }}>
         <span className="flex-1 min-w-0">
-          <span className="block font-body text-[10px] tracking-[0.25em] uppercase" style={{ color: C.brass }}>{words.kicker}</span>
-          <span className="block font-display text-[20px] leading-tight mt-1 truncate" style={{ color: C.text }}>{words.title}</span>
-          {words.line && <span className="block font-body text-[13px] mt-0.5 truncate" style={{ color: C.muted }}>{words.line}</span>}
+          <span className="block font-body text-[0.75rem] tracking-[0.25em] uppercase" style={{ color: C.brass }}>{words.kicker}</span>
+          <span className="block font-display text-[1.25rem] leading-tight mt-1 truncate" style={{ color: C.text }}>{words.title}</span>
+          {words.line && <span className="block font-body text-[0.875rem] mt-0.5 truncate" style={{ color: C.muted }}>{words.line}</span>}
         </span>
         <span aria-hidden style={{ color: C.brass }}>→</span>
       </Link>
@@ -129,9 +129,9 @@ function QuestionCard({ r, onAnswered }: { r: MemberRequest; onAnswered: (r: Mem
   const q = [...r.posts].reverse().find((p) => p.kind === "question");
   return (
     <li className="rounded-xl border px-4 py-4" style={{ borderColor: `${C.brass}80`, background: "#1a1f14" }}>
-      <span className="block font-body text-[10px] tracking-[0.25em] uppercase" style={{ color: C.brass }}>A question about your request</span>
-      <Link href={`/passport/inbox/requests/${r.id}`} scroll={false} className="block font-display text-[20px] leading-tight mt-1" style={{ color: C.text }}>{r.kind_label}</Link>
-      {q && <p className="font-body text-[15px] mt-2 whitespace-pre-wrap" style={{ color: C.text }}>{q.body}<span className="block text-[11px] mt-1" style={{ color: C.faint }}>{q.by || "Common Good"} · {whenShort(q.at)}</span></p>}
+      <span className="block font-body text-[0.75rem] tracking-[0.25em] uppercase" style={{ color: C.brass }}>A question about your request</span>
+      <Link href={`/passport/inbox/requests/${r.id}`} scroll={false} className="block font-display text-[1.25rem] leading-tight mt-1" style={{ color: C.text }}>{r.kind_label}</Link>
+      {q && <p className="font-body text-[1rem] mt-2 whitespace-pre-wrap" style={{ color: C.text }}>{q.body}<span className="block text-[0.75rem] mt-1" style={{ color: C.faint }}>{q.by || "Common Good"} · {whenShort(q.at)}</span></p>}
       <form className="mt-3 space-y-2" onSubmit={async (e) => {
         e.preventDefault();
         const out = await send<{ member_request: MemberRequest }>(`/api/passport/inbox/requests/${r.id}`, { action: "answer", body: text });
@@ -153,11 +153,11 @@ function ThreadRow({ t }: { t: InboxThread }) {
         <span className="pt-2 w-2"><UnreadDot on={t.unread} /></span>
         <span className="flex-1 min-w-0">
           <span className="flex items-baseline justify-between gap-3">
-            <span className={`font-display text-[19px] leading-tight truncate ${t.unread ? "" : "opacity-90"}`} style={{ color: C.text }}>{t.subject || (t.ref ? `About ${t.ref.name}` : "Message to the bar")}</span>
-            <span className="font-body text-[11px] shrink-0" style={{ color: C.faint }}>{whenShort(t.last_at)}</span>
+            <span className={`font-display text-[1.1875rem] leading-tight truncate ${t.unread ? "" : "opacity-90"}`} style={{ color: C.text }}>{t.subject || (t.ref ? `About ${t.ref.name}` : "Message to the bar")}</span>
+            <span className="font-body text-[0.75rem] shrink-0" style={{ color: C.faint }}>{whenShort(t.last_at)}</span>
           </span>
-          <span className="block font-body text-[13px] truncate mt-0.5" style={{ color: t.unread ? C.text : C.muted }}>{t.last_from === "member" ? "You: " : ""}{t.preview}</span>
-          <span className="block font-body text-[11px] mt-1" style={{ color: t.status === "answered" ? C.brass : C.faint }}>{t.status_label}</span>
+          <span className="block font-body text-[0.875rem] truncate mt-0.5" style={{ color: t.unread ? C.text : C.muted }}>{t.last_from === "member" ? "You: " : ""}{t.preview}</span>
+          <span className="block font-body text-[0.75rem] mt-1" style={{ color: t.status === "answered" ? C.brass : C.faint }}>{t.status_label}</span>
         </span>
       </Link>
     </li>
@@ -170,10 +170,10 @@ function RequestRow({ href, title, line, status, unread, open }: { href: string;
         <span className="pt-2 w-2"><UnreadDot on={unread} /></span>
         <span className="flex-1 min-w-0">
           <span className="flex items-start justify-between gap-3">
-            <span className="font-display text-[19px] leading-tight" style={{ color: C.text }}>{title}</span>
+            <span className="font-display text-[1.1875rem] leading-tight" style={{ color: C.text }}>{title}</span>
             <Tag brass={unread}>{status}</Tag>
           </span>
-          {line && <span className="block font-body text-[13px] truncate mt-0.5" style={{ color: C.muted }}>{line}</span>}
+          {line && <span className="block font-body text-[0.875rem] truncate mt-0.5" style={{ color: C.muted }}>{line}</span>}
         </span>
       </Link>
     </li>
@@ -244,9 +244,9 @@ function Posts({ posts, memberWord = "You" }: { posts: InboxPost[]; memberWord?:
         return (
           <li key={p.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
             <div className="max-w-[85%] rounded-2xl px-4 py-2.5" style={mine ? { background: "#2a3220", color: C.text } : { background: C.card, color: C.text, border: `1px solid ${C.line}` }}>
-              {p.kind === "question" && <span className="block font-body text-[10px] tracking-[0.2em] uppercase mb-1" style={{ color: C.brass }}>A question for you</span>}
-              <p className="font-body text-[15px] leading-relaxed whitespace-pre-wrap break-words">{p.body}</p>
-              <p className="font-body text-[11px] mt-1" style={{ color: C.faint }}>{mine ? memberWord : (p.by || "Common Good")} · {whenShort(p.at)}</p>
+              {p.kind === "question" && <span className="block font-body text-[0.75rem] tracking-[0.2em] uppercase mb-1" style={{ color: C.brass }}>A question for you</span>}
+              <p className="font-body text-[1rem] leading-relaxed whitespace-pre-wrap break-words">{p.body}</p>
+              <p className="font-body text-[0.75rem] mt-1" style={{ color: C.faint }}>{mine ? memberWord : (p.by || "Common Good")} · {whenShort(p.at)}</p>
             </div>
           </li>
         );
@@ -258,7 +258,7 @@ function Posts({ posts, memberWord = "You" }: { posts: InboxPost[]; memberWord?:
 function RefChip({ r }: { r: InboxRef }) {
   const href = refHref(r);
   const word = r.kind === "list" ? "List" : r.kind === "bottle" ? "Bottle" : "Cocktail";
-  const inner = <><span className="font-body text-[10px] tracking-[0.2em] uppercase" style={{ color: C.faint }}>{word}</span> <span className="font-body text-sm" style={{ color: C.text }}>{r.name}</span>{href && <span aria-hidden style={{ color: C.brass }}> →</span>}</>;
+  const inner = <><span className="font-body text-[0.75rem] tracking-[0.2em] uppercase" style={{ color: C.faint }}>{word}</span> <span className="font-body text-sm" style={{ color: C.text }}>{r.name}</span>{href && <span aria-hidden style={{ color: C.brass }}> →</span>}</>;
   return href
     ? <Link href={href} scroll={false} className="inline-flex items-center gap-1.5 rounded-full border px-3 min-h-[44px] pp-focus" style={{ borderColor: C.line }}>{inner}</Link>
     : <span className="inline-flex items-center gap-1.5 rounded-full border px-3 min-h-[44px]" style={{ borderColor: C.line }}>{inner}</span>;
@@ -270,7 +270,7 @@ function Composer({ onSend, busy, error, placeholder, cta = "Send" }: { onSend: 
       <label className="sr-only" htmlFor="pp-compose">{placeholder}</label>
       <textarea id="pp-compose" rows={3} maxLength={BODY_MAX} value={text} onChange={(e) => setText(e.target.value)} className={inputCls} placeholder={placeholder} />
       <div className="flex items-center justify-between gap-3">
-        <span className="font-body text-[11px]" style={{ color: C.faint }}>{text.length > BODY_MAX - 200 ? `${BODY_MAX - text.length} left` : REPLY_LINE}</span>
+        <span className="font-body text-[0.75rem]" style={{ color: C.faint }}>{text.length > BODY_MAX - 200 ? `${BODY_MAX - text.length} left` : REPLY_LINE}</span>
         <button type="submit" disabled={busy || !text.trim()} className={smallBtn} style={{ borderColor: C.brass, color: C.bg, background: C.brass }}>{busy ? "Sending…" : cta}</button>
       </div>
       {error && <Notice>{error}</Notice>}
@@ -287,11 +287,11 @@ export function ThreadView({ initial }: { initial: InboxThread }) {
   return (
     <div className="pb-16">
       <BackLink fallback="/passport/inbox" label="Inbox" />
-      <p className="font-body text-[11px] tracking-[0.3em] uppercase mt-2" style={{ color: C.brass }}>Message to the bar</p>
+      <p className="font-body text-[0.75rem] tracking-[0.3em] uppercase mt-2" style={{ color: C.brass }}>Message to the bar</p>
       <h1 className="font-display text-3xl leading-tight mt-1" style={{ color: C.text }}>{t.subject || (t.ref ? `About ${t.ref.name}` : "Your message")}</h1>
       <div className="flex flex-wrap items-center gap-2 mt-3"><Tag brass={t.status === "answered"}>{t.status_label}</Tag>{t.ref && <RefChip r={t.ref} />}</div>
       <Posts posts={t.posts || []} />
-      {t.status === "closed" && <p className="font-body text-xs mt-6" style={{ color: C.faint }}>This conversation is closed. Writing again opens it.</p>}
+      {t.status === "closed" && <p className="font-body text-[0.875rem] mt-6" style={{ color: C.faint }}>This conversation is closed. Writing again opens it.</p>}
       <Composer busy={busy} error={error} placeholder="Write to the bar" onSend={async (text) => {
         const out = await send<{ thread: InboxThread }>(`/api/passport/inbox/threads/${t.id}`, { action: "reply", body: text });
         if (out) { setT(out.thread); notifyChanged("inbox"); return true; }
@@ -319,8 +319,8 @@ function Facts({ rows }: { rows: [string, string | null | undefined][] }) {
     <dl className="mt-5 rounded-xl border divide-y" style={{ borderColor: C.line, background: C.card }}>
       {rows.filter(([, v]) => v).map(([k, v]) => (
         <div key={k} className="flex items-baseline justify-between gap-4 px-4 py-2.5" style={{ borderColor: C.line }}>
-          <dt className="font-body text-[11px] tracking-[0.18em] uppercase shrink-0" style={{ color: C.faint }}>{k}</dt>
-          <dd className="font-body text-[15px] text-right" style={{ color: C.text }}>{v}</dd>
+          <dt className="font-body text-[0.75rem] tracking-[0.18em] uppercase shrink-0" style={{ color: C.faint }}>{k}</dt>
+          <dd className="font-body text-[1rem] text-right" style={{ color: C.text }}>{v}</dd>
         </div>
       ))}
     </dl>
@@ -340,12 +340,12 @@ export function RequestView({ initial }: { initial: MemberRequest }) {
   return (
     <div className="pb-16">
       <BackLink fallback="/passport/inbox" label="Inbox" />
-      <p className="font-body text-[11px] tracking-[0.3em] uppercase mt-2" style={{ color: C.brass }}>Your request</p>
+      <p className="font-body text-[0.75rem] tracking-[0.3em] uppercase mt-2" style={{ color: C.brass }}>Your request</p>
       <h1 className="font-display text-3xl leading-tight mt-1" style={{ color: C.text }}>{r.kind_label}</h1>
       <div className="mt-3"><Tag brass={r.question}>{r.question ? "A question for you" : r.status_label}</Tag></div>
       <Facts rows={[["For", r.date ? dayLong(r.date) : null], ["Status", r.status_label]]} />
-      <p className="font-body text-[15px] mt-5 whitespace-pre-wrap leading-relaxed" style={{ color: C.text }}>{r.details}</p>
-      {r.status === "declined" && r.decline_reason && <p className="font-body text-sm mt-4 border-l-2 pl-3" style={{ borderColor: C.brass, color: C.text }}>{r.decline_reason}<span className="block text-[11px] mt-1" style={{ color: C.faint }}>From the bar</span></p>}
+      <p className="font-body text-[1rem] mt-5 whitespace-pre-wrap leading-relaxed" style={{ color: C.text }}>{r.details}</p>
+      {r.status === "declined" && r.decline_reason && <p className="font-body text-sm mt-4 border-l-2 pl-3" style={{ borderColor: C.brass, color: C.text }}>{r.decline_reason}<span className="block text-[0.75rem] mt-1" style={{ color: C.faint }}>From the bar</span></p>}
       {r.posts.length > 0 && <Posts posts={r.posts} />}
       {r.can_answer && <Composer busy={busy} error={error} placeholder="Your answer" cta="Send answer" onSend={(text) => act({ action: "answer", body: text })} />}
       {!r.can_answer && error && <div className="mt-4"><Notice>{error}</Notice></div>}
@@ -367,13 +367,13 @@ export function InquiryView({ initial, me }: { initial: EventInquiry; me?: Pick<
   return (
     <div className="pb-16">
       <BackLink fallback="/passport/inbox" label="Inbox" />
-      <p className="font-body text-[11px] tracking-[0.3em] uppercase mt-2" style={{ color: C.brass }}>Your event inquiry</p>
+      <p className="font-body text-[0.75rem] tracking-[0.3em] uppercase mt-2" style={{ color: C.brass }}>Your event inquiry</p>
       <h1 className="font-display text-3xl leading-tight mt-1" style={{ color: C.text }}>{q.kind_label}</h1>
       <div className="mt-3"><Tag brass={q.unread || q.status === "confirmed"}>{q.status_label}</Tag></div>
       <Facts rows={[["Date", dayLong(q.preferred_date)], ["Backup", q.backup_date ? dayLong(q.backup_date) : null], ["Time", q.time_label], ["Guests", String(q.guests)], ["Budget", q.budget_label]]} />
-      {q.details && <p className="font-body text-[15px] mt-5 whitespace-pre-wrap leading-relaxed" style={{ color: C.text }}>{q.details}</p>}
-      {q.status === "declined" && q.decline_reason && <p className="font-body text-sm mt-4 border-l-2 pl-3" style={{ borderColor: C.brass, color: C.text }}>{q.decline_reason}<span className="block text-[11px] mt-1" style={{ color: C.faint }}>From the bar</span></p>}
-      {me && <p className="font-body text-xs mt-4" style={{ color: C.faint }}>We&rsquo;ll reach you at {me.email}{me.phone ? ` or ${me.phone}` : ""}. Nothing is paid or held in the app.</p>}
+      {q.details && <p className="font-body text-[1rem] mt-5 whitespace-pre-wrap leading-relaxed" style={{ color: C.text }}>{q.details}</p>}
+      {q.status === "declined" && q.decline_reason && <p className="font-body text-sm mt-4 border-l-2 pl-3" style={{ borderColor: C.brass, color: C.text }}>{q.decline_reason}<span className="block text-[0.75rem] mt-1" style={{ color: C.faint }}>From the bar</span></p>}
+      {me && <p className="font-body text-[0.875rem] mt-4" style={{ color: C.faint }}>We&rsquo;ll reach you at {me.email}{me.phone ? ` or ${me.phone}` : ""}. Nothing is paid or held in the app.</p>}
       {q.posts.length > 0 && <Posts posts={q.posts} />}
       {q.can_reply && <Composer busy={busy} error={error} placeholder="Write to us about your event" onSend={(text) => act({ action: "reply", body: text })} />}
       {!q.can_reply && error && <div className="mt-4"><Notice>{error}</Notice></div>}
@@ -391,7 +391,7 @@ function Chips<T extends string>({ label, options, value, onChange }: { label: s
       <legend className={labelCls} style={{ color: C.muted }}>{label}</legend>
       <div className="flex flex-wrap gap-2">
         {options.map((o) => (
-          <button key={o.id} type="button" aria-pressed={value === o.id} onClick={() => onChange(o.id)} className="rounded-full border px-3.5 min-h-[44px] font-body text-[14px] pp-focus pp-press"
+          <button key={o.id} type="button" aria-pressed={value === o.id} onClick={() => onChange(o.id)} className="rounded-full border px-3.5 min-h-[44px] font-body text-[0.875rem] pp-focus pp-press"
             style={{ borderColor: value === o.id ? C.brass : C.line, color: value === o.id ? C.bg : C.text, background: value === o.id ? C.brass : "transparent" }}>
             {o.label}
           </button>
@@ -401,7 +401,7 @@ function Chips<T extends string>({ label, options, value, onChange }: { label: s
   );
 }
 function Counter({ n, max }: { n: number; max: number }) {
-  return <span className="block font-body text-[11px] mt-1 text-right" style={{ color: n > max - 100 ? C.brass : C.faint }}>{n.toLocaleString("en-US")} / {max.toLocaleString("en-US")}</span>;
+  return <span className="block font-body text-[0.75rem] mt-1 text-right" style={{ color: n > max - 100 ? C.brass : C.faint }}>{n.toLocaleString("en-US")} / {max.toLocaleString("en-US")}</span>;
 }
 
 /** "Message the bar", "Make a request" and "Plan an event". The member's name, email and phone come from their account. */
@@ -432,7 +432,7 @@ export function NewInboxItem({ kind, about, aboutName, me }: { kind: "message" |
     <form onSubmit={submit} className="pb-16 space-y-5" noValidate>
       <div>
         <BackLink fallback="/passport/inbox" label="Inbox" />
-        <p className="font-body text-[11px] tracking-[0.3em] uppercase mt-2" style={{ color: C.brass }}>Inbox</p>
+        <p className="font-body text-[0.75rem] tracking-[0.3em] uppercase mt-2" style={{ color: C.brass }}>Inbox</p>
         <h1 className="font-display text-4xl mt-1" style={{ color: C.text }}>{title}</h1>
         <p className="font-body text-sm mt-2 leading-relaxed" style={{ color: C.muted }}>
           {kind === "message" ? "Questions about a drink, a bottle, making something at home, or anything else." : kind === "request" ? "Something we can have ready, or a need we should know about." : "A private party, a tasting, a buyout. We'll follow up here."} {REPLY_LINE}
@@ -491,11 +491,11 @@ export function NewInboxItem({ kind, about, aboutName, me }: { kind: "message" |
             <span className={labelCls} style={{ color: C.muted }}>Anything else (optional)</span>
             <textarea rows={4} value={f.details} onChange={(e) => set("details")(e.target.value)} maxLength={DETAILS_MAX} className={inputCls} placeholder="The occasion, food, drinks, anything we should know" />
           </label>
-          {me && <p className="font-body text-xs leading-relaxed" style={{ color: C.faint }}>We&rsquo;ll reach you at {me.email}{me.phone ? ` or ${me.phone}` : ""}, from your account. Nothing is paid or held in the app.</p>}
+          {me && <p className="font-body text-[0.875rem] leading-relaxed" style={{ color: C.faint }}>We&rsquo;ll reach you at {me.email}{me.phone ? ` or ${me.phone}` : ""}, from your account. Nothing is paid or held in the app.</p>}
         </>
       )}
       {error && <Notice>{error}</Notice>}
-      <button type="submit" disabled={busy || !ready} className="w-full rounded-lg py-3.5 font-body text-[13px] tracking-[0.22em] uppercase transition-colors disabled:opacity-50 bg-[#C9A96E] text-[#13170F] hover:bg-[#d6b77d]">
+      <button type="submit" disabled={busy || !ready} className="w-full rounded-lg py-3.5 font-body text-[0.875rem] tracking-[0.22em] uppercase transition-colors disabled:opacity-50 bg-[#C9A96E] text-[#13170F] hover:bg-[#d6b77d]">
         {busy ? "Sending…" : kind === "message" ? "Send to the bar" : kind === "request" ? "Send request" : "Send inquiry"}
       </button>
     </form>
@@ -506,7 +506,7 @@ export function NewInboxItem({ kind, about, aboutName, me }: { kind: "message" |
 export function AskAboutThis({ kind, id, name }: { kind: InboxRef["kind"]; id: number; name: string }) {
   return (
     <div className="mt-6">
-      <Link href={askHref(kind, id, name)} scroll={false} className="inline-flex items-center gap-2 rounded-full border px-4 min-h-[44px] font-body text-[12px] tracking-[0.12em] uppercase pp-focus pp-press"
+      <Link href={askHref(kind, id, name)} scroll={false} className="inline-flex items-center gap-2 rounded-full border px-4 min-h-[44px] font-body text-[0.875rem] tracking-[0.12em] uppercase pp-focus pp-press"
         style={{ borderColor: C.line, color: C.text }}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden><path d="M4 5h16v11H8l-4 4z" /></svg>
         Ask about this

@@ -66,7 +66,7 @@ export default function Account({ me: initial, prefs, friends }: { me: Me; prefs
   return (
     <div className="space-y-8 animate-fade-in">
       <div>
-        <p className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>Your account</p>
+        <p className="font-body text-[0.75rem] tracking-[0.3em] uppercase" style={{ color: C.brass }}>Your account</p>
         <h1 className="font-display text-4xl mt-1">{m.first_name} {m.last_name}</h1>
         {m.member_since && <p className="font-body text-sm mt-2" style={{ color: C.muted }}>Member since {new Date(m.member_since + "T12:00:00").toLocaleDateString("en-US", { month: "long", year: "numeric" })}</p>}
       </div>
@@ -74,31 +74,31 @@ export default function Account({ me: initial, prefs, friends }: { me: Me; prefs
       <Block title="Contact">
         <Row label="Email" value={m.email} />
         <Row label="Phone" value={m.phone ? formatPhone(m.phone) : "Not added yet"} />
-        <p className="font-body text-xs leading-relaxed pt-1" style={{ color: C.faint }}>To change these, message us or ask at the bar. They&rsquo;re how we match your visits to your Passport.</p>
+        <p className="font-body text-[0.875rem] leading-relaxed pt-1" style={{ color: C.faint }}>To change these, message us or ask at the bar. They&rsquo;re how we match your visits to your Passport.</p>
       </Block>
 
       <Block title="Household">
         {me.household.length ? (
           <ul className="space-y-2">
             {me.household.map((h, i) => (
-              <li key={i} className="flex items-center justify-between font-body text-[15px]">
+              <li key={i} className="flex items-center justify-between font-body text-[1rem]">
                 <span>{h.first_name} {h.last_name}</span>
-                <span className="text-[11px] tracking-[0.2em] uppercase" style={{ color: h.status === "active" ? C.muted : C.brass }}>{h.status === "active" ? "Joined" : "Invited"}</span>
+                <span className="text-[0.75rem] tracking-[0.2em] uppercase" style={{ color: h.status === "active" ? C.muted : C.brass }}>{h.status === "active" ? "Joined" : "Invited"}</span>
               </li>
             ))}
           </ul>
         ) : (
           <p className="font-body text-sm" style={{ color: C.muted }}>Nobody else yet.</p>
         )}
-        <p className="font-body text-xs leading-relaxed" style={{ color: C.faint }}>Everyone in a household has their own sign-in. Favorites, ratings, notes, lists, photos and messages are never shared.</p>
+        <p className="font-body text-[0.875rem] leading-relaxed" style={{ color: C.faint }}>Everyone in a household has their own sign-in. Favorites, ratings, notes, lists, photos and messages are never shared.</p>
         {me.household.some((h) => h.status === "active") && (
           <>
             <Check checked={m.household_history !== false} onChange={setHouseholdHistory}>Share order history with my household</Check>
-            <p className="font-body text-xs leading-relaxed" style={{ color: C.faint }}>One person often pays for both. With this on, a check paid by anyone in your household who also shares counts in both your histories. Off: your checks count only for you, and you see only your own.</p>
+            <p className="font-body text-[0.875rem] leading-relaxed" style={{ color: C.faint }}>One person often pays for both. With this on, a check paid by anyone in your household who also shares counts in both your histories. Off: your checks count only for you, and you see only your own.</p>
           </>
         )}
         {sentTo && <Notice kind="ok">Invitation sent to {sentTo}.</Notice>}
-        {full && m.can_invite_household && <p className="font-body text-xs" style={{ color: C.faint }}>A household can have up to 3 people.</p>}
+        {full && m.can_invite_household && <p className="font-body text-[0.875rem]" style={{ color: C.faint }}>A household can have up to 3 people.</p>}
         {m.can_invite_household && !full && (inviting
           ? <InviteForm onDone={(first) => { setSentTo(first); setInviting(false); }} onCancel={() => setInviting(false)} />
           : <button type="button" className="inline-flex items-center min-h-[44px] font-body text-sm underline underline-offset-4 pp-focus rounded" style={{ color: C.text }} onClick={() => setInviting(true)}>+ Add someone in your household</button>)}
@@ -108,7 +108,7 @@ export default function Account({ me: initial, prefs, friends }: { me: Me; prefs
 
       <Block title="Suggestions">
         <Check checked={m.suggest !== false} onChange={setSuggest}>Suggest things for me</Check>
-        <p className="font-body text-xs leading-relaxed" style={{ color: C.faint }}>&ldquo;For you&rdquo; on Home and in the Index, built only from your own favorites, ratings, orders and lists. Never from anyone else&rsquo;s.</p>
+        <p className="font-body text-[0.875rem] leading-relaxed" style={{ color: C.faint }}>&ldquo;For you&rdquo; on Home and in the Index, built only from your own favorites, ratings, orders and lists. Never from anyone else&rsquo;s.</p>
         {error && prefs && <Notice>{error}</Notice>}
       </Block>
 
@@ -117,7 +117,7 @@ export default function Account({ me: initial, prefs, friends }: { me: Me; prefs
           <Check checked={m.marketing_consent} onChange={setMarketing}>
             Send me occasional news and offers. {saving && <span style={{ color: C.faint }}>Saving…</span>}
           </Check>
-          <p className="font-body text-xs leading-relaxed" style={{ color: C.faint }}>Account emails, like password resets, always come through.</p>
+          <p className="font-body text-[0.875rem] leading-relaxed" style={{ color: C.faint }}>Account emails, like password resets, always come through.</p>
           {error && <Notice>{error}</Notice>}
         </Block>
       )}
@@ -157,7 +157,7 @@ function Notifications({ initial, onNews }: { initial: NotifyPrefs; onNews: (on:
   };
   return (
     <Block title="Notifications">
-      <p className="font-body text-xs leading-relaxed" style={{ color: C.faint }}>Email me, and notify my devices if they&rsquo;re on, when{saving && <span> · Saving…</span>}</p>
+      <p className="font-body text-[0.875rem] leading-relaxed" style={{ color: C.faint }}>Email me, and notify my devices if they&rsquo;re on, when{saving && <span> · Saving…</span>}</p>
       <Check checked={p.messages} onChange={(v) => save({ messages: v })}>The bar replies to a message</Check>
       <Check checked={p.requests} onChange={(v) => save({ requests: v })}>Something changes on a request or event inquiry</Check>
       <Check checked={p.bottles} onChange={(v) => save({ bottles: v })}>There is news about a bottle request <span style={{ color: C.faint }}>(a bottle ready for pickup is always emailed)</span></Check>
@@ -170,13 +170,13 @@ function Notifications({ initial, onNews }: { initial: NotifyPrefs; onNews: (on:
         {p.digest && (
           <label className="flex items-center gap-3 font-body text-sm pl-[30px]" style={{ color: C.muted }}>
             Send it at
-            <select value={p.digest_hour} onChange={(e) => save({ digest_hour: Number(e.target.value) })} className="rounded-lg px-3 py-2 bg-[#0E120B] border border-[#323B29] text-[#EDE6D3] text-[15px]">
+            <select value={p.digest_hour} onChange={(e) => save({ digest_hour: Number(e.target.value) })} className="rounded-lg px-3 py-2 bg-[#0E120B] border border-[#323B29] text-[#EDE6D3] text-[1rem]">
               {HOURS.map((h) => <option key={h} value={h}>{hourWord(h)}</option>)}
             </select>
           </label>
         )}
       </div>
-      <p className="font-body text-xs leading-relaxed" style={{ color: C.faint }}>Emails only say that something is waiting; read it in your Inbox. At most one an hour about the same conversation, and none while you have it open. Account emails, like password resets, always come through.</p>
+      <p className="font-body text-[0.875rem] leading-relaxed" style={{ color: C.faint }}>Emails only say that something is waiting; read it in your Inbox. At most one an hour about the same conversation, and none while you have it open. Account emails, like password resets, always come through.</p>
       {error && <Notice>{error}</Notice>}
       <ThisDevice />
     </Block>
@@ -206,7 +206,7 @@ function ThisDevice() {
   };
   return (
     <div className="pt-3 border-t space-y-2" style={{ borderColor: C.line }} aria-busy={state === null || busy}>
-      <p className="font-body text-xs leading-relaxed" style={{ color: C.faint }}>On this device</p>
+      <p className="font-body text-[0.875rem] leading-relaxed" style={{ color: C.faint }}>On this device</p>
       {state === "needs-install" ? (
         <>
           <p className="font-body text-sm leading-relaxed" style={{ color: C.text }}>On iPhone, notifications work once Passport is on your home screen. Add it, open Passport from there, then turn them on here.</p>
@@ -221,8 +221,8 @@ function ThisDevice() {
           Notify me on this device {busy && <span style={{ color: C.faint }}>· {state === "on" ? "Turning off…" : "Turning on…"}</span>}
         </Check>
       )}
-      {state === "blocked" && !note && <p className="font-body text-xs leading-relaxed" style={{ color: C.muted }}>Notifications are blocked for this site in your browser&rsquo;s settings. Allow them there to turn this on.</p>}
-      <p className="font-body text-xs leading-relaxed" style={{ color: C.faint }}>A short note on this device when the bar replies or asks you something, a bottle price is ready, a bottle is ordered or ready for pickup, a friend writes, a place opens up or an event is cancelled, someone replies to your comment, a bracket moves on, or there&rsquo;s news from the bar. It never shows what anyone wrote, a price or anyone&rsquo;s last name. Nothing between 10 PM and 9 AM, and at most six a day; the rest wait in your Inbox. The switches above choose which kinds you get.</p>
+      {state === "blocked" && !note && <p className="font-body text-[0.875rem] leading-relaxed" style={{ color: C.muted }}>Notifications are blocked for this site in your browser&rsquo;s settings. Allow them there to turn this on.</p>}
+      <p className="font-body text-[0.875rem] leading-relaxed" style={{ color: C.faint }}>A short note on this device when the bar replies or asks you something, a bottle price is ready, a bottle is ordered or ready for pickup, a friend writes, a place opens up or an event is cancelled, someone replies to your comment, a bracket moves on, or there&rsquo;s news from the bar. It never shows what anyone wrote, a price or anyone&rsquo;s last name. Nothing between 10 PM and 9 AM, and at most six a day; the rest wait in your Inbox. The switches above choose which kinds you get.</p>
       {note && <Notice>{note}</Notice>}
     </div>
   );
@@ -259,27 +259,27 @@ function FriendsBlock({ initial }: { initial: FriendsOverview }) {
         <div className="flex gap-2">
           <input className={inputCls} value={name} maxLength={30} onChange={(e) => setName(e.target.value)} placeholder={s.default_name} />
           <button type="button" disabled={busy || name.trim() === s.display_name} onClick={() => call({ action: "settings", display_name: name.trim() })}
-            className="shrink-0 rounded-lg border px-4 font-body text-[12px] tracking-[0.12em] uppercase disabled:opacity-40" style={{ borderColor: C.brass, color: C.brass }}>Save</button>
+            className="shrink-0 rounded-lg border px-4 font-body text-[0.875rem] tracking-[0.12em] uppercase disabled:opacity-40" style={{ borderColor: C.brass, color: C.brass }}>Save</button>
         </div>
       </Field>
       <div className="pt-1">
-        <span className="block font-body text-[11px] tracking-[0.2em] uppercase mb-1.5" style={{ color: C.muted }}>Your friend code</span>
+        <span className="block font-body text-[0.75rem] tracking-[0.2em] uppercase mb-1.5" style={{ color: C.muted }}>Your friend code</span>
         <div className="flex items-center gap-3 flex-wrap">
-          <span className="font-display text-[28px] tracking-[0.12em]" style={{ color: C.text }}>{s.friend_code}</span>
+          <span className="font-display text-[1.75rem] tracking-[0.12em]" style={{ color: C.text }}>{s.friend_code}</span>
           <button type="button" onClick={copy} className="inline-flex items-center min-h-[44px] font-body text-sm underline underline-offset-4 pp-focus rounded" style={{ color: C.text }}>{copied ? "Link copied" : "Copy my link"}</button>
           <button type="button" disabled={busy} onClick={() => { if (confirm("Reset your friend code? The old code and link stop working.")) void call({ action: "code_reset" }); }} className="inline-flex items-center min-h-[44px] px-1 font-body text-sm underline underline-offset-4 pp-focus rounded" style={{ color: C.muted }}>Reset</button>
         </div>
-        <p className="font-body text-xs mt-1" style={{ color: C.faint }}>Share it with people you want as friends on Passport. Anyone with it can send you a request.</p>
+        <p className="font-body text-[0.875rem] mt-1" style={{ color: C.faint }}>Share it with people you want as friends on Passport. Anyone with it can send you a request.</p>
       </div>
       <Check checked={s.share_presence} onChange={(v) => call({ action: "settings", share_presence: v })}>Let friends see when I&rsquo;m at Common Good <span style={{ color: C.faint }}>(and that I&rsquo;m going to a Passport event)</span></Check>
       {blocked.length > 0 && (
         <div className="pt-1">
-          <span className="block font-body text-[11px] tracking-[0.2em] uppercase mb-1.5" style={{ color: C.muted }}>Blocked</span>
+          <span className="block font-body text-[0.75rem] tracking-[0.2em] uppercase mb-1.5" style={{ color: C.muted }}>Blocked</span>
           <ul className="space-y-1.5">
             {blocked.map((b) => (
-              <li key={b.id} className="flex items-center justify-between font-body text-[15px]" style={{ color: C.text }}>
+              <li key={b.id} className="flex items-center justify-between font-body text-[1rem]" style={{ color: C.text }}>
                 <span>{b.name}</span>
-                <button type="button" disabled={busy} className="text-xs underline" style={{ color: C.muted }} onClick={() => call({ action: "unblock", id: b.id })}>Unblock</button>
+                <button type="button" disabled={busy} className="text-[0.875rem] underline" style={{ color: C.muted }} onClick={() => call({ action: "unblock", id: b.id })}>Unblock</button>
               </li>
             ))}
           </ul>
@@ -327,7 +327,7 @@ function InviteForm({ onDone, onCancel }: { onDone: (firstName: string) => void;
 function Block({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="rounded-xl border p-5 space-y-3" style={{ borderColor: C.line, background: C.card }}>
-      <h2 className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>{title}</h2>
+      <h2 className="pp-t-section mb-3" style={{ color: C.text }}>{title}</h2>
       {children}
     </section>
   );
@@ -335,8 +335,8 @@ function Block({ title, children }: { title: string; children: React.ReactNode }
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-4 font-body">
-      <span className="text-xs tracking-[0.15em] uppercase" style={{ color: C.faint }}>{label}</span>
-      <span className="text-[15px] text-right break-all">{value || "—"}</span>
+      <span className="text-[0.875rem] tracking-[0.15em] uppercase" style={{ color: C.faint }}>{label}</span>
+      <span className="text-[1rem] text-right break-all">{value || "—"}</span>
     </div>
   );
 }

@@ -54,7 +54,7 @@ export function accentCardStyle(section: SectionId): CSSProperties {
 export function SectionHeading({ children, section, id, as = "h2", aside, className = "" }: { children: ReactNode; section?: SectionId | null; id?: string; as?: "h2" | "h3"; aside?: ReactNode; className?: string }) {
   const H = as;
   return (
-    <div className={`flex items-baseline justify-between gap-3 ${className}`}>
+    <div className={`flex items-baseline justify-between gap-3 mt-10 mb-3 ${className}`}>
       <H id={id} className="pp-t-section" style={{ color: section ? ACCENTS[section].ink : C.text }}>{children}</H>
       {aside}
     </div>

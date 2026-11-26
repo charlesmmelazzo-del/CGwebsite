@@ -88,7 +88,7 @@ export default function SignUp({ termsText, termsVersion, invitationCode }: { te
                   </div>
                   <Field label="Their email"><input className={inputCls} type="email" inputMode="email" value={p.email} onChange={(e) => setPeople(people.map((x, j) => (j === i ? { ...x, email: e.target.value } : x)))} /></Field>
                   {people.length > 1 && (
-                    <button type="button" className="font-body text-xs underline" style={{ color: C.muted }} onClick={() => setPeople(people.filter((_, j) => j !== i))}>Remove</button>
+                    <button type="button" className="font-body text-[0.875rem] underline" style={{ color: C.muted }} onClick={() => setPeople(people.filter((_, j) => j !== i))}>Remove</button>
                   )}
                 </div>
               ))}

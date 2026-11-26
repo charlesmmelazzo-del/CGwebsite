@@ -10,14 +10,19 @@ import { PAST_HREF, chartHref, discountLine, feedHref, feedKicker, flightLine, h
 import type { BarMessage, Chart, FeedCard, HouseList, SpiritOfTheDay as Spirit, VoteCard, WelcomeAperitif as Aperitif } from "@/lib/passport/types";
 import { PAST_VOTES_HREF } from "@/lib/passport/votes";
 import { VoteCardLink } from "../Votes";
+import { KindLabel, accentCardStyle } from "../Drill";
+import { ACCENTS, type SectionId } from "@/lib/passport/accents";
+
+/** File 14, Part 7: a What's new card's section (a new list, chart or vote: from the bar; a new menu: cocktails). */
+const feedSection = (c: FeedCard): SectionId => (c.link_kind === "menu" ? "cocktails" : "bar");
 
 /**
  * Places in the layout that file 06 kept and file 07 fills. Each draws NOTHING until it has something in it: never an
  * empty box or a placeholder line. They take their data as props from the tab's one call.
  */
 
-const kicker = "font-body text-[10px] tracking-[0.25em] uppercase";
-const heading = "font-body text-[11px] tracking-[0.3em] uppercase mb-3";
+const kicker = "pp-t-eyebrow";
+const heading = "pp-t-section mb-3";
 
 /** Hide a message or a What's new card for this member: gone at once; if the bar can't be reached, it comes back. */
 function useDismiss(what: "message" | "feed") {
@@ -48,8 +53,8 @@ export function WelcomeAperitif({ aperitif }: { aperitif?: Aperitif | null }) {
   if (!aperitif?.name) return null;
   return (
     <section aria-labelledby="pp-aperitif" className="mt-6 rounded-xl border p-5" style={{ borderColor: `${C.brass}66`, background: "#1a1f14" }}>
-      <h2 id="pp-aperitif" className={kicker} style={{ color: C.brass }}>Welcome Aperitif</h2>
-      <p className="font-display text-[24px] leading-tight mt-1.5" style={{ color: C.text }}>{aperitif.name}</p>
+      <h2 id="pp-aperitif" className={heading} style={{ color: ACCENTS.bar.ink }}>Welcome Aperitif</h2>
+      <p className="font-display text-[1.5rem] leading-tight mt-1.5" style={{ color: C.text }}>{aperitif.name}</p>
       {aperitif.description && <p className="font-body text-sm mt-1.5 leading-relaxed whitespace-pre-line" style={{ color: C.muted }}>{aperitif.description}</p>}
     </section>
   );
@@ -63,24 +68,23 @@ export function Tonight({ aperitif, spirit }: { aperitif?: Aperitif | null; spir
   const ap = aperitif?.name ? aperitif : null;
   if (!ap && !spirit) return null;
   const off = spirit ? discountLine(spirit.discount_pct) : null;
-  const box = "rounded-xl border p-4 h-full";
-  const boxStyle = { borderColor: `${C.brass}66`, background: "#1a1f14" };
+  const box = "rounded-xl border p-4 h-full pp-card pp-accent-card";
   return (
     <section aria-labelledby="pp-tonight" className="mt-8">
-      <h2 id="pp-tonight" className={heading} style={{ color: C.brass }}>Tonight</h2>
+      <h2 id="pp-tonight" className={heading} style={{ color: ACCENTS["bar"].ink }}>Tonight</h2>
       <div className={`grid gap-3 ${ap && spirit ? "grid-cols-2" : "grid-cols-1"}`}>
         {ap && (
-          <div className={box} style={boxStyle}>
-            <h3 className={kicker} style={{ color: C.brass }}>Welcome Aperitif</h3>
-            <p className="font-display text-[19px] leading-tight mt-1.5" style={{ color: C.text }}>{ap.name}</p>
-            {ap.description && <p className="font-body text-[13px] mt-1 leading-snug line-clamp-3" style={{ color: C.muted }}>{ap.description}</p>}
+          <div className={box} style={accentCardStyle("bar")}>
+            <h3><KindLabel section="bar">Welcome Aperitif</KindLabel></h3>
+            <p className="font-display text-[1.1875rem] leading-tight mt-1.5" style={{ color: C.text }}>{ap.name}</p>
+            {ap.description && <p className="font-body text-[0.875rem] mt-1 leading-snug line-clamp-3" style={{ color: C.muted }}>{ap.description}</p>}
           </div>
         )}
         {spirit && (
-          <PressLink item={{ kind: "bottle", id: spirit.id, name: spirit.name }} href={`/passport/spirits/${spirit.id}`} className={`block ${box} pp-row pp-focus`} style={boxStyle}>
-            <span className={`block ${kicker}`} style={{ color: C.brass }}>Spirit of the Day</span>
-            <span className="block font-display text-[19px] leading-tight mt-1.5" style={{ color: C.text }}>{spirit.name}</span>
-            {off && <span className="block font-body text-[13px] mt-1 leading-snug" style={{ color: C.brass }}>{off}</span>}
+          <PressLink item={{ kind: "bottle", id: spirit.id, name: spirit.name }} href={`/passport/spirits/${spirit.id}`} className={`block ${box} pp-row pp-focus`} style={accentCardStyle("spirits")}>
+            <KindLabel section="spirits">Spirit of the Day</KindLabel>
+            <span className="block font-display text-[1.1875rem] leading-tight mt-1.5" style={{ color: C.text }}>{spirit.name}</span>
+            {off && <span className="block font-body text-[0.875rem] mt-1 leading-snug" style={{ color: ACCENTS.spirits.ink }}>{off}</span>}
           </PressLink>
         )}
       </div>
@@ -96,15 +100,16 @@ export function FromTheBar({ messages }: { messages?: BarMessage[] | null }) {
   if (!shown.length) return null;
   return (
     <section aria-labelledby="pp-from-bar" className="mt-8">
-      <h2 id="pp-from-bar" className={heading} style={{ color: C.brass }}>From the bar</h2>
+      <h2 id="pp-from-bar" className={heading} style={{ color: ACCENTS["bar"].ink }}>From the bar</h2>
       <ul className="space-y-3">
         {shown.map((m) => {
           const href = messageHref(m);
           return (
-            <li key={m.id} className="flex items-start gap-2 border-l-2 pl-4 py-1" style={{ borderColor: C.brass }}>
+            <li key={m.id} className="flex items-start gap-2 rounded-xl border pl-4 pr-2 py-3 pp-card pp-accent-card" style={accentCardStyle("bar")}>
               <div className="flex-1 min-w-0">
-                <p className="font-display text-[19px] leading-snug" style={{ color: C.text }}>{m.title}</p>
-                {m.body && <p className="font-body text-[15px] leading-relaxed whitespace-pre-line mt-0.5" style={{ color: C.muted }}>{m.body}</p>}
+                <KindLabel section="bar">From the bar</KindLabel>
+                <p className="pp-t-card mt-1" style={{ color: C.text }}>{m.title}</p>
+                {m.body && <p className="font-body text-[1rem] leading-relaxed whitespace-pre-line mt-0.5" style={{ color: C.muted }}>{m.body}</p>}
                 {href && m.link_label && <Link href={href} scroll={false} className="inline-block mt-1 min-h-[44px] py-2.5 font-body text-sm underline underline-offset-4 pp-focus" style={{ color: C.brass }}>{m.link_label}</Link>}
                 {/* File 10: when the bar switched comments on for this message, its own page holds them. */}
                 {m.comments && <Link href={`/passport/from-the-bar/${m.id}`} scroll={false} className={`inline-block mt-1 ${href && m.link_label ? "ml-4" : ""} min-h-[44px] py-2.5 font-body text-sm underline underline-offset-4 pp-focus`} style={{ color: C.muted }}>Comments</Link>}
@@ -126,13 +131,13 @@ export function WhatsNew({ cards }: { cards?: FeedCard[] | null }) {
   if (!shown.length) return null;
   return (
     <section aria-labelledby="pp-whats-new" className="mt-10">
-      <h2 id="pp-whats-new" className={heading} style={{ color: C.brass }}>What&rsquo;s new</h2>
+      <h2 id="pp-whats-new" className={heading} style={{ color: ACCENTS["bar"].ink }}>What&rsquo;s new</h2>
       <ul className="-mx-5 px-5 flex gap-3 overflow-x-auto pb-2 snap-x">
         {shown.map((c) => (
           <li key={c.key} className="snap-start shrink-0 w-[70%] max-w-[260px] relative">
-            <Link href={feedHref(c)} scroll={false} className="block h-full rounded-xl border p-4 pr-10 pp-focus pp-row" style={{ borderColor: C.line, background: C.card }}>
-              <span className={`block ${kicker}`} style={{ color: C.brass }}>{feedKicker(c.kind)}</span>
-              <span className="block font-display text-[21px] leading-tight mt-1.5" style={{ color: C.text }}>{c.title}</span>
+            <Link href={feedHref(c)} scroll={false} className="block h-full rounded-xl border p-4 pr-10 pp-focus pp-row pp-card pp-accent-card" style={accentCardStyle(feedSection(c))}>
+              <KindLabel section={feedSection(c)}>{feedKicker(c.kind)}</KindLabel>
+              <span className="block font-display text-[1.3125rem] leading-tight mt-1.5" style={{ color: C.text }}>{c.title}</span>
             </Link>
             <span className="absolute top-1 right-2"><DismissButton label={c.title} onClick={() => dismiss(c.key)} /></span>
           </li>
@@ -148,12 +153,12 @@ export function SpiritOfTheDay({ spirit }: { spirit?: Spirit | null }) {
   const off = discountLine(spirit.discount_pct);
   return (
     <section aria-labelledby="pp-sotd" className="mt-10">
-      <h2 id="pp-sotd" className={heading} style={{ color: C.brass }}>Spirit of the Day</h2>
+      <h2 id="pp-sotd" className={heading} style={{ color: ACCENTS["spirits"].ink }}>Spirit of the Day</h2>
       <PressLink item={{ kind: "bottle", id: spirit.id, name: spirit.name }} href={`/passport/spirits/${spirit.id}`}
-        className="block rounded-xl border p-5 pp-row pp-focus" style={{ borderColor: `${C.brass}66`, background: "#1a1f14" }}>
-        <span className="block font-display text-[26px] leading-tight" style={{ color: C.text }}>{spirit.name}</span>
+        className="block rounded-xl border p-5 pp-row pp-focus pp-card pp-accent-card" style={accentCardStyle("spirits")}>
+        <span className="block font-display text-[1.625rem] leading-tight" style={{ color: C.text }}>{spirit.name}</span>
         {spirit.category && <span className={`block mt-1 ${kicker}`} style={{ color: C.faint }}>{spirit.category}</span>}
-        {off && <span className="block font-body text-[15px] mt-3" style={{ color: C.brass }}>{off}</span>}
+        {off && <span className="block font-body text-[1rem] mt-3" style={{ color: C.brass }}>{off}</span>}
       </PressLink>
     </section>
   );
@@ -164,7 +169,7 @@ export function NewestList({ list }: { list?: HouseList | null }) {
   if (!list) return null;
   return (
     <section aria-labelledby="pp-newest-list" className="mt-10">
-      <h2 id="pp-newest-list" className={heading} style={{ color: C.brass }}>From Common Good</h2>
+      <h2 id="pp-newest-list" className={heading} style={{ color: ACCENTS["bar"].ink }}>From Common Good</h2>
       <ListCard l={list} big />
     </section>
   );
@@ -173,11 +178,11 @@ export function NewestList({ list }: { list?: HouseList | null }) {
 function ListCard({ l, big = false }: { l: HouseList; big?: boolean }) {
   const flight = flightLine(l.price);
   return (
-    <Link href={houseHref(l.id)} scroll={false} className="block rounded-xl border p-4 pp-focus pp-row" style={{ borderColor: l.staff_pick ? `${C.brass}80` : C.line, background: C.card }}>
-      <span className={`block ${kicker}`} style={{ color: l.staff_pick ? C.brass : C.faint }}>{listKicker(l)}</span>
-      <span className={`block font-display leading-tight mt-1.5 ${big ? "text-[24px]" : "text-[21px]"}`} style={{ color: C.text }}>{l.title}</span>
+    <Link href={houseHref(l.id)} scroll={false} className="block rounded-xl border p-4 pp-focus pp-row pp-card pp-accent-card" style={accentCardStyle("bar")}>
+      <KindLabel section="bar">{listKicker(l)}</KindLabel>
+      <span className={`block font-display leading-tight mt-1.5 ${big ? "text-[1.5rem]" : "text-[1.3125rem]"}`} style={{ color: C.text }}>{l.title}</span>
       {big && l.intro && <span className="block font-body text-sm mt-1 leading-relaxed line-clamp-2" style={{ color: C.muted }}>{l.intro}</span>}
-      <span className="block font-body text-[11px] tracking-[0.12em] uppercase mt-2" style={{ color: C.faint }}>
+      <span className="block font-body text-[0.75rem] tracking-[0.12em] uppercase mt-2" style={{ color: C.faint }}>
         {l.count} {l.kind === "cocktail" ? "cocktail" : "bottle"}{l.count === 1 ? "" : "s"}{flight ? ` · ${flight}` : ""}
       </span>
     </Link>
@@ -190,15 +195,15 @@ export function HouseLists({ lists, charts, pastCount = 0, votes, pastVotes = 0 
   return (
     <section id="from-common-good" aria-labelledby="pp-house-lists">
       <div className="flex items-baseline justify-between mt-10 mb-3">
-        <h2 id="pp-house-lists" className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>From Common Good</h2>
+        <h2 id="pp-house-lists" className="pp-t-section mb-3" style={{ color: ACCENTS["bar"].ink }}>From Common Good</h2>
       </div>
       {!!charts?.length && (
         <ul className="grid grid-cols-2 gap-3 mb-3">
           {charts.map((c) => (
             <li key={c.key}>
-              <Link href={chartHref(c.key)} scroll={false} className="block h-full rounded-xl border p-4 pp-focus pp-row" style={{ borderColor: `${C.brass}80`, background: "#1a1f14" }}>
-                <span className={`block ${kicker}`} style={{ color: C.brass }}>{c.season_name}</span>
-                <span className="block font-display text-[21px] leading-tight mt-1.5" style={{ color: C.text }}>{c.title}</span>
+              <Link href={chartHref(c.key)} scroll={false} className="block h-full rounded-xl border p-4 pp-focus pp-row pp-card pp-accent-card" style={accentCardStyle("bar")}>
+                <KindLabel section="bar">{c.season_name}</KindLabel>
+                <span className="block font-display text-[1.3125rem] leading-tight mt-1.5" style={{ color: C.text }}>{c.title}</span>
               </Link>
             </li>
           ))}
