@@ -8,8 +8,9 @@ export const metadata: Metadata = {
   manifest: "/passport/manifest.webmanifest",
   appleWebApp: { capable: true, title: "Passport", statusBarStyle: "black-translucent" },
   icons: {
-    icon: [{ url: "/passport/icon-192.png", sizes: "192x192", type: "image/png" }],
-    apple: [{ url: "/passport/apple-touch-icon.png", sizes: "180x180" }],
+    // File 16, Part 10: the passport booklet icon (Passport pages only; the public site keeps its own favicon).
+    icon: [{ url: "/passport/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+    apple: [{ url: "/passport/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
 };
 

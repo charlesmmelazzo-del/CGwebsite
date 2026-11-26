@@ -1,5 +1,6 @@
 "use client";
 
+import { Band } from "./Library";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { C, Notice, postJson } from "./ui";
@@ -10,7 +11,6 @@ import { ShareButton } from "./Social";
 import { dayLong } from "@/lib/passport/shell";
 import { friendsGoingLine, ticketHref } from "@/lib/passport/social";
 import type { PassportEvent } from "@/lib/passport/types";
-import { ACCENTS } from "@/lib/passport/accents";
 
 /**
  * File 09: Passport events, members only. On the Events tab, upcoming events come first (then the member's own
@@ -111,7 +111,7 @@ export function EventPage({ initial }: { initial: PassportEvent }) {
       )}
       {e.rsvp && open && (
         <section aria-labelledby="pp-rsvp" className="mt-8 rounded-xl border p-5" style={{ borderColor: `${C.brass}66`, background: "#1a1f14" }}>
-          <h2 id="pp-rsvp" className="pp-t-section mb-3" style={{ color: ACCENTS["events"].ink }}>Your answer</h2>
+          <Band section="events" id="pp-rsvp" className="mb-3">Your answer</Band>
           {r?.status === "offered" && r.offer_expires_at && <p className="font-body text-[1rem] mt-2" style={{ color: C.text }}>A place opened up, and we&rsquo;re holding it for you until {new Date(r.offer_expires_at).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: "America/Chicago" })}. Tap Going to take it.</p>}
           {r?.status === "waitlist" && <p className="font-body text-sm mt-2" style={{ color: C.muted }}>You&rsquo;re on the waitlist. Your place isn&rsquo;t guaranteed; if one opens, we&rsquo;ll hold it for you for 24 hours and email you.</p>}
           {r?.status === "missed" && <p className="font-body text-sm mt-2" style={{ color: C.muted }}>The place we held for you has passed to the next person. You can join the waitlist again.</p>}

@@ -536,7 +536,7 @@ const MENU_HREF_ = "/passport/menu";
  * Every page in the app (src/app/passport/(app)) and the place one level above it: where its Back control goes when
  * there is no step in the app's own history to go back to (a page opened from a link, or a step that belongs to another
  * tab). The test checks that every route folder has an entry here, so a new page can't arrive without a way back.
- * A tab's own top level (Home, Menu, Index, Events, Inbox) has no parent.
+ * A tab's own top level (Home, Menu, Index, Events, Messages) has no parent.
  */
 export const PAGE_PARENTS: { route: string; test: RegExp; parent: Parent }[] = [
   { route: "library/[id]", test: /^\/passport\/library\/\d+\/?$/, parent: { href: INDEX_HREF, label: "Index", tab: "index" } },
@@ -561,11 +561,17 @@ export const PAGE_PARENTS: { route: string; test: RegExp; parent: Parent }[] = [
   { route: "from-the-bar/[id]", test: /^\/passport\/from-the-bar\/\d+\/?$/, parent: { href: "/passport", label: "Home", tab: "home" } },
   { route: "events/[id]", test: /^\/passport\/events\/\d+\/?$/, parent: { href: "/passport/events", label: "Events", tab: "events" } },
   { route: "events/public/[id]", test: /^\/passport\/events\/public\/[^/]+\/?$/, parent: { href: "/passport/events", label: "Events", tab: "events" } },
-  { route: "inbox/new", test: /^\/passport\/inbox\/new\/?$/, parent: { href: "/passport/inbox", label: "Inbox", tab: "inbox" } },
-  { route: "inbox/messages/[id]", test: /^\/passport\/inbox\/messages\/\d+\/?$/, parent: { href: "/passport/inbox", label: "Inbox", tab: "inbox" } },
-  { route: "inbox/requests/[id]", test: /^\/passport\/inbox\/requests\/\d+\/?$/, parent: { href: "/passport/inbox", label: "Inbox", tab: "inbox" } },
-  { route: "inbox/events/[id]", test: /^\/passport\/inbox\/events\/\d+\/?$/, parent: { href: "/passport/inbox", label: "Inbox", tab: "inbox" } },
-  { route: "inbox/friends/[id]", test: /^\/passport\/inbox\/friends\/\d+\/?$/, parent: { href: "/passport/inbox", label: "Inbox", tab: "inbox" } },
+  // File 16: the Inbox is called Messages (same addresses).
+  { route: "inbox/new", test: /^\/passport\/inbox\/new\/?$/, parent: { href: "/passport/inbox", label: "Messages", tab: "inbox" } },
+  { route: "inbox/messages/[id]", test: /^\/passport\/inbox\/messages\/\d+\/?$/, parent: { href: "/passport/inbox", label: "Messages", tab: "inbox" } },
+  { route: "inbox/requests/[id]", test: /^\/passport\/inbox\/requests\/\d+\/?$/, parent: { href: "/passport/inbox", label: "Messages", tab: "inbox" } },
+  { route: "inbox/events/[id]", test: /^\/passport\/inbox\/events\/\d+\/?$/, parent: { href: "/passport/inbox", label: "Messages", tab: "inbox" } },
+  { route: "inbox/friends/[id]", test: /^\/passport\/inbox\/friends\/\d+\/?$/, parent: { href: "/passport/inbox", label: "Messages", tab: "inbox" } },
+  { route: "inbox/groups/new", test: /^\/passport\/inbox\/groups\/new\/?$/, parent: { href: "/passport/inbox", label: "Messages", tab: "inbox" } },
+  { route: "inbox/groups/[id]", test: /^\/passport\/inbox\/groups\/\d+\/?$/, parent: { href: "/passport/inbox", label: "Messages", tab: "inbox" } },
+  { route: "inbox/channels/new", test: /^\/passport\/inbox\/channels\/new\/?$/, parent: { href: "/passport/inbox?tab=channels", label: "Channels", tab: "inbox" } },
+  { route: "inbox/channels/[id]", test: /^\/passport\/inbox\/channels\/\d+\/?$/, parent: { href: "/passport/inbox?tab=channels", label: "Channels", tab: "inbox" } },
+  { route: "inbox/channels/[id]/threads/[key]", test: /^\/passport\/inbox\/channels\/\d+\/threads\/[^/]+\/?$/, parent: { href: "/passport/inbox?tab=channels", label: "Channels", tab: "inbox" } },
 ];
 /** Route folders that are not a screen of their own: a tab's top level, a redirect to one, a picture or a file. */
 export const NOT_PAGES = ["", "[tab]", "menu", "library", "events", "inbox", "lists", "spirits", "bottles", "photo", "library/[id]/home-recipe"];

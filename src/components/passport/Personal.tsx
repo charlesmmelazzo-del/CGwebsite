@@ -1,5 +1,6 @@
 "use client";
 
+import { Band } from "./Library";
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
@@ -18,7 +19,6 @@ import { BackLink } from "./bits";
 import { Collage } from "./Drill";
 import { listCovers } from "@/lib/passport/nav";
 import { useShell } from "./shellContext";
-import { ACCENTS } from "@/lib/passport/accents";
 
 /**
  * File 04: the member's own favorites, ratings, notes, lists and bespoke recipes (client pieces).
@@ -112,7 +112,7 @@ export function ItemControls({ kind, id, name, initial }: { kind: ItemKind; id: 
       </p>
 
       <div>
-        <h2 className="pp-t-section mb-3" style={{ color: ACCENTS["yours"].ink }}>Your note</h2>
+        <Band section="yours" className="mb-3">Your note</Band>
         {editing || !mine.note ? (
           <div className="mt-2 space-y-2">
             <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={3} maxLength={2000} className={inputCls}
@@ -340,7 +340,7 @@ export function ListEditor({ initial }: { initial: PassportList }) {
       </div>
 
       <div className="mt-8">
-        <h2 className="pp-t-section mb-3" style={{ color: ACCENTS["yours"].ink }}>Add {list.kind === "cocktail" ? "a cocktail" : "a bottle"}</h2>
+        <Band section="yours" className="mb-3">Add {list.kind === "cocktail" ? "a cocktail" : "a bottle"}</Band>
         {full ? <p className="font-body text-sm mt-2" style={{ color: C.faint }}>A top 10 holds ten. Remove one to add another.</p>
           : <ListSearch kind={list.kind} have={new Set(items.map((x) => x.id).filter((x): x is number => x !== null))} onAdd={add} />}
       </div>

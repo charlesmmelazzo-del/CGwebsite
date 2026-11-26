@@ -1,8 +1,10 @@
 /**
  * Makes /passport installable to a phone's home screen as "Passport", opening
  * without browser bars. Scoped to /passport only; the rest of the site is unchanged.
- * Icons: public/passport/icon-192.png, icon-512.png and apple-touch-icon.png
- * (placeholders until the final icon is designed; replace the files to change them).
+ * Icons (file 16, Part 10): a small passport booklet with the Common Good mark on its cover, drawn once as
+ * public/passport/icons/icon.svg (and icon-maskable.svg, the booklet inside the central 80% safe zone) and committed as
+ * PNGs in public/passport/icons/. The old addresses (public/passport/icon-192.png and friends) hold the same pictures,
+ * so a phone that installed Passport before keeps a matching icon.
  */
 export const dynamic = "force-static";
 
@@ -19,9 +21,9 @@ export function GET() {
       background_color: "#13170F",
       theme_color: "#13170F",
       icons: [
-        { src: "/passport/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-        { src: "/passport/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
-        { src: "/passport/icon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+        { src: "/passport/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+        { src: "/passport/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+        { src: "/passport/icons/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
       ],
     }),
     { headers: { "Content-Type": "application/manifest+json", "Cache-Control": "public, max-age=3600" } },

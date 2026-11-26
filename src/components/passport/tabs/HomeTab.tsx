@@ -7,8 +7,7 @@ import { SeeAll, Skel } from "../bits";
 import { KindLabel, SectionHeading, accentCardStyle } from "../Drill";
 import { ACCENTS, sectionOf, type CardKind } from "@/lib/passport/accents";
 import { CocktailFeature } from "../Library";
-import InstallHint from "../InstallHint";
-import PushPrompt from "../PushPrompt";
+import { WelcomePopup } from "../WelcomeSheet";
 import PhonePrompt from "../PhonePrompt";
 import TabView from "./TabView";
 import { FromTheBar, HereButtons, NewestList, SharedWithYou, Tonight, WhatsNew } from "./Slots";
@@ -91,11 +90,11 @@ export default function HomeTab() {
         const eventNotes = d.social?.event_notices ?? [];
         const now: { key: string; card: ReactNode }[] = [
           ...eventNotes.map((n) => { const w = eventNoticeWords(n); return { key: `ev${n.kind}${n.id}`, card: <NowCard kind="event-notice" href={`/passport/events/${n.id}`} kicker={w.kicker} title={`${n.title} · ${dayLong(n.date)}`} line={w.line} /> }; }),
-          ...questions.map((r) => ({ key: `q${r.id}`, card: <NowCard kind="request-question" href={`/passport/inbox/requests/${r.id}`} kicker={r.question ? "A question about your request" : "A note about your request"} title={r.kind_label} line={r.question ? "Answer it in your Inbox." : r.status_label} /> })),
+          ...questions.map((r) => ({ key: `q${r.id}`, card: <NowCard kind="request-question" href={`/passport/inbox/requests/${r.id}`} kicker={r.question ? "A question about your request" : "A note about your request"} title={r.kind_label} line={r.question ? "Answer it in your messages." : r.status_label} /> })),
           ...replies.map((t) => ({ key: `t${t.id}`, card: <NowCard kind="bar-reply" href={`/passport/inbox/messages/${t.id}`} kicker="A reply from the bar" title={t.subject || (t.ref ? `About ${t.ref.name}` : "Your message")} line={t.preview} /> })),
           ...events.map((q) => ({ key: `e${q.id}`, card: <NowCard kind="event-reply" href={`/passport/inbox/events/${q.id}`} kicker="About your event" title={`${q.kind_label} · ${dayLong(q.preferred_date)}`} line={q.status_label} /> })),
           ...ready.map((r) => ({ key: `r${r.id}`, card: <NowCard kind="bottle-ready" href="/passport/inbox" kicker="Ready for pickup" title={r.name} line={r.quantity > 1 ? `${r.quantity} bottles, set aside for you at the bar` : "Set aside for you at the bar"} /> })),
-          ...prices.map((r) => ({ key: `p${r.id}`, card: <NowCard kind="bottle-price" href="/passport/inbox" kicker="A price is waiting for you" title={r.name} line={r.quote ? `${money(r.quote.price_cents)} a bottle, plus tax. Accept or decline in your Inbox.` : "Accept or decline in your Inbox."} /> })),
+          ...prices.map((r) => ({ key: `p${r.id}`, card: <NowCard kind="bottle-price" href="/passport/inbox?tab=bottles" kicker="A price is waiting for you" title={r.name} line={r.quote ? `${money(r.quote.price_cents)} a bottle, plus tax. Accept or decline in your messages.` : "Accept or decline in your messages."} /> })),
           ...(next ? [{ key: "res", card: <NowCard kind="reservation" href="/passport/events" kicker={`Your table · ${reservationWord(next.status)}`} title={dayLong(next.date)} line={`${next.time} · ${partyOf(next.party_size)}`} /> }] : []),
         ];
         return (
@@ -103,15 +102,13 @@ export default function HomeTab() {
             {d.needs_phone && <PhonePrompt />}
             <p className="pp-t-eyebrow" style={{ color: C.brass }} suppressHydrationWarning>{greeting()}</p>
             <h1 className="pp-t-page mt-1" style={{ color: C.text }}>Welcome, {d.first_name}</h1>
-            {/* File 12: under the welcome, so the page's heading comes first. */}
-            <div className="mt-6 -mb-6"><InstallHint /></div>
-            {/* File 13: once, after the member has used Passport for a bit: notifications on this phone. */}
-            <PushPrompt />
+            {/* File 16, Part 8: "Add Passport to your home screen" and notifications are a pop-up over Home, never a card in the page. */}
+            <WelcomePopup />
             <HereButtons presence={d.social?.presence} hasFriends={d.social?.has_friends} />
             <FriendsHere friends={d.social?.friends_here} />
             {now.length > 0 && (
               <section aria-labelledby="pp-now">
-                <SectionHeading id="pp-now">Right now</SectionHeading>
+                <SectionHeading id="pp-now" section="inbox">Right now</SectionHeading>
                 <SeeAll items={now} keyOf={(x) => x.key} render={(x) => x.card} what="things waiting" href="/passport/inbox" />
               </section>
             )}

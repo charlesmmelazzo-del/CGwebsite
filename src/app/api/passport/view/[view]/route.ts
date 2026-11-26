@@ -1,10 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
   getBarHome, getBarLists, getBottleRequests, getInbox, getIndex, getLists, getMarksSafe, getMe, getMenus, getPassportCocktails, getReservations, getSpirits,
-  getPassportEvents, getSocialHome, getSocialInbox, getVotes, getForYou,
+  getPassportEvents, getSocialHome, getSocialInbox, getVotes, getForYou, getFriends, passport,
   type MemberAuth,
 } from "@/lib/passport/bible";
 import { memberRequest } from "@/lib/passport/route";
+import type { ChatOverview } from "@/lib/passport/chat";
 import { sortRequests } from "@/lib/passport/bottles";
 import { needsMember } from "@/lib/passport/shell";
 import { reserveEnabled } from "@/lib/reserve/enabled";
@@ -74,9 +75,13 @@ const VIEWS: Record<string, (auth: MemberAuth) => Promise<unknown>> = {
   // Inbox: My bottles (file 05) and (file 08) the member's conversations with the bar, requests and event inquiries.
   // My bottles keeps its own shape at the top (requests, open_count, max_open); the rest arrives as `inbox`.
   // File 09 adds `social`: conversations with friends, friend requests waiting, and notices from the bar.
+  // File 16: Messages. Adds `chat` (conversations with the bar, friends and groups, invitations, channels) and `friends`
+  // (the Friends top tab and the "New message" and "New group" pickers).
   inbox: async (auth) => {
-    const [r, inbox, social] = await Promise.all([getBottleRequests(auth), getInbox(auth).catch(() => null), getSocialInbox(auth).catch(() => null)]);
-    return { ...r, requests: sortRequests(r.requests), inbox, social };
+    const [r, inbox, social, chat, friends, home] = await Promise.all([getBottleRequests(auth), getInbox(auth).catch(() => null), getSocialInbox(auth).catch(() => null),
+      passport<ChatOverview>("GET", "/chat", { auth }).catch(() => null), getFriends(auth).catch(() => null), getSocialHome(auth).catch(() => null)]);
+    // "Needs you" also shows a place held for the member at a Passport event (file 09).
+    return { ...r, requests: sortRequests(r.requests), inbox, social, chat, friends, event_notices: (home?.event_notices || []).filter((n) => n.kind === "offer") };
   },
 };
 

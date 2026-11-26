@@ -210,7 +210,7 @@ export interface InboxLimits {
 }
 export interface InboxData { threads: InboxThread[]; member_requests: MemberRequest[]; inquiries: EventInquiry[]; limits: InboxLimits }
 /** Account → Notifications. news is the member's marketing choice. digest_hour: bar time, 6 to 22. */
-export interface NotifyPrefs { messages: boolean; requests: boolean; bottles: boolean; friends?: boolean; comments?: boolean; votes?: boolean; news: boolean; digest: boolean; digest_hour: number }
+export interface NotifyPrefs { messages: boolean; requests: boolean; bottles: boolean; friends?: boolean; comments?: boolean; votes?: boolean; chats?: boolean; channels?: boolean; news: boolean; digest: boolean; digest_hour: number }
 /** File 13: notifications on this device. public_key is the Bible's PUBLIC web-push key (not a secret); never the private one. */
 export interface PushStatus { public_key: string; subscribed: boolean; devices: number }
 
@@ -234,7 +234,11 @@ export interface ShareCard {
   list?: { kind: ItemKind; ranked: boolean; items: SharedListItem[] };
   recipe?: { name: string; notes: string; lines: BespokeLine[]; made_by: string | null };
 }
-export interface DmPost { id: number; from: "me" | "friend"; body: string; removed: boolean; at: string; share: ShareCard | null }
+export interface DmPost {
+  id: number; from: "me" | "friend"; body: string; removed: boolean; at: string; share: ShareCard | null;
+  /** File 16: the message it answers (a short quote), and reactions from the two of them. */
+  reply_to?: { id: number; name: string; text: string } | null; reactions?: { emoji: string; count: number; mine: boolean; names: string[] }[];
+}
 export interface Conversation {
   id: number; available: boolean; name: string | null; friend_id?: number; unread: boolean; last_at?: string; last_from?: "me" | "friend"; preview?: string;
   here?: boolean; can_write?: boolean; posts?: DmPost[];

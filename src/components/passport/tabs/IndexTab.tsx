@@ -102,7 +102,8 @@ function Index({ d, version }: { d: IndexView; version: number }) {
     <div ref={rootRef}>
       {/* File 15, Part B: every level below the top has Back at the top left: one level up, the trail's previous step. */}
       {level.trail.length > 1 && <div className="-mt-3 mb-1"><BackLink exact to={level.trail[level.trail.length - 2]} /></div>}
-      <PageTitle kicker={parent && level.path.length > 1 ? parent : "Everything we've served"} title={level.title} />
+      {/* File 16, Part 9: below the top, the level's title is a band in its section's accent ("you're in Spirits now"). */}
+      <PageTitle kicker={parent && level.path.length > 1 ? parent : "Everything we've served"} title={level.title} section={level.path.length ? level.section : null} />
       <SearchArea initial={initialQ}>
         <Trail trail={level.trail} title={level.title} />
         <div ref={motion} className="mt-4">

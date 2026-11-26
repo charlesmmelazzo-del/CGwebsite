@@ -39,8 +39,8 @@ export function lookupBody(b: Record<string, unknown>): Built<{ email: string } 
   const c = cleanCode(code);
   return c ? { body: { code: c } } : { error: "A friend code has 8 letters and numbers" };
 }
-/** "friend:12" | "ask:3" | "thread:9": someone the member already knows of, for remove, block and report. */
-export const isTarget = (v: unknown): v is string => typeof v === "string" && /^(friend|ask|thread):\d{1,9}$/.test(v);
+/** "friend:12" | "ask:3" | "thread:9" (file 16: "chatpost:7", a message's writer in a group or channel; "gseat:4" / "cseat:4", a room-mate): someone the member already knows of, for remove, block and report. */
+export const isTarget = (v: unknown): v is string => typeof v === "string" && /^(friend|ask|thread|chatpost|gseat|cseat):\d{1,9}$/.test(v);
 /** The address of the "add me" link a member can show: their friend code fills the form. */
 export const friendLink = (origin: string, code: string) => `${origin.replace(/\/+$/, "")}/passport/friends?code=${encodeURIComponent(code.replace(/[^A-Z0-9]/gi, ""))}`;
 

@@ -236,8 +236,9 @@ function slowServer() {
     // A one-word address with no folder of its own is answered by the old-tab route ([tab]).
     return /^\/passport\/[a-z-]+$/.test(path) ? join(APP, "passport", "(app)", "[tab]", "page.tsx") : null;
   };
-  await test("five tabs, left to right: Menu, Index, CG (Home), Events, Inbox", () => {
-    assert.deepEqual(TABS.map((t) => t.label), ["Menu", "Index", "Home", "Events", "Inbox"]);
+  // File 16 renamed the fifth tab "Messages" (same address, /passport/inbox).
+  await test("five tabs, left to right: Menu, Index, CG (Home), Events, Messages", () => {
+    assert.deepEqual(TABS.map((t) => t.label), ["Menu", "Index", "Home", "Events", "Messages"]);
     assert.equal(TABS[2].href, "/passport", "the centre button is Home");
   });
   await test("a tab's own address is that tab; anything else opens over a tab", () => {
@@ -724,9 +725,12 @@ function slowServer() {
       assert.deepEqual([...at].sort((x, y) => x - y), at, "in this order");
       assert.ok(home.includes("<SeeAll items={now}") && home.includes("<SeeAll items={d.exclusives}") && compP("Votes.tsx").includes("<SeeAll"), "more than three behind See all");
     });
-    await test("\"Keep it handy\": Not now lasts 30 days; never once installed", () => {
-      const ih = compP("InstallHint.tsx");
-      assert.ok(ih.includes("30 * 24 * 60 * 60 * 1000") && ih.includes('"appinstalled"') && ih.includes("store(INSTALLED, \"1\")"));
+    // File 16, Part 8: the in-page "Keep it handy" card became the pop-up (WelcomeSheet.tsx, rules in welcomePrompt.ts);
+    // the same promises are checked there: Not now lasts 30 days; never once installed (and notifications on).
+    await test("\"Keep it handy\" (now the pop-up): Not now lasts 30 days; never once installed", async () => {
+      const ws = compP("WelcomeSheet.tsx");
+      const W = await import("../welcomePrompt");
+      assert.ok(W.SNOOZE_MS === 30 * 24 * 60 * 60 * 1000 && ws.includes('"appinstalled"') && ws.includes("store(INSTALLED, \"1\")"));
     });
     await test("the faint text passes WCAG AA on the background; the Index's jump chips stick; Back slides the page out", async () => {
       const { C } = await import("../../../components/passport/theme");
@@ -766,8 +770,10 @@ function slowServer() {
       const calls = pc.split("Notification.requestPermission(").length - 1;
       assert.equal(calls, 1, "one place asks");
       assert.ok(/export async function turnOn\(\)[\s\S]*?Notification\.requestPermission\(/.test(pc), "inside turnOn");
-      const prompt = compP("PushPrompt.tsx");
-      assert.ok(prompt.includes("usedForABit()") && prompt.includes("promptDone()") && prompt.includes("installHintShowing()"));
+      // File 16, Part 8: Home's notifications card became the pop-up's second step: it asks only from the "Turn on" tap,
+      // never in a visit's first second (welcomePrompt.ts). The old "four opens on two days" counter stays in pushClient.
+      const prompt = compP("WelcomeSheet.tsx");
+      assert.ok(/step === "notify" && \([\s\S]{0,200}const r = await turnOn\(\)/.test(prompt), "turnOn only from the Turn on button");
       assert.ok(/p\.n >= 4 && Array\.isArray\(p\.days\) && p\.days\.length >= 2/.test(pc), "four opens on two days");
       assert.ok(!compP("tabs/HomeTab.tsx").includes("turnOn("), "Home never asks by itself");
     });

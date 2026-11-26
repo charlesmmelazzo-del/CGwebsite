@@ -24,7 +24,8 @@ const ICON_PATHS: Record<SectionId, ReactNode> = {
   spirits: <><path d="M10 3h4v4l1.5 2v11a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1V9L10 7z" /><path d="M8.5 13h7" /></>,
   "beer-wine": <><path d="M8 3h8l-.5 6a3.5 3.5 0 0 1-7 0z" /><path d="M12 12.5V20M9 20.5h6" /></>,
   events: <><rect x="4" y="5.5" width="16" height="14.5" rx="1.5" /><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" /></>,
-  inbox: <><path d="M4 13.5 6.5 5h11l2.5 8.5V19H4z" /><path d="M4 13.5h4.5l1.2 2h4.6l1.2-2H20" /></>,
+  // File 16: Messages, a chat bubble (the bottom tab's icon).
+  inbox: <><path d="M4.5 6.5A2.5 2.5 0 0 1 7 4h10a2.5 2.5 0 0 1 2.5 2.5v7A2.5 2.5 0 0 1 17 16h-6.5L6 19.5V16H7a2.5 2.5 0 0 1-2.5-2.5z" /><path d="M8.5 9h7M8.5 12h4.5" /></>,
   friends: <><circle cx="9" cy="9" r="3" /><circle cx="16.5" cy="10" r="2.4" /><path d="M3.5 19c.8-3 3-4.5 5.5-4.5s4.7 1.5 5.5 4.5M14.5 15c2.6-.5 4.8.8 5.6 3.5" /></>,
   bar: <><path d="M5 20V9l7-5 7 5v11" /><path d="M9.5 20v-5h5v5" /></>,
   yours: <><path d="M6 4.5h10.5a1.5 1.5 0 0 1 1.5 1.5v14H7.5A1.5 1.5 0 0 1 6 18.5z" /><path d="M6 18.5A1.5 1.5 0 0 1 7.5 17H18M9.5 8.5h5M9.5 11.5h5" /></>,
@@ -52,13 +53,20 @@ export function accentCardStyle(section: SectionId): CSSProperties {
   return { background: a.tint, borderColor: `${a.edge}55`, borderLeftColor: a.edge };
 }
 
-/** Part 8: a section heading: the display serif, larger than body, in its section's colour (h2 unless told). */
-export function SectionHeading({ children, section, id, as = "h2", aside, className = "" }: { children: ReactNode; section?: SectionId | null; id?: string; as?: "h2" | "h3"; aside?: ReactNode; className?: string }) {
+/**
+ * Part 8: a section heading: the display serif, larger than body, in its section's colour (h2 unless told). File 16,
+ * Part 9: drawn as a header band (the section's icon, its accent, a hairline rule under it); every heading has a section.
+ */
+export function SectionHeading({ children, section = "bar", id, as = "h2", aside, className = "" }: { children: ReactNode; section?: SectionId; id?: string; as?: "h2" | "h3"; aside?: ReactNode; className?: string }) {
   const H = as;
+  const ink = ACCENTS[section].ink;
   return (
-    <div className={`flex items-baseline justify-between gap-3 mt-10 mb-3 ${className}`}>
-      <H id={id} className="pp-t-section" style={{ color: section ? ACCENTS[section].ink : C.text }}>{children}</H>
-      {aside}
+    <div className={`pp-band-wrap ${className}`}>
+      <div className="pp-band" style={{ color: ink }}>
+        <SectionIcon section={section} size={28} color="currentColor" />
+        <H id={id} className="pp-t-section flex-1 min-w-0" style={{ color: ink }}>{children}</H>
+        {aside}
+      </div>
     </div>
   );
 }

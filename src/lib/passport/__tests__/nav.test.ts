@@ -276,8 +276,9 @@ const group = (name: string, n: number): MenuGroup => ({ name, items: Array.from
   });
 
   console.log("File 14, Part 8: the type scale");
-  await test("section heading ≥ 1.3 × body; body ≥ 16px; secondary ≥ 14px; page title above the section heading", () => {
-    assert.ok(px(TYPE.section) / px(TYPE.body) >= 1.3);
+  // File 16, Part 9 raised the bar from 1.3 to 1.6 (the section heading went from 1.5rem to 1.75rem).
+  await test("section heading ≥ 1.6 × body; body ≥ 16px; secondary ≥ 14px; page title above the section heading", () => {
+    assert.ok(px(TYPE.section) / px(TYPE.body) >= 1.6);
     assert.ok(px(TYPE.body) >= 16);
     assert.ok(px(TYPE.secondary) >= 14);
     assert.ok(px(TYPE.page) > px(TYPE.section) && px(TYPE.section) > px(TYPE.card) && px(TYPE.card) > px(TYPE.body));
@@ -291,6 +292,25 @@ const group = (name: string, n: number): MenuGroup => ({ name, items: Array.from
       assert.ok(css.includes(`--pp-fs-${k}: ${v.rem}rem`), k);
     }
     assert.ok(/\.pp-t-page, \.pp-t-section, \.pp-t-card \{[^}]*font-synthesis: none/.test(css));
+  });
+  console.log("File 16, Part 9: section headings that say \"you're in a different section\"");
+  await test("every section's heading colour and its rule pass contrast on the page (text AA 4.5, the rule 3:1)", () => {
+    for (const id of SECTION_IDS) {
+      assert.ok(contrast(ACCENTS[id].ink, APP_BG) >= 4.5, `${id} heading ${contrast(ACCENTS[id].ink, APP_BG).toFixed(2)}`);
+      assert.ok(contrast(ACCENTS[id].ink, APP_BG) >= 3, `${id} rule`);
+    }
+  });
+  await test("a heading is a band (icon, accent, rule), more space above than below; no h2 without an accent", () => {
+    const comp = (f: string) => readFileSync(join(ROOT, "components", "passport", f), "utf8");
+    const css = readFileSync(join(ROOT, "app", "globals.css"), "utf8");
+    assert.ok(/\.pp-band \{[^}]*border-bottom: 1px solid currentColor/.test(css) && /\.pp-band-wrap \{ margin-top: 2\.5rem; margin-bottom: 0\.75rem; \}/.test(css));
+    assert.ok(/export function SectionHeading[\s\S]*?<SectionIcon[\s\S]*?className="pp-band"/.test(comp("Drill.tsx")) || /export function SectionHeading[\s\S]*?className="pp-band"[\s\S]*?<SectionIcon/.test(comp("Drill.tsx")));
+    assert.ok(comp("tabs/HomeTab.tsx").includes('<SectionHeading id="pp-now" section="inbox">Right now'), "Right now: Messages teal");
+    assert.ok(/<Band section="bar" id="pp-tonight"/.test(comp("tabs/Slots.tsx")), "Tonight: From the bar cream");
+    assert.ok(/<Band section="yours" id="pp-for-you"/.test(comp("ForYou.tsx")), "For you: Journal olive");
+    const files = ["tabs/HomeTab.tsx", "tabs/Slots.tsx", "tabs/IndexTab.tsx", "tabs/MenuTab.tsx", "tabs/EventsTab.tsx", "tabs/InboxTab.tsx", "Social.tsx", "Messages.tsx", "Votes.tsx", "ForYou.tsx", "Library.tsx", "Search.tsx", "Account.tsx", "Comments.tsx", "Personal.tsx", "Photos.tsx", "Events.tsx", "AddToList.tsx"];
+    for (const f of files) assert.ok(!/<h2[^>]*pp-t-section[^>]*style=\{\{ color: C\.text/.test(comp(f)), `${f}: an h2 without an accent`);
+    assert.ok(/section=\{level\.path\.length \? level\.section : null\}/.test(comp("tabs/IndexTab.tsx")), "an Index level's title is a band in its section's accent");
   });
   await test("each tab draws exactly one h1 (its page title) and its section headings as h2", () => {
     const comp = (f: string) => readFileSync(join(ROOT, "components", "passport", f), "utf8");

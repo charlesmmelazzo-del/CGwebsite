@@ -1,8 +1,9 @@
 "use client";
 
+import { Band } from "./Library";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import InstallHint from "./InstallHint";
+import { InstallHelpButton } from "./WelcomeSheet";
 import { markPromptDone, pushState, turnOff, turnOn, type PushState } from "./pushClient";
 import { notifyChanged } from "./appEvents";
 import { forgetRecent } from "./recent";
@@ -17,7 +18,6 @@ export default function Account({ me: initial, prefs, friends }: { me: Me; prefs
   const [me, setMe] = useState(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [showInstall, setShowInstall] = useState(false);
   const [inviting, setInviting] = useState(false);
   const [sentTo, setSentTo] = useState("");
   // Up to 3 people in a household, counting anyone invited who hasn't joined.
@@ -125,9 +125,8 @@ export default function Account({ me: initial, prefs, friends }: { me: Me; prefs
         </Block>
       )}
 
-      {showInstall
-        ? <InstallHint force onClose={() => setShowInstall(false)} />
-        : <button type="button" onClick={() => setShowInstall(true)} className="inline-flex items-center min-h-[44px] font-body text-sm underline underline-offset-4 pp-focus rounded" style={{ color: C.text }}>Save Passport to your home screen</button>}
+      {/* File 16, Part 8: reopens the pop-up's install step any time. */}
+      <InstallHelpButton>Add Passport to your home screen</InstallHelpButton>
 
       <div className="pt-2">
         <Button type="button" kind="quiet" onClick={signOut}>Sign out</Button>
@@ -164,7 +163,9 @@ function Notifications({ initial, onNews }: { initial: NotifyPrefs; onNews: (on:
       <Check checked={p.messages} onChange={(v) => save({ messages: v })}>The bar replies to a message</Check>
       <Check checked={p.requests} onChange={(v) => save({ requests: v })}>Something changes on a request or event inquiry</Check>
       <Check checked={p.bottles} onChange={(v) => save({ bottles: v })}>There is news about a bottle request <span style={{ color: C.faint }}>(a bottle ready for pickup is always emailed)</span></Check>
-      {p.friends !== undefined && <Check checked={!!p.friends} onChange={(v) => save({ friends: v })}>A friend sends me a request or a message <span style={{ color: C.faint }}>(who, never the words)</span></Check>}
+      {p.friends !== undefined && <Check checked={!!p.friends} onChange={(v) => save({ friends: v })}>Friends: a friend request, or a friend&rsquo;s message <span style={{ color: C.faint }}>(who, never the words)</span></Check>}
+      {p.chats !== undefined && <Check checked={!!p.chats} onChange={(v) => save({ chats: v })}>Friend chats and groups: a message, a group invitation, or someone mentions me in a group <span style={{ color: C.faint }}>(who, never the words; email only for a mention)</span></Check>}
+      {p.channels !== undefined && <Check checked={!!p.channels} onChange={(v) => save({ channels: v })}>Channels: a mention, a reply in my threads, and the channels I asked for every message <span style={{ color: C.faint }}>(email only for a mention)</span></Check>}
       {p.comments !== undefined && <Check checked={!!p.comments} onChange={(v) => save({ comments: v })}>Comments: someone replies to my comment <span style={{ color: C.faint }}>(who and where, never the words)</span></Check>}
       {p.votes !== undefined && <Check checked={!!p.votes} onChange={(v) => save({ votes: v })}>Votes and brackets: a bracket I voted in opens its next round or has a winner <span style={{ color: C.faint }}>(at most one a day)</span></Check>}
       <Check checked={p.news} onChange={(v) => save({ news: v })}>News from the bar: occasional news and offers</Check>
@@ -179,7 +180,7 @@ function Notifications({ initial, onNews }: { initial: NotifyPrefs; onNews: (on:
           </label>
         )}
       </div>
-      <p className="font-body text-[0.875rem] leading-relaxed" style={{ color: C.faint }}>Emails only say that something is waiting; read it in your Inbox. At most one an hour about the same conversation, and none while you have it open. Account emails, like password resets, always come through.</p>
+      <p className="font-body text-[0.875rem] leading-relaxed" style={{ color: C.faint }}>Emails only say that something is waiting; open your messages to read it. At most one an hour about the same conversation, and none while you have it open. Account emails, like password resets, always come through.</p>
       {error && <Notice>{error}</Notice>}
       <ThisDevice />
     </Block>
@@ -195,7 +196,6 @@ function ThisDevice() {
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
-  const [showInstall, setShowInstall] = useState(false);
   useEffect(() => { let live = true; pushState().then((s) => { if (live) setState(s); }); return () => { live = false; }; }, []);
   const flip = async (on: boolean) => {
     setBusy(true);
@@ -213,9 +213,7 @@ function ThisDevice() {
       {state === "needs-install" ? (
         <>
           <p className="font-body text-sm leading-relaxed" style={{ color: C.text }}>On iPhone, notifications work once Passport is on your home screen. Add it, open Passport from there, then turn them on here.</p>
-          {showInstall
-            ? <InstallHint force onClose={() => setShowInstall(false)} />
-            : <button type="button" onClick={() => setShowInstall(true)} className="inline-flex items-center min-h-[44px] font-body text-sm underline underline-offset-4 pp-focus rounded" style={{ color: C.text }}>How to add Passport to your home screen</button>}
+          <InstallHelpButton>How to add Passport to your home screen</InstallHelpButton>
         </>
       ) : state === "unsupported" ? (
         <p className="font-body text-sm leading-relaxed" style={{ color: C.muted }}>This browser can&rsquo;t show notifications from Passport. Emails still come through.</p>
@@ -225,7 +223,7 @@ function ThisDevice() {
         </Check>
       )}
       {state === "blocked" && !note && <p className="font-body text-[0.875rem] leading-relaxed" style={{ color: C.muted }}>Notifications are blocked for this site in your browser&rsquo;s settings. Allow them there to turn this on.</p>}
-      <p className="font-body text-[0.875rem] leading-relaxed" style={{ color: C.faint }}>A short note on this device when the bar replies or asks you something, a bottle price is ready, a bottle is ordered or ready for pickup, a friend writes, a place opens up or an event is cancelled, someone replies to your comment, a bracket moves on, or there&rsquo;s news from the bar. It never shows what anyone wrote, a price or anyone&rsquo;s last name. Nothing between 10 PM and 9 AM, and at most six a day; the rest wait in your Inbox. The switches above choose which kinds you get.</p>
+      <p className="font-body text-[0.875rem] leading-relaxed" style={{ color: C.faint }}>A short note on this device when the bar replies or asks you something, a bottle price is ready, a bottle is ordered or ready for pickup, a friend or a group writes, someone mentions you, a place opens up or an event is cancelled, someone replies to your comment, a bracket moves on, or there&rsquo;s news from the bar. It never shows what anyone wrote, a price or anyone&rsquo;s last name. Nothing between 10 PM and 9 AM, and at most six a day; the rest wait in your messages. The switches above choose which kinds you get.</p>
       {note && <Notice>{note}</Notice>}
     </div>
   );
@@ -330,7 +328,7 @@ function InviteForm({ onDone, onCancel }: { onDone: (firstName: string) => void;
 function Block({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="rounded-xl border p-5 space-y-3" style={{ borderColor: C.line, background: C.card }}>
-      <h2 className="pp-t-section mb-3" style={{ color: C.text }}>{title}</h2>
+      <Band section="yours" className="mb-3">{title}</Band>
       {children}
     </section>
   );

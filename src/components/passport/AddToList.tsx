@@ -1,5 +1,6 @@
 "use client";
 
+import { Band } from "./Library";
 import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { C } from "./theme";
 import { inputCls, postJson } from "./ui";
@@ -82,7 +83,7 @@ export default function AddToList({ target, onClose, toast, cache }: {
         <div className="pt-2.5 pb-1 flex justify-center" aria-hidden><span className="w-10 h-1 rounded-full" style={{ background: C.line }} /></div>
         <div className="px-5 pb-3 flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 id="pp-add-title" className="pp-t-section mb-3" style={{ color: C.text }}>Add to a list</h2>
+            <Band section="yours" id="pp-add-title" className="mb-3">Add to a list</Band>
             <p className="font-display text-[1.375rem] leading-tight mt-1 truncate" style={{ color: C.text }}>{target.name}</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close" className="w-11 h-11 -mr-2 rounded-full flex items-center justify-center pp-focus shrink-0" style={{ color: C.muted }}>

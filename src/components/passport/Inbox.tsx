@@ -7,6 +7,7 @@ import { C, Notice, inputCls, postJson } from "./ui";
 import { BackLink } from "./bits";
 import { notifyChanged } from "./appEvents";
 import { useShell } from "./shellContext";
+import { ChatScreen, useRoomPoll, type UiPost } from "./Chat";
 import { money } from "@/lib/passport/bottles";
 import { dayLong } from "@/lib/passport/shell";
 import {
@@ -228,6 +229,40 @@ export function InboxSections({ inbox, bottles, title }: { inbox: InboxData | nu
   );
 }
 
+/**
+ * File 16: the Requests top tab. General requests and event inquiries with their status, as before, under two buttons
+ * worded exactly "Send a request" and "Book an event". A question from the bar is answered right here.
+ */
+export function RequestsPanel({ inbox }: { inbox: InboxData | null }) {
+  const [data, setData] = useState(inbox);
+  useEffect(() => { setData(inbox); }, [inbox]);
+  const answered = (r: MemberRequest) => setData((d) => (d ? { ...d, member_requests: d.member_requests.map((x) => (x.id === r.id ? r : x)) } : d));
+  const btn = (kind: string, label: string, primary: boolean) => (
+    <Link href={`/passport/inbox/new?kind=${kind}`} scroll={false} className="inline-flex items-center justify-center gap-1.5 rounded-full border px-4 min-h-[44px] font-body text-[0.9375rem] whitespace-nowrap pp-focus pp-press"
+      style={{ borderColor: primary ? C.brass : C.line, color: primary ? C.bg : C.text, background: primary ? C.brass : "transparent" }}>{label}</Link>
+  );
+  const questions = (data?.member_requests || []).filter((r) => r.question);
+  const rows = data ? [
+    ...data.member_requests.filter((r) => !r.question).map((r) => ({ at: r.updated_at, open: OPEN_REQUEST.has(r.status), el: (
+      <RequestRow key={`r${r.id}`} href={`/passport/inbox/requests/${r.id}`} title={r.kind_label} line={r.date ? `For ${dayLong(r.date)} · ${r.details}` : r.details}
+        status={r.status_label} unread={r.unread} open={OPEN_REQUEST.has(r.status)} />
+    ) })),
+    ...data.inquiries.map((q) => ({ at: q.updated_at, open: OPEN_EVENT.has(q.status), el: (
+      <RequestRow key={`e${q.id}`} href={`/passport/inbox/events/${q.id}`} title={`${q.kind_label} · ${dayLong(q.preferred_date)}`} line={`${q.guests} ${q.guests === 1 ? "guest" : "guests"} · ${q.time_label}`}
+        status={q.status_label} unread={q.unread} open={OPEN_EVENT.has(q.status)} />
+    ) })),
+  ].sort((a, b) => Number(b.open) - Number(a.open) || (b.at || "").localeCompare(a.at || "")) : [];
+  return (
+    <div>
+      <div className="grid grid-cols-2 gap-2" role="group" aria-label="Start a request">{btn("request", "Send a request", true)}{btn("event", "Book an event", false)}</div>
+      {!data && <p className="font-body text-sm mt-6" style={{ color: C.faint }}>Your requests can&rsquo;t load right now. Come back in a minute.</p>}
+      {questions.length > 0 && <ul className="space-y-3 mt-5">{questions.map((r) => <QuestionCard key={r.id} r={r} onAnswered={answered} />)}</ul>}
+      {rows.length > 0 && <ul className="mt-4">{rows.map((x) => x.el)}</ul>}
+      {data && !rows.length && !questions.length && <p className="font-body text-sm mt-6 leading-relaxed" style={{ color: C.faint }}>Something for your next visit, a celebration, a seating need, or a private event: ask here and follow it through. {REPLY_LINE}</p>}
+    </div>
+  );
+}
+
 // ── One conversation ─────────────────────────────────────────────────────────
 function Posts({ posts, memberWord = "You" }: { posts: InboxPost[]; memberWord?: string }) {
   const end = useRef<HTMLLIElement>(null);
@@ -278,26 +313,40 @@ function Composer({ onSend, busy, error, placeholder, cta = "Send" }: { onSend: 
   );
 }
 
+/**
+ * A conversation with the bar, in the one conversation screen (file 16): subject, status, staff first names and
+ * "Ask about this" stay as file 08 set them. It asks for news every 5 seconds while it is on screen.
+ */
 export function ThreadView({ initial }: { initial: InboxThread }) {
   const [t, setT] = useState(initial);
   const { send, busy, error } = useSend();
-  usePoll(`/api/passport/inbox/threads/${initial.id}`, (d) => d.thread as InboxThread | undefined, setT);
-  // Opening it read the bar's replies: the Inbox and its dot follow.
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/passport/inbox/threads/${initial.id}`, { cache: "no-store" });
+      if (!res.ok) return;
+      const d = await res.json();
+      if (d.thread) setT(d.thread);
+    } catch { /* offline */ }
+  }, [initial.id]);
+  useRoomPoll(load);
+  // Opening it read the bar's replies: Messages and its dot follow.
   useEffect(() => { notifyChanged("inbox"); }, []);
-  return (
-    <div className="pb-16">
-      <BackLink fallback="/passport/inbox" label="Inbox" />
-      <p className="font-body text-[0.75rem] tracking-[0.3em] uppercase mt-2" style={{ color: C.brass }}>Message to the bar</p>
+  const posts: UiPost[] = (t.posts || []).map((p) => ({ id: p.id, at: p.at, mine: p.from === "member", author: p.from === "member" ? "You" : `Common Good${p.by ? ` · ${p.by}` : ""}`, fromBar: p.from !== "member", body: p.body, tag: p.kind === "question" ? "A question for you" : null }));
+  const header = (
+    <div>
+      <BackLink fallback="/passport/inbox" label="Messages" />
+      <p className="pp-t-eyebrow mt-2" style={{ color: C.brass }}>Common Good</p>
       <h1 className="font-display text-3xl leading-tight mt-1" style={{ color: C.text }}>{t.subject || (t.ref ? `About ${t.ref.name}` : "Your message")}</h1>
       <div className="flex flex-wrap items-center gap-2 mt-3"><Tag brass={t.status === "answered"}>{t.status_label}</Tag>{t.ref && <RefChip r={t.ref} />}</div>
-      <Posts posts={t.posts || []} />
-      {t.status === "closed" && <p className="font-body text-[0.875rem] mt-6" style={{ color: C.faint }}>This conversation is closed. Writing again opens it.</p>}
-      <Composer busy={busy} error={error} placeholder="Write to the bar" onSend={async (text) => {
+    </div>
+  );
+  return (
+    <ChatScreen header={header} posts={posts} line={t.status === "closed" ? `This conversation is closed. Writing again opens it. ${REPLY_LINE}` : REPLY_LINE} canWrite placeholder="Write to the bar" max={BODY_MAX} showNames busy={busy} error={error}
+      onSend={async (text) => {
         const out = await send<{ thread: InboxThread }>(`/api/passport/inbox/threads/${t.id}`, { action: "reply", body: text });
         if (out) { setT(out.thread); notifyChanged("inbox"); return true; }
         return false;
       }} />
-    </div>
   );
 }
 
@@ -339,7 +388,7 @@ export function RequestView({ initial }: { initial: MemberRequest }) {
   };
   return (
     <div className="pb-16">
-      <BackLink fallback="/passport/inbox" label="Inbox" />
+      <BackLink fallback="/passport/inbox" label="Messages" />
       <p className="font-body text-[0.75rem] tracking-[0.3em] uppercase mt-2" style={{ color: C.brass }}>Your request</p>
       <h1 className="font-display text-3xl leading-tight mt-1" style={{ color: C.text }}>{r.kind_label}</h1>
       <div className="mt-3"><Tag brass={r.question}>{r.question ? "A question for you" : r.status_label}</Tag></div>
@@ -366,7 +415,7 @@ export function InquiryView({ initial, me }: { initial: EventInquiry; me?: Pick<
   };
   return (
     <div className="pb-16">
-      <BackLink fallback="/passport/inbox" label="Inbox" />
+      <BackLink fallback="/passport/inbox" label="Messages" />
       <p className="font-body text-[0.75rem] tracking-[0.3em] uppercase mt-2" style={{ color: C.brass }}>Your event inquiry</p>
       <h1 className="font-display text-3xl leading-tight mt-1" style={{ color: C.text }}>{q.kind_label}</h1>
       <div className="mt-3"><Tag brass={q.unread || q.status === "confirmed"}>{q.status_label}</Tag></div>
@@ -431,8 +480,8 @@ export function NewInboxItem({ kind, about, aboutName, me }: { kind: "message" |
   return (
     <form onSubmit={submit} className="pb-16 space-y-5" noValidate>
       <div>
-        <BackLink fallback="/passport/inbox" label="Inbox" />
-        <p className="font-body text-[0.75rem] tracking-[0.3em] uppercase mt-2" style={{ color: C.brass }}>Inbox</p>
+        <BackLink fallback="/passport/inbox" label="Messages" />
+        <p className="font-body text-[0.75rem] tracking-[0.3em] uppercase mt-2" style={{ color: C.brass }}>Messages</p>
         <h1 className="font-display text-4xl mt-1" style={{ color: C.text }}>{title}</h1>
         <p className="font-body text-sm mt-2 leading-relaxed" style={{ color: C.muted }}>
           {kind === "message" ? "Questions about a drink, a bottle, making something at home, or anything else." : kind === "request" ? "Something we can have ready, or a need we should know about." : "A private party, a tasting, a buyout. We'll follow up here."} {REPLY_LINE}
