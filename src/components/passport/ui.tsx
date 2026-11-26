@@ -29,8 +29,8 @@ export function Cover({ title, subtitle, children, footer }: { title: string; su
     <div className="min-h-[100dvh] flex flex-col items-center px-5 pb-10" style={{ paddingTop: "max(env(safe-area-inset-top), 40px)" }}>
       <div className="w-full max-w-sm flex flex-col items-center animate-fade-in">
         <PassportMark />
-        <p className="mt-5 text-[11px] tracking-[0.45em] uppercase" style={{ color: C.brass }}>Common Good</p>
-        <h1 className="font-display text-[44px] leading-none mt-2" style={{ color: C.text }}>Passport</h1>
+        <p className="mt-5 text-[0.75rem] tracking-[0.45em] uppercase" style={{ color: C.brass }}>Common Good</p>
+        <h1 className="font-display text-[2.75rem] leading-none mt-2" style={{ color: C.text }}>Passport</h1>
         <div className="w-16 h-px my-6" style={{ background: C.brass, opacity: 0.6 }} />
         <h2 className="font-display text-2xl text-center" style={{ color: C.text }}>{title}</h2>
         {subtitle && <p className="font-body text-sm text-center mt-2 leading-relaxed" style={{ color: C.muted }}>{subtitle}</p>}
@@ -44,15 +44,15 @@ export function Cover({ title, subtitle, children, footer }: { title: string; su
 export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: ReactNode }) {
   return (
     <label className="block">
-      <span className="block font-body text-[11px] tracking-[0.2em] uppercase mb-1.5" style={{ color: C.muted }}>{label}</span>
+      <span className="block font-body text-[0.75rem] tracking-[0.2em] uppercase mb-1.5" style={{ color: C.muted }}>{label}</span>
       {children}
-      {hint && <span className="block font-body text-xs mt-1.5" style={{ color: C.faint }}>{hint}</span>}
+      {hint && <span className="block font-body text-[0.875rem] mt-1.5" style={{ color: C.faint }}>{hint}</span>}
     </label>
   );
 }
 
 export const inputCls =
-  "w-full rounded-lg px-4 py-3 font-body text-[16px] bg-[#0E120B] border border-[#323B29] text-[#EDE6D3] placeholder:text-[#5d6a52] focus:outline-none focus:border-[#C9A96E] focus:ring-1 focus:ring-[#C9A96E]/40 transition-colors";
+  "w-full rounded-lg px-4 py-3 font-body text-[1rem] bg-[#0E120B] border border-[#323B29] text-[#EDE6D3] placeholder:text-[#5d6a52] focus:outline-none focus:border-[#C9A96E] focus:ring-1 focus:ring-[#C9A96E]/40 transition-colors";
 
 export function Button({ children, busy, disabled, type = "submit", onClick, kind = "primary", className = "" }: {
   children: ReactNode; busy?: boolean; disabled?: boolean; type?: "submit" | "button"; onClick?: () => void; kind?: "primary" | "quiet"; className?: string;
@@ -62,7 +62,7 @@ export function Button({ children, busy, disabled, type = "submit", onClick, kin
     : "bg-transparent border border-[#3e4934] text-[#EDE6D3] hover:border-[#C9A96E]";
   return (
     <button type={type} onClick={onClick} disabled={disabled || busy}
-      className={`w-full rounded-lg py-3.5 font-body text-[13px] tracking-[0.22em] uppercase transition-colors disabled:opacity-50 ${style} ${className}`}>
+      className={`w-full rounded-lg py-3.5 font-body text-[0.875rem] tracking-[0.22em] uppercase transition-colors disabled:opacity-50 ${style} ${className}`}>
       {busy ? "One moment…" : children}
     </button>
   );

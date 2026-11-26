@@ -64,7 +64,7 @@ export default function SearchArea({ initial = "", children }: { initial?: strin
         </svg>
         <input id={inputId} value={q} onChange={(e) => setQ(e.target.value)} type="search" enterKeyHint="search" autoComplete="off" autoCorrect="off" spellCheck={false}
           placeholder="Cocktails, bottles, producers"
-          className="w-full rounded-xl pl-10 pr-11 min-h-[48px] font-body text-[16px] bg-[#0E120B] border border-[#323B29] text-[#EDE6D3] placeholder:text-[#5d6a52] focus:outline-none focus:border-[#C9A96E] focus:ring-1 focus:ring-[#C9A96E]/40 [&::-webkit-search-cancel-button]:appearance-none" />
+          className="w-full rounded-xl pl-10 pr-11 min-h-[48px] font-body text-[1rem] bg-[#0E120B] border border-[#323B29] text-[#EDE6D3] placeholder:text-[#5d6a52] focus:outline-none focus:border-[#C9A96E] focus:ring-1 focus:ring-[#C9A96E]/40 [&::-webkit-search-cancel-button]:appearance-none" />
         {q && (
           <button type="button" onClick={() => setQ("")} aria-label="Clear search" className="absolute right-1 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center rounded-full pp-focus" style={{ color: C.muted }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6 6 18" /></svg>
@@ -78,8 +78,8 @@ export default function SearchArea({ initial = "", children }: { initial?: strin
 
 function Heading({ children, n }: { children: ReactNode; n: number }) {
   return (
-    <h2 className="flex items-baseline justify-between mt-8 mb-1 font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>
-      {children}<span className="tracking-normal text-[12px]" style={{ color: C.faint }}>{n}</span>
+    <h2 className="flex items-baseline justify-between mt-8 mb-1 pp-t-section mb-3" style={{ color: C.text }}>
+      {children}<span className="tracking-normal text-[0.875rem]" style={{ color: C.faint }}>{n}</span>
     </h2>
   );
 }
@@ -102,10 +102,10 @@ function Results({ q, results, busy, partial, error }: { q: string; results: Fin
                 {results.cocktails.map((c) => (
                   <ItemRow key={c.id} item={{ kind: "cocktail", id: c.id, name: c.name }} href={`/passport/library/${c.id}`}>
                     <span className="flex items-center gap-2">
-                      <span className="font-display text-[20px] leading-tight" style={{ color: C.text }}>{c.name}</span>
+                      <span className="font-display text-[1.25rem] leading-tight" style={{ color: C.text }}>{c.name}</span>
                       <Avail on={c.available} />
                     </span>
-                    <span className="block font-body text-[11px] tracking-[0.12em] uppercase mt-1" style={{ color: C.faint }}>
+                    <span className="block font-body text-[0.75rem] tracking-[0.12em] uppercase mt-1" style={{ color: C.faint }}>
                       {c.passport === "current" ? "Passport · " : ""}{c.menu_status === "past" ? `Past menu · ${c.menu_name}` : c.menu_name}
                     </span>
                   </ItemRow>
@@ -120,10 +120,10 @@ function Results({ q, results, busy, partial, error }: { q: string; results: Fin
                 {results.bottles.map((b) => (
                   <ItemRow key={b.id} item={{ kind: "bottle", id: b.id, name: b.name }} href={`/passport/spirits/${b.id}`}>
                     <span className="flex items-center gap-2">
-                      <span className="font-body text-[15px]" style={{ color: C.text }}>{b.name}</span>
+                      <span className="font-body text-[1rem]" style={{ color: C.text }}>{b.name}</span>
                       <Avail on={b.available} />
                     </span>
-                    <span className="block font-body text-[10px] tracking-[0.15em] uppercase mt-1" style={{ color: C.faint }}>
+                    <span className="block font-body text-[0.75rem] tracking-[0.15em] uppercase mt-1" style={{ color: C.faint }}>
                       {[b.category, b.status_label].filter(Boolean).join(" · ")}
                     </span>
                   </ItemRow>
@@ -138,15 +138,15 @@ function Results({ q, results, busy, partial, error }: { q: string; results: Fin
                 {results.producers.map((p) => (
                   <li key={p.id} className="border-b" style={{ borderColor: C.line }}>
                     <Link href={`/passport/producers/${p.id}`} scroll={false} className="flex items-baseline justify-between gap-3 py-3 min-h-[48px] pp-focus pp-row rounded-sm">
-                      <span className="font-body text-[15px]" style={{ color: C.text }}>{p.name}</span>
-                      {p.based_in && <span className="font-body text-xs text-right" style={{ color: C.faint }}>{p.based_in}</span>}
+                      <span className="font-body text-[1rem]" style={{ color: C.text }}>{p.name}</span>
+                      {p.based_in && <span className="font-body text-[0.875rem] text-right" style={{ color: C.faint }}>{p.based_in}</span>}
                     </Link>
                   </li>
                 ))}
               </ul>
             </section>
           )}
-          {partial && busy && <p className="mt-6 font-body text-xs" role="status" style={{ color: C.faint }}>Looking for producers and ingredients…</p>}
+          {partial && busy && <p className="mt-6 font-body text-[0.875rem]" role="status" style={{ color: C.faint }}>Looking for producers and ingredients…</p>}
           {n === 0 && !busy && !partial && <p className="mt-8 font-body text-sm" style={{ color: C.faint }}>Nothing matches “{q}”. Try one word, like a spirit or a producer.</p>}
         </div>
       )}

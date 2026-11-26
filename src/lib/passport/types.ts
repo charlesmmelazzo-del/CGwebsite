@@ -41,7 +41,7 @@ export interface DrinkBottle { id: number | null; name: string; category: string
 export interface ArchivedBottle { id: number; name: string; category: string; producer: string; description: string; status_label: string | null }
 /** Toast menus as the Bible's approved list sends them (menu reader). */
 export interface MenuPrice { label: string | null; price: number }
-export interface MenuItem { name: string; description: string; prices: MenuPrice[]; cocktail_id: number | null; bottle_id: number | null; unavailable: boolean; card?: MenuCard; photo?: string | null }
+export interface MenuItem { name: string; description: string; prices: MenuPrice[]; cocktail_id: number | null; bottle_id: number | null; unavailable: boolean; card?: MenuCard; photo?: string | null; cover?: boolean; producer?: string }
 /**
  * The matched library cocktail's tagline, ingredients and flavor line, sent with the menu item (no call per cocktail).
  * Only when the Toast item has that cocktail's own name; a variant ("… - Free Spirited") has none and keeps its own
@@ -51,6 +51,13 @@ export interface MenuCard { tagline: string; ingredients: string; flavor: string
 export interface MenuGroup { name: string; items: MenuItem[] }
 export interface ToastMenu { name: string; groups: MenuGroup[] }
 export interface MenuInfo { available: boolean; updated_at: string | null }
+/**
+ * File 14: one Menu tab, in the admin's order: menus[menu], the whole menu (groups null: "one tab" under its own
+ * name) or those groups of it (a menu shown as "groups as tabs", whose own name is never a label).
+ */
+export interface MenuTabDef { label: string; menu: number; groups: number[] | null }
+/** File 14: a "By menu" album in the Index (newest first). */
+export interface Album { name: string; current: boolean }
 export interface Fact { label: string; value: string }
 export interface BottleCocktail { id: number; name: string; menu_name: string; menu_status: "current" | "past" }
 export interface Bottle extends ArchivedBottle { producer_id: number | null; passport_description?: string; prices: MenuPrice[]; facts: Fact[]; cocktails: BottleCocktail[]; photo?: string | null; photo_alt?: string }
@@ -118,13 +125,13 @@ export interface BottleRequest {
 export interface BottleRequests { requests: BottleRequest[]; open_count: number; max_open: number }
 // ── File 06: the new shell (Index tab, search, the member's own upcoming reservations) ──────────────────────────
 /** A cocktail in the Index or in search. available: on a ticked Toast menu today. spirits: base-spirit keys (Index only). */
-export interface IndexCocktail extends CocktailCard { available: boolean; spirits?: string[]; photo?: string | null }
+export interface IndexCocktail extends CocktailCard { available: boolean; spirits?: string[]; photo?: string | null; menus?: string[]; cover?: boolean }
 /** A bottle a member may open. available: on the shown spirits list and not out. */
-export interface IndexBottle { id: number; name: string; category: string; status_label: string | null; available: boolean; photo?: string | null }
+export interface IndexBottle { id: number; name: string; category: string; status_label: string | null; available: boolean; photo?: string | null; producer?: string; on_list?: boolean; cover?: boolean }
 /** A beer, wine or cider sold on the list (past or present). It has no page of its own. */
 export interface IndexDrink { name: string; kind: "Beer" | "Wine" | "Other"; description: string; status_label: string | null; available: boolean }
 export interface FoundProducer { id: number; name: string; based_in: string }
-export interface IndexData { cocktails: IndexCocktail[]; bottles: IndexBottle[]; drinks: IndexDrink[]; base_spirits: BaseSpirit[]; recommendations?: Recommendation[]; enough?: boolean; suggest?: boolean }
+export interface IndexData { cocktails: IndexCocktail[]; bottles: IndexBottle[]; drinks: IndexDrink[]; base_spirits: BaseSpirit[]; recommendations?: Recommendation[]; enough?: boolean; suggest?: boolean; albums?: Album[] }
 // ── File 12: "For you" ────────────────────────────────────────────────────────
 /**
  * One suggestion, built by the Bible only from the member's own favorites, ratings, orders, lists and notes (never

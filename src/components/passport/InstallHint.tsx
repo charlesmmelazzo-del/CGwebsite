@@ -78,7 +78,7 @@ export default function InstallHint({ force = false, onClose }: { force?: boolea
   return (
     <section className="rounded-xl border p-5 mb-6 animate-fade-in relative" style={{ borderColor: C.brass + "66", background: "#1a1f14" }}>
       <button type="button" onClick={close} aria-label="Not now" title="Not now" className="absolute top-1.5 right-1.5 w-11 h-11 text-xl leading-none pp-focus rounded-full" style={{ color: C.muted }}>×</button>
-      <p className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>Keep it handy</p>
+      <p className="font-body text-[0.75rem] tracking-[0.3em] uppercase" style={{ color: C.brass }}>Keep it handy</p>
       <h2 className="font-display text-2xl mt-1" style={{ color: C.text }}>Save Passport to your home screen</h2>
       {installed ? (
         <p className="font-body text-sm mt-3 leading-relaxed" style={{ color: C.muted }}>You&rsquo;re already using Passport from your home screen.</p>
@@ -90,7 +90,7 @@ export default function InstallHint({ force = false, onClose }: { force?: boolea
         </ol>
       ) : canPrompt ? (
         <div className="mt-4">
-          <button type="button" className="rounded-lg px-5 min-h-[44px] font-body pp-focus text-[12px] tracking-[0.22em] uppercase bg-[#C9A96E] text-[#13170F]"
+          <button type="button" className="rounded-lg px-5 min-h-[44px] font-body pp-focus text-[0.875rem] tracking-[0.22em] uppercase bg-[#C9A96E] text-[#13170F]"
             onClick={async () => { if (!deferred) return; await deferred.prompt(); const choice = await deferred.userChoice.catch(() => null); deferred = null; setCanPrompt(false); if (choice?.outcome === "accepted") store(INSTALLED, "1"); close(); }}>
             Add to home screen
           </button>
@@ -100,7 +100,7 @@ export default function InstallHint({ force = false, onClose }: { force?: boolea
           Open your browser&rsquo;s menu (⋮) and choose <strong>Add to Home screen</strong> or <strong>Install app</strong>.
         </p>
       )}
-      <button type="button" onClick={close} className="font-body text-xs underline underline-offset-4 mt-2 min-h-[44px] px-1 -ml-1 pp-focus" style={{ color: C.muted }}>Not now</button>
+      <button type="button" onClick={close} className="font-body text-[0.875rem] underline underline-offset-4 mt-2 min-h-[44px] px-1 -ml-1 pp-focus" style={{ color: C.muted }}>Not now</button>
     </section>
   );
 }

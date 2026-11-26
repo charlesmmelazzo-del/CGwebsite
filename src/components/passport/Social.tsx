@@ -15,6 +15,8 @@ import {
   ANSWERS, DM_MAX, LETSGO_NOTE_MAX, LETSGO_TIMES, LOOKUP_LINE, NOTE_MAX, POLL_MS, PRIVATE_LINE, SHARE_WORDS, answerWord, nextDays, shareHref, sortPlans,
 } from "@/lib/passport/social";
 import type { Conversation, DmPost, Friend, FriendsOverview, LetsGo, MemberNotice, Presence, ShareCard, ShareKind, SocialInbox } from "@/lib/passport/types";
+import { ACCENTS } from "@/lib/passport/accents";
+import { KindLabel, SectionIcon, accentCardStyle } from "./Drill";
 
 /**
  * File 09: friends, direct messages, sharing, "Let's go" and "I'm here". Everything goes through the website's own
@@ -23,10 +25,10 @@ import type { Conversation, DmPost, Friend, FriendsOverview, LetsGo, MemberNotic
  */
 
 const OFFLINE = "Couldn't do that. Please try again.";
-const smallBtn = "rounded-full border px-4 min-h-[44px] font-body text-[12px] tracking-[0.12em] uppercase transition-colors disabled:opacity-50 pp-focus pp-press";
-const kicker = "font-body text-[10px] tracking-[0.25em] uppercase";
-const heading = "font-body text-[11px] tracking-[0.3em] uppercase mb-3";
-const labelCls = "block font-body text-[11px] tracking-[0.2em] uppercase mb-1.5";
+const smallBtn = "rounded-full border px-4 min-h-[44px] font-body text-[0.875rem] tracking-[0.12em] uppercase transition-colors disabled:opacity-50 pp-focus pp-press";
+const kicker = "pp-t-eyebrow";
+const heading = "pp-t-section mb-3";
+const labelCls = "block font-body text-[0.75rem] tracking-[0.2em] uppercase mb-1.5";
 
 function useSend() {
   const router = useRouter();
@@ -46,7 +48,7 @@ function useSend() {
 }
 function Pill({ on, children, onClick, disabled }: { on: boolean; children: ReactNode; onClick: () => void; disabled?: boolean }) {
   return (
-    <button type="button" aria-pressed={on} onClick={onClick} disabled={disabled} className="rounded-full border px-3.5 min-h-[44px] font-body text-[14px] pp-focus pp-press disabled:opacity-50"
+    <button type="button" aria-pressed={on} onClick={onClick} disabled={disabled} className="rounded-full border px-3.5 min-h-[44px] font-body text-[0.875rem] pp-focus pp-press disabled:opacity-50"
       style={{ borderColor: on ? C.brass : C.line, color: on ? C.bg : C.text, background: on ? C.brass : "transparent" }}>{children}</button>
   );
 }
@@ -68,7 +70,7 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
       <button type="button" aria-label="Close" className="absolute inset-0 bg-black/60" onClick={onClose} />
       <div className="relative w-full max-w-md max-h-[85dvh] overflow-y-auto rounded-t-2xl md:rounded-2xl border p-5 pb-[calc(env(safe-area-inset-bottom)+20px)]" style={{ background: C.bg, borderColor: C.line }}>
         <div className="flex items-start justify-between gap-3">
-          <h2 className="font-display text-[26px] leading-tight" style={{ color: C.text }}>{title}</h2>
+          <h2 className="font-display text-[1.625rem] leading-tight" style={{ color: C.text }}>{title}</h2>
           <button type="button" onClick={onClose} aria-label="Close" className="w-11 h-11 -mr-2 -mt-1 rounded-full flex items-center justify-center pp-focus" style={{ color: C.muted }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6 6 18" /></svg>
           </button>
@@ -124,20 +126,20 @@ export function HereButtons({ presence, hasFriends }: { presence?: Presence | nu
             style={{ borderColor: C.brass, background: p.here ? C.brass : "transparent", color: p.here ? C.bg : C.brass }}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11z" /><circle cx="12" cy="10" r="2.3" /></svg>
           </button>
-          <span className="font-body text-[11px] tracking-[0.14em] uppercase text-center" style={{ color: p.here ? C.brass : C.muted }}>{p.here ? "I've left" : "I'm here"}</span>
+          <span className="font-body text-[0.75rem] tracking-[0.14em] uppercase text-center" style={{ color: p.here ? C.brass : C.muted }}>{p.here ? "I've left" : "I'm here"}</span>
         </div>
         <div className="flex flex-col items-center gap-1.5">
           <Link href="/passport/letsgo" scroll={false} className={round} style={{ borderColor: C.line, color: C.text }} aria-label="Let's go to Common Good with friends">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M7 4.5h10l-5 7z" /><path d="M12 11.5V18M9 19.5h6" /><path d="M18.5 7.5l2-2M20.5 10h-2" /></svg>
           </Link>
-          <span className="font-body text-[11px] tracking-[0.14em] uppercase" style={{ color: C.muted }}>Let&rsquo;s go</span>
+          <span className="font-body text-[0.75rem] tracking-[0.14em] uppercase" style={{ color: C.muted }}>Let&rsquo;s go</span>
         </div>
       </div>
-      {p.here && p.until && <p className="font-body text-xs text-center mt-3" style={{ color: C.faint }}>Friends see you here until {new Date(p.until).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Chicago" })}, or until you tap I&rsquo;ve left.</p>}
+      {p.here && p.until && <p className="font-body text-[0.875rem] text-center mt-3" style={{ color: C.faint }}>Friends see you here until {new Date(p.until).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Chicago" })}, or until you tap I&rsquo;ve left.</p>}
       {error && !explain && <div className="mt-3"><Notice>{error}</Notice></div>}
       {explain && (
         <Sheet title="I'm at Common Good" onClose={() => setExplain(false)}>
-          <p className="font-body text-[15px] leading-relaxed" style={{ color: C.text }}>Your friends on Passport will see that you&rsquo;re at Common Good, on their Home, until closing time or until you tap I&rsquo;ve left (at most six hours).</p>
+          <p className="font-body text-[1rem] leading-relaxed" style={{ color: C.text }}>Your friends on Passport will see that you&rsquo;re at Common Good, on their Home, until closing time or until you tap I&rsquo;ve left (at most six hours).</p>
           <p className="font-body text-sm leading-relaxed mt-3" style={{ color: C.muted }}>Only friends see it, and only while &ldquo;Let friends see when I&rsquo;m at Common Good&rdquo; is on in your account. Our team can see who has checked in. Nothing checks where you are.</p>
           {!hasFriends && <p className="font-body text-sm mt-3" style={{ color: C.faint }}>You have no friends on Passport yet. <Link href="/passport/friends" scroll={false} className="underline" style={{ color: C.text }}>Add a friend</Link></p>}
           {error && <div className="mt-3"><Notice>{error}</Notice></div>}
@@ -155,12 +157,13 @@ export function FriendsHere({ friends }: { friends?: { name: string }[] | null }
   if (!friends?.length) return null;
   return (
     <section aria-labelledby="pp-here" className="mt-8">
-      <h2 id="pp-here" className={heading} style={{ color: C.brass }}>At Common Good now</h2>
+      <h2 id="pp-here" className={heading} style={{ color: ACCENTS["friends"].ink }}>At Common Good now</h2>
       <ul className="space-y-2">
         {friends.map((f, i) => (
-          <li key={i} className="flex items-center gap-3 rounded-xl border px-4 py-3" style={{ borderColor: `${C.brass}66`, background: "#1a1f14" }}>
+          <li key={i} className="flex items-center gap-3 rounded-xl border px-4 py-3 pp-card pp-accent-card" style={accentCardStyle("friends")}>
+            <SectionIcon section="friends" />
             <span aria-hidden className="w-2.5 h-2.5 rounded-full" style={{ background: "#86C07A" }} />
-            <span className="font-body text-[15px]" style={{ color: C.text }}><span className="font-display text-[19px]">{f.name}</span> is at Common Good</span>
+            <span className="font-body text-[1rem]" style={{ color: C.text }}><span className="font-display text-[1.1875rem]">{f.name}</span> is at Common Good</span>
           </li>
         ))}
       </ul>
@@ -185,29 +188,29 @@ export function LetsGoCards({ plans }: { plans?: LetsGo[] | null }) {
   };
   return (
     <section aria-labelledby="pp-letsgo" className="mt-8">
-      <h2 id="pp-letsgo" className={heading} style={{ color: C.brass }}>Let&rsquo;s go</h2>
+      <h2 id="pp-letsgo" className={heading} style={{ color: ACCENTS["friends"].ink }}>Let&rsquo;s go</h2>
       <ul className="space-y-3">
         {sortPlans(list).map((l) => (
-          <li key={`${l.mine ? "m" : "f"}${l.id}`} className="rounded-xl border p-4" style={{ borderColor: l.mine ? C.line : `${C.brass}80`, background: l.mine ? C.card : "#1a1f14" }}>
-            <span className={`block ${kicker}`} style={{ color: C.brass }}>{l.mine ? "Your plan" : `${l.from_name} is going to Common Good`}</span>
-            <span className="block font-display text-[21px] leading-tight mt-1" style={{ color: C.text }}>{dayLong(l.day)} · {l.time_label}</span>
-            {l.note && <span className="block font-body text-[14px] mt-1" style={{ color: C.muted }}>&ldquo;{l.note}&rdquo;</span>}
+          <li key={`${l.mine ? "m" : "f"}${l.id}`} className="rounded-xl border p-4 pp-card pp-accent-card" style={accentCardStyle("friends")}>
+            <KindLabel section="friends">{l.mine ? "Your plan" : `${l.from_name} is going to Common Good`}</KindLabel>
+            <span className="block font-display text-[1.3125rem] leading-tight mt-1" style={{ color: C.text }}>{dayLong(l.day)} · {l.time_label}</span>
+            {l.note && <span className="block font-body text-[0.875rem] mt-1" style={{ color: C.muted }}>&ldquo;{l.note}&rdquo;</span>}
             {l.mine ? (
               <>
                 <ul className="mt-2 space-y-0.5">
-                  {(l.answers || []).map((a, i) => <li key={i} className="font-body text-[14px]" style={{ color: C.text }}>{a.name} · <span style={{ color: a.answer === "in" ? C.brass : C.muted }}>{answerWord(a.answer)}</span></li>)}
+                  {(l.answers || []).map((a, i) => <li key={i} className="font-body text-[0.875rem]" style={{ color: C.text }}>{a.name} · <span style={{ color: a.answer === "in" ? C.brass : C.muted }}>{answerWord(a.answer)}</span></li>)}
                 </ul>
-                <button type="button" disabled={busy} onClick={() => cancel(l)} className="mt-1 inline-flex items-center min-h-[44px] font-body text-xs underline underline-offset-4 pp-focus rounded" style={{ color: C.muted }}>Cancel plan</button>
+                <button type="button" disabled={busy} onClick={() => cancel(l)} className="mt-1 inline-flex items-center min-h-[44px] font-body text-[0.875rem] underline underline-offset-4 pp-focus rounded" style={{ color: C.muted }}>Cancel plan</button>
               </>
             ) : (
               <>
                 <div className="flex gap-2 mt-3" role="group" aria-label="Your answer">
                   {ANSWERS.map((a) => <Pill key={a.id} on={l.my_answer === a.id} disabled={busy} onClick={() => answer(l, a.id)}>{a.label}</Pill>)}
                 </div>
-                {(l.in_count || l.maybe_count) ? <span className="block font-body text-xs mt-2" style={{ color: C.faint }}>{l.in_count || 0} in · {l.maybe_count || 0} maybe</span> : null}
+                {(l.in_count || l.maybe_count) ? <span className="block font-body text-[0.875rem] mt-2" style={{ color: C.faint }}>{l.in_count || 0} in · {l.maybe_count || 0} maybe</span> : null}
               </>
             )}
-            <span className="block font-body text-xs mt-3" style={{ color: C.faint }}>Not a reservation. <a href="/reserve" className="underline" style={{ color: C.text }}>Book a table</a></span>
+            <span className="block font-body text-[0.875rem] mt-3" style={{ color: C.faint }}>Not a reservation. <a href="/reserve" className="underline" style={{ color: C.text }}>Book a table</a></span>
           </li>
         ))}
       </ul>
@@ -228,8 +231,8 @@ export function SharedWithYou({ shared }: { shared?: ShareCard[] | null }) {
   };
   return (
     <section aria-labelledby="pp-shared" className="mt-10">
-      <h2 id="pp-shared" className={heading} style={{ color: C.brass }}>Shared with you</h2>
-      <SeeAll items={shown} keyOf={(s) => String(s.id)} render={(s) => <div className="relative"><ShareCardView s={s} /><span className="absolute top-1 right-1"><button type="button" onClick={() => dismiss(s.id)} aria-label={`Dismiss ${s.name}`} title="Dismiss" className="w-11 h-11 rounded-full flex items-center justify-center pp-focus" style={{ color: C.faint }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6 6 18" /></svg></button></span></div>} />
+      <h2 id="pp-shared" className={heading} style={{ color: ACCENTS["friends"].ink }}>Shared with you</h2>
+      <SeeAll items={shown} what="shared" href="/passport/inbox" keyOf={(s) => String(s.id)} render={(s) => <div className="relative"><ShareCardView s={s} /><span className="absolute top-1 right-1"><button type="button" onClick={() => dismiss(s.id)} aria-label={`Dismiss ${s.name}`} title="Dismiss" className="w-11 h-11 rounded-full flex items-center justify-center pp-focus" style={{ color: C.faint }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6 6 18" /></svg></button></span></div>} />
     </section>
   );
 }
@@ -237,14 +240,14 @@ export function ShareCardView({ s, inThread = false }: { s: ShareCard; inThread?
   const href = shareHref(s);
   const inner = (
     <>
-      <span className={`block ${kicker}`} style={{ color: C.brass }}>{inThread ? SHARE_WORDS[s.kind] : `${SHARE_WORDS[s.kind]} from ${s.from_name || "a friend"}`}</span>
-      <span className="block font-display text-[20px] leading-tight mt-1 pr-8" style={{ color: C.text }}>{s.name}</span>
-      {s.note && !inThread && <span className="block font-body text-[14px] mt-1" style={{ color: C.muted }}>&ldquo;{s.note}&rdquo;</span>}
-      {!s.opens && <span className="block font-body text-xs mt-1" style={{ color: C.faint }}>This isn&rsquo;t available to open right now.</span>}
+      <KindLabel section="friends">{inThread ? SHARE_WORDS[s.kind] : `${SHARE_WORDS[s.kind]} from ${s.from_name || "a friend"}`}</KindLabel>
+      <span className="block font-display text-[1.25rem] leading-tight mt-1 pr-8" style={{ color: C.text }}>{s.name}</span>
+      {s.note && !inThread && <span className="block font-body text-[0.875rem] mt-1" style={{ color: C.muted }}>&ldquo;{s.note}&rdquo;</span>}
+      {!s.opens && <span className="block font-body text-[0.875rem] mt-1" style={{ color: C.faint }}>This isn&rsquo;t available to open right now.</span>}
     </>
   );
-  const cls = "block rounded-xl border p-4 pp-focus";
-  const style = { borderColor: C.line, background: C.card };
+  const cls = "block h-full rounded-xl border p-4 pp-focus pp-card pp-accent-card";
+  const style = accentCardStyle("friends");
   return href ? <Link href={href} scroll={false} className={`${cls} pp-row`} style={style}>{inner}</Link> : <div className={cls} style={style}>{inner}</div>;
 }
 
@@ -254,7 +257,7 @@ export function ShareButton({ kind, id, name, compact = false }: { kind: ShareKi
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" className={compact ? "font-body text-xs underline" : "inline-flex items-center gap-2 rounded-full border px-4 min-h-[44px] font-body text-[12px] tracking-[0.12em] uppercase pp-focus pp-press"}
+      <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" className={compact ? "font-body text-[0.875rem] underline" : "inline-flex items-center gap-2 rounded-full border px-4 min-h-[44px] font-body text-[0.875rem] tracking-[0.12em] uppercase pp-focus pp-press"}
         style={compact ? { color: C.muted } : { borderColor: C.line, color: C.text }}>
         {!compact && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="18" cy="5.5" r="2.5" /><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="18.5" r="2.5" /><path d="m8.2 10.8 7.6-4.1M8.2 13.2l7.6 4.1" /></svg>}
         {kind === "event" ? "Invite friends" : "Share with a friend"}
@@ -288,7 +291,7 @@ function ShareSheet({ kind, id, name, onClose }: { kind: ShareKind; id: number; 
   return (
     <Sheet title={kind === "event" ? "Invite friends" : "Share with a friend"} onClose={onClose}>
       <p className="font-body text-sm" style={{ color: C.muted }}>{name}</p>
-      {kind === "list" && <p className="font-body text-xs mt-1" style={{ color: C.faint }}>They get a copy they can save. Your stars and notes stay private.</p>}
+      {kind === "list" && <p className="font-body text-[0.875rem] mt-1" style={{ color: C.faint }}>They get a copy they can save. Your stars and notes stay private.</p>}
       {friends === null && <p className="font-body text-sm mt-4" style={{ color: C.faint }}>One moment…</p>}
       {friends && !friends.length && !error && <p className="font-body text-sm mt-4" style={{ color: C.muted }}>Add a friend first. <Link href="/passport/friends" scroll={false} className="underline" style={{ color: C.text }} onClick={onClose}>Friends</Link></p>}
       {muted && <div className="mt-4"><Notice>You can&rsquo;t share with friends right now.</Notice></div>}
@@ -297,7 +300,7 @@ function ShareSheet({ kind, id, name, onClose }: { kind: ShareKind; id: number; 
           <ul className="mt-4 divide-y rounded-xl border" style={{ borderColor: C.line }}>
             {friends.map((f) => (
               <li key={f.id} style={{ borderColor: C.line }}>
-                <label className="flex items-center gap-3 px-4 min-h-[52px] cursor-pointer font-body text-[15px]" style={{ color: C.text }}>
+                <label className="flex items-center gap-3 px-4 min-h-[52px] cursor-pointer font-body text-[1rem]" style={{ color: C.text }}>
                   <input type="checkbox" className="w-[18px] h-[18px] accent-[#C9A96E]" checked={pick.has(f.id)} onChange={() => toggle(f.id)} />
                   <span className="flex-1">{f.name}</span>
                 </label>
@@ -308,7 +311,7 @@ function ShareSheet({ kind, id, name, onClose }: { kind: ShareKind; id: number; 
             <span className={labelCls} style={{ color: C.muted }}>A note (optional)</span>
             <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={NOTE_MAX} className={inputCls} placeholder="You have to try this" />
           </label>
-          <p className="font-body text-xs mt-2" style={{ color: C.faint }}>{PRIVATE_LINE}</p>
+          <p className="font-body text-[0.875rem] mt-2" style={{ color: C.faint }}>{PRIVATE_LINE}</p>
           {error && <div className="mt-3"><Notice>{error}</Notice></div>}
           <button type="button" disabled={busy || !pick.size} onClick={go} className={`${smallBtn} w-full mt-4`} style={{ borderColor: C.brass, background: C.brass, color: C.bg }}>
             {busy ? "Sharing…" : `Share${pick.size ? ` with ${pick.size}` : ""}`}
@@ -333,9 +336,9 @@ export function SharedView({ initial }: { initial: ShareCard }) {
   return (
     <div className="pb-16">
       <BackLink fallback="/passport" label="Home" />
-      <p className="font-body text-[11px] tracking-[0.3em] uppercase mt-2" style={{ color: C.brass }}>{SHARE_WORDS[s.kind]}{s.from_name ? ` from ${s.from_name}` : ""}</p>
+      <p className="font-body text-[0.75rem] tracking-[0.3em] uppercase mt-2" style={{ color: C.brass }}>{SHARE_WORDS[s.kind]}{s.from_name ? ` from ${s.from_name}` : ""}</p>
       <h1 className="font-display text-4xl leading-tight mt-1" style={{ color: C.text }}>{s.name}</h1>
-      {s.note && <p className="font-body text-[15px] mt-3" style={{ color: C.muted }}>&ldquo;{s.note}&rdquo;</p>}
+      {s.note && <p className="font-body text-[1rem] mt-3" style={{ color: C.muted }}>&ldquo;{s.note}&rdquo;</p>}
       {s.list && (
         <>
           <ol className="mt-6">
@@ -343,8 +346,8 @@ export function SharedView({ initial }: { initial: ShareCard }) {
               <li key={i} className="flex items-baseline gap-3 py-3 border-b" style={{ borderColor: C.line }}>
                 {s.list!.ranked && <span className="font-display text-xl w-6 text-right" style={{ color: C.brass }}>{i + 1}</span>}
                 {it.opens && it.id
-                  ? <Link href={it.kind === "cocktail" ? `/passport/library/${it.id}` : `/passport/spirits/${it.id}`} scroll={false} className="font-body text-[16px] underline-offset-4 hover:underline pp-focus" style={{ color: C.text }}>{it.name}</Link>
-                  : <span className="font-body text-[16px]" style={{ color: C.muted }}>{it.name}</span>}
+                  ? <Link href={it.kind === "cocktail" ? `/passport/library/${it.id}` : `/passport/spirits/${it.id}`} scroll={false} className="font-body text-[1rem] underline-offset-4 hover:underline pp-focus" style={{ color: C.text }}>{it.name}</Link>
+                  : <span className="font-body text-[1rem]" style={{ color: C.muted }}>{it.name}</span>}
               </li>
             ))}
           </ol>
@@ -355,10 +358,10 @@ export function SharedView({ initial }: { initial: ShareCard }) {
       )}
       {s.recipe && (
         <div className="mt-6 rounded-xl border p-5" style={{ borderColor: C.line, background: C.card }}>
-          {s.recipe.made_by && <p className="font-body text-[11px] tracking-[0.15em] uppercase" style={{ color: C.brass }}>Made for {s.from_name || "them"} by {s.recipe.made_by} at Common Good</p>}
+          {s.recipe.made_by && <p className="font-body text-[0.75rem] tracking-[0.15em] uppercase" style={{ color: C.brass }}>Made for {s.from_name || "them"} by {s.recipe.made_by} at Common Good</p>}
           <ul className="mt-2 space-y-1.5">
             {s.recipe.lines.map((l, i) => (
-              <li key={i} className="font-body text-[15px]" style={{ color: C.text }}>{[l.quantity, l.unit, l.name].filter(Boolean).join(" ")}{l.sub_recipe && <span className="block text-sm ml-4" style={{ color: C.muted }}>{l.sub_recipe}</span>}</li>
+              <li key={i} className="font-body text-[1rem]" style={{ color: C.text }}>{[l.quantity, l.unit, l.name].filter(Boolean).join(" ")}{l.sub_recipe && <span className="block text-sm ml-4" style={{ color: C.muted }}>{l.sub_recipe}</span>}</li>
             ))}
           </ul>
           {s.recipe.notes && <p className="font-body text-sm mt-3 whitespace-pre-wrap" style={{ color: C.muted }}>{s.recipe.notes}</p>}
@@ -398,19 +401,19 @@ export function FriendsPage({ initial, code = "" }: { initial: FriendsOverview; 
     <div className="pb-16 space-y-8">
       <div>
         <BackLink fallback="/passport/account" label="Account" />
-        <p className="font-body text-[11px] tracking-[0.3em] uppercase mt-2" style={{ color: C.brass }}>Passport</p>
+        <p className="font-body text-[0.75rem] tracking-[0.3em] uppercase mt-2" style={{ color: C.brass }}>Passport</p>
         <h1 className="font-display text-4xl mt-1" style={{ color: C.text }}>Friends</h1>
         <p className="font-body text-sm mt-2 leading-relaxed" style={{ color: C.muted }}>Friends see your display name ({d.settings.shown_as}), can message you, share with you, and see your plans and when you&rsquo;re here. Never your email, phone, history or notes.</p>
       </div>
 
       {d.incoming.length > 0 && (
         <section aria-labelledby="pp-requests">
-          <h2 id="pp-requests" className={heading} style={{ color: C.brass }}>Friend requests</h2>
+          <h2 id="pp-requests" className={heading} style={{ color: ACCENTS["friends"].ink }}>Friend requests</h2>
           <ul className="space-y-3">
             {d.incoming.map((r) => (
               <li key={r.id} className="rounded-xl border p-4" style={{ borderColor: `${C.brass}80`, background: "#1a1f14" }}>
-                <span className="block font-display text-[21px]" style={{ color: C.text }}>{r.name}</span>
-                <span className="block font-body text-xs mt-0.5" style={{ color: C.faint }}>{whenShort(r.at)}</span>
+                <span className="block font-display text-[1.3125rem]" style={{ color: C.text }}>{r.name}</span>
+                <span className="block font-body text-[0.875rem] mt-0.5" style={{ color: C.faint }}>{whenShort(r.at)}</span>
                 <div className="flex flex-wrap gap-2 mt-3">
                   <button type="button" disabled={busy} className={smallBtn} style={{ borderColor: C.brass, background: C.brass, color: C.bg }} onClick={() => act({ action: "accept", id: r.id }, `You and ${r.name} are friends.`)}>Accept</button>
                   <button type="button" disabled={busy} className={smallBtn} style={{ borderColor: C.line, color: C.text }} onClick={() => act({ action: "decline", id: r.id }, "Declined. They won't be told.")}>Decline</button>
@@ -423,7 +426,7 @@ export function FriendsPage({ initial, code = "" }: { initial: FriendsOverview; 
       )}
 
       <section aria-labelledby="pp-add" className="rounded-xl border p-5" style={{ borderColor: C.line, background: C.card }}>
-        <h2 id="pp-add" className={heading} style={{ color: C.brass }}>Add a friend</h2>
+        <h2 id="pp-add" className={heading} style={{ color: ACCENTS["friends"].ink }}>Add a friend</h2>
         <form onSubmit={find} className="space-y-3" noValidate>
           <div className="flex gap-2" role="group" aria-label="Find them by">
             {(["email", "phone", "code"] as FindHow[]).map((h) => <Pill key={h} on={how === h} onClick={() => { setHow(h); setValue(""); setError(""); }}>{h === "email" ? "Email" : h === "phone" ? "Phone" : "Friend code"}</Pill>)}
@@ -437,17 +440,17 @@ export function FriendsPage({ initial, code = "" }: { initial: FriendsOverview; 
           <button type="submit" disabled={busy || !value.trim()} className={`${smallBtn} w-full`} style={{ borderColor: C.brass, background: C.brass, color: C.bg }}>{busy ? "One moment…" : "Send friend request"}</button>
           {sentMsg && <Notice kind="ok">{sentMsg}</Notice>}
           {error && <Notice>{error}</Notice>}
-          <p className="font-body text-xs leading-relaxed" style={{ color: C.faint }}>{LOOKUP_LINE} There is no member directory.</p>
+          <p className="font-body text-[0.875rem] leading-relaxed" style={{ color: C.faint }}>{LOOKUP_LINE} There is no member directory.</p>
         </form>
       </section>
 
       {d.suggested.length > 0 && (
         <section aria-labelledby="pp-suggested">
-          <h2 id="pp-suggested" className={heading} style={{ color: C.brass }}>In your household</h2>
+          <h2 id="pp-suggested" className={heading} style={{ color: ACCENTS["friends"].ink }}>In your household</h2>
           <ul className="space-y-2">
             {d.suggested.map((s) => (
               <li key={s.id} className="flex items-center justify-between gap-3 rounded-xl border px-4 py-3" style={{ borderColor: C.line }}>
-                <span className="font-body text-[15px]" style={{ color: C.text }}>{s.name}</span>
+                <span className="font-body text-[1rem]" style={{ color: C.text }}>{s.name}</span>
                 <button type="button" disabled={busy} className={smallBtn} style={{ borderColor: C.line, color: C.text }} onClick={async () => { const o = await send<{ message: string }>("/api/passport/friends", { action: "suggested", id: s.id }); if (o) { shell?.toast("Request sent."); void reload(); } }}>Add</button>
               </li>
             ))}
@@ -456,13 +459,13 @@ export function FriendsPage({ initial, code = "" }: { initial: FriendsOverview; 
       )}
 
       <section aria-labelledby="pp-friends">
-        <h2 id="pp-friends" className={heading} style={{ color: C.brass }}>Your friends{d.friends.length ? ` · ${d.friends.length}` : ""}</h2>
+        <h2 id="pp-friends" className={heading} style={{ color: ACCENTS["friends"].ink }}>Your friends{d.friends.length ? ` · ${d.friends.length}` : ""}</h2>
         {!d.friends.length && <p className="font-body text-sm" style={{ color: C.muted }}>When someone accepts your request, they show here.</p>}
         <ul>
           {d.friends.map((f) => (
             <li key={f.id} className="flex items-center gap-3 py-3 border-b" style={{ borderColor: C.line }}>
               <span className="flex-1 min-w-0">
-                <span className="flex items-center gap-2 font-display text-[20px]" style={{ color: C.text }}>{f.name}{f.here && <span className="font-body text-[10px] tracking-[0.18em] uppercase rounded px-1.5 py-0.5 border" style={{ color: "#86C07A", borderColor: "#86C07A66" }}>Here now</span>}{f.unread && <span aria-label="Unread" className="w-2 h-2 rounded-full" style={{ background: C.accent }} />}</span>
+                <span className="flex items-center gap-2 font-display text-[1.25rem]" style={{ color: C.text }}>{f.name}{f.here && <span className="font-body text-[0.75rem] tracking-[0.18em] uppercase rounded px-1.5 py-0.5 border" style={{ color: "#86C07A", borderColor: "#86C07A66" }}>Here now</span>}{f.unread && <span aria-label="Unread" className="w-2 h-2 rounded-full" style={{ background: C.accent }} />}</span>
               </span>
               <Link href={f.conversation_id ? `/passport/inbox/friends/${f.conversation_id}` : `/passport/inbox/friends/new?friend=${f.id}`} scroll={false} className={smallBtn} style={{ borderColor: C.line, color: C.text }}>Message</Link>
               <FriendMenu f={f} busy={busy} onAct={(body, done) => act(body, done)} />
@@ -473,12 +476,12 @@ export function FriendsPage({ initial, code = "" }: { initial: FriendsOverview; 
 
       {d.sent.length > 0 && (
         <section aria-labelledby="pp-sent">
-          <h2 id="pp-sent" className={heading} style={{ color: C.brass }}>Requests you sent</h2>
+          <h2 id="pp-sent" className={heading} style={{ color: ACCENTS["friends"].ink }}>Requests you sent</h2>
           <ul>
             {d.sent.map((a) => (
-              <li key={a.id} className="flex items-center justify-between gap-3 py-2.5 border-b font-body text-[14px]" style={{ borderColor: C.line, color: C.muted }}>
+              <li key={a.id} className="flex items-center justify-between gap-3 py-2.5 border-b font-body text-[0.875rem]" style={{ borderColor: C.line, color: C.muted }}>
                 <span className="min-w-0 truncate">{a.via === "code" ? `Friend code ${a.typed}` : a.typed} · Request sent</span>
-                <button type="button" disabled={busy} className="underline text-xs shrink-0" style={{ color: C.muted }} onClick={() => act({ action: "withdraw", id: a.id })}>Withdraw</button>
+                <button type="button" disabled={busy} className="underline text-[0.875rem] shrink-0" style={{ color: C.muted }} onClick={() => act({ action: "withdraw", id: a.id })}>Withdraw</button>
               </li>
             ))}
           </ul>
@@ -487,18 +490,18 @@ export function FriendsPage({ initial, code = "" }: { initial: FriendsOverview; 
 
       {d.blocked.length > 0 && (
         <section aria-labelledby="pp-blocked">
-          <h2 id="pp-blocked" className={heading} style={{ color: C.brass }}>Blocked</h2>
+          <h2 id="pp-blocked" className={heading} style={{ color: ACCENTS["friends"].ink }}>Blocked</h2>
           <ul>
             {d.blocked.map((b) => (
-              <li key={b.id} className="flex items-center justify-between gap-3 py-2.5 border-b font-body text-[14px]" style={{ borderColor: C.line, color: C.text }}>
+              <li key={b.id} className="flex items-center justify-between gap-3 py-2.5 border-b font-body text-[0.875rem]" style={{ borderColor: C.line, color: C.text }}>
                 <span>{b.name}</span>
-                <button type="button" disabled={busy} className="underline text-xs" style={{ color: C.muted }} onClick={() => act({ action: "unblock", id: b.id }, "Unblocked. You aren't friends again unless one of you asks.")}>Unblock</button>
+                <button type="button" disabled={busy} className="underline text-[0.875rem]" style={{ color: C.muted }} onClick={() => act({ action: "unblock", id: b.id }, "Unblocked. You aren't friends again unless one of you asks.")}>Unblock</button>
               </li>
             ))}
           </ul>
         </section>
       )}
-      <p className="font-body text-xs" style={{ color: C.faint }}>Your display name, friend code and &ldquo;Let friends see&rdquo; switch are in <Link href="/passport/account" scroll={false} className="underline" style={{ color: C.text }}>your account</Link>.</p>
+      <p className="font-body text-[0.875rem]" style={{ color: C.faint }}>Your display name, friend code and &ldquo;Let friends see&rdquo; switch are in <Link href="/passport/account" scroll={false} className="underline" style={{ color: C.text }}>your account</Link>.</p>
     </div>
   );
 }
@@ -591,17 +594,17 @@ export function ConversationView({ initial, friendId, friendName = "" }: { initi
       <div className="pb-16">
         <BackLink fallback="/passport/inbox" label="Inbox" />
         <h1 className="font-display text-3xl mt-3" style={{ color: C.text }}>Conversation</h1>
-        <p className="font-body text-[15px] mt-4" style={{ color: C.muted }}>This conversation is no longer available.</p>
+        <p className="font-body text-[1rem] mt-4" style={{ color: C.muted }}>This conversation is no longer available.</p>
       </div>
     );
   }
   return (
     <div className="pb-16">
       <BackLink fallback="/passport/inbox" label="Inbox" />
-      <p className="font-body text-[11px] tracking-[0.3em] uppercase mt-2" style={{ color: C.brass }}>Friend{c?.here ? " · at Common Good now" : ""}</p>
+      <p className="font-body text-[0.75rem] tracking-[0.3em] uppercase mt-2" style={{ color: C.brass }}>Friend{c?.here ? " · at Common Good now" : ""}</p>
       <div className="flex items-start justify-between gap-3">
         <h1 className="font-display text-3xl leading-tight mt-1" style={{ color: C.text }}>{c?.name || friendName || "New message"}</h1>
-        {c && <button type="button" onClick={() => setReporting({})} className="font-body text-xs underline mt-3 shrink-0" style={{ color: C.muted }}>Report</button>}
+        {c && <button type="button" onClick={() => setReporting({})} className="font-body text-[0.875rem] underline mt-3 shrink-0" style={{ color: C.muted }}>Report</button>}
       </div>
       <ul className="space-y-3 mt-6" aria-live="polite">
         {(c?.posts || []).map((p: DmPost) => {
@@ -609,13 +612,13 @@ export function ConversationView({ initial, friendId, friendName = "" }: { initi
           return (
             <li key={p.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
               <div className="max-w-[85%] rounded-2xl px-4 py-2.5" style={mine ? { background: "#2a3220", color: C.text } : { background: C.card, color: C.text, border: `1px solid ${C.line}` }}>
-                {p.removed ? <p className="font-body text-[14px] italic" style={{ color: C.faint }}>This message was removed.</p> : (
+                {p.removed ? <p className="font-body text-[0.875rem] italic" style={{ color: C.faint }}>This message was removed.</p> : (
                   <>
                     {p.share && <div className="mb-2 min-w-[200px]"><ShareCardView s={p.share} inThread /></div>}
-                    {p.body && <p className="font-body text-[15px] leading-relaxed whitespace-pre-wrap break-words">{p.body}</p>}
+                    {p.body && <p className="font-body text-[1rem] leading-relaxed whitespace-pre-wrap break-words">{p.body}</p>}
                   </>
                 )}
-                <p className="font-body text-[11px] mt-1 flex items-center gap-2" style={{ color: C.faint }}>
+                <p className="font-body text-[0.75rem] mt-1 flex items-center gap-2" style={{ color: C.faint }}>
                   {mine ? "You" : c?.name} · {whenShort(p.at)}
                   {!mine && !p.removed && <button type="button" onClick={() => setReporting({ id: p.id })} className="underline">Report</button>}
                 </p>
@@ -630,7 +633,7 @@ export function ConversationView({ initial, friendId, friendName = "" }: { initi
           <label className="sr-only" htmlFor="pp-dm">Write to {c?.name || "your friend"}</label>
           <textarea id="pp-dm" rows={3} maxLength={DM_MAX} value={text} onChange={(e) => setText(e.target.value)} className={inputCls} placeholder={`Write to ${c?.name || friendName || "your friend"}`} />
           <div className="flex items-center justify-between gap-3">
-            <span className="font-body text-[11px] leading-snug" style={{ color: C.faint }}>{text.length > DM_MAX - 150 ? `${DM_MAX - text.length} left` : PRIVATE_LINE}</span>
+            <span className="font-body text-[0.75rem] leading-snug" style={{ color: C.faint }}>{text.length > DM_MAX - 150 ? `${DM_MAX - text.length} left` : PRIVATE_LINE}</span>
             <button type="submit" disabled={busy || !text.trim()} className={smallBtn} style={{ borderColor: C.brass, color: C.bg, background: C.brass }}>{busy ? "Sending…" : "Send"}</button>
           </div>
           {error && <Notice>{error}</Notice>}
@@ -665,8 +668,8 @@ export function InboxFriends({ social, title }: { social: SocialInbox | null | u
               const inner = (
                 <>
                   <span className={`block ${kicker}`} style={{ color: C.brass }}>{n.unread ? "New reply" : "Reply"}</span>
-                  <span className="block font-body text-[15px] mt-1" style={{ color: C.text }}>{n.name} replied to your comment on “{n.title}”</span>
-                  <span className="block font-body text-[11px] mt-1" style={{ color: C.faint }}>{whenShort(n.at)}</span>
+                  <span className="block font-body text-[1rem] mt-1" style={{ color: C.text }}>{n.name} replied to your comment on “{n.title}”</span>
+                  <span className="block font-body text-[0.75rem] mt-1" style={{ color: C.faint }}>{whenShort(n.at)}</span>
                 </>
               );
               return (
@@ -688,8 +691,8 @@ export function InboxFriends({ social, title }: { social: SocialInbox | null | u
               <li key={n.id}>
                 <button type="button" onClick={() => read(n)} className="w-full text-left rounded-xl border px-4 py-3.5 pp-focus" style={{ borderColor: n.unread ? `${C.brass}80` : C.line, background: n.unread ? "#1a1f14" : C.card }}>
                   <span className={`block ${kicker}`} style={{ color: C.brass }}>A note from the bar{n.unread ? " · new" : ""}</span>
-                  <span className="block font-body text-[15px] mt-1 whitespace-pre-wrap" style={{ color: C.text }}>{n.body}</span>
-                  <span className="block font-body text-[11px] mt-1" style={{ color: C.faint }}>{whenShort(n.at)}</span>
+                  <span className="block font-body text-[1rem] mt-1 whitespace-pre-wrap" style={{ color: C.text }}>{n.body}</span>
+                  <span className="block font-body text-[0.75rem] mt-1" style={{ color: C.faint }}>{whenShort(n.at)}</span>
                 </button>
               </li>
             ))}
@@ -700,7 +703,7 @@ export function InboxFriends({ social, title }: { social: SocialInbox | null | u
         {title("pp-friends-inbox", "Friends")}
         {social.incoming.length > 0 && (
           <Link href="/passport/friends" scroll={false} className="flex items-center gap-3 rounded-xl border px-4 py-3.5 mb-3 pp-focus pp-row" style={{ borderColor: `${C.brass}80`, background: "#1a1f14" }}>
-            <span className="flex-1 font-body text-[15px]" style={{ color: C.text }}>{social.incoming.length === 1 ? `${social.incoming[0].name} sent you a friend request` : `${social.incoming.length} friend requests`}</span>
+            <span className="flex-1 font-body text-[1rem]" style={{ color: C.text }}>{social.incoming.length === 1 ? `${social.incoming[0].name} sent you a friend request` : `${social.incoming.length} friend requests`}</span>
             <span aria-hidden style={{ color: C.brass }}>→</span>
           </Link>
         )}
@@ -712,10 +715,10 @@ export function InboxFriends({ social, title }: { social: SocialInbox | null | u
                   <span className="pt-2 w-2">{c.unread && <span className="inline-block w-2 h-2 rounded-full" style={{ background: C.accent }}><span className="sr-only">Unread</span></span>}</span>
                   <span className="flex-1 min-w-0">
                     <span className="flex items-baseline justify-between gap-3">
-                      <span className="font-display text-[19px] leading-tight truncate" style={{ color: C.text }}>{c.name}</span>
-                      <span className="font-body text-[11px] shrink-0" style={{ color: C.faint }}>{whenShort(c.last_at)}</span>
+                      <span className="font-display text-[1.1875rem] leading-tight truncate" style={{ color: C.text }}>{c.name}</span>
+                      <span className="font-body text-[0.75rem] shrink-0" style={{ color: C.faint }}>{whenShort(c.last_at)}</span>
                     </span>
-                    <span className="block font-body text-[13px] truncate mt-0.5" style={{ color: c.unread ? C.text : C.muted }}>{c.last_from === "me" ? "You: " : ""}{c.preview}</span>
+                    <span className="block font-body text-[0.875rem] truncate mt-0.5" style={{ color: c.unread ? C.text : C.muted }}>{c.last_from === "me" ? "You: " : ""}{c.preview}</span>
                   </span>
                 </Link>
               </li>
@@ -750,12 +753,12 @@ export function LetsGoForm({ friends }: { friends: Friend[] }) {
     <form onSubmit={submit} className="pb-16 space-y-5" noValidate>
       <div>
         <BackLink fallback="/passport" label="Home" />
-        <p className="font-body text-[11px] tracking-[0.3em] uppercase mt-2" style={{ color: C.brass }}>Let&rsquo;s go</p>
+        <p className="font-body text-[0.75rem] tracking-[0.3em] uppercase mt-2" style={{ color: C.brass }}>Let&rsquo;s go</p>
         <h1 className="font-display text-4xl mt-1" style={{ color: C.text }}>Plan a visit</h1>
         <p className="font-body text-sm mt-2 leading-relaxed" style={{ color: C.muted }}>Tell friends when you&rsquo;re thinking of coming in. They can answer In, Maybe or Can&rsquo;t. It isn&rsquo;t a reservation, and it disappears the next morning.</p>
       </div>
       {!friends.length ? (
-        <p className="font-body text-[15px]" style={{ color: C.text }}>Add a friend first. <Link href="/passport/friends" scroll={false} className="underline">Friends</Link></p>
+        <p className="font-body text-[1rem]" style={{ color: C.text }}>Add a friend first. <Link href="/passport/friends" scroll={false} className="underline">Friends</Link></p>
       ) : (
         <>
           <label className="block">
@@ -777,7 +780,7 @@ export function LetsGoForm({ friends }: { friends: Friend[] }) {
               <ul className="divide-y rounded-xl border" style={{ borderColor: C.line }}>
                 {friends.map((f) => (
                   <li key={f.id} style={{ borderColor: C.line }}>
-                    <label className="flex items-center gap-3 px-4 min-h-[50px] cursor-pointer font-body text-[15px]" style={{ color: C.text }}>
+                    <label className="flex items-center gap-3 px-4 min-h-[50px] cursor-pointer font-body text-[1rem]" style={{ color: C.text }}>
                       <input type="checkbox" className="w-[18px] h-[18px] accent-[#C9A96E]" checked={pick.has(f.id)} onChange={() => setPick((p) => { const n = new Set(p); if (n.has(f.id)) n.delete(f.id); else n.add(f.id); return n; })} />
                       {f.name}
                     </label>
@@ -787,8 +790,8 @@ export function LetsGoForm({ friends }: { friends: Friend[] }) {
             )}
           </fieldset>
           {error && <Notice>{error}</Notice>}
-          <button type="submit" disabled={busy || !ready} className="w-full rounded-lg py-3.5 font-body text-[13px] tracking-[0.22em] uppercase transition-colors disabled:opacity-50 bg-[#C9A96E] text-[#13170F] hover:bg-[#d6b77d]">{busy ? "Sending…" : "Send to friends"}</button>
-          <p className="font-body text-xs text-center" style={{ color: C.faint }}>Want a table held? <a href="/reserve" className="underline" style={{ color: C.text }}>Book a table</a></p>
+          <button type="submit" disabled={busy || !ready} className="w-full rounded-lg py-3.5 font-body text-[0.875rem] tracking-[0.22em] uppercase transition-colors disabled:opacity-50 bg-[#C9A96E] text-[#13170F] hover:bg-[#d6b77d]">{busy ? "Sending…" : "Send to friends"}</button>
+          <p className="font-body text-[0.875rem] text-center" style={{ color: C.faint }}>Want a table held? <a href="/reserve" className="underline" style={{ color: C.text }}>Book a table</a></p>
         </>
       )}
     </form>

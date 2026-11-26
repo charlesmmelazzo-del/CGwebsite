@@ -22,7 +22,7 @@ export default function Agreement({ termsText, age, setAge, terms, setTerms, mar
           </button>.
         </Check>
         {open && (
-          <div className="mt-3 max-h-64 overflow-y-auto rounded-md border px-4 py-3 font-body text-[13px] leading-relaxed whitespace-pre-line"
+          <div className="mt-3 max-h-64 overflow-y-auto rounded-md border px-4 py-3 font-body text-[0.875rem] leading-relaxed whitespace-pre-line"
             style={{ borderColor: C.line, color: C.muted, background: "#0E120B" }}>
             {termsText}
           </div>

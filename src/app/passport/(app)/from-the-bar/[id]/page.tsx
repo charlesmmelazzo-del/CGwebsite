@@ -22,9 +22,9 @@ export default async function Page({ params }: { params: { id: string } }) {
   return (
     <div>
       <BackLink fallback="/passport" label="Home" />
-      <p className="font-body text-[11px] tracking-[0.3em] uppercase mt-2" style={{ color: C.brass }}>From the bar</p>
+      <p className="font-body text-[0.75rem] tracking-[0.3em] uppercase mt-2" style={{ color: C.brass }}>From the bar</p>
       <h1 className="font-display text-4xl leading-tight mt-1" style={{ color: C.text }}>{m.title}</h1>
-      {m.body && <p className="font-body text-[16px] mt-4 leading-relaxed whitespace-pre-line" style={{ color: C.text }}>{m.body}</p>}
+      {m.body && <p className="font-body text-[1rem] mt-4 leading-relaxed whitespace-pre-line" style={{ color: C.text }}>{m.body}</p>}
       {href && m.link_label && <Link href={href} scroll={false} className="inline-block mt-3 min-h-[44px] py-2.5 font-body text-sm underline underline-offset-4" style={{ color: C.brass }}>{m.link_label}</Link>}
       <Comments type="message" id={m.id} />
     </div>

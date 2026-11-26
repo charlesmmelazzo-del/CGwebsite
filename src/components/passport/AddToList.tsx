@@ -82,8 +82,8 @@ export default function AddToList({ target, onClose, toast, cache }: {
         <div className="pt-2.5 pb-1 flex justify-center" aria-hidden><span className="w-10 h-1 rounded-full" style={{ background: C.line }} /></div>
         <div className="px-5 pb-3 flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 id="pp-add-title" className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>Add to a list</h2>
-            <p className="font-display text-[22px] leading-tight mt-1 truncate" style={{ color: C.text }}>{target.name}</p>
+            <h2 id="pp-add-title" className="pp-t-section mb-3" style={{ color: C.text }}>Add to a list</h2>
+            <p className="font-display text-[1.375rem] leading-tight mt-1 truncate" style={{ color: C.text }}>{target.name}</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close" className="w-11 h-11 -mr-2 rounded-full flex items-center justify-center pp-focus shrink-0" style={{ color: C.muted }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6 6 18" /></svg>
@@ -97,21 +97,21 @@ export default function AddToList({ target, onClose, toast, cache }: {
               <div role="radiogroup" aria-label="Kind of list" className="flex gap-2">
                 {([[false, "Playlist"], [true, "Top 10"]] as const).map(([v, l]) => (
                   <button key={l} type="button" role="radio" aria-checked={ranked === v} onClick={() => setRanked(v)}
-                    className="rounded-full border px-4 min-h-[44px] font-body text-[12px] tracking-[0.08em] pp-focus"
+                    className="rounded-full border px-4 min-h-[44px] font-body text-[0.875rem] tracking-[0.08em] pp-focus"
                     style={ranked === v ? { borderColor: C.brass, color: C.brass, background: "#1a1f14" } : { borderColor: C.line, color: C.muted }}>{l}</button>
                 ))}
               </div>
               <div className="flex gap-2">
-                <button type="submit" disabled={!name.trim() || busy !== null} className="rounded-full px-5 min-h-[44px] font-body text-[12px] tracking-[0.14em] uppercase disabled:opacity-50 pp-focus"
+                <button type="submit" disabled={!name.trim() || busy !== null} className="rounded-full px-5 min-h-[44px] font-body text-[0.875rem] tracking-[0.14em] uppercase disabled:opacity-50 pp-focus"
                   style={{ background: C.brass, color: C.bg }}>{busy === "new" ? "One moment…" : "Make list and add"}</button>
-                <button type="button" onClick={() => setMaking(false)} className="rounded-full border px-4 min-h-[44px] font-body text-[12px] tracking-[0.14em] uppercase pp-focus" style={{ borderColor: C.line, color: C.muted }}>Cancel</button>
+                <button type="button" onClick={() => setMaking(false)} className="rounded-full border px-4 min-h-[44px] font-body text-[0.875rem] tracking-[0.14em] uppercase pp-focus" style={{ borderColor: C.line, color: C.muted }}>Cancel</button>
               </div>
             </form>
           ) : (
             <button type="button" data-autofocus onClick={() => setMaking(true)} className={`${btn} border-b`} style={{ borderColor: C.line }}>
               <span className="flex items-center gap-3">
                 <span className="w-9 h-9 rounded-full border flex items-center justify-center" style={{ borderColor: C.brass, color: C.brass }} aria-hidden>+</span>
-                <span className="font-body text-[15px]" style={{ color: C.text }}>New list</span>
+                <span className="font-body text-[1rem]" style={{ color: C.text }}>New list</span>
               </span>
             </button>
           )}
@@ -126,12 +126,12 @@ export default function AddToList({ target, onClose, toast, cache }: {
                   <li key={l.id} className="border-b" style={{ borderColor: C.line }}>
                     <button type="button" disabled={busy !== null || full} onClick={() => add(l)} className={`${btn} disabled:opacity-50`}>
                       <span className="min-w-0">
-                        <span className="block font-display text-[19px] leading-tight truncate" style={{ color: C.text }}>{l.name}</span>
-                        <span className="block font-body text-[11px] tracking-[0.12em] uppercase mt-0.5" style={{ color: C.faint }}>
+                        <span className="block font-display text-[1.1875rem] leading-tight truncate" style={{ color: C.text }}>{l.name}</span>
+                        <span className="block font-body text-[0.75rem] tracking-[0.12em] uppercase mt-0.5" style={{ color: C.faint }}>
                           {l.ranked ? "Top 10" : "Playlist"} · {l.count} {kindWord}{l.count === 1 ? "" : "s"}{full ? " · full" : ""}
                         </span>
                       </span>
-                      <span className="font-body text-xs shrink-0" style={{ color: C.brass }}>{busy === l.id ? "Adding…" : "Add"}</span>
+                      <span className="font-body text-[0.875rem] shrink-0" style={{ color: C.brass }}>{busy === l.id ? "Adding…" : "Add"}</span>
                     </button>
                   </li>
                 );

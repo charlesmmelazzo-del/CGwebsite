@@ -8,23 +8,25 @@ import { useShell } from "./shellContext";
 import { notifyChanged } from "./appEvents";
 import { PAST_VOTES_HREF, pctLabel, startRound, voteHref, voteKicker } from "@/lib/passport/votes";
 import type { Bracket, BracketEntry, BracketMatchup, FlightVote, VoteCard } from "@/lib/passport/types";
+import { ACCENTS } from "@/lib/passport/accents";
+import { KindLabel, accentCardStyle } from "./Drill";
 
 /**
  * File 10, Parts 2 to 4: "Choose your perfect flight" and brackets. A member sees their own picks only; while voting is open
  * there are no totals; afterwards the winner, and a whole-percent share only when the bar chose to show one. Never a count.
  */
-const kicker = "font-body text-[10px] tracking-[0.25em] uppercase";
-const heading = "font-body text-[11px] tracking-[0.3em] uppercase mb-3";
+const kicker = "pp-t-eyebrow";
+const heading = "pp-t-section mb-3";
 
 /** A vote or bracket as a card (Home, the Index, Past votes). */
 export function VoteCardLink({ c, big = false }: { c: VoteCard; big?: boolean }) {
   const open = c.status === "open";
   return (
-    <Link href={voteHref(c)} scroll={false} className="block rounded-xl border p-4 pp-focus pp-row" style={{ borderColor: open ? `${C.brass}80` : C.line, background: open ? "#1a1f14" : C.card }}>
-      <span className={`block ${kicker}`} style={{ color: open ? C.brass : C.faint }}>{voteKicker(c)}{open && c.done ? " · you've voted" : ""}</span>
-      <span className={`block font-display leading-tight mt-1.5 ${big ? "text-[23px]" : "text-[20px]"}`} style={{ color: C.text }}>{c.title}</span>
-      {c.winner && <span className="block font-body text-[15px] mt-1" style={{ color: C.brass }}>Winner: {c.winner}</span>}
-      <span className="block font-body text-[12px] mt-1.5" style={{ color: C.muted }}>{c.line}</span>
+    <Link href={voteHref(c)} scroll={false} className="block h-full rounded-xl border p-4 pp-focus pp-row pp-card pp-accent-card" style={accentCardStyle("bar")}>
+      <KindLabel section="bar">{voteKicker(c)}{open && c.done ? " · you've voted" : ""}</KindLabel>
+      <span className={`block font-display leading-tight mt-1.5 ${big ? "text-[1.4375rem]" : "text-[1.25rem]"}`} style={{ color: C.text }}>{c.title}</span>
+      {c.winner && <span className="block font-body text-[1rem] mt-1" style={{ color: ACCENTS.bar.ink }}>Winner: {c.winner}</span>}
+      <span className="block font-body text-[0.875rem] mt-1.5" style={{ color: C.muted }}>{c.line}</span>
     </Link>
   );
 }
@@ -33,10 +35,10 @@ export function VotesHome({ open, results }: { open?: VoteCard[] | null; results
   if (!open?.length && !results?.length) return null;
   return (
     <section aria-labelledby="pp-votes-home" className="mt-10">
-      <h2 id="pp-votes-home" className={heading} style={{ color: C.brass }}>{open?.length ? "Voting is open" : "The results are in"}</h2>
+      <h2 id="pp-votes-home" className={heading} style={{ color: ACCENTS["bar"].ink }}>{open?.length ? "Voting is open" : "The results are in"}</h2>
       {/* File 12: three at most on Home, the rest behind "See all". */}
       <SeeAll items={[...(open || []).map((c) => ({ c, big: true })), ...(results || []).map((c) => ({ c, big: false }))]}
-        keyOf={(x) => `${x.big ? "" : "r"}${x.c.kind}${x.c.id}`} render={(x) => <VoteCardLink c={x.c} big={x.big} />} />
+        keyOf={(x) => `${x.big ? "" : "r"}${x.c.kind}${x.c.id}`} render={(x) => <VoteCardLink c={x.c} big={x.big} />} what="votes" href="/passport/library?at=cg%2Fvotes" />
     </section>
   );
 }
@@ -65,14 +67,14 @@ export function FlightVotePage({ initial }: { initial: FlightVote }) {
       <BackLink fallback="/passport/library" label="Index" />
       <p className={`${kicker} mt-2`} style={{ color: C.brass }}>Choose your perfect flight · {f.status_label}</p>
       <h1 className="font-display text-4xl leading-tight mt-1" style={{ color: C.text }}>{f.title}</h1>
-      {f.intro && <p className="font-body text-[15px] mt-3 leading-relaxed whitespace-pre-line" style={{ color: C.muted }}>{f.intro}</p>}
+      {f.intro && <p className="font-body text-[1rem] mt-3 leading-relaxed whitespace-pre-line" style={{ color: C.muted }}>{f.intro}</p>}
       <p className="font-body text-sm mt-3" style={{ color: C.text }}>{f.when}{f.pour_oz ? ` · ${f.pour_oz} oz pours` : ""}</p>
-      {open && <p className="font-body text-[13px] mt-1" style={{ color: C.faint }}>Pick one bottle in each slot. You can change a pick until voting closes. Results show once it closes.</p>}
+      {open && <p className="font-body text-[0.875rem] mt-1" style={{ color: C.faint }}>Pick one bottle in each slot. You can change a pick until voting closes. Results show once it closes.</p>}
       {error && <div className="mt-4"><Notice>{error}</Notice></div>}
       <ol className="mt-6 space-y-7">
         {f.slots.map((s, i) => (
           <li key={s.id}>
-            <h2 className="font-body text-[11px] tracking-[0.25em] uppercase" style={{ color: C.brass }}>Slot {i + 1}{s.label ? ` · ${s.label}` : ""}</h2>
+            <h2 className="pp-t-section mb-3" style={{ color: ACCENTS["bar"].ink }}>Slot {i + 1}{s.label ? ` · ${s.label}` : ""}</h2>
             <ul className="mt-2 space-y-2" role={open ? "radiogroup" : undefined} aria-label={`Slot ${i + 1}`}>
               {s.options.map((o) => {
                 const mine = s.my_pick === o.id;
@@ -88,12 +90,12 @@ export function FlightVotePage({ initial }: { initial: FlightVote }) {
                           {mine && <span className="w-2.5 h-2.5 rounded-full" style={{ background: C.brass }} />}
                         </span>
                         <span className="flex-1 min-w-0">
-                          <span className="block font-body text-[16px] truncate" style={{ color: C.text }}>{o.name}</span>
-                          <span className="block font-body text-[11px] tracking-[0.12em] uppercase" style={{ color: C.faint }}>
+                          <span className="block font-body text-[1rem] truncate" style={{ color: C.text }}>{o.name}</span>
+                          <span className="block font-body text-[0.75rem] tracking-[0.12em] uppercase" style={{ color: C.faint }}>
                             {[o.category, o.winner ? "Winner" : null, mine && !open ? "Your pick" : null].filter(Boolean).join(" · ")}
                           </span>
                         </span>
-                        {pct && <span className="font-body text-[15px] shrink-0" style={{ color: o.winner ? C.brass : C.muted }}>{pct}</span>}
+                        {pct && <span className="font-body text-[1rem] shrink-0" style={{ color: o.winner ? C.brass : C.muted }}>{pct}</span>}
                       </span>
                     </button>
                     {o.opens && o.bottle_id && (
@@ -113,7 +115,7 @@ export function FlightVotePage({ initial }: { initial: FlightVote }) {
 
 // ── Brackets ─────────────────────────────────────────────────────────────────
 function EntryRow({ e, side, m, open, onPick, busy }: { e: BracketEntry | null; side: "a" | "b"; m: BracketMatchup; open: boolean; onPick: (side: "a" | "b") => void; busy: boolean }) {
-  if (!e) return <div className="px-3 py-2.5 font-body text-[13px] min-h-[48px] flex items-center" style={{ color: C.faint }}>To be decided</div>;
+  if (!e) return <div className="px-3 py-2.5 font-body text-[0.875rem] min-h-[48px] flex items-center" style={{ color: C.faint }}>To be decided</div>;
   const mine = m.my_pick === side;
   const won = m.winner === side;
   const lost = !!m.winner && !won;
@@ -124,12 +126,12 @@ function EntryRow({ e, side, m, open, onPick, busy }: { e: BracketEntry | null; 
       <button type="button" disabled={!open || busy} onClick={() => onPick(side)} aria-pressed={open ? mine : undefined}
         aria-label={`${e.name}, seed ${e.seed}${won ? ", advanced" : lost ? ", out" : ""}${pct ? `, ${pct} of the votes` : ""}${mine ? ", your pick" : ""}`}
         className="flex-1 min-w-0 text-left px-3 py-2.5 min-h-[48px] flex items-center gap-2 pp-focus disabled:cursor-default" style={{ background: mine ? "#1a1f14" : "transparent" }}>
-        <span className="font-body text-[11px] w-5 shrink-0 text-right" style={{ color: C.faint }}>{e.seed}</span>
+        <span className="font-body text-[0.75rem] w-5 shrink-0 text-right" style={{ color: C.faint }}>{e.seed}</span>
         <span className="flex-1 min-w-0">
-          <span className="block font-body text-[15px] truncate" style={{ color: lost ? C.faint : C.text, fontWeight: won ? 600 : 400 }}>{e.name}</span>
-          {(mine || won) && <span className="block font-body text-[10px] tracking-[0.15em] uppercase" style={{ color: C.brass }}>{[won ? "Advanced" : null, mine ? "Your pick" : null].filter(Boolean).join(" · ")}</span>}
+          <span className="block font-body text-[1rem] truncate" style={{ color: lost ? C.faint : C.text, fontWeight: won ? 600 : 400 }}>{e.name}</span>
+          {(mine || won) && <span className="block font-body text-[0.75rem] tracking-[0.15em] uppercase" style={{ color: C.brass }}>{[won ? "Advanced" : null, mine ? "Your pick" : null].filter(Boolean).join(" · ")}</span>}
         </span>
-        {pct && <span className="font-body text-[13px] shrink-0" style={{ color: won ? C.brass : C.muted }}>{pct}</span>}
+        {pct && <span className="font-body text-[0.875rem] shrink-0" style={{ color: won ? C.brass : C.muted }}>{pct}</span>}
         {open && <span aria-hidden className="w-4 h-4 shrink-0 rounded-full border" style={{ borderColor: mine ? C.brass : C.faint, background: mine ? C.brass : "transparent" }} />}
       </button>
       {href && <Link href={href} scroll={false} aria-label={`About ${e.name}`} className="shrink-0 w-11 flex items-center justify-center pp-focus" style={{ color: C.muted }}>→</Link>}
@@ -163,27 +165,27 @@ export function BracketPage({ initial }: { initial: Bracket }) {
       <BackLink fallback="/passport/library" label="Index" />
       <p className={`${kicker} mt-2`} style={{ color: C.brass }}>Bracket · {b.kind === "cocktail" ? "cocktails" : "spirits"} · {b.status_label}</p>
       <h1 className="font-display text-4xl leading-tight mt-1" style={{ color: C.text }}>{b.title}</h1>
-      {b.intro && <p className="font-body text-[15px] mt-3 leading-relaxed whitespace-pre-line" style={{ color: C.muted }}>{b.intro}</p>}
+      {b.intro && <p className="font-body text-[1rem] mt-3 leading-relaxed whitespace-pre-line" style={{ color: C.muted }}>{b.intro}</p>}
       <p className="font-body text-sm mt-3" style={{ color: C.text }}>{b.when}</p>
       {b.winner && (
         <div className="mt-5 rounded-xl border p-5" style={{ borderColor: `${C.brass}80`, background: "#1a1f14" }}>
           <p className={kicker} style={{ color: C.brass }}>The winner</p>
           {b.winner.opens && b.winner.id
-            ? <Link href={b.winner.kind === "cocktail" ? `/passport/library/${b.winner.id}` : `/passport/spirits/${b.winner.id}`} scroll={false} className="block font-display text-[28px] leading-tight mt-1 pp-focus" style={{ color: C.text }}>{b.winner.name}</Link>
-            : <p className="font-display text-[28px] leading-tight mt-1" style={{ color: C.text }}>{b.winner.name}</p>}
+            ? <Link href={b.winner.kind === "cocktail" ? `/passport/library/${b.winner.id}` : `/passport/spirits/${b.winner.id}`} scroll={false} className="block font-display text-[1.75rem] leading-tight mt-1 pp-focus" style={{ color: C.text }}>{b.winner.name}</Link>
+            : <p className="font-display text-[1.75rem] leading-tight mt-1" style={{ color: C.text }}>{b.winner.name}</p>}
         </div>
       )}
-      {b.status === "open" && <p className="font-body text-[13px] mt-2" style={{ color: C.faint }}>Tap one in each matchup. You can change it until the round ends; who advances shows after.</p>}
+      {b.status === "open" && <p className="font-body text-[0.875rem] mt-2" style={{ color: C.faint }}>Tap one in each matchup. You can change it until the round ends; who advances shows after.</p>}
       {error && <div className="mt-4"><Notice>{error}</Notice></div>}
       <div ref={scroller} role="region" tabIndex={0} className="-mx-5 px-5 mt-6 flex gap-4 overflow-x-auto snap-x snap-mandatory pb-3 pp-focus" aria-label={`The bracket, ${b.rounds.length} round${b.rounds.length === 1 ? "" : "s"}, round by round`}>
         {b.rounds.map((r, i) => {
           const open = r.state === "open" && b.status === "open";
           return (
             <section key={r.round} data-round={i} aria-labelledby={`pp-round-${r.round}`} className="snap-start shrink-0 w-[82%] max-w-[300px] md:w-[260px]">
-              <h2 id={`pp-round-${r.round}`} className="font-body text-[11px] tracking-[0.25em] uppercase" style={{ color: r.state === "open" ? C.brass : C.muted }}>
+              <h2 id={`pp-round-${r.round}`} className="pp-t-section mb-3" style={{ color: r.state === "open" ? C.brass : C.muted }}>
                 {r.name}{r.state === "open" ? " · now" : r.state === "done" ? " · done" : ""}
               </h2>
-              <p className="font-body text-[11px] mt-0.5 mb-2" style={{ color: C.faint }}>{r.when}</p>
+              <p className="font-body text-[0.75rem] mt-0.5 mb-2" style={{ color: C.faint }}>{r.when}</p>
               <ul className="space-y-3">
                 {r.matchups.map((m, k) => (
                   <li key={m.id ?? `p${k}`} role="group" aria-label={`${r.name}, matchup ${k + 1}: ${m.a?.name || "to be decided"} versus ${m.b?.name || "to be decided"}`} className="rounded-xl border overflow-hidden divide-y divide-[#323B29]" style={{ borderColor: open && m.id ? `${C.brass}66` : C.line, background: C.card }}>
@@ -196,7 +198,7 @@ export function BracketPage({ initial }: { initial: Bracket }) {
           );
         })}
       </div>
-      {b.rounds.length > 1 && <p className="font-body text-[11px] mt-1" style={{ color: C.faint }}>Swipe sideways for the other rounds.</p>}
+      {b.rounds.length > 1 && <p className="font-body text-[0.75rem] mt-1" style={{ color: C.faint }}>Swipe sideways for the other rounds.</p>}
     </div>
   );
 }

@@ -15,8 +15,8 @@ import type { CommentThread, CommentType, PComment } from "@/lib/passport/types"
  * global one): never an empty box. Other members appear by display name only; the bar as "Common Good · {first name}".
  * One level of replies; the author may edit for 10 minutes and delete any time; report a comment or block its author.
  */
-const smallBtn = "rounded-full border px-4 min-h-[44px] font-body text-[12px] tracking-[0.12em] uppercase transition-colors disabled:opacity-50 pp-focus pp-press";
-const linkBtn = "font-body text-[12px] underline underline-offset-4 min-h-[44px] pp-focus";
+const smallBtn = "rounded-full border px-4 min-h-[44px] font-body text-[0.875rem] tracking-[0.12em] uppercase transition-colors disabled:opacity-50 pp-focus pp-press";
+const linkBtn = "font-body text-[0.875rem] underline underline-offset-4 min-h-[44px] pp-focus";
 
 export default function Comments({ type, id }: { type: CommentType; id: number }) {
   const shell = useShell();
@@ -64,13 +64,13 @@ export default function Comments({ type, id }: { type: CommentType; id: number }
     return (
       <li key={c.id} className={`py-3 ${reply ? "ml-5 pl-3 border-l" : "border-b"}`} style={{ borderColor: C.line }}>
         {!gone && (
-          <p className="font-body text-[12px] flex items-baseline gap-1.5 flex-wrap" style={{ color: C.faint }}>
+          <p className="font-body text-[0.875rem] flex items-baseline gap-1.5 flex-wrap" style={{ color: C.faint }}>
             <span style={{ color: c.from === "bar" ? C.brass : C.text }} className="font-semibold">{c.name}</span>
-            {c.from === "bar" && <span className="text-[10px] tracking-[0.15em] uppercase" style={{ color: C.brass }}>From the bar</span>}
+            {c.from === "bar" && <span className="text-[0.75rem] tracking-[0.15em] uppercase" style={{ color: C.brass }}>From the bar</span>}
             <span>{whenShort(c.at)}</span>{c.edited && <span>· edited</span>}
           </p>
         )}
-        <p className="font-body text-[15px] mt-0.5 whitespace-pre-wrap break-words" style={{ color: gone ? C.faint : C.text, fontStyle: gone ? "italic" : undefined }}>
+        <p className="font-body text-[1rem] mt-0.5 whitespace-pre-wrap break-words" style={{ color: gone ? C.faint : C.text, fontStyle: gone ? "italic" : undefined }}>
           {c.removed ? REMOVED_LINE : c.deleted ? DELETED_LINE : c.body}
         </p>
         {!gone && (
@@ -88,25 +88,25 @@ export default function Comments({ type, id }: { type: CommentType; id: number }
   };
   return (
     <section aria-labelledby={`pp-comments-${type}-${id}`} className="mt-10">
-      <h2 id={`pp-comments-${type}-${id}`} className="font-body text-[11px] tracking-[0.3em] uppercase mb-3" style={{ color: C.brass }}>Comments</h2>
+      <h2 id={`pp-comments-${type}-${id}`} className="pp-t-section mb-3" style={{ color: C.text }}>Comments</h2>
       {t.can_write && t.first_time && !okPg && (
         <div className="rounded-xl border p-4 mb-4" style={{ borderColor: `${C.brass}66`, background: "#1a1f14" }}>
-          <p className="font-body text-[15px]" style={{ color: C.text }}>Before your first comment: {PG_LINE}</p>
-          <p className="font-body text-[13px] mt-1" style={{ color: C.muted }}>Other members see your display name and what you write. Our team can remove a comment.</p>
+          <p className="font-body text-[1rem]" style={{ color: C.text }}>Before your first comment: {PG_LINE}</p>
+          <p className="font-body text-[0.875rem] mt-1" style={{ color: C.muted }}>Other members see your display name and what you write. Our team can remove a comment.</p>
           <button type="button" className={`${smallBtn} mt-3`} style={{ borderColor: C.brass, color: C.brass }} onClick={() => setOkPg(true)}>I&rsquo;ll keep it kind</button>
         </div>
       )}
       {writing && (
         <form onSubmit={(e) => { e.preventDefault(); void send(); }} className="space-y-2 mb-2">
           {(replyTo || editing) && (
-            <p className="font-body text-[13px]" style={{ color: C.muted }}>
+            <p className="font-body text-[0.875rem]" style={{ color: C.muted }}>
               {editing ? "Changing your comment" : `Replying to ${replyTo?.from === "me" ? "yourself" : replyTo?.name}`} · <button type="button" className="underline" onClick={() => { setReplyTo(null); setEditing(null); setText(""); }}>cancel</button>
             </p>
           )}
           <label className="sr-only" htmlFor={`pp-c-${type}-${id}`}>Your comment</label>
           <textarea id={`pp-c-${type}-${id}`} rows={3} maxLength={COMMENT_MAX} value={text} onChange={(e) => setText(e.target.value)} className={inputCls} placeholder={replyTo ? "Write a reply" : "Add a comment"} />
           <div className="flex items-center justify-between gap-3">
-            <span className="font-body text-[11px] leading-snug" style={{ color: C.faint }}>{text.length > COMMENT_MAX - 80 ? `${COMMENT_MAX - text.length} left · ` : ""}{t.note || PG_LINE}</span>
+            <span className="font-body text-[0.75rem] leading-snug" style={{ color: C.faint }}>{text.length > COMMENT_MAX - 80 ? `${COMMENT_MAX - text.length} left · ` : ""}{t.note || PG_LINE}</span>
             <button type="submit" disabled={busy || !text.trim()} className={smallBtn} style={{ borderColor: C.brass, color: C.bg, background: C.brass }}>{busy ? "Posting…" : editing ? "Save" : replyTo ? "Reply" : "Post"}</button>
           </div>
           {error && <Notice>{error}</Notice>}
@@ -138,7 +138,7 @@ function ActSheet({ c, what, onClose, onDone }: { c: PComment; what: "report" | 
       </p>
       {what === "report" && (
         <>
-          <label className="block font-body text-[11px] tracking-[0.2em] uppercase mt-4 mb-1.5" style={{ color: C.muted }} htmlFor="pp-report-reason">What&rsquo;s wrong (optional)</label>
+          <label className="block font-body text-[0.75rem] tracking-[0.2em] uppercase mt-4 mb-1.5" style={{ color: C.muted }} htmlFor="pp-report-reason">What&rsquo;s wrong (optional)</label>
           <textarea id="pp-report-reason" rows={3} maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} className={inputCls} />
         </>
       )}

@@ -329,12 +329,15 @@ function slowServer() {
   });
   await test("the recipe book is called My Cocktails, sits in the Index under Yours with Add a cocktail, and never in the Menu", () => {
     const comp = (f: string) => readFileSync(join(__dirname, "..", "..", "..", "components", "passport", f), "utf8");
+    // File 14: the Index is a drill-down; My Cocktails is a tile under Index › Yours (lib/passport/nav.ts), and the Yours
+    // level keeps "+ Add a cocktail". (Updated from the flat Index's card, which this file replaced.)
     const index = comp("tabs/IndexTab.tsx");
-    assert.ok(index.includes(">My Cocktails<") && index.includes('href="/passport/bespoke?new=1"') && index.includes("+ Add a cocktail"));
+    const nav = readFileSync(join(__dirname, "..", "nav.ts"), "utf8");
+    assert.ok(nav.includes('label: "My Cocktails"') && nav.includes('href: "/passport/bespoke"') && index.includes('href="/passport/bespoke?new=1"') && index.includes("+ Add a cocktail"));
     assert.ok(!/bespoke|My Cocktails/i.test(comp("tabs/MenuTab.tsx")), "not on the Menu tab");
     const page = readFileSync(pageOf("/passport/bespoke")!, "utf8");
     assert.ok(page.includes('title="My Cocktails"'));
-    const all = [index, comp("Personal.tsx"), page].join("\n");
+    const all = [index, nav, comp("Personal.tsx"), page].join("\n");
     assert.ok(!/Bespoke (recipes|cocktails)/.test(all.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "")), "the old label is shown nowhere");
   });
   await test("places for later files draw nothing until they have something (no empty boxes, no 'coming soon')", () => {
@@ -667,7 +670,8 @@ function slowServer() {
       assert.ok(photos.includes("Removed by Common Good"));
       assert.ok(pageOf("/passport/photos"), "My photos page");
       assert.equal(homeTabOf("/passport/photos"), "index");
-      assert.ok(readFileSync(join(APP, "..", "components", "passport", "tabs", "IndexTab.tsx"), "utf8").includes('href: "/passport/photos"'));
+      // File 14: the Yours tiles live in the navigation model (updated from the flat Index's list of links).
+      assert.ok(readFileSync(join(APP, "..", "lib", "passport", "nav.ts"), "utf8").includes('href: "/passport/photos"'));
       for (const page of ["library/[id]/page.tsx", "spirits/[id]/page.tsx"]) assert.ok(readFileSync(join(APP, "passport", "(app)", ...page.split("/")), "utf8").includes("<MyItemPhotos"), page);
     });
     await test("a page or card without a photo draws nothing for it (it looks finished, not missing something)", () => {
@@ -728,7 +732,9 @@ function slowServer() {
       const lum = (h: string) => { const c = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((x) => (x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
       const ratio = (a: string, b: string) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
       for (const bg of [C.bg, C.card]) assert.ok(ratio(C.faint, bg) >= 4.5, `faint on ${bg}: ${ratio(C.faint, bg).toFixed(2)}`);
-      assert.ok(compP("tabs/IndexTab.tsx").includes("pp-jump sticky"));
+      // File 14: the jump chips are gone (the Index drills down); what sticks under the top bar now is the "where you
+      // are" trail and the Menu tab's sideways tabs. (Updated from the flat Index's jump chips.)
+      assert.ok(compP("Drill.tsx").includes('aria-label="Where you are" className="sticky') && compP("tabs/MenuTab.tsx").includes('className="sticky z-20'));
       assert.ok(compP("AppShell.tsx").includes('{ transform: "translateX(100%)" }'));
     });
   }

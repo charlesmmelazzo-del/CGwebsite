@@ -1,181 +1,272 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- Passport photos come through the member's own signed-in route. */
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { C } from "../theme";
-import { Collapsible, GREEN, ScreenSkeleton } from "../bits";
-import { BottleRow, CocktailRow, PageTitle, Quiet, SectionTitle } from "../Library";
+import { Avail } from "../bits";
+import { PageTitle, Quiet } from "../Library";
 import { ListsManager } from "../Personal";
 import SearchArea from "../Search";
 import TabView from "./TabView";
-import { HouseLists } from "./Slots";
 import { ForYouIndex } from "../ForYou";
-import { byCategory, withSpirit } from "@/lib/passport/shell";
-import { markKey, type Chart, type HouseList, type IndexData, type IndexDrink, type Marks, type PassportList, type VoteCard } from "@/lib/passport/types";
-import { scrollToId } from "../appEvents";
+import { VoteCardLink } from "../Votes";
+import { CompactBottle, CompactCocktail, CountRow, KindLabel, SectionHeading, TileGrid, Trail, accentCardStyle, useLevelMotion } from "../Drill";
+import { readRecent } from "../recent";
+import { chartHref, houseHref, listKicker } from "@/lib/passport/bar";
+import { INDEX_HREF, indexLevel, indexPathOf, jumpBackIn, type IndexLevel, type Recent } from "@/lib/passport/nav";
+import { barPhotoSrc, markKey, type Chart, type HouseList, type IndexData, type Marks, type PassportList, type VoteCard } from "@/lib/passport/types";
 
 /** What the Index view sends (api/passport/view/index). */
 export interface IndexView extends IndexData { lists: PassportList[]; marks: Marks; house_lists?: HouseList[]; charts?: Chart[]; past_count?: number; votes?: VoteCard[]; past_votes_count?: number }
 
-const YOURS = [
-  { href: "/passport/favorites", title: "Favorites", line: "Cocktails and bottles you love, and your ratings" },
-  { href: "/passport/notes", title: "Notes", line: "Your tasting notes" },
-  { href: "/passport/history", title: "History", line: "What you've ordered, and how often" },
-  // File 11: the member's own photos of our cocktails and bottles.
-  { href: "/passport/photos", title: "My photos", line: "Your own photos, only for you and our team" },
-];
+// Remembered while the app is open: the "Pouring now / Everything" choice and each level's scroll position.
+let everythingChoice = false;
+const scrollAt = new Map<string, number>();
 
 /**
- * File 06: the Index tab, everything the bar has ever served plus the member's own lists. The search bar; Lists (theirs,
- * then the house lists from file 07); Yours (favorites, notes, recipes, history); every cocktail shown in Passport with
- * the base-spirit filter; every bottle a member may open, by category; and beer and wine. What is being served right now
- * carries a small green dot.
+ * File 14: the Index as a drill-down, like an iPod's menus. The top is six large tiles (Cocktails, Spirits, Beer &
+ * wine, Lists, From Common Good, Yours) under "Jump back in"; each level is a short set of choices that slides over
+ * the last, until a final list the member chose (one album, one spirit, one letter, one category or producer), in
+ * compact rows. The search bar stays at the top of every level, and "Index › Cocktails › By spirit" shows where you
+ * are. Every level has its own address (/passport/library?at=…), so Back, refresh and sharing work; old addresses
+ * (?spirit=, #lists, …) open the right level. Every level is built from the one Index answer already loaded.
  */
 export default function IndexTab() {
   return (
-    <TabView<IndexView> name="index" skeleton={<ScreenSkeleton rows={8} />}>
+    <TabView<IndexView> name="index" skeleton={<IndexSkeleton />}>
       {(d, version) => <Index d={d} version={version} />}
     </TabView>
   );
 }
 
+/** First paint: the title, the search bar's place and six tile shapes, at once. */
+function IndexSkeleton() {
+  return (
+    <div role="status" aria-label="Loading">
+      <PageTitle kicker="Everything we've served" title="Index" />
+      <div className="pp-skel rounded-xl h-12" />
+      <ul className="grid grid-cols-2 gap-3 mt-6" aria-hidden>
+        {["Cocktails", "Spirits", "Beer & wine", "Lists", "From Common Good", "Yours"].map((t) => (
+          <li key={t} className="rounded-xl overflow-hidden border" style={{ borderColor: C.line }}>
+            <span className="block aspect-[4/3] pp-skel" />
+            <span className="block px-3 py-3 pp-t-card" style={{ color: C.faint }}>{t}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function Index({ d, version }: { d: IndexView; version: number }) {
   const params = useSearchParams();
-  // An old Library link (?q= / ?spirit=) still works: it fills the search box or the filter.
-  const [spirit, setSpirit] = useState(() => {
-    const s = params?.get("spirit") || "";
-    return d.base_spirits.some((b) => b.key === s) ? s : "";
-  });
-  const initialQ = (params?.get("q") || "").slice(0, 100);
-  const cocktails = useMemo(() => withSpirit(d.cocktails, spirit), [d.cocktails, spirit]);
-  const spirits = useMemo(() => byCategory(d.bottles), [d.bottles]);
-  const drinks = useMemo(() => {
-    const out: { name: string; items: IndexDrink[] }[] = [];
-    for (const kind of ["Beer", "Wine", "Other"] as const) {
-      const items = d.drinks.filter((x) => x.kind === kind);
-      if (items.length) out.push({ name: kind === "Other" ? "Cider and more" : kind, items });
-    }
-    return out;
-  }, [d.drinks]);
-  const anyAvailable = d.cocktails.some((c) => c.available) || d.bottles.some((b) => b.available) || d.drinks.some((x) => x.available);
+  const [hash, setHash] = useState("");
   useEffect(() => {
-    if (window.location.hash === "#lists") scrollToId("lists");
+    const read = () => setHash(window.location.hash);
+    read();
+    window.addEventListener("hashchange", read);
+    return () => window.removeEventListener("hashchange", read);
   }, []);
-  const jump = (id: string) => scrollToId(id, true);
-  const sections = [
-    { id: "lists", label: "Lists" },
-    ...(d.house_lists?.length || d.charts?.length || d.past_count || d.votes?.length || d.past_votes_count ? [{ id: "from-common-good", label: "From Common Good" }] : []),
-    { id: "yours", label: "Yours" }, { id: "cocktails", label: "Cocktails" },
-    ...(spirits.length ? [{ id: "spirits", label: "Spirits" }] : []), ...(drinks.length ? [{ id: "beer-wine", label: "Beer & wine" }] : []),
-  ];
+  const path = useMemo(() => indexPathOf(params, hash), [params, hash]);
+  const [everything, setEverything] = useState(everythingChoice);
+  const level = useMemo(() => indexLevel(d, path, { everything }), [d, path, everything]);
+  const key = path.join("/");
+  const initialQ = (params?.get("q") || "").slice(0, 100);
+
+  // Each level keeps its own scroll position: Back returns to the same place.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const keyRef = useRef(key);
+  keyRef.current = key;
+  useEffect(() => {
+    const on = () => { if (rootRef.current?.offsetParent) scrollAt.set(keyRef.current, window.scrollY); };
+    window.addEventListener("scroll", on, { passive: true });
+    return () => window.removeEventListener("scroll", on);
+  }, []);
+  const shownKey = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    if (shownKey.current === null) { shownKey.current = key; return; }
+    if (shownKey.current === key) return;
+    shownKey.current = key;
+    if (rootRef.current?.offsetParent) window.scrollTo({ top: scrollAt.get(key) || 0, behavior: "instant" as ScrollBehavior });
+  }, [key]);
+  const motion = useLevelMotion(key, path.length);
+
+  const parent = level.trail.length > 1 ? level.trail[level.trail.length - 2]?.label : null;
   return (
-    <>
-      <PageTitle kicker="Everything we've served" title="Index" />
+    <div ref={rootRef}>
+      <PageTitle kicker={parent && level.path.length > 1 ? parent : "Everything we've served"} title={level.title} />
       <SearchArea initial={initialQ}>
-        {/* File 12: the jump chips stay reachable while the long Index scrolls (they stick under the top bar). */}
-        <nav aria-label="Jump to" className="pp-jump sticky z-20 -mx-5 px-5 mt-4 py-2 flex gap-2 overflow-x-auto border-b"
-          style={{ top: "var(--pp-top)", background: C.bg, borderColor: C.line }}>
-          {sections.map((s) => (
-            <button key={s.id} type="button" onClick={() => jump(s.id)} className="shrink-0 rounded-full border px-3.5 min-h-[44px] font-body text-xs whitespace-nowrap pp-focus pp-press"
-              style={{ borderColor: C.line, color: C.muted }}>{s.label}</button>
-          ))}
-        </nav>
-
-        <section id="lists">
-          <SectionTitle>Your lists</SectionTitle>
-          <ListsManager key={`lists-${version}`} initial={d.lists} />
-        </section>
-        <HouseLists lists={d.house_lists} charts={d.charts} pastCount={d.past_count} votes={d.votes} pastVotes={d.past_votes_count} />
-
-        <section id="yours">
-          <SectionTitle>Yours</SectionTitle>
-          {/* "My Cocktails" (the member's recipe book, Index only): its own clearly visible entry, with "Add a cocktail". */}
-          <div className="mb-3 rounded-xl border p-4 flex items-center gap-3" style={{ borderColor: `${C.brass}66`, background: C.card }}>
-            <Link href="/passport/bespoke" scroll={false} className="flex-1 min-w-0 pp-focus rounded-sm">
-              <span className="font-display text-[23px] leading-tight block" style={{ color: C.text }}>My Cocktails</span>
-              <span className="font-body text-xs mt-1 block leading-snug" style={{ color: C.muted }}>Drinks made for you at the bar, and your own</span>
-            </Link>
-            <Link href="/passport/bespoke?new=1" scroll={false} className="shrink-0 rounded-full border px-4 min-h-[44px] flex items-center font-body text-[12px] tracking-[0.08em] pp-focus pp-press"
-              style={{ borderColor: C.brass, color: C.brass }}>+ Add a cocktail</Link>
-          </div>
-          <ul className="grid grid-cols-2 gap-3">
-            {YOURS.map((p) => (
-              <li key={p.href}>
-                <Link href={p.href} scroll={false} className="block h-full rounded-xl border p-4 pp-focus pp-row" style={{ borderColor: C.line, background: C.card }}>
-                  <span className="font-display text-[21px] leading-tight block" style={{ color: C.text }}>{p.title}</span>
-                  <span className="font-body text-xs mt-1 block leading-snug" style={{ color: C.muted }}>{p.line}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-          <ForYouIndex items={d.recommendations} enough={d.enough} suggest={d.suggest} />
-        </section>
-
-        {anyAvailable && (
-          <p className="mt-10 -mb-6 flex items-center gap-2 font-body text-xs" style={{ color: C.muted }}>
-            <span aria-hidden className="inline-block w-2 h-2 rounded-full" style={{ background: GREEN }} /> Being served right now
-          </p>
-        )}
-
-        <section id="cocktails">
-          <SectionTitle aside={<span className="font-body text-xs" style={{ color: C.faint }}>{cocktails.length}</span>}>Cocktails</SectionTitle>
-          {d.base_spirits.length > 0 && (
-            <div role="group" aria-label="Filter cocktails by base spirit" className="-mx-5 px-5 mb-2 flex gap-2 overflow-x-auto pb-1">
-              {[{ key: "", label: "All", count: d.cocktails.length }, ...d.base_spirits].map((s) => {
-                const on = s.key === spirit;
-                return (
-                  <button key={s.key || "all"} type="button" aria-pressed={on} onClick={() => setSpirit(s.key)}
-                    className="shrink-0 rounded-full border px-3.5 min-h-[44px] font-body text-xs whitespace-nowrap pp-focus pp-press"
-                    style={on ? { borderColor: C.brass, color: C.brass, background: "#1a1f14" } : { borderColor: C.line, color: C.muted }}>
-                    {s.label}{s.key ? <span style={{ opacity: 0.6 }}> {s.count}</span> : null}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          {cocktails.length
-            ? <ul>{cocktails.map((c) => <CocktailRow key={c.id} c={c} mark={d.marks[markKey("cocktail", c.id)]} lazy />)}</ul>
-            : <Quiet>{spirit ? "No cocktails under that spirit." : "The Index is being filled in."}</Quiet>}
-        </section>
-
-        {spirits.length > 0 && (
-          <section id="spirits">
-            <SectionTitle aside={<span className="font-body text-xs" style={{ color: C.faint }}>{d.bottles.length}</span>}>Spirits</SectionTitle>
-            <div className="border-t" style={{ borderColor: C.line }}>
-              {spirits.map((g) => (
-                <Collapsible key={g.name} title={g.name} count={g.items.length}>
-                  <ul className="pb-3">{g.items.map((b) => <BottleRow key={b.id} b={b} mark={d.marks[markKey("bottle", b.id)]} lazy />)}</ul>
-                </Collapsible>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {drinks.length > 0 && (
-          <section id="beer-wine">
-            <SectionTitle aside={<span className="font-body text-xs" style={{ color: C.faint }}>{d.drinks.length}</span>}>Beer and wine</SectionTitle>
-            <div className="border-t" style={{ borderColor: C.line }}>
-              {drinks.map((g) => (
-                <Collapsible key={g.name} title={g.name} count={g.items.length}>
-                  <ul className="pb-3">
-                    {g.items.map((x, i) => (
-                      <li key={`${x.name}-${i}`} className="py-3 border-b" style={{ borderColor: C.line, contentVisibility: "auto", containIntrinsicSize: "auto 64px" }}>
-                        <span className="flex items-center gap-2">
-                          <span className="font-body text-[15px]" style={{ color: x.status_label ? C.muted : C.text }}>{x.name}</span>
-                          {x.available && <span title="Available now" className="inline-flex"><span aria-hidden className="inline-block w-2 h-2 rounded-full" style={{ background: GREEN }} /><span className="sr-only">Available now</span></span>}
-                          {x.status_label && <span className="font-body text-[10px] tracking-[0.15em] uppercase" style={{ color: C.faint }}>{x.status_label}</span>}
-                        </span>
-                        {x.description && <span className="block font-body text-sm mt-1 leading-relaxed whitespace-pre-line" style={{ color: C.muted }}>{x.description}</span>}
-                      </li>
-                    ))}
-                  </ul>
-                </Collapsible>
-              ))}
-            </div>
-          </section>
-        )}
+        <Trail trail={level.trail} title={level.title} />
+        <div ref={motion} className="mt-4">
+          <LevelBody level={level} d={d} version={version} everything={everything} setEverything={(v) => { everythingChoice = v; setEverything(v); }} />
+        </div>
       </SearchArea>
-    </>
+    </div>
+  );
+}
+
+function LevelBody({ level, d, version, everything, setEverything }: { level: IndexLevel; d: IndexView; version: number; everything: boolean; setEverything: (v: boolean) => void }) {
+  const spiritsSwitch = level.path[0] === "spirits" ? <PouringSwitch everything={everything} onChange={setEverything} /> : null;
+  switch (level.kind) {
+    case "tiles":
+      return (
+        <>
+          {level.path.length === 0 && <JumpBackIn d={d} />}
+          {spiritsSwitch}
+          {level.tiles.length ? <TileGrid tiles={level.tiles} big={level.path.length === 0} /> : <Quiet>Nothing here yet.</Quiet>}
+          {/* "My Cocktails" (the member's recipe book, Index only) keeps its "Add a cocktail" under Yours. */}
+          {level.path.length === 1 && level.path[0] === "yours" && (
+            <Link href="/passport/bespoke?new=1" scroll={false} className="mt-4 inline-flex items-center rounded-full border px-4 min-h-[44px] pp-t-secondary pp-focus pp-press"
+              style={{ borderColor: C.brass, color: C.brass }}>+ Add a cocktail to My Cocktails</Link>
+          )}
+          {level.path.length === 0 && d.cocktails.some((c) => c.available) && (
+            <p className="pp-t-secondary mt-6 flex items-center gap-2" style={{ color: C.muted }}><Avail on /> <span aria-hidden>Green dot: being served right now</span></p>
+          )}
+        </>
+      );
+    case "letters":
+      return (
+        <ul className="grid grid-cols-6 sm:grid-cols-9 gap-2" aria-label="Cocktails by first letter">
+          {level.letters.map((l) => (
+            <li key={l.letter}>
+              <Link href={l.href} scroll={false} aria-label={`${l.letter}, ${l.count} cocktail${l.count === 1 ? "" : "s"}`}
+                className="flex flex-col items-center justify-center min-h-[56px] rounded-lg border pp-focus pp-press" style={accentCardStyle("cocktails")}>
+                <span className="pp-t-card" style={{ color: C.text }}>{l.letter}</span>
+                <span className="pp-t-secondary pp-num" style={{ color: C.muted, fontSize: "0.75rem" }}>{l.count}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      );
+    case "cocktails":
+      return (
+        <>
+          <Count n={level.items.length} what="cocktail" />
+          <ul>{level.items.map((c) => <CompactCocktail key={c.id} c={c} mark={d.marks[markKey("cocktail", c.id)]} />)}</ul>
+        </>
+      );
+    case "bottles":
+      return (
+        <>
+          {spiritsSwitch}
+          <Count n={level.items.length} what="bottle" />
+          <ul>{level.items.map((x) => <CompactBottle key={x.bottle.id} b={x.bottle} out={x.out} mark={d.marks[markKey("bottle", x.bottle.id)]} />)}</ul>
+        </>
+      );
+    case "producers":
+      return (
+        <>
+          {spiritsSwitch}
+          <p className="pp-t-secondary mb-1" style={{ color: C.muted }}>By producer · {level.producers.reduce((n, p) => n + p.count, 0)} bottles</p>
+          <ul>{level.producers.map((p) => <CountRow key={p.name} href={p.href} label={p.name} count={p.count} />)}</ul>
+        </>
+      );
+    case "drinks":
+      return (
+        <ul>
+          {level.items.map((x, i) => (
+            <li key={`${x.name}-${i}`} className="py-3 border-b" style={{ borderColor: C.line, contentVisibility: "auto", containIntrinsicSize: "auto 64px", opacity: x.status_label ? 0.7 : 1 }}>
+              <span className="flex items-center gap-2">
+                <span className="pp-t-body" style={{ color: C.text }}>{x.name}</span>
+                <Avail on={x.available} />
+                {x.status_label && <span className="pp-t-eyebrow" style={{ color: C.faint }}>{x.status_label}</span>}
+              </span>
+              {x.description && <span className="pp-t-secondary block mt-0.5 line-clamp-2" style={{ color: C.muted }}>{x.description}</span>}
+            </li>
+          ))}
+        </ul>
+      );
+    case "lists":
+      return <ListsManager key={`lists-${version}`} initial={d.lists} />;
+    case "house":
+      return (
+        <ul className="space-y-3">
+          {level.lists.map((l) => (
+            <li key={l.id}>
+              <Link href={houseHref(l.id)} scroll={false} className="block rounded-xl border p-4 pp-focus pp-row pp-card pp-accent-card" style={accentCardStyle("bar")}>
+                <KindLabel section="bar">{listKicker(l)}</KindLabel>
+                <span className="pp-t-card block mt-1" style={{ color: C.text }}>{l.title}</span>
+                <span className="pp-t-secondary block mt-1" style={{ color: C.muted }}>{l.count} {l.kind === "cocktail" ? "cocktail" : "bottle"}{l.count === 1 ? "" : "s"}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      );
+    case "charts":
+      return (
+        <ul className="space-y-3">
+          {level.charts.map((c) => (
+            <li key={c.key}>
+              <Link href={chartHref(c.key)} scroll={false} className="block rounded-xl border p-4 pp-focus pp-row pp-card pp-accent-card" style={accentCardStyle("bar")}>
+                <KindLabel section="bar">{c.season_name}</KindLabel>
+                <span className="pp-t-card block mt-1" style={{ color: C.text }}>{c.title}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      );
+    case "votes":
+      return <ul className="space-y-3">{level.votes.map((v) => <li key={`${v.kind}${v.id}`}><VoteCardLink c={v} /></li>)}</ul>;
+    case "for-you":
+      return <ForYouIndex items={d.recommendations} enough={d.enough} suggest={d.suggest} />;
+    default:
+      return (
+        <div className="mt-2">
+          <Quiet>This part of the Index has changed since that link was made.</Quiet>
+          <Link href={INDEX_HREF} scroll={false} className="inline-flex items-center min-h-[44px] mt-2 pp-t-body underline underline-offset-4 pp-focus" style={{ color: C.brass }}>Back to the Index</Link>
+        </div>
+      );
+  }
+}
+
+function Count({ n, what }: { n: number; what: string }) {
+  return <p className="pp-t-secondary pp-num mb-1" style={{ color: C.faint }}>{n} {what}{n === 1 ? "" : "s"}</p>;
+}
+
+/** The Index's spirits: what is on the spirits list now, or everything (the archive too). */
+function PouringSwitch({ everything, onChange }: { everything: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div role="group" aria-label="Which spirits" className="inline-flex rounded-full border p-1 mb-4" style={{ borderColor: C.line }}>
+      {[{ v: false, label: "Pouring now" }, { v: true, label: "Everything" }].map((o) => (
+        <button key={o.label} type="button" aria-pressed={everything === o.v} onClick={() => onChange(o.v)}
+          className="rounded-full px-4 min-h-[44px] pp-t-secondary pp-focus" style={everything === o.v ? { background: C.brass, color: C.bg, fontWeight: 500 } : { color: C.muted }}>
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** "Jump back in": the last three things the member opened that the Index still holds. */
+function JumpBackIn({ d }: { d: IndexView }) {
+  const [recent, setRecent] = useState<Recent[]>([]);
+  useEffect(() => {
+    const read = () => setRecent(readRecent());
+    read();
+    window.addEventListener("pp-recent", read);
+    return () => window.removeEventListener("pp-recent", read);
+  }, []);
+  const items = useMemo(() => jumpBackIn(recent, d), [recent, d]);
+  if (!items.length) return null;
+  return (
+    <section aria-labelledby="pp-jump-back" className="mb-6 -mt-6">
+      <SectionHeading id="pp-jump-back" section="yours">Jump back in</SectionHeading>
+      <ul className="grid grid-cols-3 gap-2">
+        {items.map((x) => (
+          <li key={`${x.kind}${x.id}`}>
+            <Link href={x.kind === "cocktail" ? `/passport/library/${x.id}` : `/passport/spirits/${x.id}`} scroll={false}
+              className="flex flex-col h-full rounded-lg border overflow-hidden pp-focus pp-row" style={{ borderColor: C.line, background: C.card }}>
+              <span className="block aspect-square overflow-hidden" style={{ background: C.card }}>
+                {x.photo
+                  ? <img src={barPhotoSrc(x.kind, x.id, x.photo, "thumb")} alt={x.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                  : <span aria-hidden className="w-full h-full flex items-center justify-center font-display" style={{ color: C.brass, fontSize: "1.6rem", background: "#1a2015" }}>{x.name.slice(0, 1)}</span>}
+              </span>
+              <span className="pp-t-secondary px-2 py-1.5 line-clamp-2" style={{ color: C.text }}>{x.name}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

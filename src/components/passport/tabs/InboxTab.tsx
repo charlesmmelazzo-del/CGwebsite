@@ -22,10 +22,10 @@ export default function InboxTab() {
         <>
           <PageTitle kicker="Messages and requests" title="Inbox" />
           <InboxActions />
-          <InboxSections inbox={d.inbox ?? null} bottles={d.requests} title={(id, children) => <div id={id}><SectionTitle>{children}</SectionTitle></div>} />
-          <InboxFriends social={d.social} title={(id, children) => <div id={id}><SectionTitle>{children}</SectionTitle></div>} />
+          <InboxSections inbox={d.inbox ?? null} bottles={d.requests} title={(id, children) => <div id={id}><SectionTitle section="inbox">{children}</SectionTitle></div>} />
+          <InboxFriends social={d.social} title={(id, children) => <div id={id}><SectionTitle section="friends">{children}</SectionTitle></div>} />
           <section aria-labelledby="pp-my-bottles">
-            <div id="pp-my-bottles"><SectionTitle>My bottles</SectionTitle></div>
+            <div id="pp-my-bottles"><SectionTitle section="spirits">My bottles</SectionTitle></div>
             <MyBottles initial={d} />
           </section>
         </>

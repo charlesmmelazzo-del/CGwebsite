@@ -8,6 +8,7 @@ import { createPortal } from "react-dom";
 import { C, Notice, inputCls, postJson } from "./ui";
 import { itemHref } from "./personalShared";
 import { myPhotoSrc, type ItemKind, type MemberPhoto, type PhotoLimits, type PhotosData } from "@/lib/passport/types";
+import { ACCENTS } from "@/lib/passport/accents";
 
 /**
  * File 11, Part 4: a member's own photos. Up to three on any cocktail or bottle they may open, with an optional caption.
@@ -15,7 +16,7 @@ import { myPhotoSrc, type ItemKind, type MemberPhoto, type PhotoLimits, type Pho
  * again with nothing of the original kept. Private to the member and to the Common Good team.
  */
 export const PHOTO_PRIVATE_LINE = "Only you and the Common Good team can see your photos.";
-const smallBtn = "rounded-full border px-4 min-h-[44px] font-body text-[12px] tracking-[0.12em] uppercase transition-colors disabled:opacity-50 pp-focus pp-press";
+const smallBtn = "rounded-full border px-4 min-h-[44px] font-body text-[0.875rem] tracking-[0.12em] uppercase transition-colors disabled:opacity-50 pp-focus pp-press";
 const MAX_SIDE = 1600;
 const TARGET = 400 * 1024;
 const MAX_BYTES = 15 * 1024 * 1024;
@@ -90,7 +91,7 @@ function Viewer({ p, onClose, onDelete, itemLink }: { p: MemberPhoto; onClose: (
   return createPortal(
     <div role="dialog" aria-modal="true" aria-label="Your photo" className="fixed inset-0 z-[90] flex flex-col" style={{ background: "rgba(8,10,6,0.97)" }}>
       <div className="flex items-center justify-between px-4 pt-[max(env(safe-area-inset-top),12px)] pb-2">
-        <span className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>Your photo</span>
+        <span className="font-body text-[0.75rem] tracking-[0.3em] uppercase" style={{ color: C.brass }}>Your photo</span>
         <button ref={close} type="button" onClick={onClose} className="min-w-[44px] min-h-[44px] font-body text-sm pp-focus rounded" style={{ color: C.text }}>Close</button>
       </div>
       <div className="flex-1 min-h-0 flex items-center justify-center px-2">
@@ -98,7 +99,7 @@ function Viewer({ p, onClose, onDelete, itemLink }: { p: MemberPhoto; onClose: (
       </div>
       <div className="px-5 pt-3 pb-[max(env(safe-area-inset-bottom),16px)] space-y-2">
         {p.caption && <p className="font-display italic text-lg" style={{ color: C.text }}>{p.caption}</p>}
-        <p className="font-body text-xs" style={{ color: C.faint }}>{dateWords(p.at)}{itemLink ? <> · <Link href={itemLink.href} scroll={false} className="underline underline-offset-4" style={{ color: C.muted }}>{itemLink.name}</Link></> : null}</p>
+        <p className="font-body text-[0.875rem]" style={{ color: C.faint }}>{dateWords(p.at)}{itemLink ? <> · <Link href={itemLink.href} scroll={false} className="underline underline-offset-4" style={{ color: C.muted }}>{itemLink.name}</Link></> : null}</p>
         {onDelete && (sure ? (
           <div className="flex gap-2 items-center flex-wrap">
             <span className="font-body text-sm" style={{ color: C.text }}>Delete this photo?</span>
@@ -169,8 +170,8 @@ export function MyItemPhotos({ kind, id, name }: { kind: ItemKind; id: number; n
   return (
     <section className="mt-6 rounded-xl border p-5 space-y-3" style={{ borderColor: C.line, background: C.card }} aria-label="Your photos">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>Your photos</h2>
-        {photos.length > 0 && <Link href="/passport/photos" scroll={false} className="font-body text-[12px] underline underline-offset-4 pp-focus" style={{ color: C.muted }}>My photos</Link>}
+        <h2 className="pp-t-section mb-3" style={{ color: ACCENTS["yours"].ink }}>Your photos</h2>
+        {photos.length > 0 && <Link href="/passport/photos" scroll={false} className="font-body text-[0.875rem] underline underline-offset-4 pp-focus" style={{ color: C.muted }}>My photos</Link>}
       </div>
       {photos.length > 0 && (
         <ul className="grid grid-cols-3 gap-2">
@@ -187,9 +188,9 @@ export function MyItemPhotos({ kind, id, name }: { kind: ItemKind; id: number; n
         <div className="space-y-3">
           <img src={picked.url} alt="The photo you chose" className="w-full max-h-[50vh] object-contain rounded-md" style={{ background: C.bg }} />
           <label className="block">
-            <span className="block font-body text-[11px] tracking-[0.2em] uppercase mb-1.5" style={{ color: C.muted }}>Caption (optional)</span>
+            <span className="block font-body text-[0.75rem] tracking-[0.2em] uppercase mb-1.5" style={{ color: C.muted }}>Caption (optional)</span>
             <input value={caption} onChange={(e) => setCaption(e.target.value.slice(0, limits?.caption_max || 120))} maxLength={limits?.caption_max || 120} className={inputCls} placeholder={`At the bar with ${name}`} />
-            <span className="block font-body text-xs mt-1.5 text-right" style={{ color: C.faint }}>{caption.length}/{limits?.caption_max || 120}</span>
+            <span className="block font-body text-[0.875rem] mt-1.5 text-right" style={{ color: C.faint }}>{caption.length}/{limits?.caption_max || 120}</span>
           </label>
           <div className="flex gap-2 flex-wrap">
             <button type="button" disabled={busy} onClick={send} className={smallBtn} style={{ borderColor: C.brass, color: C.bg, background: C.brass }}>{busy ? "Saving…" : "Save photo"}</button>
@@ -208,7 +209,7 @@ export function MyItemPhotos({ kind, id, name }: { kind: ItemKind; id: number; n
           </button>
         </div>
       )}
-      <p className="font-body text-xs" style={{ color: C.faint }}>{PHOTO_PRIVATE_LINE}</p>
+      <p className="font-body text-[0.875rem]" style={{ color: C.faint }}>{PHOTO_PRIVATE_LINE}</p>
       {error && <Notice>{error}</Notice>}
       {open && <Viewer p={open} onClose={() => setOpen(null)} onDelete={() => remove(open)} />}
     </section>
@@ -233,7 +234,7 @@ export function MyPhotosList({ initial }: { initial: PhotosData }) {
       <p className="font-body text-sm" style={{ color: C.muted }}>{PHOTO_PRIVATE_LINE}</p>
       {error && <Notice>{error}</Notice>}
       {data.photos.length === 0 ? (
-        <p className="font-body text-[15px] leading-relaxed" style={{ color: C.muted }}>
+        <p className="font-body text-[1rem] leading-relaxed" style={{ color: C.muted }}>
           No photos yet. Open any cocktail or bottle and tap &ldquo;Add a photo&rdquo; to keep one of your own, up to three on each.
         </p>
       ) : (
@@ -243,7 +244,7 @@ export function MyPhotosList({ initial }: { initial: PhotosData }) {
             if (p.removed) {
               return (
                 <li key={`removed-${i}`} className="rounded-md border p-3 flex flex-col justify-center aspect-square" style={{ borderColor: C.line }}>
-                  <p className="font-body text-[12px] tracking-[0.12em] uppercase" style={{ color: C.faint }}>Removed by Common Good</p>
+                  <p className="font-body text-[0.875rem] tracking-[0.12em] uppercase" style={{ color: C.faint }}>Removed by Common Good</p>
                   <p className="font-body text-sm mt-1" style={{ color: C.muted }}>{p.item_name}</p>
                 </li>
               );
@@ -256,13 +257,13 @@ export function MyPhotosList({ initial }: { initial: PhotosData }) {
                 {href
                   ? <Link href={href} scroll={false} className="block font-body text-sm mt-1.5 truncate pp-focus rounded-sm" style={{ color: C.text }}>{p.item_name}</Link>
                   : <span className="block font-body text-sm mt-1.5 truncate" style={{ color: C.muted }}>{p.item_name}</span>}
-                {p.caption && <span className="block font-body text-xs truncate" style={{ color: C.faint }}>{p.caption}</span>}
+                {p.caption && <span className="block font-body text-[0.875rem] truncate" style={{ color: C.faint }}>{p.caption}</span>}
               </li>
             );
           })}
         </ul>
       )}
-      {kept > 0 && <p className="font-body text-xs" style={{ color: C.faint }}>{kept} kept · up to 300 in all, 20 a day</p>}
+      {kept > 0 && <p className="font-body text-[0.875rem]" style={{ color: C.faint }}>{kept} kept · up to 300 in all, 20 a day</p>}
       {open && (
         <Viewer p={open} onClose={() => setOpen(null)} onDelete={() => remove(open)}
           itemLink={open.kind && open.opens && open.item_id ? { href: itemHref(open.kind, open.item_id) as string, name: open.item_name || "" } : null} />

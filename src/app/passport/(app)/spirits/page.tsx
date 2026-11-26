@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** File 06: the spirits list now lives on the Menu tab, by category. */
+/** File 06: the spirits list lives on the Menu tab; file 14: its own Spirits tab, by category. */
 export default function SpiritsRoute() {
-  redirect("/passport/menu#spirits");
+  redirect("/passport/menu?tab=spirits");
 }
