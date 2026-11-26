@@ -55,6 +55,39 @@ export function WelcomeAperitif({ aperitif }: { aperitif?: Aperitif | null }) {
   );
 }
 
+/**
+ * File 12: "Tonight", the Welcome Aperitif and the Spirit of the Day as one compact pair (side by side, one line each),
+ * so the top of Home stays short. Either one alone takes the whole width; neither: nothing.
+ */
+export function Tonight({ aperitif, spirit }: { aperitif?: Aperitif | null; spirit?: Spirit | null }) {
+  const ap = aperitif?.name ? aperitif : null;
+  if (!ap && !spirit) return null;
+  const off = spirit ? discountLine(spirit.discount_pct) : null;
+  const box = "rounded-xl border p-4 h-full";
+  const boxStyle = { borderColor: `${C.brass}66`, background: "#1a1f14" };
+  return (
+    <section aria-labelledby="pp-tonight" className="mt-8">
+      <h2 id="pp-tonight" className={heading} style={{ color: C.brass }}>Tonight</h2>
+      <div className={`grid gap-3 ${ap && spirit ? "grid-cols-2" : "grid-cols-1"}`}>
+        {ap && (
+          <div className={box} style={boxStyle}>
+            <h3 className={kicker} style={{ color: C.brass }}>Welcome Aperitif</h3>
+            <p className="font-display text-[19px] leading-tight mt-1.5" style={{ color: C.text }}>{ap.name}</p>
+            {ap.description && <p className="font-body text-[13px] mt-1 leading-snug line-clamp-3" style={{ color: C.muted }}>{ap.description}</p>}
+          </div>
+        )}
+        {spirit && (
+          <PressLink item={{ kind: "bottle", id: spirit.id, name: spirit.name }} href={`/passport/spirits/${spirit.id}`} className={`block ${box} pp-row pp-focus`} style={boxStyle}>
+            <span className={`block ${kicker}`} style={{ color: C.brass }}>Spirit of the Day</span>
+            <span className="block font-display text-[19px] leading-tight mt-1.5" style={{ color: C.text }}>{spirit.name}</span>
+            {off && <span className="block font-body text-[13px] mt-1 leading-snug" style={{ color: C.brass }}>{off}</span>}
+          </PressLink>
+        )}
+      </div>
+    </section>
+  );
+}
+
 /** "From the bar" (file 07): short messages, newest first (three at most), each dismissible. Links stay inside Passport. */
 export function FromTheBar({ messages }: { messages?: BarMessage[] | null }) {
   const { gone, dismiss } = useDismiss("message");

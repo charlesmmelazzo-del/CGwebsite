@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { C, Check, Notice, inputCls, postJson } from "./ui";
-import { BackLink } from "./bits";
+import { BackLink, SeeAll } from "./bits";
 import { notifyChanged } from "./appEvents";
 import { useShell } from "./shellContext";
 import { whenShort } from "@/lib/passport/inbox";
@@ -23,7 +23,7 @@ import type { Conversation, DmPost, Friend, FriendsOverview, LetsGo, MemberNotic
  */
 
 const OFFLINE = "Couldn't do that. Please try again.";
-const smallBtn = "rounded-full border px-4 min-h-[40px] font-body text-[12px] tracking-[0.12em] uppercase transition-colors disabled:opacity-50 pp-focus pp-press";
+const smallBtn = "rounded-full border px-4 min-h-[44px] font-body text-[12px] tracking-[0.12em] uppercase transition-colors disabled:opacity-50 pp-focus pp-press";
 const kicker = "font-body text-[10px] tracking-[0.25em] uppercase";
 const heading = "font-body text-[11px] tracking-[0.3em] uppercase mb-3";
 const labelCls = "block font-body text-[11px] tracking-[0.2em] uppercase mb-1.5";
@@ -46,7 +46,7 @@ function useSend() {
 }
 function Pill({ on, children, onClick, disabled }: { on: boolean; children: ReactNode; onClick: () => void; disabled?: boolean }) {
   return (
-    <button type="button" aria-pressed={on} onClick={onClick} disabled={disabled} className="rounded-full border px-3.5 min-h-[40px] font-body text-[14px] pp-focus pp-press disabled:opacity-50"
+    <button type="button" aria-pressed={on} onClick={onClick} disabled={disabled} className="rounded-full border px-3.5 min-h-[44px] font-body text-[14px] pp-focus pp-press disabled:opacity-50"
       style={{ borderColor: on ? C.brass : C.line, color: on ? C.bg : C.text, background: on ? C.brass : "transparent" }}>{children}</button>
   );
 }
@@ -197,7 +197,7 @@ export function LetsGoCards({ plans }: { plans?: LetsGo[] | null }) {
                 <ul className="mt-2 space-y-0.5">
                   {(l.answers || []).map((a, i) => <li key={i} className="font-body text-[14px]" style={{ color: C.text }}>{a.name} · <span style={{ color: a.answer === "in" ? C.brass : C.muted }}>{answerWord(a.answer)}</span></li>)}
                 </ul>
-                <button type="button" disabled={busy} onClick={() => cancel(l)} className="mt-2 font-body text-xs underline" style={{ color: C.muted }}>Cancel plan</button>
+                <button type="button" disabled={busy} onClick={() => cancel(l)} className="mt-1 inline-flex items-center min-h-[44px] font-body text-xs underline underline-offset-4 pp-focus rounded" style={{ color: C.muted }}>Cancel plan</button>
               </>
             ) : (
               <>
@@ -229,7 +229,7 @@ export function SharedWithYou({ shared }: { shared?: ShareCard[] | null }) {
   return (
     <section aria-labelledby="pp-shared" className="mt-10">
       <h2 id="pp-shared" className={heading} style={{ color: C.brass }}>Shared with you</h2>
-      <ul className="space-y-3">{shown.map((s) => <li key={s.id} className="relative"><ShareCardView s={s} /><span className="absolute top-1 right-1"><button type="button" onClick={() => dismiss(s.id)} aria-label={`Dismiss ${s.name}`} className="w-11 h-11 rounded-full flex items-center justify-center pp-focus" style={{ color: C.faint }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6 6 18" /></svg></button></span></li>)}</ul>
+      <SeeAll items={shown} keyOf={(s) => String(s.id)} render={(s) => <div className="relative"><ShareCardView s={s} /><span className="absolute top-1 right-1"><button type="button" onClick={() => dismiss(s.id)} aria-label={`Dismiss ${s.name}`} title="Dismiss" className="w-11 h-11 rounded-full flex items-center justify-center pp-focus" style={{ color: C.faint }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6 6 18" /></svg></button></span></div>} />
     </section>
   );
 }

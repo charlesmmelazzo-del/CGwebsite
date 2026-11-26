@@ -6,11 +6,24 @@ import { C } from "./ui";
 /**
  * "Save Passport to your home screen". iPhone has no install prompt, so it gets
  * short instructions; Android offers the browser's own install prompt.
- * Shown once after signing in; dismissing it is remembered on this device, and
- * the account screen can open it again. Hidden when already opened from the home screen.
+ * Shown on Home after signing in; "Not now" keeps it away for 30 days on this device, and
+ * the account screen can open it again. Never shown once Passport is installed.
  */
 
 const DISMISSED = "cg-passport-install-dismissed";
+// File 12: "Not now" keeps it away for 30 days (stored as the time it was tapped; the old "1" counts as just now), and
+// once Passport has been opened from the home screen (or installed from the prompt) it never shows again on this device.
+const INSTALLED = "cg-passport-installed";
+const QUIET_MS = 30 * 24 * 60 * 60 * 1000;
+function store(key: string, value: string) { try { localStorage.setItem(key, value); } catch { /* storage blocked */ } }
+function read(key: string) { try { return localStorage.getItem(key); } catch { return null; } }
+function dismissedRecently() {
+  const v = read(DISMISSED);
+  if (!v) return false;
+  if (v === "1") { store(DISMISSED, String(Date.now())); return true; }
+  const at = Number(v);
+  return Number.isFinite(at) && Date.now() - at < QUIET_MS;
+}
 type Prompt = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
 
 function standalone() {
@@ -39,17 +52,18 @@ export default function InstallHint({ force = false, onClose }: { force?: boolea
     setCanPrompt(!!deferred);
     const onPrompt = () => setCanPrompt(true);
     window.addEventListener("beforeinstallprompt", onPrompt);
-    const isInstalled = standalone();
+    const onInstalled = () => { store(INSTALLED, "1"); setShow(false); };
+    window.addEventListener("appinstalled", onInstalled);
+    if (standalone()) store(INSTALLED, "1");
+    const isInstalled = standalone() || read(INSTALLED) === "1";
     setInstalled(isInstalled);
-    let dismissed = false;
-    try { dismissed = localStorage.getItem(DISMISSED) === "1"; } catch { /* storage blocked */ }
-    // After sign-in it stays on the home screen until dismissed; never when already installed.
-    if (force || (!dismissed && !isInstalled)) setShow(true);
-    return () => window.removeEventListener("beforeinstallprompt", onPrompt);
+    // On Home until "Not now" (then away for 30 days); never once installed. The account screen can always open it.
+    if (force || (!dismissedRecently() && !isInstalled)) setShow(true);
+    return () => { window.removeEventListener("beforeinstallprompt", onPrompt); window.removeEventListener("appinstalled", onInstalled); };
   }, [force]);
 
   const close = () => {
-    try { localStorage.setItem(DISMISSED, "1"); } catch { /* storage blocked */ }
+    if (!force) store(DISMISSED, String(Date.now()));
     setShow(false);
     onClose?.();
   };
@@ -57,7 +71,7 @@ export default function InstallHint({ force = false, onClose }: { force?: boolea
   if (!show) return null;
   return (
     <section className="rounded-xl border p-5 mb-6 animate-fade-in relative" style={{ borderColor: C.brass + "66", background: "#1a1f14" }}>
-      <button type="button" onClick={close} aria-label="Dismiss" className="absolute top-1.5 right-1.5 w-11 h-11 text-xl leading-none pp-focus rounded-full" style={{ color: C.muted }}>×</button>
+      <button type="button" onClick={close} aria-label="Not now" title="Not now" className="absolute top-1.5 right-1.5 w-11 h-11 text-xl leading-none pp-focus rounded-full" style={{ color: C.muted }}>×</button>
       <p className="font-body text-[11px] tracking-[0.3em] uppercase" style={{ color: C.brass }}>Keep it handy</p>
       <h2 className="font-display text-2xl mt-1" style={{ color: C.text }}>Save Passport to your home screen</h2>
       {installed ? (
@@ -70,8 +84,8 @@ export default function InstallHint({ force = false, onClose }: { force?: boolea
         </ol>
       ) : canPrompt ? (
         <div className="mt-4">
-          <button type="button" className="rounded-lg px-5 py-3 font-body text-[12px] tracking-[0.22em] uppercase bg-[#C9A96E] text-[#13170F]"
-            onClick={async () => { if (!deferred) return; await deferred.prompt(); deferred = null; setCanPrompt(false); close(); }}>
+          <button type="button" className="rounded-lg px-5 min-h-[44px] font-body pp-focus text-[12px] tracking-[0.22em] uppercase bg-[#C9A96E] text-[#13170F]"
+            onClick={async () => { if (!deferred) return; await deferred.prompt(); const choice = await deferred.userChoice.catch(() => null); deferred = null; setCanPrompt(false); if (choice?.outcome === "accepted") store(INSTALLED, "1"); close(); }}>
             Add to home screen
           </button>
         </div>

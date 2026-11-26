@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { C, Notice, postJson } from "./ui";
-import { BackLink } from "./bits";
+import { BackLink, SeeAll } from "./bits";
 import { useShell } from "./shellContext";
 import { notifyChanged } from "./appEvents";
 import { PAST_VOTES_HREF, pctLabel, startRound, voteHref, voteKicker } from "@/lib/passport/votes";
@@ -34,10 +34,9 @@ export function VotesHome({ open, results }: { open?: VoteCard[] | null; results
   return (
     <section aria-labelledby="pp-votes-home" className="mt-10">
       <h2 id="pp-votes-home" className={heading} style={{ color: C.brass }}>{open?.length ? "Voting is open" : "The results are in"}</h2>
-      <ul className="space-y-3">
-        {(open || []).map((c) => <li key={`${c.kind}${c.id}`}><VoteCardLink c={c} big /></li>)}
-        {(results || []).map((c) => <li key={`r${c.kind}${c.id}`}><VoteCardLink c={c} /></li>)}
-      </ul>
+      {/* File 12: three at most on Home, the rest behind "See all". */}
+      <SeeAll items={[...(open || []).map((c) => ({ c, big: true })), ...(results || []).map((c) => ({ c, big: false }))]}
+        keyOf={(x) => `${x.big ? "" : "r"}${x.c.kind}${x.c.id}`} render={(x) => <VoteCardLink c={x.c} big={x.big} />} />
     </section>
   );
 }
@@ -123,6 +122,7 @@ function EntryRow({ e, side, m, open, onPick, busy }: { e: BracketEntry | null; 
   return (
     <div className="flex items-stretch">
       <button type="button" disabled={!open || busy} onClick={() => onPick(side)} aria-pressed={open ? mine : undefined}
+        aria-label={`${e.name}, seed ${e.seed}${won ? ", advanced" : lost ? ", out" : ""}${pct ? `, ${pct} of the votes` : ""}${mine ? ", your pick" : ""}`}
         className="flex-1 min-w-0 text-left px-3 py-2.5 min-h-[48px] flex items-center gap-2 pp-focus disabled:cursor-default" style={{ background: mine ? "#1a1f14" : "transparent" }}>
         <span className="font-body text-[11px] w-5 shrink-0 text-right" style={{ color: C.faint }}>{e.seed}</span>
         <span className="flex-1 min-w-0">
@@ -132,7 +132,7 @@ function EntryRow({ e, side, m, open, onPick, busy }: { e: BracketEntry | null; 
         {pct && <span className="font-body text-[13px] shrink-0" style={{ color: won ? C.brass : C.muted }}>{pct}</span>}
         {open && <span aria-hidden className="w-4 h-4 shrink-0 rounded-full border" style={{ borderColor: mine ? C.brass : C.faint, background: mine ? C.brass : "transparent" }} />}
       </button>
-      {href && <Link href={href} scroll={false} aria-label={`Open ${e.name}`} className="shrink-0 w-10 flex items-center justify-center pp-focus" style={{ color: C.muted }}>→</Link>}
+      {href && <Link href={href} scroll={false} aria-label={`About ${e.name}`} className="shrink-0 w-11 flex items-center justify-center pp-focus" style={{ color: C.muted }}>→</Link>}
     </div>
   );
 }
@@ -175,7 +175,7 @@ export function BracketPage({ initial }: { initial: Bracket }) {
       )}
       {b.status === "open" && <p className="font-body text-[13px] mt-2" style={{ color: C.faint }}>Tap one in each matchup. You can change it until the round ends; who advances shows after.</p>}
       {error && <div className="mt-4"><Notice>{error}</Notice></div>}
-      <div ref={scroller} className="-mx-5 px-5 mt-6 flex gap-4 overflow-x-auto snap-x snap-mandatory pb-3" aria-label="The bracket, round by round">
+      <div ref={scroller} role="region" tabIndex={0} className="-mx-5 px-5 mt-6 flex gap-4 overflow-x-auto snap-x snap-mandatory pb-3 pp-focus" aria-label={`The bracket, ${b.rounds.length} round${b.rounds.length === 1 ? "" : "s"}, round by round`}>
         {b.rounds.map((r, i) => {
           const open = r.state === "open" && b.status === "open";
           return (
@@ -186,7 +186,7 @@ export function BracketPage({ initial }: { initial: Bracket }) {
               <p className="font-body text-[11px] mt-0.5 mb-2" style={{ color: C.faint }}>{r.when}</p>
               <ul className="space-y-3">
                 {r.matchups.map((m, k) => (
-                  <li key={m.id ?? `p${k}`} className="rounded-xl border overflow-hidden divide-y divide-[#323B29]" style={{ borderColor: open && m.id ? `${C.brass}66` : C.line, background: C.card }}>
+                  <li key={m.id ?? `p${k}`} role="group" aria-label={`${r.name}, matchup ${k + 1}: ${m.a?.name || "to be decided"} versus ${m.b?.name || "to be decided"}`} className="rounded-xl border overflow-hidden divide-y divide-[#323B29]" style={{ borderColor: open && m.id ? `${C.brass}66` : C.line, background: C.card }}>
                     <EntryRow e={m.a} side="a" m={m} open={open && !!m.id} busy={busy === m.id} onPick={(s) => vote(m, s)} />
                     <EntryRow e={m.b} side="b" m={m} open={open && !!m.id} busy={busy === m.id} onPick={(s) => vote(m, s)} />
                   </li>

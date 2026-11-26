@@ -10,6 +10,7 @@ import { ListsManager } from "../Personal";
 import SearchArea from "../Search";
 import TabView from "./TabView";
 import { HouseLists } from "./Slots";
+import { ForYouIndex } from "../ForYou";
 import { byCategory, withSpirit } from "@/lib/passport/shell";
 import { markKey, type Chart, type HouseList, type IndexData, type IndexDrink, type Marks, type PassportList, type VoteCard } from "@/lib/passport/types";
 import { scrollToId } from "../appEvents";
@@ -72,9 +73,11 @@ function Index({ d, version }: { d: IndexView; version: number }) {
     <>
       <PageTitle kicker="Everything we've served" title="Index" />
       <SearchArea initial={initialQ}>
-        <nav aria-label="Jump to" className="-mx-5 px-5 mt-4 flex gap-2 overflow-x-auto pb-1">
+        {/* File 12: the jump chips stay reachable while the long Index scrolls (they stick under the top bar). */}
+        <nav aria-label="Jump to" className="pp-jump sticky z-20 -mx-5 px-5 mt-4 py-2 flex gap-2 overflow-x-auto border-b"
+          style={{ top: "var(--pp-top)", background: C.bg, borderColor: C.line }}>
           {sections.map((s) => (
-            <button key={s.id} type="button" onClick={() => jump(s.id)} className="shrink-0 rounded-full border px-3.5 min-h-[36px] font-body text-xs whitespace-nowrap pp-focus pp-press"
+            <button key={s.id} type="button" onClick={() => jump(s.id)} className="shrink-0 rounded-full border px-3.5 min-h-[44px] font-body text-xs whitespace-nowrap pp-focus pp-press"
               style={{ borderColor: C.line, color: C.muted }}>{s.label}</button>
           ))}
         </nav>
@@ -106,6 +109,7 @@ function Index({ d, version }: { d: IndexView; version: number }) {
               </li>
             ))}
           </ul>
+          <ForYouIndex items={d.recommendations} enough={d.enough} suggest={d.suggest} />
         </section>
 
         {anyAvailable && (
@@ -122,7 +126,7 @@ function Index({ d, version }: { d: IndexView; version: number }) {
                 const on = s.key === spirit;
                 return (
                   <button key={s.key || "all"} type="button" aria-pressed={on} onClick={() => setSpirit(s.key)}
-                    className="shrink-0 rounded-full border px-3.5 min-h-[36px] font-body text-xs whitespace-nowrap pp-focus pp-press"
+                    className="shrink-0 rounded-full border px-3.5 min-h-[44px] font-body text-xs whitespace-nowrap pp-focus pp-press"
                     style={on ? { borderColor: C.brass, color: C.brass, background: "#1a1f14" } : { borderColor: C.line, color: C.muted }}>
                     {s.label}{s.key ? <span style={{ opacity: 0.6 }}> {s.count}</span> : null}
                   </button>

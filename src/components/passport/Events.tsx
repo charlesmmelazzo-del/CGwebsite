@@ -37,13 +37,14 @@ export function EventCard({ e }: { e: PassportEvent }) {
   const friends = friendsGoingLine(e.friends_going);
   return (
     <li>
-      <Link href={`/passport/events/${e.id}`} scroll={false} className="block rounded-xl border p-4 pp-focus pp-row" style={{ borderColor: e.status === "cancelled" ? C.line : `${C.brass}66`, background: e.status === "cancelled" ? C.card : "#1a1f14", opacity: e.status === "cancelled" ? 0.8 : 1 }}>
+      <Link href={`/passport/events/${e.id}`} scroll={false} className="block rounded-xl border p-4 pp-focus pp-row" style={{ borderColor: e.status === "cancelled" ? C.line : `${C.brass}66`, background: e.status === "cancelled" ? C.card : "#1a1f14" }}>
+        {/* File 12: the day leads (every card here is a members-only Passport event, so it no longer says so on each). */}
         <span className="flex items-start justify-between gap-3">
-          <span className="font-body text-[10px] tracking-[0.25em] uppercase" style={{ color: C.brass }}>Passport event · members only</span>
+          <span className="font-body text-[10px] tracking-[0.25em] uppercase" style={{ color: C.brass }}>{dayLong(e.date)}</span>
           <StatusTag e={e} />
         </span>
         <span className="block font-display text-[23px] leading-tight mt-1.5" style={{ color: C.text }}>{e.title}</span>
-        <span className="block font-body text-sm mt-1" style={{ color: C.muted }}>{dayLong(e.date)} · {time(e)}{e.price_text ? ` · ${e.price_text}` : ""}</span>
+        <span className="block font-body text-sm mt-1" style={{ color: C.muted }}>{time(e)}{e.price_text ? ` · ${e.price_text}` : ""}</span>
         {friends && <span className="block font-body text-[13px] mt-1.5" style={{ color: C.text }}>{friends}</span>}
       </Link>
     </li>

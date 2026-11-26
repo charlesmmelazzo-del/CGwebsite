@@ -2,7 +2,7 @@ import "server-only";
 import { setDefaultResultOrder } from "node:dns";
 import {
   markKey, type MemberAuth, type Me, type Config, type CocktailCard, type Cocktail, type ArchivedBottle, type MenuGroup, type ToastMenu, type MenuInfo, type Bottle, type Producer, type BaseSpirit, type ItemKind, type FavoriteItem, type RatingItem, type NoteItem, type Mark, type Marks, type Mine, type PassportList, type Bespoke, type History, type BottleRequests,
-  type IndexData, type FindResults, type Reservation, type BarHome, type BarLists, type HouseList, type Chart,
+  type IndexData, type ForYou, type FindResults, type Reservation, type BarHome, type BarLists, type HouseList, type Chart,
   type InboxData, type InboxThread, type MemberRequest, type EventInquiry, type NotifyPrefs,
   type FriendsOverview, type SocialHome, type SocialInbox, type Conversation, type ShareCard, type PassportEvent,
   type BarMessage, type Bracket, type CommentThread, type CommentType, type FlightVote, type VoteCard, type VotesData,
@@ -148,6 +148,8 @@ export const getBottleRequests = (auth: MemberAuth) => passport<BottleRequests>(
 // ── File 06: the new shell. One call per screen, never one per item. ──────────────────────────────────────────────
 /** The Index tab in one answer: every cocktail shown in Passport, every bottle a member may open, beer and wine, the filter. */
 export const getIndex = (auth: MemberAuth) => passport<IndexData>("GET", "/index", { auth });
+// File 12: "For you" (Home asks for four; the Index's answer already carries up to twelve).
+export const getForYou = (auth: MemberAuth, limit = 4) => passport<ForYou>("GET", `/recommendations?limit=${Math.max(1, Math.min(12, Math.floor(limit)))}`, { auth });
 /** One search for cocktails, bottles and producers, only things a member may open. */
 export const findAll = (auth: MemberAuth, q: string) => passport<FindResults>("GET", `/find?${new URLSearchParams({ q: q.slice(0, 100) }).toString()}`, { auth });
 /** The member's own upcoming reservations (Guest Book link by confirmed email). */
