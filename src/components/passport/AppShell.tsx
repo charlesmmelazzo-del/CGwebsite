@@ -1,14 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { C } from "./theme";
 import { PassportMark } from "./ui";
 import AddToList from "./AddToList";
-import { CHANGED_EVENT, appMoved, reducedMotion, type Changed } from "./appEvents";
+import { CHANGED_EVENT, TAB_ROOT_EVENT, appMoved, recordStep, reducedMotion, tabAtRoot, type Changed } from "./appEvents";
+import { isTabRoot, tabPress } from "@/lib/passport/nav";
 import { ShellContext, ViewStore, type AddTarget, type ShellApi, type ViewEntry, type ViewName } from "./shellContext";
-import { TABS, homeTabOf, inboxDot, tabOfPath, type TabId } from "@/lib/passport/shell";
+import { TABS, homeTabOf, inboxDot, tabHref, tabOfPath, type TabId } from "@/lib/passport/shell";
 import type { BottleRequests, InboxData, PassportList, SocialInbox } from "@/lib/passport/types";
 import { needsYou } from "@/lib/passport/inbox";
 import { socialLit } from "@/lib/passport/social";
@@ -51,8 +52,18 @@ export default function AppShell({ signedIn, children }: { signedIn: boolean; ch
   return <Frame>{children}</Frame>;
 }
 
+/** File 15, Part B: records each place the member moves to (address and the tab it sits on), for the Back controls. */
+function StepTracker({ tab }: { tab: TabId }) {
+  const pathname = usePathname() || "/passport";
+  const params = useSearchParams();
+  const search = params?.toString() || "";
+  useEffect(() => { recordStep(`${pathname}${search ? `?${search}` : ""}`, tab); }, [pathname, search, tab]);
+  return null;
+}
+
 function Frame({ children }: { children: ReactNode }) {
   const pathname = usePathname() || "/passport";
+  const router = useRouter();
   const pathTab = tabOfPath(pathname);
   const [pending, setPending] = useState<TabId | null>(null);
   const [under, setUnder] = useState<TabId>(() => pathTab ?? homeTabOf(pathname));
@@ -193,15 +204,24 @@ function Frame({ children }: { children: ReactNode }) {
   const closeAdd = useCallback(() => setAddTarget(null), []);
   const api: ShellApi = useMemo(() => ({ views, tab, openAdd: setAddTarget, toast, setInboxDot: setDot, setMessagesDot }), [views, tab, toast]);
 
-  /** A tab tap: show it at once (the address follows); tapping the tab already on screen goes back to its top. */
+  /**
+   * A tab tap: show it at once (the address follows). File 15, Part B: tapping the tab already on screen returns it to
+   * its top level (Index root, the Menu's first section, the Inbox, Events or Home top) and scrolls up; tapped again at
+   * the top, nothing happens. The same on the bottom bar and the wide-screen top bar.
+   */
   const onTab = (e: React.MouseEvent, id: TabId) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
-    if (id === tab && !overlay) {
-      e.preventDefault();
-      window.scrollTo({ top: 0, behavior: reducedMotion() ? "auto" : "smooth" });
-      return;
-    }
-    setPending(id);
+    if (id !== tab) { setPending(id); return; }
+    const here = typeof window !== "undefined" ? window.location : null;
+    const atRoot = !!here && isTabRoot(id, here.pathname, here.search, tabAtRoot(id) !== false);
+    const action = tabPress({ overlay, atRoot, scrollY: typeof window !== "undefined" ? window.scrollY : 0 });
+    e.preventDefault();
+    if (action === "none") return;
+    if (action === "top") { window.scrollTo({ top: 0, behavior: reducedMotion() ? "auto" : "smooth" }); return; }
+    window.dispatchEvent(new CustomEvent(TAB_ROOT_EVENT, { detail: { tab: id } }));
+    scrollOf.current[id] = 0;
+    if (here && here.pathname + here.search !== tabHref(id)) { setPending(id); router.push(tabHref(id), { scroll: false }); }
+    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
   };
 
   const tabLink = (t: (typeof TABS)[number], where: "bottom" | "top") => {
@@ -233,6 +253,7 @@ function Frame({ children }: { children: ReactNode }) {
   const panels: Record<TabId, ReactNode> = { home: <HomeTab />, menu: <MenuTab />, index: <IndexTab />, events: <EventsTab />, inbox: <InboxTab /> };
   return (
     <ShellContext.Provider value={api}>
+      <Suspense fallback={null}><StepTracker tab={tab} /></Suspense>
       <div className="pp-app min-h-[100dvh]" style={{ background: C.bg, color: C.text, ["--pp-top" as string]: "calc(env(safe-area-inset-top) + 56px)" }}>
         <header className="fixed top-0 inset-x-0 z-40 border-b backdrop-blur-md"
           style={{ paddingTop: "env(safe-area-inset-top)", background: "rgba(19,23,15,0.94)", borderColor: C.line }}>

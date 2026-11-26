@@ -2,11 +2,11 @@
 // Every check is on the models in lib/passport (nav.ts, accents.ts, typescale.ts), never on pixels.
 
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import {
   EXCLUSIVES_TAB, NOW_ALBUM, PRODUCER_THRESHOLD, ROW_LIMIT, SPIRITS_TAB, allLevels, chosenTab, coverOf, indexHref, indexLevel, indexPathOf, isFinal,
-  jumpBackIn, letterOf, menuTabs, monogram, parseAt, pathOfHref, rowsBeforeChoice, shortLine, spiritCategories, spiritLevel, spiritsFromIndex, type IndexInput, type SpiritEntry,
+  jumpBackIn, letterOf, menuTabs, parseAt, coversOf, mergeCovers, partyBanner, normalizePath, favoriteCovers, PAGE_PARENTS, NOT_PAGES, parentOf, tabPress, isTabRoot, COLLAGE_MAX, pathOfHref, rowsBeforeChoice, shortLine, spiritCategories, spiritLevel, spiritsFromIndex, type IndexInput, type SpiritEntry,
 } from "../nav";
 import { ACCENTS, APP_BG, APP_CARD, BRASS, CARD_SECTIONS, GREEN_DOT, SECTION_IDS, STATUS_COLORS, contrast, deltaE } from "../accents";
 import { TYPE, px } from "../typescale";
@@ -99,8 +99,7 @@ const group = (name: string, n: number): MenuGroup => ({ name, items: Array.from
     assert.equal(coverOf(items, "cocktail")!.id, 2);
     assert.equal(coverOf(items.map((x) => ({ ...x, cover: false })), "cocktail")!.id, 1);
     assert.equal(coverOf([{ id: 3, name: "C" }], "cocktail"), null);
-    assert.equal(monogram("Beer, Wine, Cider"), "Bw");
-    assert.equal(monogram("Spirits"), "Sp");
+    // File 15: the two-letter monogram tiles are gone (a place with no photo shows its section's icon instead).
   });
   await test("a compact row's one line: the flavor line, else the tagline, else the description's first line", () => {
     assert.equal(shortLine({ card: { flavor: "[Bright, Bitter]", tagline: "T" } }), "Bright, Bitter");
@@ -127,8 +126,8 @@ const group = (name: string, n: number): MenuGroup => ({ name, items: Array.from
   await test("category tiles carry counts and a cover when a bottle in them has a photo", () => {
     const tiles = spiritCategories([...entries(3), { id: 99, name: "G", category: "Gin", producer: "", out: false, photo: "g" }]);
     assert.deepEqual(tiles.map((t) => [t.name, t.count]), [["Bourbon", 3], ["Gin", 1]]);
-    assert.equal(tiles[0].cover, null);
-    assert.equal(tiles[1].cover!.id, 99);
+    assert.deepEqual(tiles[0].covers, []);
+    assert.equal(tiles[1].covers[0].id, 99);
   });
   await test("the Index's \"Pouring now\" keeps the spirits list; \"Everything\" adds the archive", () => {
     const d = bigIndex();
@@ -142,7 +141,8 @@ const group = (name: string, n: number): MenuGroup => ({ name, items: Array.from
     const top = indexLevel(d, []);
     assert.equal(top.kind, "tiles");
     if (top.kind === "tiles") {
-      assert.deepEqual(top.tiles.map((t) => t.label), ["Cocktails", "Spirits", "Beer & wine", "Lists", "From Common Good", "Yours"]);
+      // File 15: "From Common Good" is "CG Picks" and "Yours" is "Journal" (updated from file 14's names).
+      assert.deepEqual(top.tiles.map((t) => t.label), ["Cocktails", "Spirits", "Beer & wine", "Lists", "CG Picks", "Journal"]);
       assert.equal(top.tiles[0].count, 300);
     }
   });
@@ -186,13 +186,13 @@ const group = (name: string, n: number): MenuGroup => ({ name, items: Array.from
     assert.ok(p.kind === "bottles" && p.items.length > 0);
     assert.deepEqual(p.trail.map((c) => c.label), ["Index", "Spirits", "Bourbon", "Producer 3"]);
   });
-  await test("Beer & wine, Lists, From Common Good (only tiles that have something) and Yours", () => {
+  await test("Beer & wine, Lists, CG Picks (only tiles that have something) and Journal (file 15 names)", () => {
     const bw = indexLevel(d, ["beer-wine"]);
     assert.ok(bw.kind === "tiles" && bw.tiles.map((t) => t.label).join() === "Beer,Wine");
     const cg = indexLevel(d, ["cg"]);
     assert.ok(cg.kind === "tiles" && cg.tiles.map((t) => t.label).join() === "House lists,Past lists");
     assert.equal(indexLevel(d, ["cg", "staff"]).kind, "missing", "no staff picks: no tile, and an old link says so");
-    const y = indexLevel(d, ["yours"]);
+    const y = indexLevel(d, ["journal"]);
     assert.ok(y.kind === "tiles" && y.tiles.map((t) => t.label).join() === "For you,Favorites,My Cocktails,Notes,History,My photos");
     assert.equal(indexLevel(d, ["lists"]).kind, "lists");
   });
@@ -218,7 +218,7 @@ const group = (name: string, n: number): MenuGroup => ({ name, items: Array.from
   await test("every old Index address opens the right level", () => {
     assert.deepEqual(at("spirit=mezcal"), ["cocktails", "spirit", "mezcal"]);
     assert.deepEqual(at("q=gin"), []);
-    for (const [h, p] of [["#lists", "lists"], ["#from-common-good", "cg"], ["#yours", "yours"], ["#cocktails", "cocktails"], ["#spirits", "spirits"], ["#beer-wine", "beer-wine"]]) assert.deepEqual(at("", h), [p]);
+    for (const [h, p] of [["#lists", "lists"], ["#from-common-good", "cg"], ["#yours", "journal"], ["#cocktails", "cocktails"], ["#spirits", "spirits"], ["#beer-wine", "beer-wine"]]) assert.deepEqual(at("", h), [p]);
     assert.equal(indexLevel(d, at("spirit=mezcal")).kind, "cocktails");
     assert.equal(OLD_ADDRESSES.find((a) => a.path === "/passport/lists")!.goes, "/passport/library?at=lists");
     assert.equal(OLD_ADDRESSES.find((a) => a.path === "/passport/spirits")!.goes, "/passport/menu?tab=spirits");
@@ -323,6 +323,129 @@ const group = (name: string, n: number): MenuGroup => ({ name, items: Array.from
     const r1 = readFileSync(join(ROOT, "app", "api", "passport", "website-photos", "route.ts"), "utf8");
     const r2 = readFileSync(join(ROOT, "app", "api", "passport", "website-photos", "[id]", "[which]", "route.ts"), "utf8");
     assert.ok(r1.includes("if (!fromBible(req))") && r2.includes("if (!fromBible(req))") && r2.includes('redirect: "manual"') && r2.includes("MAX_BYTES"));
+  });
+
+
+  // ── File 15 ────────────────────────────────────────────────────────────────
+  console.log("File 15, Part A: names and where things live");
+  const vote = (id: number, status: "open" | "closed", covers: { kind: "cocktail" | "bottle"; id: number; photo: string }[] = []) =>
+    ({ kind: "flight" as const, id, title: `Vote ${id}`, status, line: "", winner: null, done: false, covers });
+  const withVotes: IndexInput = { ...d, votes: [vote(1, "open", [{ kind: "bottle", id: 5000, photo: "b0" }]), vote(2, "open")], vote_results: [], past_votes_count: 3 };
+  await test("CG Picks holds only curated things; votes and brackets are in Party Picks", () => {
+    const cg = indexLevel({ ...withVotes, charts: [{ key: "top", title: "Top", season_name: "W", items: [] }] }, ["cg"]);
+    assert.ok(cg.kind === "tiles" && !cg.tiles.some((t) => /vote/i.test(t.label)), "no votes in CG Picks");
+    assert.equal(cg.title, "CG Picks");
+    const p = indexLevel(withVotes, ["party"]);
+    assert.ok(p.kind === "party" && p.open.length === 2 && p.past === 3);
+    assert.deepEqual(p.trail.map((c) => c.label), ["Index", "Party Picks"]);
+  });
+  await test("the Party Picks banner sits above the tiles with its status line, and is absent when there is nothing", () => {
+    const top = indexLevel(withVotes, []);
+    assert.ok(top.kind === "tiles" && top.banner && top.banner.label === "Party Picks" && top.banner.line === "Voting is open: 2" && top.banner.section === "party");
+    assert.equal(partyBanner({ votes: [], vote_results: [], past_votes_count: 4 })!.line, "See past votes");
+    assert.equal(partyBanner({ votes: [], vote_results: [], past_votes_count: 0 }), null);
+    const none = indexLevel(d, []);
+    assert.ok(none.kind === "tiles" && !none.banner);
+    assert.equal(rowsBeforeChoice(top), 4, "three rows of tiles and the banner");
+  });
+  await test("Journal holds For you, Favorites, My Cocktails, Notes, History, My photos", () => {
+    const j = indexLevel(d, ["journal"]);
+    assert.ok(j.kind === "tiles" && j.title === "Journal" && j.tiles.map((t) => t.label).join() === "For you,Favorites,My Cocktails,Notes,History,My photos");
+  });
+  await test("old addresses land in the new places", () => {
+    assert.deepEqual(at("at=yours"), ["journal"]);
+    assert.deepEqual(at("at=yours%2Ffor-you"), ["journal", "for-you"]);
+    assert.deepEqual(at("at=cg%2Fvotes"), ["party"]);
+    assert.deepEqual(at("", "#from-common-good"), ["cg"]);
+    assert.deepEqual(normalizePath(["cg", "house"]), ["cg", "house"]);
+    assert.equal(indexLevel(withVotes, ["cg", "votes"]).kind, "party", "Home's old See all link");
+    assert.equal(indexLevel(d, ["yours", "for-you"]).kind, "for-you");
+  });
+  await test("Party Picks has its own accent from the site's palette (copper), passing the same tests as the others", () => {
+    assert.equal(ACCENTS.party.edge, "#C97D5A");
+    assert.equal(CARD_SECTIONS.vote, "party");
+  });
+
+  console.log("File 15, Part B: always a way back");
+  await test("tapping the tab you are on: deep → its top level → scroll up → nothing (each of the five tabs)", () => {
+    for (const tab of ["menu", "index", "home", "events", "inbox"] as const) {
+      assert.equal(tabPress({ overlay: true, atRoot: false, scrollY: 900 }), "root", `${tab}: a page over it`);
+      assert.equal(tabPress({ overlay: false, atRoot: false, scrollY: 0 }), "root", `${tab}: a deeper level`);
+      assert.equal(tabPress({ overlay: false, atRoot: true, scrollY: 600 }), "top", `${tab}: scrolled down`);
+      assert.equal(tabPress({ overlay: false, atRoot: true, scrollY: 0 }), "none", `${tab}: second tap at the top`);
+    }
+    assert.equal(isTabRoot("index", "/passport/library", "?at=lists"), false);
+    assert.equal(isTabRoot("index", "/passport/library", ""), true);
+    assert.equal(isTabRoot("menu", "/passport/menu", "?tab=spirits&s=Bourbon"), false);
+    assert.equal(isTabRoot("menu", "/passport/menu", "?tab=spirits", false), false, "a Menu section other than the first");
+    assert.equal(isTabRoot("menu", "/passport/menu", "", true), true);
+    assert.equal(isTabRoot("inbox", "/passport/inbox/messages/3"), false);
+    assert.equal(isTabRoot("inbox", "/passport/inbox"), true);
+    assert.equal(isTabRoot("events", "/passport/events"), true);
+    assert.equal(isTabRoot("home", "/passport/account"), false);
+    assert.equal(isTabRoot("home", "/passport"), true);
+  });
+  await test("every route in the app has a parent in the navigation model (or is a tab's top level)", () => {
+    const base = join(ROOT, "app", "passport", "(app)");
+    const routes: string[] = [];
+    const walk = (dir: string, rel: string) => {
+      for (const f of readdirSync(dir)) {
+        const full = join(dir, f);
+        if (statSync(full).isDirectory()) walk(full, rel ? `${rel}/${f}` : f);
+        else if (f === "page.tsx" || f === "route.ts") routes.push(rel);
+      }
+    };
+    walk(base, "");
+    const known = new Set(PAGE_PARENTS.map((p) => p.route));
+    for (const r of routes) {
+      if (NOT_PAGES.includes(r) || r.startsWith("photo/")) continue;
+      assert.ok(known.has(r), `${r} has no parent in nav.ts PAGE_PARENTS`);
+    }
+    const sample = (r: string) => `/passport/${r.replace(/\[key\]/, "top").replace(/\[id\]/g, "7")}`;
+    for (const p of PAGE_PARENTS) { const got = parentOf(sample(p.route)); assert.ok(got && got.href === p.parent.href, `${p.route} → ${got?.href}`); }
+    for (const tab of ["/passport", "/passport/menu", "/passport/library", "/passport/events", "/passport/inbox"]) assert.equal(parentOf(tab), null, tab);
+  });
+  await test("an Index level's Back is the trail's previous step; a Spirits level's goes up one", () => {
+    assert.deepEqual(parentOf("/passport/library", "?at=cocktails%2Fspirit%2Fmezcal"), { href: indexHref(["cocktails", "spirit"]), label: "By spirit", tab: "index" });
+    assert.equal(parentOf("/passport/library", "?at=journal")!.href, "/passport/library");
+    assert.equal(parentOf("/passport/menu", "?tab=spirits&s=Bourbon%2FFox")!.label, "Bourbon");
+    assert.equal(parentOf("/passport/menu", "?tab=spirits&s=Bourbon")!.label, "Spirits");
+    assert.equal(parentOf("/passport/votes/4")!.label, "Party Picks");
+    assert.equal(parentOf("/passport/house/4")!.label, "CG Picks");
+    assert.equal(parentOf("/passport/favorites")!.label, "Journal");
+    for (const l of allLevels(withVotes)) if (l.trail.length > 1) assert.ok(l.trail[l.trail.length - 2].href.startsWith("/passport/library"), l.path.join("/"));
+  });
+
+  console.log("File 15, Part C: covers like playlist art");
+  const pic = (id: number, photo: string | null, cover = false) => ({ id, name: `I${id}`, photo, cover });
+  await test("four photos, chosen stably: the cover-marked item first, then the collection's own order; never twice", () => {
+    const xs = [pic(1, null), pic(2, "b"), pic(3, "c"), pic(4, "d", true), pic(5, "e"), pic(6, "f")];
+    assert.deepEqual(coversOf(xs, "cocktail").map((c) => c.id), [4, 2, 3, 5]);
+    assert.deepEqual(coversOf(xs, "cocktail").map((c) => c.id), coversOf([...xs], "cocktail").map((c) => c.id), "the same on every visit");
+    assert.equal(coversOf(xs, "cocktail").length, COLLAGE_MAX);
+    assert.deepEqual(coversOf([pic(1, "a"), pic(2, "b")], "bottle").map((c) => c.id), [1, 2], "two photos: a split of two");
+    assert.deepEqual(coversOf([pic(1, null)], "bottle"), [], "none: the section's icon");
+    assert.deepEqual(coversOf([pic(9, "z"), ...xs], "cocktail").map((c) => c.id), [4, 9, 2, 3], "changes when the collection changes");
+  });
+  await test("a transparent photo is marked so it is drawn without a box", () => {
+    assert.equal(coversOf([{ id: 1, name: "x", photo: "p", photo_clear: true }], "bottle")[0].clear, true);
+  });
+  await test("several collections: one from each first (Lists, CG Picks, Party Picks)", () => {
+    const a = [{ kind: "cocktail" as const, id: 1, photo: "a", name: "" }, { kind: "cocktail" as const, id: 2, photo: "b", name: "" }];
+    const b = [{ kind: "bottle" as const, id: 1, photo: "c", name: "" }];
+    assert.deepEqual(mergeCovers([a, b]).map((c) => `${c.kind}${c.id}`), ["cocktail1", "bottle1", "cocktail2"]);
+  });
+  await test("Spirits, Beer & wine, Journal and Party Picks tiles use their own items' photos", () => {
+    const dd: IndexInput = { ...withVotes, drinks: [{ name: "Pils", kind: "Beer", description: "", status_label: null, available: true, id: 7001, photo: "pp" }], marks: { "cocktail:1": { kind: "cocktail", id: 1, favorite: true, rating: null } } };
+    const top = indexLevel(dd, []);
+    assert.ok(top.kind === "tiles");
+    if (top.kind !== "tiles") return;
+    const t = (id: string) => top.tiles.find((x) => x.id === id)!;
+    assert.ok(t("spirits").covers.length > 0 && t("spirits").covers.every((c) => c.kind === "bottle"));
+    assert.deepEqual(t("beer-wine").covers.map((c) => c.id), [7001]);
+    assert.deepEqual(t("journal").covers.map((c) => c.id), [1], "Journal: the member's own favorites");
+    assert.deepEqual(favoriteCovers({ ...dd, marks: {} }), []);
+    assert.deepEqual(top.banner!.covers.map((c) => c.id), [5000]);
   });
 
   console.log(`\n${passed} passed, ${failed} failed`);

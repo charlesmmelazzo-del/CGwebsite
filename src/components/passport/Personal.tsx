@@ -15,6 +15,8 @@ import { createSaveQueue } from "@/lib/passport/saveQueue";
 import type { Bespoke, BespokeLine, ItemKind, ListItem, Mine, PassportList, Pick } from "@/lib/passport/types";
 import { notifyChanged } from "./appEvents";
 import { BackLink } from "./bits";
+import { Collage } from "./Drill";
+import { listCovers } from "@/lib/passport/nav";
 import { useShell } from "./shellContext";
 import { ACCENTS } from "@/lib/passport/accents";
 
@@ -78,7 +80,7 @@ export function ItemControls({ kind, id, name, initial }: { kind: ItemKind; id: 
     if (await save("/api/passport/note", { kind, id, body: text }, { note: text.trim() }, "your note")) { setEditing(false); setSaved(true); setTimeout(() => setSaved(false), 2500); }
   };
   return (
-    <section className="mt-8 rounded-xl border p-5 space-y-5" style={{ borderColor: C.line, background: C.card }} aria-label="Yours">
+    <section className="mt-8 rounded-xl border p-5 space-y-5" style={{ borderColor: C.line, background: C.card }} aria-label="Your journal">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <button type="button" onClick={toggleFav} aria-pressed={mine.favorite}
           className={smallBtn} style={mine.favorite ? { borderColor: C.accent, color: C.accent } : { borderColor: C.line, color: C.text }}>
@@ -199,6 +201,7 @@ export function ListsManager({ initial }: { initial: PassportList[] }) {
         <ul>
           {lists.map((l, i) => (
             <li key={l.id} className="flex items-center gap-2 py-3 border-b" style={{ borderColor: C.line }}>
+              <span className="block w-14 h-14 shrink-0 rounded-md overflow-hidden"><Collage covers={listCovers(l)} section="yours" label={l.name} /></span>
               <Link href={`/passport/lists/${l.id}`} scroll={false} className="flex-1 min-w-0 pp-focus rounded-sm">
                 <span className="font-display text-[1.25rem] leading-tight block truncate" style={{ color: C.text }}>{l.name}</span>
                 <span className="font-body text-[0.75rem] tracking-[0.12em] uppercase" style={{ color: C.faint }}>
@@ -298,7 +301,7 @@ export function ListEditor({ initial }: { initial: PassportList }) {
   };
   return (
     <div>
-      <BackLink fallback="/passport/library" label="Index" />
+      <BackLink fallback="/passport/library?at=lists" label="Lists" />
       <p className="font-body text-[0.75rem] tracking-[0.3em] uppercase mt-3" style={{ color: C.brass }}>
         {list.ranked ? "Top 10" : "Playlist"} · {list.kind === "cocktail" ? "Cocktails" : "Bottles"}
       </p>

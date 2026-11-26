@@ -8,7 +8,7 @@ import { memberData } from "@/lib/passport/member";
 export const dynamic = "force-dynamic";
 
 /**
- * File 11: My photos (Index → Yours). Every photo the member kept, newest first, each opening its cocktail or bottle.
+ * File 11: My photos (Index → Journal). Every photo the member kept, newest first, each opening its cocktail or bottle.
  * A photo Common Good removed shows "Removed by Common Good" in its place once.
  */
 export default async function MyPhotosPage() {
@@ -16,9 +16,9 @@ export default async function MyPhotosPage() {
   if (!r.data) return <Unavailable />;
   return (
     <>
-      <BackLink fallback="/passport/library" label="Index" />
+      <BackLink fallback="/passport/library?at=journal" label="Journal" />
       <div className="mt-3" />
-      <PageTitle kicker="Yours" title="My photos" />
+      <PageTitle kicker="Journal" title="My photos" />
       <MyPhotosList initial={r.data} />
     </>
   );

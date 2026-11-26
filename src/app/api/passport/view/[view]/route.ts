@@ -8,6 +8,7 @@ import { memberRequest } from "@/lib/passport/route";
 import { sortRequests } from "@/lib/passport/bottles";
 import { needsMember } from "@/lib/passport/shell";
 import { reserveEnabled } from "@/lib/reserve/enabled";
+import { getPublicEvents } from "@/lib/passport/publicEventsServer";
 
 export const dynamic = "force-dynamic";
 
@@ -62,12 +63,13 @@ const VIEWS: Record<string, (auth: MemberAuth) => Promise<unknown>> = {
   index: async (auth) => {
     const [index, lists, marks, bar, votes] = await Promise.all([getIndex(auth), getLists(auth), getMarksSafe(auth), getBarLists(auth).catch(() => null), getVotes(auth).catch(() => null)]);
     // File 10: open votes and brackets, then how many are under "Past votes".
-    return { ...index, lists, marks, house_lists: bar?.house_lists ?? [], charts: bar?.charts ?? [], past_count: bar?.past_count ?? 0, votes: votes?.votes ?? [], past_votes_count: votes?.past_count ?? 0 };
+    return { ...index, lists, marks, house_lists: bar?.house_lists ?? [], charts: bar?.charts ?? [], past_count: bar?.past_count ?? 0, votes: votes?.votes ?? [], vote_results: votes?.vote_results ?? [], past_votes_count: votes?.past_count ?? 0 };
   },
   // File 09: upcoming Passport events first (the member's own answers and friends going), then the same as before.
+  // File 15, Part G: and the public website's events (the public page's own list and rule; nothing when unavailable).
   events: async (auth) => {
-    const [events, reservations, book] = await Promise.all([getPassportEvents(auth).catch(() => null), getReservations(auth), reserveEnabled().catch(() => false)]);
-    return { events, reservations, book };
+    const [events, reservations, book, public_events] = await Promise.all([getPassportEvents(auth).catch(() => null), getReservations(auth), reserveEnabled().catch(() => false), getPublicEvents().catch(() => [])]);
+    return { events, reservations, book, public_events };
   },
   // Inbox: My bottles (file 05) and (file 08) the member's conversations with the bar, requests and event inquiries.
   // My bottles keeps its own shape at the top (requests, open_count, max_open); the rest arrives as `inbox`.

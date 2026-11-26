@@ -9,7 +9,8 @@ import { notifyChanged } from "./appEvents";
 import { PAST_VOTES_HREF, pctLabel, startRound, voteHref, voteKicker } from "@/lib/passport/votes";
 import type { Bracket, BracketEntry, BracketMatchup, FlightVote, VoteCard } from "@/lib/passport/types";
 import { ACCENTS } from "@/lib/passport/accents";
-import { KindLabel, accentCardStyle } from "./Drill";
+import { Collage, KindLabel, accentCardStyle } from "./Drill";
+import { PARTY_HREF, voteCovers } from "@/lib/passport/nav";
 
 /**
  * File 10, Parts 2 to 4: "Choose your perfect flight" and brackets. A member sees their own picks only; while voting is open
@@ -22,11 +23,15 @@ const heading = "pp-t-section mb-3";
 export function VoteCardLink({ c, big = false }: { c: VoteCard; big?: boolean }) {
   const open = c.status === "open";
   return (
-    <Link href={voteHref(c)} scroll={false} className="block h-full rounded-xl border p-4 pp-focus pp-row pp-card pp-accent-card" style={accentCardStyle("bar")}>
-      <KindLabel section="bar">{voteKicker(c)}{open && c.done ? " · you've voted" : ""}</KindLabel>
-      <span className={`block font-display leading-tight mt-1.5 ${big ? "text-[1.4375rem]" : "text-[1.25rem]"}`} style={{ color: C.text }}>{c.title}</span>
-      {c.winner && <span className="block font-body text-[1rem] mt-1" style={{ color: ACCENTS.bar.ink }}>Winner: {c.winner}</span>}
-      <span className="block font-body text-[0.875rem] mt-1.5" style={{ color: C.muted }}>{c.line}</span>
+    <Link href={voteHref(c)} scroll={false} className="flex items-stretch h-full rounded-xl border pl-4 overflow-hidden pp-focus pp-row pp-card pp-accent-card" style={accentCardStyle("party")}>
+      <span className="flex-1 min-w-0 py-4 pr-2">
+        <KindLabel section="party">{voteKicker(c)}{open && c.done ? " · you've voted" : ""}</KindLabel>
+        <span className={`block font-display leading-tight mt-1.5 ${big ? "text-[1.4375rem]" : "text-[1.25rem]"}`} style={{ color: C.text }}>{c.title}</span>
+        {c.winner && <span className="block font-body text-[1rem] mt-1" style={{ color: ACCENTS.party.ink }}>Winner: {c.winner}</span>}
+        <span className="block font-body text-[0.875rem] mt-1.5" style={{ color: C.muted }}>{c.line}</span>
+      </span>
+      {/* File 15, Part C: the vote's or bracket's own options as a collage. */}
+      <span className="block w-[88px] shrink-0"><Collage covers={voteCovers(c)} section="party" label={c.title} /></span>
     </Link>
   );
 }
@@ -35,10 +40,12 @@ export function VotesHome({ open, results }: { open?: VoteCard[] | null; results
   if (!open?.length && !results?.length) return null;
   return (
     <section aria-labelledby="pp-votes-home" className="mt-10">
-      <h2 id="pp-votes-home" className={heading} style={{ color: ACCENTS["bar"].ink }}>{open?.length ? "Voting is open" : "The results are in"}</h2>
+      {/* File 15, Part A: Home's votes are Party Picks, the same name as in the Index. */}
+      <h2 id="pp-votes-home" className={heading} style={{ color: ACCENTS.party.ink }}>Party Picks</h2>
+      <p className="pp-t-secondary -mt-1 mb-3" style={{ color: C.muted }}>{open?.length ? "Voting is open" : "The results are in"}</p>
       {/* File 12: three at most on Home, the rest behind "See all". */}
       <SeeAll items={[...(open || []).map((c) => ({ c, big: true })), ...(results || []).map((c) => ({ c, big: false }))]}
-        keyOf={(x) => `${x.big ? "" : "r"}${x.c.kind}${x.c.id}`} render={(x) => <VoteCardLink c={x.c} big={x.big} />} what="votes" href="/passport/library?at=cg%2Fvotes" />
+        keyOf={(x) => `${x.big ? "" : "r"}${x.c.kind}${x.c.id}`} render={(x) => <VoteCardLink c={x.c} big={x.big} />} what="votes" href={PARTY_HREF} />
     </section>
   );
 }
@@ -64,7 +71,7 @@ export function FlightVotePage({ initial }: { initial: FlightVote }) {
   };
   return (
     <div className="pb-4">
-      <BackLink fallback="/passport/library" label="Index" />
+      <BackLink fallback="/passport/library?at=party" label="Party Picks" />
       <p className={`${kicker} mt-2`} style={{ color: C.brass }}>Choose your perfect flight · {f.status_label}</p>
       <h1 className="font-display text-4xl leading-tight mt-1" style={{ color: C.text }}>{f.title}</h1>
       {f.intro && <p className="font-body text-[1rem] mt-3 leading-relaxed whitespace-pre-line" style={{ color: C.muted }}>{f.intro}</p>}
@@ -74,7 +81,7 @@ export function FlightVotePage({ initial }: { initial: FlightVote }) {
       <ol className="mt-6 space-y-7">
         {f.slots.map((s, i) => (
           <li key={s.id}>
-            <h2 className="pp-t-section mb-3" style={{ color: ACCENTS["bar"].ink }}>Slot {i + 1}{s.label ? ` · ${s.label}` : ""}</h2>
+            <h2 className="pp-t-section mb-3" style={{ color: ACCENTS.party.ink }}>Slot {i + 1}{s.label ? ` · ${s.label}` : ""}</h2>
             <ul className="mt-2 space-y-2" role={open ? "radiogroup" : undefined} aria-label={`Slot ${i + 1}`}>
               {s.options.map((o) => {
                 const mine = s.my_pick === o.id;
@@ -162,7 +169,7 @@ export function BracketPage({ initial }: { initial: Bracket }) {
   };
   return (
     <div className="pb-4">
-      <BackLink fallback="/passport/library" label="Index" />
+      <BackLink fallback="/passport/library?at=party" label="Party Picks" />
       <p className={`${kicker} mt-2`} style={{ color: C.brass }}>Bracket · {b.kind === "cocktail" ? "cocktails" : "spirits"} · {b.status_label}</p>
       <h1 className="font-display text-4xl leading-tight mt-1" style={{ color: C.text }}>{b.title}</h1>
       {b.intro && <p className="font-body text-[1rem] mt-3 leading-relaxed whitespace-pre-line" style={{ color: C.muted }}>{b.intro}</p>}
@@ -207,8 +214,8 @@ export function BracketPage({ initial }: { initial: Bracket }) {
 export function PastVotes({ votes }: { votes: VoteCard[] }) {
   return (
     <div>
-      <BackLink fallback="/passport/library" label="Index" />
-      <p className={`${kicker} mt-2`} style={{ color: C.brass }}>From Common Good</p>
+      <BackLink fallback="/passport/library?at=party" label="Party Picks" />
+      <p className={`${kicker} mt-2`} style={{ color: ACCENTS.party.ink }}>Party Picks</p>
       <h1 className="font-display text-4xl leading-tight mt-1" style={{ color: C.text }}>Past votes</h1>
       {votes.length
         ? <ul className="mt-6 space-y-3">{votes.map((c) => <li key={`${c.kind}${c.id}`}><VoteCardLink c={c} /></li>)}</ul>

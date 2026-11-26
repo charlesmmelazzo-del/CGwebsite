@@ -14,7 +14,7 @@ import { KindLabel, accentCardStyle } from "./Drill";
 
 /**
  * File 12: "For you". Suggestions the Bible builds only from the member's own favorites, ratings, orders, lists and
- * notes, each with one plain reason. Home shows up to four (cocktails first); the Index's Yours shows up to twelve.
+ * notes, each with one plain reason. Home shows up to four (cocktails first); the Index's Journal shows up to twelve.
  * "Not for me" hides one at once on both (it stays away for 90 days); if the bar can't be reached it comes back.
  */
 
@@ -66,7 +66,7 @@ export function ForYouHome({ items }: { items?: Recommendation[] | null }) {
     <section aria-labelledby="pp-for-you" className="mt-10">
       <div className="flex items-baseline justify-between gap-3 mb-3">
         <h2 id="pp-for-you" className="pp-t-section" style={{ color: ACCENTS["yours"].ink }}>For you</h2>
-        <Link href="/passport/library?at=yours%2Ffor-you" scroll={false} className="pp-t-secondary underline underline-offset-4 min-h-[44px] inline-flex items-center pp-focus rounded" style={{ color: C.text }}>See all</Link>
+        <Link href="/passport/library?at=journal%2Ffor-you" scroll={false} className="pp-t-secondary underline underline-offset-4 min-h-[44px] inline-flex items-center pp-focus rounded" style={{ color: C.text }}>See all</Link>
       </div>
       <ul className="pp-hscroll -mx-5 px-5 flex gap-3 overflow-x-auto pb-2 snap-x">
         {shown.map((r) => (
@@ -90,7 +90,7 @@ export function ForYouHome({ items }: { items?: Recommendation[] | null }) {
 }
 
 /**
- * Index → Yours → "For you": up to twelve, cocktails first. Too little history: one quiet line. Switched off in
+ * Index → Journal → "For you": up to twelve, cocktails first. Too little history: one quiet line. Switched off in
  * Account: a quiet line that says where to turn it on. Nothing to suggest today: nothing.
  */
 export function ForYouIndex({ items, enough, suggest }: { items?: Recommendation[] | null; enough?: boolean; suggest?: boolean }) {

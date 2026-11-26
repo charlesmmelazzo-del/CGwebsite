@@ -253,7 +253,8 @@ export function ShareCardView({ s, inThread = false }: { s: ShareCard; inThread?
 
 // ── Share with a friend ──────────────────────────────────────────────────────
 /** "Share with a friend" on a cocktail, bottle, house list, the member's own list or recipe, or a Passport event. */
-export function ShareButton({ kind, id, name, compact = false }: { kind: ShareKind; id: number; name: string; compact?: boolean }) {
+/** File 15, Part G: `publicId` shares an event from the public website (the website checks the public page shows it). */
+export function ShareButton({ kind, id, name, compact = false, publicId }: { kind: ShareKind; id: number; name: string; compact?: boolean; publicId?: string }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -262,11 +263,11 @@ export function ShareButton({ kind, id, name, compact = false }: { kind: ShareKi
         {!compact && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="18" cy="5.5" r="2.5" /><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="18.5" r="2.5" /><path d="m8.2 10.8 7.6-4.1M8.2 13.2l7.6 4.1" /></svg>}
         {kind === "event" ? "Invite friends" : "Share with a friend"}
       </button>
-      {open && <ShareSheet kind={kind} id={id} name={name} onClose={() => setOpen(false)} />}
+      {open && <ShareSheet kind={kind} id={id} name={name} publicId={publicId} onClose={() => setOpen(false)} />}
     </>
   );
 }
-function ShareSheet({ kind, id, name, onClose }: { kind: ShareKind; id: number; name: string; onClose: () => void }) {
+function ShareSheet({ kind, id, name, onClose, publicId }: { kind: ShareKind; id: number; name: string; onClose: () => void; publicId?: string }) {
   const shell = useShell();
   const [friends, setFriends] = useState<Friend[] | null>(null);
   const [muted, setMuted] = useState(false);
@@ -285,7 +286,7 @@ function ShareSheet({ kind, id, name, onClose }: { kind: ShareKind; id: number; 
   }, [setError]);
   const toggle = (fid: number) => setPick((p) => { const n = new Set(p); if (n.has(fid)) n.delete(fid); else n.add(fid); return n; });
   const go = async () => {
-    const out = await send<{ count: number }>("/api/passport/share", { kind, id, to: Array.from(pick), note });
+    const out = await send<{ count: number }>("/api/passport/share", publicId ? { kind: "public_event", public_id: publicId, to: Array.from(pick), note } : { kind, id, to: Array.from(pick), note });
     if (out) { shell?.toast(`Shared with ${out.count} friend${out.count === 1 ? "" : "s"}.`); notifyChanged("inbox"); onClose(); }
   };
   return (

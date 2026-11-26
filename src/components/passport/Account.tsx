@@ -6,6 +6,7 @@ import InstallHint from "./InstallHint";
 import { markPromptDone, pushState, turnOff, turnOn, type PushState } from "./pushClient";
 import { notifyChanged } from "./appEvents";
 import { forgetRecent } from "./recent";
+import { BackLink } from "./bits";
 import { Button, C, Check, Field, Notice, inputCls, postJson, useBotFields } from "./ui";
 import type { FriendsOverview, Me, NotifyPrefs } from "@/lib/passport/bible";
 import Link from "next/link";
@@ -66,7 +67,9 @@ export default function Account({ me: initial, prefs, friends }: { me: Me; prefs
   return (
     <div className="space-y-8 animate-fade-in">
       <div>
-        <p className="font-body text-[0.75rem] tracking-[0.3em] uppercase" style={{ color: C.brass }}>Your account</p>
+        {/* File 15, Part B: Account had no way back; it goes to Home (or back where it was opened from). */}
+        <BackLink fallback="/passport" label="Home" />
+        <p className="font-body text-[0.75rem] tracking-[0.3em] uppercase mt-2" style={{ color: C.brass }}>Your account</p>
         <h1 className="font-display text-4xl mt-1">{m.first_name} {m.last_name}</h1>
         {m.member_since && <p className="font-body text-sm mt-2" style={{ color: C.muted }}>Member since {new Date(m.member_since + "T12:00:00").toLocaleDateString("en-US", { month: "long", year: "numeric" })}</p>}
       </div>

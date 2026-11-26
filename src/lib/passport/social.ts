@@ -65,6 +65,17 @@ export function shareBody(b: Record<string, unknown>): Built<{ kind: ShareKind; 
   const e = tooLong(note, NOTE_MAX, "the note");
   return e ? { error: e } : { body: { kind, id, to, note } };
 }
+/** File 15, Part G: sharing an event from the public website: its id (checked against the public page by the route). */
+export function publicShareBody(b: Record<string, unknown>): Built<{ public_id: string; to: number[]; note: string }> {
+  const public_id = str(b.public_id);
+  if (!/^[A-Za-z0-9_-]{1,64}(::\d{4}-\d{2}-\d{2})?$/.test(public_id)) return { error: "Not found" };
+  const to = Array.isArray(b.to) ? Array.from(new Set(b.to.map(posInt).filter((x): x is number => !!x))) : [];
+  if (!to.length) return { error: "Choose at least one friend" };
+  if (to.length > MAX_SHARE_TO) return { error: `Share with up to ${MAX_SHARE_TO} friends at a time` };
+  const note = str(b.note).trim();
+  const e = tooLong(note, NOTE_MAX, "the note");
+  return e ? { error: e } : { body: { public_id, to, note } };
+}
 export const LETSGO_TIMES: { id: LetsGoTime; label: string }[] = [
   { id: "afternoon", label: "In the afternoon" }, { id: "early", label: "Around 5" }, { id: "evening", label: "Around 7" }, { id: "late", label: "Around 9 or later" },
 ];
@@ -104,8 +115,10 @@ export function ticketHref(url: string | null | undefined): string | null {
 }
 export const answerWord = (a: LetsGoAnswer | null | undefined) => (a ? ANSWERS.find((x) => x.id === a)?.label || "" : "No answer yet");
 /** Where a shared thing opens for the receiver, or null (shown by name only). A copy of a list or recipe opens as a share. */
-export function shareHref(s: Pick<ShareCard, "id" | "kind" | "ref_id" | "opens">): string | null {
+export function shareHref(s: Pick<ShareCard, "id" | "kind" | "ref_id" | "opens" | "public_event_id">): string | null {
   if (!s.opens) return null;
+  // File 15, Part G: an event from the public website opens its page in Passport.
+  if (s.kind === "event" && s.public_event_id) return `/passport/events/public/${encodeURIComponent(s.public_event_id)}`;
   if (s.kind === "list" || s.kind === "recipe") return `/passport/shared/${s.id}`;
   if (!s.ref_id) return null;
   return s.kind === "cocktail" ? `/passport/library/${s.ref_id}` : s.kind === "bottle" ? `/passport/spirits/${s.ref_id}` : s.kind === "house_list" ? `/passport/house/${s.ref_id}` : `/passport/events/${s.ref_id}`;

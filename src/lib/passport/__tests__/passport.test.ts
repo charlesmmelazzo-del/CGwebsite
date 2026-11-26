@@ -327,7 +327,7 @@ function slowServer() {
     assert.equal(dayLong("2026-12-04"), "Friday, December 4");
     assert.deepEqual([partyOf(1), partyOf(4)], ["Just you", "Party of 4"]);
   });
-  await test("the recipe book is called My Cocktails, sits in the Index under Yours with Add a cocktail, and never in the Menu", () => {
+  await test("the recipe book is called My Cocktails, sits in the Index under Journal (file 15: was Yours) with Add a cocktail, and never in the Menu", () => {
     const comp = (f: string) => readFileSync(join(__dirname, "..", "..", "..", "components", "passport", f), "utf8");
     // File 14: the Index is a drill-down; My Cocktails is a tile under Index › Yours (lib/passport/nav.ts), and the Yours
     // level keeps "+ Add a cocktail". (Updated from the flat Index's card, which this file replaced.)
@@ -375,7 +375,7 @@ function slowServer() {
         ["From the bar", React.createElement(S.FromTheBar, { messages: [] })], ["From the bar (none sent)", React.createElement(S.FromTheBar, {})],
         ["What's new", React.createElement(S.WhatsNew, { cards: [] })], ["Spirit of the Day", React.createElement(S.SpiritOfTheDay, { spirit: null })],
         ["Welcome Aperitif", React.createElement(S.WelcomeAperitif, { aperitif: null })], ["Welcome Aperitif (blank name)", React.createElement(S.WelcomeAperitif, { aperitif: { name: "", description: "x" } })],
-        ["Newest list", React.createElement(S.NewestList, { list: null })], ["From Common Good", React.createElement(S.HouseLists, { lists: [], charts: [], pastCount: 0 })],
+        ["Newest list", React.createElement(S.NewestList, { list: null })], ["CG Picks", React.createElement(S.HouseLists, { lists: [], charts: [], pastCount: 0 })],
       ] as const) assert.equal(html(el), "", name);
     });
     await test("… and shows when filled", () => {
@@ -393,7 +393,8 @@ function slowServer() {
       const nl = html(React.createElement(S.NewestList, { list }));
       assert.ok(nl.includes("Rye flight") && nl.includes("Staff pick · by Sam") && nl.includes("Flight · $28"), nl);
       const hl = html(React.createElement(S.HouseLists, { lists: [list], charts: [{ key: "top", title: "Top of the Charts", season_name: "Winter 2026", items: [] }], pastCount: 2 }));
-      assert.ok(hl.includes("From Common Good") && hl.includes('href="/passport/house/charts/top"') && hl.includes("Past lists from Common Good") && hl.includes('href="/passport/house/past"'), hl);
+      // File 15: "From Common Good" is now "CG Picks" (updated from file 07's wording).
+      assert.ok(hl.includes("CG Picks") && hl.includes('href="/passport/house/charts/top"') && hl.includes("Past lists") && hl.includes('href="/passport/house/past"'), hl);
     });
     await test("links from the bar only ever open pages inside Passport", () => {
       assert.equal(B.messageHref({ link_kind: "list", link_id: 3 }), "/passport/house/3");
@@ -650,7 +651,7 @@ function slowServer() {
     });
     await test("the photo routes ask the Bible for the signed-in member only, and never let a shared cache keep a picture", () => {
       const lib = readFileSync(join(__dirname, "..", "photoRoute.ts"), "utf8");
-      assert.ok(lib.includes("currentAuth()") && lib.includes('limited(req, "passport-photo-read")') && lib.includes('.startsWith("image/jpeg")'), "signed in, rate limited, only a JPEG the Bible made goes on");
+      assert.ok(lib.includes("currentAuth()") && lib.includes('limited(req, "passport-photo-read")') && lib.includes('PHOTO_TYPES = ["image/jpeg", "image/webp"]') && lib.includes("!PHOTO_TYPES.includes(type)"), "signed in, rate limited, only a JPEG (file 15: or a cut-out WebP) the Bible made goes on; never an SVG");
       const bar = readFileSync(join(APP, "passport", "(app)", "photo", "bar", "[kind]", "[id]", "[size]", "route.ts"), "utf8");
       const mine = readFileSync(join(APP, "passport", "(app)", "photo", "mine", "[token]", "[size]", "route.ts"), "utf8");
       assert.ok(bar.includes('"private, max-age=31536000, immutable"'), "the bar's photos: long cache, in the member's own browser only");
@@ -663,7 +664,7 @@ function slowServer() {
       assert.ok(!/member_id|memberId/.test(api), "never takes a member number");
       assert.ok(LIMITS["passport-photos"].max > 0 && LIMITS["passport-photo-read"].max > 0);
     });
-    await test("the privacy line shows where a member adds a photo; My photos is under Index → Yours", () => {
+    await test("the privacy line shows where a member adds a photo; My photos is under Index → Journal (file 15: was Yours)", () => {
       const photos = comp11("Photos.tsx");
       assert.ok(photos.includes('"Only you and the Common Good team can see your photos."') && /MyItemPhotos[\s\S]*PHOTO_PRIVATE_LINE/.test(photos));
       assert.ok(photos.includes("MAX_SIDE = 1600") && photos.includes("TARGET = 400 * 1024") && photos.includes('"image/jpeg"'), "shrunk on the device: 1600px, JPEG, under 400 KB");
@@ -795,6 +796,71 @@ function slowServer() {
     await test("an item page says \"You or your household have ordered this\" only when the Bible says so", () => {
       const p = compP("Personal.tsx");
       assert.ok(p.includes("mine.ordered_household") && p.includes("You or your household have ordered this"));
+    });
+  }
+
+  console.log("File 15, Part F: beer, wine and cider open their own pages");
+  {
+    const React = await import("react");
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    (globalThis as { React?: unknown }).React = React;
+    const D = await import("../../../components/passport/Drill");
+    const html = (el: unknown) => renderToStaticMarkup(el as never);
+    await test("a beer row with a Bible item opens its bottle page (file 06's \"no page of its own\" rows are replaced)", () => {
+      const row = html(React.createElement(D.CompactBottle, { b: { id: 7001, name: "Pils", photo: "pp", available: true, status_label: null }, out: false }));
+      assert.ok(row.includes('href="/passport/spirits/7001"') && row.includes("Pils"), row);
+      const index = readFileSync(join(__dirname, "..", "..", "..", "components", "passport", "tabs", "IndexTab.tsx"), "utf8");
+      assert.ok(/case "drinks":[\s\S]*?x\.id\s*\?\s*<CompactBottle/.test(index), "the Index's Beer & wine rows use the bottle row when the item has a page");
+    });
+    await test("a row with no Bible item stays a plain row; \"Request a bottle for home\" hides when the Bible says can_request false", () => {
+      const index = readFileSync(join(__dirname, "..", "..", "..", "components", "passport", "tabs", "IndexTab.tsx"), "utf8");
+      assert.ok(/case "drinks":[\s\S]*?: \(\s*<li key=\{`\$\{x\.name\}/.test(index));
+      const page = readFileSync(join(__dirname, "..", "..", "..", "app", "passport", "(app)", "spirits", "[id]", "page.tsx"), "utf8");
+      assert.ok(page.includes("can_request !== false && <RequestBottle"));
+    });
+  }
+
+  console.log("File 15, Part G: the public website's events in the Events tab");
+  {
+    const PE = await import("../publicEvents");
+    const pev = (id: number, date: string, start = "7:00 PM") => ({ id, title: `P${id}`, description: "", date, start, end: null, price_text: "", ticket_url: null, rsvp: true, guest_limit: 0, status: "announced" as const, status_label: "", cancel_note: "", my_rsvp: null, friends_going: null });
+    const raw = { id: "abc-123", title: "Jazz Night", start: "2026-12-05", description: "Live trio\nSecond line", imageUrl: "https://x.supabase.co/storage/v1/object/public/e.jpg", linkUrl: "https://tickets.example/j", linkLabel: "Tickets", location: "Main bar",
+      visibleFrom: "2026-11-01", recurrence: "none", internal: "STAFF NOTE", capacity: 80 } as never;
+    await test("a public event carries only what the public page shows (never anything else from its row)", () => {
+      const e = PE.toPublicEvent(raw, "open")!;
+      assert.deepEqual(Object.keys(e).sort(), [...PE.PUBLIC_EVENT_KEYS].sort());
+      assert.ok(!JSON.stringify(e).includes("STAFF NOTE") && !JSON.stringify(e).includes("80"));
+      assert.equal(e.line, "Live trio");
+      assert.equal(e.book, true, "the public page offers booking when the Bible says the event is open");
+      assert.equal(PE.publicBookHref(e), "/events?event=abc-123");
+      assert.equal(PE.toPublicEvent({ ...(raw as object), linkUrl: "http://insecure.example" } as never)!.link_url, null, "only an https link");
+      assert.equal(PE.toPublicEvent({ ...(raw as object), id: "../x" } as never), null);
+      assert.ok(PE.isPublicEventId("abc-123::2026-12-05") && !PE.isPublicEventId("a/b"));
+    });
+    await test("Passport shows exactly the public page's list: the same function and the same booking state", () => {
+      const srv = readFileSync(join(__dirname, "..", "publicEventsServer.ts"), "utf8");
+      assert.ok(srv.includes("getEventsData()") && srv.includes("getEventStatuses(") && srv.includes("TTL_MS = 5 * 60 * 1000"));
+      assert.ok(/catch \{\s*return cache\?\.events \?\? \[\];/.test(srv), "unavailable: Passport events only, no error");
+      const ev = readFileSync(join(__dirname, "..", "..", "eventsdata.ts"), "utf8");
+      assert.ok(ev.includes("visible_from") && ev.includes("visibleUntil") && ev.includes("start_date.gte."), "hidden (outside its window) and past events never come through");
+    });
+    await test("the two tabs: All events mixes both kinds by date (soonest first); Passport exclusives has only Passport events", () => {
+      const pub = [PE.toPublicEvent({ ...(raw as object), id: "w1", start: "2026-12-03" } as never)!, PE.toPublicEvent({ ...(raw as object), id: "w2", start: "2026-12-10T18:30" } as never)!];
+      const pass = [pev(1, "2026-12-05"), pev(2, "2026-12-10", "6:00 PM"), pev(3, "2026-12-01")];
+      const all = PE.eventRows(pass as never, pub, "all");
+      assert.deepEqual(all.map((r) => r.key), ["p3", "ww1", "p1", "p2", "ww2"]);
+      assert.ok(all.filter((r) => r.kind === "passport").every((r) => r.members_only) && all.filter((r) => r.kind === "public").every((r) => !r.members_only));
+      assert.deepEqual(PE.eventRows(pass as never, pub, "exclusives").map((r) => r.key), ["p3", "p1", "p2"]);
+      assert.deepEqual(PE.EVENTS_TABS.map((t) => t.label), ["All events", "Passport exclusives"]);
+      assert.deepEqual(PE.eventRows(null, null, "all"), []);
+    });
+    await test("a public event opens its own page with a way back; a share opens it too", async () => {
+      const nav = readFileSync(join(__dirname, "..", "nav.ts"), "utf8");
+      assert.ok(nav.includes('route: "events/public/[id]"'));
+      const { shareHref } = await import("../social");
+      assert.equal(shareHref({ id: 1, kind: "event", ref_id: null, opens: true, public_event_id: "w1::2026-12-05" }), "/passport/events/public/w1%3A%3A2026-12-05");
+      const route = readFileSync(join(__dirname, "..", "..", "..", "app", "api", "passport", "share", "route.ts"), "utf8");
+      assert.ok(route.includes("findPublicEvent(") && route.includes('public: { id: e.id, title: e.title, date: e.date }'), "only an event the public page shows, and only its id, title and date");
     });
   }
 

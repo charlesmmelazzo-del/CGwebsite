@@ -17,9 +17,9 @@ export default async function FavoritesPage() {
   const bottles = favorites.filter((f) => f.kind === "bottle");
   return (
     <>
-      <BackLink fallback="/passport/library" label="Index" />
+      <BackLink fallback="/passport/library?at=journal" label="Journal" />
       <div className="mt-3" />
-      <PageTitle kicker="Yours" title="Favorites" />
+      <PageTitle kicker="Journal" title="Favorites" />
       {!favorites.length && !ratings.length && <Quiet>Tap the heart on any cocktail or bottle to keep it here.</Quiet>}
       {cocktails.length > 0 && (
         <>

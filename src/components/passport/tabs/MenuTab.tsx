@@ -3,7 +3,8 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { C } from "../theme";
-import { SkelRows } from "../bits";
+import { BackLink, SkelRows } from "../bits";
+import { TAB_ROOT_EVENT, setTabAtRoot } from "../appEvents";
 import { PageTitle, Quiet } from "../Library";
 import SearchArea from "../Search";
 import TabView from "./TabView";
@@ -102,6 +103,19 @@ function Menu({ d }: { d: MenuView }) {
   };
 
   const sPath = tab?.kind === "spirits" ? parseAt(params?.get("s")) : [];
+  // File 15, Part B: the Menu's top level is its first section; tapping the Menu tab again comes back to it.
+  const firstId = tabs[0]?.id ?? null;
+  useEffect(() => { setTabAtRoot("menu", current === firstId && !sPath.length); }, [current, firstId, sPath.length]);
+  useEffect(() => {
+    const on = (e: Event) => {
+      if ((e as CustomEvent<{ tab: string }>).detail?.tab !== "menu" || !firstId) return;
+      setPicked(firstId);
+      remembered = firstId;
+      try { window.history.replaceState(window.history.state, "", MENU_HREF); } catch { /* old browser */ }
+    };
+    window.addEventListener(TAB_ROOT_EVENT, on);
+    return () => window.removeEventListener(TAB_ROOT_EVENT, on);
+  }, [firstId]);
   const motion = useLevelMotion(`${current}|${sPath.join("/")}`, tabs.findIndex((t) => t.id === current) * 10 + sPath.length);
   const updated = d.menu_info.updated_at ? new Date(d.menu_info.updated_at) : null;
 
@@ -196,14 +210,18 @@ function MenuBody({ tab, marks, first }: { tab: MenuTabModel; marks: Marks; firs
 function SpiritsBody({ tab, d, path, go }: { tab: MenuTabModel; d: MenuView; path: string[]; go: (p: string[]) => void }) {
   const entries = useMemo(() => spiritsFromMenu(tab.groups), [tab.groups]);
   const [cat, producer] = path;
+  const up = producer ? { href: spiritsHref([cat]), label: cat } : { href: spiritsHref([]), label: "Spirits" };
   const crumbs = (
-    <nav aria-label="Where you are" className="mt-4 flex items-center gap-1 flex-wrap">
+    <>
+    <div className="mt-3"><BackLink exact to={up} /></div>
+    <nav aria-label="Where you are" className="flex items-center gap-1 flex-wrap">
       <button type="button" onClick={() => go([])} className="pp-t-secondary pp-focus rounded min-h-[44px] px-1 underline underline-offset-4" style={{ color: C.muted }}>‹ All spirits</button>
       {producer && <><span aria-hidden style={{ color: C.faint }}>›</span><button type="button" onClick={() => go([cat])} className="pp-t-secondary pp-focus rounded min-h-[44px] px-1 underline underline-offset-4" style={{ color: C.muted }}>{cat}</button></>}
     </nav>
+    </>
   );
   if (!cat) {
-    const tiles: Tile[] = spiritCategories(entries).map((t) => ({ id: t.name, label: t.name, count: t.count, cover: t.cover, href: spiritsHref([t.name]), section: "spirits" }));
+    const tiles: Tile[] = spiritCategories(entries).map((t) => ({ id: t.name, label: t.name, count: t.count, covers: t.covers, href: spiritsHref([t.name]), section: "spirits" }));
     return (
       <section aria-labelledby="menu-h-spirits">
         <SectionHeading id="menu-h-spirits" section="spirits" aside={<span className="pp-t-secondary pp-num" style={{ color: C.faint }}>{entries.length} bottles</span>}>Spirits</SectionHeading>

@@ -16,7 +16,7 @@ export default async function BespokePage({ searchParams }: { searchParams: { ne
   if (!r.data) return <Unavailable />;
   return (
     <>
-      <BackLink fallback="/passport/library" label="Index" />
+      <BackLink fallback="/passport/library?at=journal" label="Journal" />
       <div className="mt-3" />
       <PageTitle kicker="Your recipe book" title="My Cocktails" />
       <BespokeBook initial={r.data.recipes} units={r.data.units} startNew={searchParams.new === "1"} />

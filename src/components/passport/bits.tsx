@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { C } from "./theme";
-import { hasAppHistory } from "./appEvents";
+import { currentStep, hasAppHistory, previousStep } from "./appEvents";
+import { parentOf } from "@/lib/passport/nav";
 import { useShell, type AddTarget } from "./shellContext";
 
 /** File 06: small pieces shared by the tabs and the pages that open over them. */
@@ -66,20 +67,32 @@ export function ViewError({ message, onRetry }: { message: string; onRetry: () =
 }
 
 /**
- * Back, from a page opened over a tab: back in the app's own history when there is one, otherwise to the tab the page
- * belongs to (a page opened straight from a link or the home screen).
+ * File 15, Part B: Back, at the top left of every screen below a tab's top level, in the same place and style everywhere.
+ * It goes one level up: back in the app's own history when the step before is in the same tab (the place the member came
+ * from; for an Index or Spirits level, only when that step is exactly the level above), otherwise to the place one level
+ * up in the navigation model (lib/passport/nav.ts parentOf), never browser-back into another tab. `fallback` is used
+ * only for an address the model does not know.
  */
-export function BackLink({ fallback, label }: { fallback: string; label: string }) {
+export function BackLink({ fallback = "/passport", label = "Back", exact = false, to }: { fallback?: string; label?: string; exact?: boolean; to?: { href: string; label: string } }) {
   const router = useRouter();
-  const [inApp, setInApp] = useState(false);
-  useEffect(() => { setInApp(hasAppHistory()); }, []);
+  const [where, setWhere] = useState<{ href: string; label: string }>(to || { href: fallback, label });
+  useEffect(() => {
+    if (to) { setWhere(to); return; }
+    const p = parentOf(window.location.pathname, window.location.search);
+    setWhere(p ? { href: p.href, label: p.label } : { href: fallback, label });
+  }, [to, fallback, label]);
   return (
-    <a href={fallback} onClick={(e) => {
+    <a href={where.href} aria-label={`Back to ${where.label}`} data-pp-back onClick={(e) => {
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
       e.preventDefault();
-      if (hasAppHistory() && window.history.length > 1) router.back(); else router.push(fallback, { scroll: false });
-    }} className="inline-flex items-center gap-1.5 -ml-1 px-1 min-h-[44px] font-body text-[0.875rem] tracking-[0.2em] uppercase pp-focus rounded" style={{ color: C.muted }}>
-      <span aria-hidden>←</span> {inApp ? "Back" : label}
+      const prev = previousStep();
+      const cur = currentStep();
+      const sameTab = !!(prev && cur && prev.tab === cur.tab);
+      const sameUrl = (u: string, v: string) => { try { const a = new URL(u, window.location.origin); const b2 = new URL(v, window.location.origin); return a.pathname.replace(/\/+$/, "") === b2.pathname.replace(/\/+$/, "") && a.search === b2.search; } catch { return u === v; } };
+      if (hasAppHistory() && window.history.length > 1 && sameTab && (!exact || sameUrl(prev!.url, where.href))) router.back();
+      else router.push(where.href, { scroll: false });
+    }} className="pp-back inline-flex items-center gap-1.5 -ml-1 px-1 min-h-[44px] font-body text-[0.875rem] tracking-[0.2em] uppercase pp-focus rounded" style={{ color: C.muted }}>
+      <span aria-hidden>←</span> Back
     </a>
   );
 }

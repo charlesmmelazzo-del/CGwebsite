@@ -23,7 +23,7 @@ export function HouseListPage({ list, chart }: { list?: HouseList; chart?: Chart
   const kicker = list ? listKicker(list) : chart!.season_name;
   return (
     <article>
-      <BackLink fallback="/passport/library#from-common-good" label="Index" />
+      <BackLink fallback="/passport/library?at=cg" label="CG Picks" />
       <p className="font-body text-[0.75rem] tracking-[0.3em] uppercase mt-3" style={{ color: C.brass }}>{kicker}{list?.past && !list.chart ? " · Past list" : ""}</p>
       <h1 className="font-display text-[2.375rem] leading-[1.05] mt-2" style={{ color: C.text }}>{title}</h1>
       {list?.intro && <p className="font-body text-[1rem] mt-3 leading-relaxed whitespace-pre-line" style={{ color: C.muted }}>{list.intro}</p>}
@@ -58,7 +58,7 @@ function HouseRow({ it, rank }: { it: HouseItem; rank: number | null }) {
         </span>
         {it.note && <span className="block font-body text-sm mt-0.5 leading-relaxed" style={{ color: C.muted }}>{it.note}</span>}
       </span>
-      {href && <span className="self-center"><Thumb kind={it.kind} id={it.id} photo={it.photo} size={48} /></span>}
+      {href && <span className="self-center"><Thumb kind={it.kind} id={it.id} photo={it.photo} size={48} clear={it.photo_clear} /></span>}
     </span>
   );
   return <ItemRow item={href && it.id ? { kind: it.kind, id: it.id, name: it.name } : null} href={href} pad="py-3">{body}</ItemRow>;
@@ -99,8 +99,8 @@ function ListComments() { return null; }
 export function PastLists({ lists }: { lists: HouseList[] }) {
   return (
     <article>
-      <BackLink fallback="/passport/library#from-common-good" label="Index" />
-      <p className="font-body text-[0.75rem] tracking-[0.3em] uppercase mt-3" style={{ color: C.brass }}>From Common Good</p>
+      <BackLink fallback="/passport/library?at=cg" label="CG Picks" />
+      <p className="font-body text-[0.75rem] tracking-[0.3em] uppercase mt-3" style={{ color: C.brass }}>CG Picks</p>
       <h1 className="font-display text-[2.375rem] leading-[1.05] mt-2" style={{ color: C.text }}>Past lists</h1>
       <div className="w-14 h-px my-6" style={{ background: C.brass, opacity: 0.6 }} />
       {lists.length ? (

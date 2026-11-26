@@ -216,7 +216,7 @@ export function MyItemPhotos({ kind, id, name }: { kind: ItemKind; id: number; n
   );
 }
 
-/** "My photos" (Index → Yours): every photo the member kept, newest first, each opening its item. */
+/** "My photos" (Index → Journal): every photo the member kept, newest first, each opening its item. */
 export function MyPhotosList({ initial }: { initial: PhotosData }) {
   const router = useRouter();
   const [data, setData] = useState(initial);

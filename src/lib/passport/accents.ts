@@ -10,7 +10,7 @@
  *   ink   the colour of the small label on the tint (the same "text" colour; AA against the tint, tested)
  * Plain functions and constants only (shared by server and browser code, and by the tests).
  */
-export type SectionId = "cocktails" | "spirits" | "beer-wine" | "events" | "inbox" | "friends" | "bar" | "yours";
+export type SectionId = "cocktails" | "spirits" | "beer-wine" | "events" | "inbox" | "friends" | "bar" | "yours" | "party";
 
 export const APP_BG = "#13170F";
 export const APP_CARD = "#1B2016";
@@ -27,6 +27,8 @@ export const BRAND = {
   green: { dark: "#3B5040", muted: "#6a8a72", text: "#A8C4A0" },
   olive: { dark: "#2a3020", muted: "#5a6a4a", text: "#8A9A78" },
   cream: { dark: "#F5F0E8", muted: "#F5F0E8", text: "#F5F0E8" },
+  // File 15: the site's "Accent / CTA" copper, the one colour of its palette no section used yet (Party Picks).
+  copper: { dark: "#C97D5A", muted: "#C97D5A", text: "#C97D5A" },
 } as const;
 
 // ── Colour arithmetic (sRGB, WCAG 2.x) ───────────────────────────────────────
@@ -55,7 +57,8 @@ export interface Accent { id: SectionId; label: string; brand: keyof typeof BRAN
 const make = (id: SectionId, label: string, brand: keyof typeof BRAND, tintAmount = 0.26, edgeTone: "text" | "muted" = "text"): Accent => {
   const b = BRAND[brand];
   // Cream has no dark tone of its own: its tint is a faint wash of cream, its strong tone cream itself.
-  const tint = brand === "cream" ? mix(b.text, APP_BG, 0.07) : mix(b.dark, APP_BG, tintAmount);
+  // Copper has only one tone too: its tint is a low wash of it (12%), dark enough for body text at AA.
+  const tint = brand === "cream" ? mix(b.text, APP_BG, 0.07) : brand === "copper" ? mix(b.text, APP_BG, 0.12) : mix(b.dark, APP_BG, tintAmount);
   return { id, label, brand, tint, edge: b[edgeTone], ink: b.text };
 };
 
@@ -69,8 +72,11 @@ export const ACCENTS: Record<SectionId, Accent> = {
   events: make("events", "Events", "blue", 0.45), // steel blue
   inbox: make("inbox", "Inbox", "teal", 0.5), // dark teal
   friends: make("friends", "Friends", "green", 0.4), // forest green
-  bar: make("bar", "From the bar", "cream"), // cream
-  yours: make("yours", "Yours", "olive", 0.7), // olive
+  // File 15: "From the bar" cream stays on CG Picks (the bar's curated lists) and the bar's messages.
+  bar: make("bar", "CG Picks", "cream"), // cream
+  yours: make("yours", "Journal", "olive", 0.7), // olive (file 15: "Yours" is now "Journal")
+  // File 15: Party Picks (votes, brackets, anything a member takes part in): the site's Accent / CTA copper.
+  party: make("party", "Party Picks", "copper"), // copper
 };
 export const SECTION_IDS = Object.keys(ACCENTS) as SectionId[];
 
@@ -93,10 +99,12 @@ export const CARD_SECTIONS = {
   // Friends and sharing
   letsgo: "friends", "friends-here": "friends", shared: "friends", "friend-message": "friends",
   // From the bar
-  aperitif: "bar", "bar-message": "bar", "house-list": "bar", chart: "bar", vote: "bar", "whats-new": "bar",
+  aperitif: "bar", "bar-message": "bar", "house-list": "bar", chart: "bar", "whats-new": "bar",
+  // Party Picks (file 15)
+  vote: "party",
   // Drinks
   "spirit-of-the-day": "spirits", exclusive: "cocktails", cocktail: "cocktails", bottle: "spirits", drink: "beer-wine",
-  // Yours
+  // Journal
   "for-you": "yours", favorite: "yours", note: "yours", list: "yours",
 } as const satisfies Record<string, SectionId>;
 export type CardKind = keyof typeof CARD_SECTIONS;
