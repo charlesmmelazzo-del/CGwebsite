@@ -53,13 +53,20 @@ export function accentCardStyle(section: SectionId): CSSProperties {
   return { background: a.tint, borderColor: `${a.edge}55`, borderLeftColor: a.edge };
 }
 
-/** Part 8: a section heading: the display serif, larger than body, in its section's colour (h2 unless told). */
-export function SectionHeading({ children, section, id, as = "h2", aside, className = "" }: { children: ReactNode; section?: SectionId | null; id?: string; as?: "h2" | "h3"; aside?: ReactNode; className?: string }) {
+/**
+ * Part 8: a section heading: the display serif, larger than body, in its section's colour (h2 unless told). File 16,
+ * Part 9: drawn as a header band (the section's icon, its accent, a hairline rule under it); every heading has a section.
+ */
+export function SectionHeading({ children, section = "bar", id, as = "h2", aside, className = "" }: { children: ReactNode; section?: SectionId; id?: string; as?: "h2" | "h3"; aside?: ReactNode; className?: string }) {
   const H = as;
+  const ink = ACCENTS[section].ink;
   return (
-    <div className={`flex items-baseline justify-between gap-3 mt-10 mb-3 ${className}`}>
-      <H id={id} className="pp-t-section" style={{ color: section ? ACCENTS[section].ink : C.text }}>{children}</H>
-      {aside}
+    <div className={`pp-band-wrap ${className}`}>
+      <div className="pp-band" style={{ color: ink }}>
+        <SectionIcon section={section} size={28} color="currentColor" />
+        <H id={id} className="pp-t-section flex-1 min-w-0" style={{ color: ink }}>{children}</H>
+        {aside}
+      </div>
     </div>
   );
 }

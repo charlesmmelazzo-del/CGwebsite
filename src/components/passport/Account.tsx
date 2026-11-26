@@ -1,5 +1,6 @@
 "use client";
 
+import { Band } from "./Library";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { InstallHelpButton } from "./WelcomeSheet";
@@ -327,7 +328,7 @@ function InviteForm({ onDone, onCancel }: { onDone: (firstName: string) => void;
 function Block({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="rounded-xl border p-5 space-y-3" style={{ borderColor: C.line, background: C.card }}>
-      <h2 className="pp-t-section mb-3" style={{ color: C.text }}>{title}</h2>
+      <Band section="yours" className="mb-3">{title}</Band>
       {children}
     </section>
   );

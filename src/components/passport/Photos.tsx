@@ -1,6 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- members' photos come only through their own signed-in route, never the image optimizer. */
 
+import { Band } from "./Library";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -8,7 +9,6 @@ import { createPortal } from "react-dom";
 import { C, Notice, inputCls, postJson } from "./ui";
 import { itemHref } from "./personalShared";
 import { myPhotoSrc, type ItemKind, type MemberPhoto, type PhotoLimits, type PhotosData } from "@/lib/passport/types";
-import { ACCENTS } from "@/lib/passport/accents";
 
 /**
  * File 11, Part 4: a member's own photos. Up to three on any cocktail or bottle they may open, with an optional caption.
@@ -170,7 +170,7 @@ export function MyItemPhotos({ kind, id, name }: { kind: ItemKind; id: number; n
   return (
     <section className="mt-6 rounded-xl border p-5 space-y-3" style={{ borderColor: C.line, background: C.card }} aria-label="Your photos">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="pp-t-section mb-3" style={{ color: ACCENTS["yours"].ink }}>Your photos</h2>
+        <Band section="yours" className="mb-3">Your photos</Band>
         {photos.length > 0 && <Link href="/passport/photos" scroll={false} className="font-body text-[0.875rem] underline underline-offset-4 pp-focus" style={{ color: C.muted }}>My photos</Link>}
       </div>
       {photos.length > 0 && (

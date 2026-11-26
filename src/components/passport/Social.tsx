@@ -1,5 +1,6 @@
 "use client";
 
+import { Band } from "./Library";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
@@ -15,7 +16,6 @@ import {
   ANSWERS, DM_MAX, LETSGO_NOTE_MAX, LETSGO_TIMES, LOOKUP_LINE, NOTE_MAX, PRIVATE_LINE, SHARE_WORDS, answerWord, nextDays, shareHref, sortPlans,
 } from "@/lib/passport/social";
 import type { Conversation, DmPost, Friend, FriendsOverview, LetsGo, MemberNotice, Presence, ShareCard, ShareKind, SocialInbox } from "@/lib/passport/types";
-import { ACCENTS } from "@/lib/passport/accents";
 import { KindLabel, SectionIcon, accentCardStyle } from "./Drill";
 import { ChatScreen, useRoomPoll, type UiPost } from "./Chat";
 
@@ -28,7 +28,6 @@ import { ChatScreen, useRoomPoll, type UiPost } from "./Chat";
 const OFFLINE = "Couldn't do that. Please try again.";
 const smallBtn = "rounded-full border px-4 min-h-[44px] font-body text-[0.875rem] tracking-[0.12em] uppercase transition-colors disabled:opacity-50 pp-focus pp-press";
 const kicker = "pp-t-eyebrow";
-const heading = "pp-t-section mb-3";
 const labelCls = "block font-body text-[0.75rem] tracking-[0.2em] uppercase mb-1.5";
 
 function useSend() {
@@ -158,7 +157,7 @@ export function FriendsHere({ friends }: { friends?: { name: string }[] | null }
   if (!friends?.length) return null;
   return (
     <section aria-labelledby="pp-here" className="mt-8">
-      <h2 id="pp-here" className={heading} style={{ color: ACCENTS["friends"].ink }}>At Common Good now</h2>
+      <Band section="friends" id="pp-here" className="mb-3">At Common Good now</Band>
       <ul className="space-y-2">
         {friends.map((f, i) => (
           <li key={i} className="flex items-center gap-3 rounded-xl border px-4 py-3 pp-card pp-accent-card" style={accentCardStyle("friends")}>
@@ -189,7 +188,7 @@ export function LetsGoCards({ plans }: { plans?: LetsGo[] | null }) {
   };
   return (
     <section aria-labelledby="pp-letsgo" className="mt-8">
-      <h2 id="pp-letsgo" className={heading} style={{ color: ACCENTS["friends"].ink }}>Let&rsquo;s go</h2>
+      <Band section="friends" id="pp-letsgo" className="mb-3">Let&rsquo;s go</Band>
       <ul className="space-y-3">
         {sortPlans(list).map((l) => (
           <li key={`${l.mine ? "m" : "f"}${l.id}`} className="rounded-xl border p-4 pp-card pp-accent-card" style={accentCardStyle("friends")}>
@@ -232,7 +231,7 @@ export function SharedWithYou({ shared }: { shared?: ShareCard[] | null }) {
   };
   return (
     <section aria-labelledby="pp-shared" className="mt-10">
-      <h2 id="pp-shared" className={heading} style={{ color: ACCENTS["friends"].ink }}>Shared with you</h2>
+      <Band section="friends" id="pp-shared" className="mb-3">Shared with you</Band>
       <SeeAll items={shown} what="shared" href="/passport/inbox" keyOf={(s) => String(s.id)} render={(s) => <div className="relative"><ShareCardView s={s} /><span className="absolute top-1 right-1"><button type="button" onClick={() => dismiss(s.id)} aria-label={`Dismiss ${s.name}`} title="Dismiss" className="w-11 h-11 rounded-full flex items-center justify-center pp-focus" style={{ color: C.faint }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6 6 18" /></svg></button></span></div>} />
     </section>
   );
@@ -457,7 +456,7 @@ export function FriendsPage({ initial, code = "", embedded = false }: { initial:
 
       {d.incoming.length > 0 && (
         <section aria-labelledby="pp-requests">
-          <h2 id="pp-requests" className={heading} style={{ color: ACCENTS["friends"].ink }}>Friend requests</h2>
+          <Band section="friends" id="pp-requests" className="mb-3">Friend requests</Band>
           <ul className="space-y-3">
             {d.incoming.map((r) => (
               <li key={r.id} className="rounded-xl border p-4" style={{ borderColor: `${C.brass}80`, background: "#1a1f14" }}>
@@ -475,7 +474,7 @@ export function FriendsPage({ initial, code = "", embedded = false }: { initial:
       )}
 
       <section aria-labelledby="pp-add" className="rounded-xl border p-5" style={{ borderColor: C.line, background: C.card }}>
-        <h2 id="pp-add" className={heading} style={{ color: ACCENTS["friends"].ink }}>Add a friend</h2>
+        <Band section="friends" id="pp-add" className="mb-3">Add a friend</Band>
         <form onSubmit={find} className="space-y-3" noValidate>
           <div className="flex gap-2" role="group" aria-label="Find them by">
             {(["email", "phone", "code"] as FindHow[]).map((h) => <Pill key={h} on={how === h} onClick={() => { setHow(h); setValue(""); setError(""); }}>{h === "email" ? "Email" : h === "phone" ? "Phone" : "Friend code"}</Pill>)}
@@ -495,7 +494,7 @@ export function FriendsPage({ initial, code = "", embedded = false }: { initial:
 
       {d.suggested.length > 0 && (
         <section aria-labelledby="pp-suggested">
-          <h2 id="pp-suggested" className={heading} style={{ color: ACCENTS["friends"].ink }}>In your household</h2>
+          <Band section="friends" id="pp-suggested" className="mb-3">In your household</Band>
           <ul className="space-y-2">
             {d.suggested.map((s) => (
               <li key={s.id} className="flex items-center justify-between gap-3 rounded-xl border px-4 py-3" style={{ borderColor: C.line }}>
@@ -508,7 +507,7 @@ export function FriendsPage({ initial, code = "", embedded = false }: { initial:
       )}
 
       <section aria-labelledby="pp-friends">
-        <h2 id="pp-friends" className={heading} style={{ color: ACCENTS["friends"].ink }}>Your friends{d.friends.length ? ` · ${d.friends.length}` : ""}</h2>
+        <Band section="friends" id="pp-friends" className="mb-3">Your friends{d.friends.length ? ` · ${d.friends.length}` : ""}</Band>
         {!d.friends.length && <p className="font-body text-sm" style={{ color: C.muted }}>When someone accepts your request, they show here.</p>}
         <ul>
           {d.friends.map((f) => (
@@ -525,7 +524,7 @@ export function FriendsPage({ initial, code = "", embedded = false }: { initial:
 
       {d.sent.length > 0 && (
         <section aria-labelledby="pp-sent">
-          <h2 id="pp-sent" className={heading} style={{ color: ACCENTS["friends"].ink }}>Requests you sent</h2>
+          <Band section="friends" id="pp-sent" className="mb-3">Requests you sent</Band>
           <ul>
             {d.sent.map((a) => (
               <li key={a.id} className="flex items-center justify-between gap-3 py-2.5 border-b font-body text-[0.875rem]" style={{ borderColor: C.line, color: C.muted }}>
@@ -539,7 +538,7 @@ export function FriendsPage({ initial, code = "", embedded = false }: { initial:
 
       {d.blocked.length > 0 && (
         <section aria-labelledby="pp-blocked">
-          <h2 id="pp-blocked" className={heading} style={{ color: ACCENTS["friends"].ink }}>Blocked</h2>
+          <Band section="friends" id="pp-blocked" className="mb-3">Blocked</Band>
           <ul>
             {d.blocked.map((b) => (
               <li key={b.id} className="flex items-center justify-between gap-3 py-2.5 border-b font-body text-[0.875rem]" style={{ borderColor: C.line, color: C.text }}>

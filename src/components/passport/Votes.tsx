@@ -1,5 +1,6 @@
 "use client";
 
+import { Band } from "./Library";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { C, Notice, postJson } from "./ui";
@@ -17,7 +18,6 @@ import { PARTY_HREF, voteCovers } from "@/lib/passport/nav";
  * there are no totals; afterwards the winner, and a whole-percent share only when the bar chose to show one. Never a count.
  */
 const kicker = "pp-t-eyebrow";
-const heading = "pp-t-section mb-3";
 
 /** A vote or bracket as a card (Home, the Index, Past votes). */
 export function VoteCardLink({ c, big = false }: { c: VoteCard; big?: boolean }) {
@@ -41,7 +41,7 @@ export function VotesHome({ open, results }: { open?: VoteCard[] | null; results
   return (
     <section aria-labelledby="pp-votes-home" className="mt-10">
       {/* File 15, Part A: Home's votes are Party Picks, the same name as in the Index. */}
-      <h2 id="pp-votes-home" className={heading} style={{ color: ACCENTS.party.ink }}>Party Picks</h2>
+      <Band section="party" id="pp-votes-home" className="mb-3">Party Picks</Band>
       <p className="pp-t-secondary -mt-1 mb-3" style={{ color: C.muted }}>{open?.length ? "Voting is open" : "The results are in"}</p>
       {/* File 12: three at most on Home, the rest behind "See all". */}
       <SeeAll items={[...(open || []).map((c) => ({ c, big: true })), ...(results || []).map((c) => ({ c, big: false }))]}
@@ -81,7 +81,7 @@ export function FlightVotePage({ initial }: { initial: FlightVote }) {
       <ol className="mt-6 space-y-7">
         {f.slots.map((s, i) => (
           <li key={s.id}>
-            <h2 className="pp-t-section mb-3" style={{ color: ACCENTS.party.ink }}>Slot {i + 1}{s.label ? ` · ${s.label}` : ""}</h2>
+            <Band section="party" className="mb-3">Slot {i + 1}{s.label ? ` · ${s.label}` : ""}</Band>
             <ul className="mt-2 space-y-2" role={open ? "radiogroup" : undefined} aria-label={`Slot ${i + 1}`}>
               {s.options.map((o) => {
                 const mine = s.my_pick === o.id;
@@ -189,9 +189,9 @@ export function BracketPage({ initial }: { initial: Bracket }) {
           const open = r.state === "open" && b.status === "open";
           return (
             <section key={r.round} data-round={i} aria-labelledby={`pp-round-${r.round}`} className="snap-start shrink-0 w-[82%] max-w-[300px] md:w-[260px]">
-              <h2 id={`pp-round-${r.round}`} className="pp-t-section mb-3" style={{ color: r.state === "open" ? C.brass : C.muted }}>
+              <Band section="party" id={`pp-round-${r.round}`} className="mb-3">
                 {r.name}{r.state === "open" ? " · now" : r.state === "done" ? " · done" : ""}
-              </h2>
+              </Band>
               <p className="font-body text-[0.75rem] mt-0.5 mb-2" style={{ color: C.faint }}>{r.when}</p>
               <ul className="space-y-3">
                 {r.matchups.map((m, k) => (

@@ -7,6 +7,7 @@ import { AddButton, Avail, BackLink, ItemRow, PressLink } from "./bits";
 import { BarPhoto, Thumb } from "./PhotoBits";
 import Remember from "./Remember";
 import { ACCENTS, type SectionId } from "@/lib/passport/accents";
+import { SectionIcon } from "./Drill";
 
 /**
  * File 03a: the library pieces. Only fields from the Bible's approved list. File 06: shared by the server-rendered pages
@@ -15,22 +16,48 @@ import { ACCENTS, type SectionId } from "@/lib/passport/accents";
  */
 
 /** File 14, Part 8: the page title (h1, the display serif, large) under its small-caps eyebrow. */
-export function PageTitle({ kicker, title, children }: { kicker: string; title: string; children?: ReactNode }) {
+export function PageTitle({ kicker, title, children, section }: { kicker: string; title: string; children?: ReactNode; section?: SectionId | null }) {
   return (
     <div className="mb-6">
       <p className="pp-t-eyebrow" style={{ color: C.brass }}>{kicker}</p>
-      <h1 className="pp-t-page mt-1" style={{ color: C.text, overflowWrap: "anywhere" }}>{title}</h1>
+      {/* File 16, Part 9: a drill-down level's title is a band at h1 size in the accent of the section it belongs to. */}
+      {section ? (
+        <h1 className="pp-t-page pp-band mt-1" style={{ color: ACCENTS[section].ink, overflowWrap: "anywhere" }}><SectionIcon section={section} size={40} color="currentColor" />{title}</h1>
+      ) : (
+        <h1 className="pp-t-page mt-1" style={{ color: C.text, overflowWrap: "anywhere" }}>{title}</h1>
+      )}
       {children}
     </div>
   );
 }
 
-/** File 14, Part 8: a section heading (h2): the display serif, clearly larger than body, in its section's colour. */
-export function SectionTitle({ children, aside, section }: { children: ReactNode; aside?: ReactNode; section?: SectionId }) {
+/**
+ * File 16, Part 9: every section heading (h2) is a header band: its section's icon at heading size, the heading in the
+ * section's accent and a full-width hairline rule in that accent, with more space above than below. Every one has an
+ * accent (a mixed section gets a fixed one: "Right now" Messages teal, "Tonight" From the bar cream, "For you" olive).
+ */
+export function Band({ section, children, id, as = "h2", className = "", aside }: { section: SectionId; children: ReactNode; id?: string; as?: "h2" | "h3"; className?: string; aside?: ReactNode }) {
+  const H = as;
+  const ink = ACCENTS[section].ink;
   return (
-    <div className="flex items-baseline justify-between gap-3 mt-10 mb-3">
-      <h2 className="pp-t-section" style={{ color: section ? ACCENTS[section].ink : C.text }}>{children}</h2>
+    <div className={`pp-band ${className}`} style={{ color: ink }}>
+      <SectionIcon section={section} size={28} color="currentColor" />
+      <H id={id} className="pp-t-section flex-1 min-w-0" style={{ color: ink }}>{children}</H>
       {aside}
+    </div>
+  );
+}
+
+/** File 14, Part 8: a section heading (h2): the display serif, clearly larger than body, in its section's colour. */
+export function SectionTitle({ children, aside, section = "bar" }: { children: ReactNode; aside?: ReactNode; section?: SectionId }) {
+  const ink = ACCENTS[section].ink;
+  return (
+    <div className="pp-band-wrap">
+      <div className="pp-band" style={{ color: ink }}>
+        <SectionIcon section={section} size={28} color="currentColor" />
+        <h2 className="pp-t-section flex-1 min-w-0" style={{ color: ink }}>{children}</h2>
+        {aside}
+      </div>
     </div>
   );
 }
@@ -127,13 +154,13 @@ export function CocktailPage({ c }: { c: Cocktail }) {
       <div className="w-14 h-px my-6" style={{ background: C.brass, opacity: 0.6 }} />
       {c.ingredients && (
         <section>
-          <h2 className="pp-t-section mb-3" style={{ color: ACCENTS["cocktails"].ink }}>In the glass</h2>
+          <Band section="cocktails" className="mb-3">In the glass</Band>
           <p className="font-body text-[1rem] mt-2 leading-relaxed" style={{ color: C.text }}>{c.ingredients}</p>
         </section>
       )}
       {c.bottles && c.bottles.length > 0 && (
         <section className="mt-6">
-          <h2 className="pp-t-section mb-3" style={{ color: ACCENTS["cocktails"].ink }}>Bottles in this drink</h2>
+          <Band section="cocktails" className="mb-3">Bottles in this drink</Band>
           <ul className="mt-1">
             {c.bottles.map((b, i) => {
               const body = (
@@ -155,7 +182,7 @@ export function CocktailPage({ c }: { c: Cocktail }) {
       )}
       {c.flavor && (
         <section className="mt-6">
-          <h2 className="pp-t-section mb-3" style={{ color: ACCENTS["cocktails"].ink }}>Tastes like</h2>
+          <Band section="cocktails" className="mb-3">Tastes like</Band>
           <p className="font-body text-[1rem] mt-2" style={{ color: C.text }}>{c.flavor}</p>
         </section>
       )}
@@ -221,7 +248,7 @@ export function BottlePage({ b }: { b: Bottle | ArchivedBottle }) {
       )}
       {r.cocktails && r.cocktails.length > 0 && (
         <section className="mt-8">
-          <h2 className="pp-t-section mb-3" style={{ color: ACCENTS["spirits"].ink }}>In our cocktails</h2>
+          <Band section="spirits" className="mb-3">In our cocktails</Band>
           <ul className="mt-2">
             {r.cocktails.map((c) => (
               <li key={c.id}>
@@ -259,7 +286,7 @@ export function ProducerPage({ p }: { p: Producer }) {
       <div className="w-14 h-px my-6" style={{ background: C.brass, opacity: 0.6 }} />
       {p.passport_description && <LongText text={p.passport_description} className="mb-8" />}
       <section>
-        <h2 className="pp-t-section mb-3" style={{ color: ACCENTS["spirits"].ink }}>Their bottles</h2>
+        <Band section="spirits" className="mb-3">Their bottles</Band>
         <ul className="mt-2">
           {p.bottles.map((b) => (
             <ItemRow key={b.id} item={{ kind: "bottle", id: b.id, name: b.name }} href={`/passport/spirits/${b.id}`}>

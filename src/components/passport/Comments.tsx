@@ -1,5 +1,6 @@
 "use client";
 
+import { Band } from "./Library";
 import { useCallback, useEffect, useState } from "react";
 import { C, Notice, inputCls, postJson } from "./ui";
 import { Sheet } from "./Social";
@@ -88,7 +89,7 @@ export default function Comments({ type, id }: { type: CommentType; id: number }
   };
   return (
     <section aria-labelledby={`pp-comments-${type}-${id}`} className="mt-10">
-      <h2 id={`pp-comments-${type}-${id}`} className="pp-t-section mb-3" style={{ color: C.text }}>Comments</h2>
+      <Band section="bar" id={`pp-comments-${type}-${id}`} className="mb-3">Comments</Band>
       {t.can_write && t.first_time && !okPg && (
         <div className="rounded-xl border p-4 mb-4" style={{ borderColor: `${C.brass}66`, background: "#1a1f14" }}>
           <p className="font-body text-[1rem]" style={{ color: C.text }}>Before your first comment: {PG_LINE}</p>

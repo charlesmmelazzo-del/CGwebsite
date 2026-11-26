@@ -108,7 +108,7 @@ export default function HomeTab() {
             <FriendsHere friends={d.social?.friends_here} />
             {now.length > 0 && (
               <section aria-labelledby="pp-now">
-                <SectionHeading id="pp-now">Right now</SectionHeading>
+                <SectionHeading id="pp-now" section="inbox">Right now</SectionHeading>
                 <SeeAll items={now} keyOf={(x) => x.key} render={(x) => x.card} what="things waiting" href="/passport/inbox" />
               </section>
             )}

@@ -1,5 +1,6 @@
 "use client";
 
+import { Band } from "../Library";
 import Link from "next/link";
 import { useState } from "react";
 import { C } from "../theme";
@@ -23,7 +24,6 @@ const feedSection = (c: FeedCard): SectionId => (c.link_kind === "menu" ? "cockt
  */
 
 const kicker = "pp-t-eyebrow";
-const heading = "pp-t-section mb-3";
 
 /** Hide a message or a What's new card for this member: gone at once; if the bar can't be reached, it comes back. */
 function useDismiss(what: "message" | "feed") {
@@ -54,7 +54,7 @@ export function WelcomeAperitif({ aperitif }: { aperitif?: Aperitif | null }) {
   if (!aperitif?.name) return null;
   return (
     <section aria-labelledby="pp-aperitif" className="mt-6 rounded-xl border p-5" style={{ borderColor: `${C.brass}66`, background: "#1a1f14" }}>
-      <h2 id="pp-aperitif" className={heading} style={{ color: ACCENTS.bar.ink }}>Welcome Aperitif</h2>
+      <Band section="bar" id="pp-aperitif" className="mb-3">Welcome Aperitif</Band>
       <p className="font-display text-[1.5rem] leading-tight mt-1.5" style={{ color: C.text }}>{aperitif.name}</p>
       {aperitif.description && <p className="font-body text-sm mt-1.5 leading-relaxed whitespace-pre-line" style={{ color: C.muted }}>{aperitif.description}</p>}
     </section>
@@ -72,7 +72,7 @@ export function Tonight({ aperitif, spirit }: { aperitif?: Aperitif | null; spir
   const box = "rounded-xl border p-4 h-full pp-card pp-accent-card";
   return (
     <section aria-labelledby="pp-tonight" className="mt-8">
-      <h2 id="pp-tonight" className={heading} style={{ color: ACCENTS["bar"].ink }}>Tonight</h2>
+      <Band section="bar" id="pp-tonight" className="mb-3">Tonight</Band>
       <div className={`grid gap-3 ${ap && spirit ? "grid-cols-2" : "grid-cols-1"}`}>
         {ap && (
           <div className={box} style={accentCardStyle("bar")}>
@@ -101,7 +101,7 @@ export function FromTheBar({ messages }: { messages?: BarMessage[] | null }) {
   if (!shown.length) return null;
   return (
     <section aria-labelledby="pp-from-bar" className="mt-8">
-      <h2 id="pp-from-bar" className={heading} style={{ color: ACCENTS["bar"].ink }}>From the bar</h2>
+      <Band section="bar" id="pp-from-bar" className="mb-3">From the bar</Band>
       <ul className="space-y-3">
         {shown.map((m) => {
           const href = messageHref(m);
@@ -132,7 +132,7 @@ export function WhatsNew({ cards }: { cards?: FeedCard[] | null }) {
   if (!shown.length) return null;
   return (
     <section aria-labelledby="pp-whats-new" className="mt-10">
-      <h2 id="pp-whats-new" className={heading} style={{ color: ACCENTS["bar"].ink }}>What&rsquo;s new</h2>
+      <Band section="bar" id="pp-whats-new" className="mb-3">What&rsquo;s new</Band>
       <ul className="-mx-5 px-5 flex gap-3 overflow-x-auto pb-2 snap-x">
         {shown.map((c) => (
           <li key={c.key} className="snap-start shrink-0 w-[70%] max-w-[260px] relative">
@@ -154,7 +154,7 @@ export function SpiritOfTheDay({ spirit }: { spirit?: Spirit | null }) {
   const off = discountLine(spirit.discount_pct);
   return (
     <section aria-labelledby="pp-sotd" className="mt-10">
-      <h2 id="pp-sotd" className={heading} style={{ color: ACCENTS["spirits"].ink }}>Spirit of the Day</h2>
+      <Band section="spirits" id="pp-sotd" className="mb-3">Spirit of the Day</Band>
       <PressLink item={{ kind: "bottle", id: spirit.id, name: spirit.name }} href={`/passport/spirits/${spirit.id}`}
         className="block rounded-xl border p-5 pp-row pp-focus pp-card pp-accent-card" style={accentCardStyle("spirits")}>
         <span className="block font-display text-[1.625rem] leading-tight" style={{ color: C.text }}>{spirit.name}</span>
@@ -170,7 +170,7 @@ export function NewestList({ list }: { list?: HouseList | null }) {
   if (!list) return null;
   return (
     <section aria-labelledby="pp-newest-list" className="mt-10">
-      <h2 id="pp-newest-list" className={heading} style={{ color: ACCENTS["bar"].ink }}>CG Picks</h2>
+      <Band section="bar" id="pp-newest-list" className="mb-3">CG Picks</Band>
       <ListCard l={list} big />
     </section>
   );
@@ -200,7 +200,7 @@ export function HouseLists({ lists, charts, pastCount = 0, votes, pastVotes = 0 
   return (
     <section id="from-common-good" aria-labelledby="pp-house-lists">
       <div className="flex items-baseline justify-between mt-10 mb-3">
-        <h2 id="pp-house-lists" className="pp-t-section mb-3" style={{ color: ACCENTS["bar"].ink }}>CG Picks</h2>
+        <Band section="bar" id="pp-house-lists" className="mb-3">CG Picks</Band>
       </div>
       {!!charts?.length && (
         <ul className="grid grid-cols-2 gap-3 mb-3">

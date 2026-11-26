@@ -1,5 +1,6 @@
 "use client";
 
+import { Band } from "./Library";
 import Link from "next/link";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { C } from "./theme";
@@ -77,11 +78,8 @@ export default function SearchArea({ initial = "", children }: { initial?: strin
 }
 
 function Heading({ children, n }: { children: ReactNode; n: number }) {
-  return (
-    <h2 className="flex items-baseline justify-between mt-8 mb-1 pp-t-section mb-3" style={{ color: C.text }}>
-      {children}<span className="tracking-normal text-[0.875rem]" style={{ color: C.faint }}>{n}</span>
-    </h2>
-  );
+  // File 16, Part 9: a band in the accent of what it lists (cocktails terracotta; bottles and producers amber).
+  return <div className="mt-8 mb-3"><Band section={children === "Cocktails" ? "cocktails" : "spirits"} aside={<span className="pp-t-secondary pp-num" style={{ color: C.faint }}>{n}</span>}>{children}</Band></div>;
 }
 
 function Results({ q, results, busy, partial, error }: { q: string; results: FindResults | null; busy: boolean; partial: boolean; error: string }) {

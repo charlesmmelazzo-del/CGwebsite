@@ -1,5 +1,6 @@
 "use client";
 
+import { Band } from "./Library";
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import { C } from "./theme";
@@ -9,7 +10,6 @@ import { Thumb } from "./PhotoBits";
 import { useShell } from "./shellContext";
 import { notifyChanged } from "./appEvents";
 import type { Recommendation } from "@/lib/passport/types";
-import { ACCENTS } from "@/lib/passport/accents";
 import { KindLabel, accentCardStyle } from "./Drill";
 
 /**
@@ -65,7 +65,7 @@ export function ForYouHome({ items }: { items?: Recommendation[] | null }) {
   return (
     <section aria-labelledby="pp-for-you" className="mt-10">
       <div className="flex items-baseline justify-between gap-3 mb-3">
-        <h2 id="pp-for-you" className="pp-t-section" style={{ color: ACCENTS["yours"].ink }}>For you</h2>
+        <Band section="yours" id="pp-for-you" className="mb-3">For you</Band>
         <Link href="/passport/library?at=journal%2Ffor-you" scroll={false} className="pp-t-secondary underline underline-offset-4 min-h-[44px] inline-flex items-center pp-focus rounded" style={{ color: C.text }}>See all</Link>
       </div>
       <ul className="pp-hscroll -mx-5 px-5 flex gap-3 overflow-x-auto pb-2 snap-x">

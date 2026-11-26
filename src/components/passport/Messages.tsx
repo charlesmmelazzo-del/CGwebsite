@@ -1,5 +1,6 @@
 "use client";
 
+import { Band } from "./Library";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -232,13 +233,13 @@ export function ChannelsPanel({ chat }: { chat: ChatOverview | null }) {
       {chat.channels.length > 0 ? <ul className="mt-2">{chat.channels.map((c) => <ChannelLine key={c.id} c={c} />)}</ul> : <p className="font-body text-sm mt-4" style={{ color: C.muted }}>You haven&rsquo;t joined a channel yet. Browse below.</p>}
       {chat.browse.length > 0 && (
         <section aria-labelledby="pp-browse" className="mt-8">
-          <h2 id="pp-browse" className="pp-t-section mb-1" style={{ color: teal.ink }}>Browse</h2>
+          <Band section="inbox" id="pp-browse" className="mb-1">Browse</Band>
           <ul>{chat.browse.map((c) => <ChannelLine key={c.id} c={c} onJoin={() => join(c.id)} />)}</ul>
         </section>
       )}
       {chat.proposals.length > 0 && (
         <section aria-labelledby="pp-ideas" className="mt-8">
-          <h2 id="pp-ideas" className="pp-t-section mb-2" style={{ color: teal.ink }}>Your channel ideas</h2>
+          <Band section="inbox" id="pp-ideas" className="mb-2">Your channel ideas</Band>
           <ul className="space-y-2">{chat.proposals.map((p) => (
             <li key={p.id} className="rounded-xl border px-4 py-3" style={{ borderColor: C.line, background: C.card }}>
               <span className="block font-display text-[1.125rem]" style={{ color: C.text }}>{p.name}</span>

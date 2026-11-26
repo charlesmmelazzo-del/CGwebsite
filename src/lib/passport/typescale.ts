@@ -12,7 +12,8 @@ export const ROOT_PX = 16;
 export interface TypeStep { name: string; use: string; family: "display" | "body"; rem: number; weight: number; lineHeight: number; tracking?: string; caps?: boolean }
 export const TYPE = {
   page: { name: "Page title", use: "Menu, Index, a cocktail's name (h1)", family: "display", rem: 2.5, weight: 500, lineHeight: 1.08 },
-  section: { name: "Section heading", use: "Right now, From the bar, Your lists, a tab's or album's name (h2)", family: "display", rem: 1.5, weight: 600, lineHeight: 1.2 },
+  // File 16, Part 9: one step larger (1.5 → 1.75rem) and drawn as a band: the section's icon, its accent and a rule.
+  section: { name: "Section heading", use: "Right now, From the bar, Your lists, a tab's or album's name (h2)", family: "display", rem: 1.75, weight: 600, lineHeight: 1.2 },
   card: { name: "Card title", use: "a card's or row's name (h3, or the row's own text)", family: "display", rem: 1.25, weight: 500, lineHeight: 1.2 },
   body: { name: "Body", use: "descriptions, messages, paragraphs", family: "body", rem: 1, weight: 400, lineHeight: 1.5 },
   secondary: { name: "Secondary", use: "the one line under a name, captions, notes", family: "body", rem: 0.875, weight: 400, lineHeight: 1.45 },
