@@ -170,9 +170,12 @@ function LevelBody({ level, d, version, everything, setEverything }: { level: In
         </>
       );
     case "drinks":
+      // File 15, Part F: a beer, wine or cider opens its own page (like a spirit), with "+", heart, notes and photos.
       return (
         <ul>
-          {level.items.map((x, i) => (
+          {level.items.map((x, i) => x.id
+            ? <CompactBottle key={`d${x.id}`} b={{ id: x.id, name: x.name, photo: x.photo, photo_clear: x.photo_clear, available: x.available, status_label: x.status_label }} out={!!x.status_label} mark={d.marks[markKey("bottle", x.id)]} />
+            : (
             <li key={`${x.name}-${i}`} className="py-3 border-b" style={{ borderColor: C.line, contentVisibility: "auto", containIntrinsicSize: "auto 64px", opacity: x.status_label ? 0.7 : 1 }}>
               <span className="flex items-center gap-2">
                 <span className="pp-t-body" style={{ color: C.text }}>{x.name}</span>

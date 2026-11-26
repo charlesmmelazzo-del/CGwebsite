@@ -62,7 +62,9 @@ export interface Fact { label: string; value: string }
 export interface BottleCocktail { id: number; name: string; menu_name: string; menu_status: "current" | "past" }
 export interface Bottle extends ArchivedBottle { producer_id: number | null; passport_description?: string; prices: MenuPrice[]; facts: Fact[]; cocktails: BottleCocktail[]; photo?: string | null; photo_alt?: string; photo_clear?: boolean;
   /** File 15: "Photo: {credit}" in small type, only when the bar typed a credit for its photo. */
-  photo_credit?: string }
+  photo_credit?: string;
+  /** File 15, Part F: false for a beer, wine or cider not sold whole, so "Request a bottle for home" is hidden. */
+  can_request?: boolean }
 export interface ProducerBottle { id: number; name: string; category: string; status_label: string | null }
 /** passport_description: the approved Passport text (Part 6), or "" when there is none yet. */
 export interface Producer { id: number; name: string; based_in: string; passport_description?: string; bottles: ProducerBottle[] }

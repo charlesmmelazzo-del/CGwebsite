@@ -651,7 +651,7 @@ function slowServer() {
     });
     await test("the photo routes ask the Bible for the signed-in member only, and never let a shared cache keep a picture", () => {
       const lib = readFileSync(join(__dirname, "..", "photoRoute.ts"), "utf8");
-      assert.ok(lib.includes("currentAuth()") && lib.includes('limited(req, "passport-photo-read")') && lib.includes('.startsWith("image/jpeg")'), "signed in, rate limited, only a JPEG the Bible made goes on");
+      assert.ok(lib.includes("currentAuth()") && lib.includes('limited(req, "passport-photo-read")') && lib.includes('PHOTO_TYPES = ["image/jpeg", "image/webp"]') && lib.includes("!PHOTO_TYPES.includes(type)"), "signed in, rate limited, only a JPEG (file 15: or a cut-out WebP) the Bible made goes on; never an SVG");
       const bar = readFileSync(join(APP, "passport", "(app)", "photo", "bar", "[kind]", "[id]", "[size]", "route.ts"), "utf8");
       const mine = readFileSync(join(APP, "passport", "(app)", "photo", "mine", "[token]", "[size]", "route.ts"), "utf8");
       assert.ok(bar.includes('"private, max-age=31536000, immutable"'), "the bar's photos: long cache, in the member's own browser only");
@@ -796,6 +796,27 @@ function slowServer() {
     await test("an item page says \"You or your household have ordered this\" only when the Bible says so", () => {
       const p = compP("Personal.tsx");
       assert.ok(p.includes("mine.ordered_household") && p.includes("You or your household have ordered this"));
+    });
+  }
+
+  console.log("File 15, Part F: beer, wine and cider open their own pages");
+  {
+    const React = await import("react");
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    (globalThis as { React?: unknown }).React = React;
+    const D = await import("../../../components/passport/Drill");
+    const html = (el: unknown) => renderToStaticMarkup(el as never);
+    await test("a beer row with a Bible item opens its bottle page (file 06's \"no page of its own\" rows are replaced)", () => {
+      const row = html(React.createElement(D.CompactBottle, { b: { id: 7001, name: "Pils", photo: "pp", available: true, status_label: null }, out: false }));
+      assert.ok(row.includes('href="/passport/spirits/7001"') && row.includes("Pils"), row);
+      const index = readFileSync(join(__dirname, "..", "..", "..", "components", "passport", "tabs", "IndexTab.tsx"), "utf8");
+      assert.ok(/case "drinks":[\s\S]*?x\.id\s*\?\s*<CompactBottle/.test(index), "the Index's Beer & wine rows use the bottle row when the item has a page");
+    });
+    await test("a row with no Bible item stays a plain row; \"Request a bottle for home\" hides when the Bible says can_request false", () => {
+      const index = readFileSync(join(__dirname, "..", "..", "..", "components", "passport", "tabs", "IndexTab.tsx"), "utf8");
+      assert.ok(/case "drinks":[\s\S]*?: \(\s*<li key=\{`\$\{x\.name\}/.test(index));
+      const page = readFileSync(join(__dirname, "..", "..", "..", "app", "passport", "(app)", "spirits", "[id]", "page.tsx"), "utf8");
+      assert.ok(page.includes("can_request !== false && <RequestBottle"));
     });
   }
 
