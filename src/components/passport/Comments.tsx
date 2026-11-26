@@ -15,8 +15,8 @@ import type { CommentThread, CommentType, PComment } from "@/lib/passport/types"
  * global one): never an empty box. Other members appear by display name only; the bar as "Common Good · {first name}".
  * One level of replies; the author may edit for 10 minutes and delete any time; report a comment or block its author.
  */
-const smallBtn = "rounded-full border px-4 min-h-[40px] font-body text-[12px] tracking-[0.12em] uppercase transition-colors disabled:opacity-50 pp-focus pp-press";
-const linkBtn = "font-body text-[12px] underline underline-offset-4 min-h-[36px] pp-focus";
+const smallBtn = "rounded-full border px-4 min-h-[44px] font-body text-[12px] tracking-[0.12em] uppercase transition-colors disabled:opacity-50 pp-focus pp-press";
+const linkBtn = "font-body text-[12px] underline underline-offset-4 min-h-[44px] pp-focus";
 
 export default function Comments({ type, id }: { type: CommentType; id: number }) {
   const shell = useShell();

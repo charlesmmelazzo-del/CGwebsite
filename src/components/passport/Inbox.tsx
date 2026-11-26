@@ -22,7 +22,7 @@ import type { BottleRequest, EventInquiry, InboxData, InboxPost, InboxRef, Inbox
  */
 
 const OFFLINE = "Couldn't send that. Please try again.";
-const smallBtn = "rounded-full border px-4 min-h-[40px] font-body text-[12px] tracking-[0.12em] uppercase transition-colors disabled:opacity-50 pp-focus pp-press";
+const smallBtn = "rounded-full border px-4 min-h-[44px] font-body text-[12px] tracking-[0.12em] uppercase transition-colors disabled:opacity-50 pp-focus pp-press";
 const labelCls = "block font-body text-[11px] tracking-[0.2em] uppercase mb-1.5";
 export const REPLY_LINE = "Replies can take a day. For anything during service, just ask us at the bar.";
 
@@ -82,17 +82,21 @@ function usePoll<T>(url: string, pick: (d: Record<string, unknown>) => T | undef
 }
 
 // ── The Inbox tab ────────────────────────────────────────────────────────────
-/** The three ways to start something, always at the top. */
+/**
+ * The three ways to start something, always at the top. File 12: one compact row (short words, full names for screen
+ * readers) so the Inbox's own sections start sooner, even with every section present.
+ */
 export function InboxActions() {
-  const a = (kind: string, label: string) => (
-    <Link href={`/passport/inbox/new?kind=${kind}`} scroll={false} className={`${smallBtn} inline-flex items-center justify-center text-center`}
+  const a = (kind: string, short: string, label: string) => (
+    <Link href={`/passport/inbox/new?kind=${kind}`} scroll={false} aria-label={label}
+      className="inline-flex items-center justify-center gap-1.5 rounded-full border px-3 min-h-[44px] font-body text-[13px] whitespace-nowrap pp-focus pp-press"
       style={{ borderColor: kind === "message" ? C.brass : C.line, color: kind === "message" ? C.bg : C.text, background: kind === "message" ? C.brass : "transparent" }}>
-      {label}
+      <span aria-hidden>+</span> {short}
     </Link>
   );
   return (
-    <div className="grid grid-cols-1 min-[380px]:grid-cols-3 gap-2" role="group" aria-label="Start something">
-      {a("message", "Message the bar")}{a("request", "Make a request")}{a("event", "Plan an event")}
+    <div className="grid grid-cols-3 gap-2 -mt-2" role="group" aria-label="Start something">
+      {a("message", "Message", "Message the bar")}{a("request", "Request", "Make a request")}{a("event", "Event", "Plan an event")}
     </div>
   );
 }
@@ -256,8 +260,8 @@ function RefChip({ r }: { r: InboxRef }) {
   const word = r.kind === "list" ? "List" : r.kind === "bottle" ? "Bottle" : "Cocktail";
   const inner = <><span className="font-body text-[10px] tracking-[0.2em] uppercase" style={{ color: C.faint }}>{word}</span> <span className="font-body text-sm" style={{ color: C.text }}>{r.name}</span>{href && <span aria-hidden style={{ color: C.brass }}> →</span>}</>;
   return href
-    ? <Link href={href} scroll={false} className="inline-flex items-center gap-1.5 rounded-full border px-3 min-h-[36px] pp-focus" style={{ borderColor: C.line }}>{inner}</Link>
-    : <span className="inline-flex items-center gap-1.5 rounded-full border px-3 min-h-[36px]" style={{ borderColor: C.line }}>{inner}</span>;
+    ? <Link href={href} scroll={false} className="inline-flex items-center gap-1.5 rounded-full border px-3 min-h-[44px] pp-focus" style={{ borderColor: C.line }}>{inner}</Link>
+    : <span className="inline-flex items-center gap-1.5 rounded-full border px-3 min-h-[44px]" style={{ borderColor: C.line }}>{inner}</span>;
 }
 function Composer({ onSend, busy, error, placeholder, cta = "Send" }: { onSend: (text: string) => Promise<boolean>; busy: boolean; error: string; placeholder: string; cta?: string }) {
   const [text, setText] = useState("");
@@ -387,7 +391,7 @@ function Chips<T extends string>({ label, options, value, onChange }: { label: s
       <legend className={labelCls} style={{ color: C.muted }}>{label}</legend>
       <div className="flex flex-wrap gap-2">
         {options.map((o) => (
-          <button key={o.id} type="button" aria-pressed={value === o.id} onClick={() => onChange(o.id)} className="rounded-full border px-3.5 min-h-[40px] font-body text-[14px] pp-focus pp-press"
+          <button key={o.id} type="button" aria-pressed={value === o.id} onClick={() => onChange(o.id)} className="rounded-full border px-3.5 min-h-[44px] font-body text-[14px] pp-focus pp-press"
             style={{ borderColor: value === o.id ? C.brass : C.line, color: value === o.id ? C.bg : C.text, background: value === o.id ? C.brass : "transparent" }}>
             {o.label}
           </button>

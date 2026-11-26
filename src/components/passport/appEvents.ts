@@ -28,6 +28,9 @@ export const reducedMotion = () => typeof window !== "undefined" && !!window.mat
 export function scrollToId(id: string, smooth = false) {
   const el = typeof document !== "undefined" ? document.getElementById(id) : null;
   if (!el) return;
-  const top = el.getBoundingClientRect().top + window.scrollY - (document.querySelector(".pp-app header")?.getBoundingClientRect().height || 56) - 12;
+  // File 12: the Index's jump chips stick under the top bar, so a heading lands below them too.
+  const jump = document.querySelector(".pp-jump") as HTMLElement | null;
+  const chips = jump && jump.offsetParent ? jump.getBoundingClientRect().height : 0;
+  const top = el.getBoundingClientRect().top + window.scrollY - (document.querySelector(".pp-app header")?.getBoundingClientRect().height || 56) - chips - 12;
   window.scrollTo({ top: Math.max(0, top), behavior: (smooth && !reducedMotion() ? "smooth" : "instant") as ScrollBehavior });
 }

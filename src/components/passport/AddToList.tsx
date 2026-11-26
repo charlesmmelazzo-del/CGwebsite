@@ -97,7 +97,7 @@ export default function AddToList({ target, onClose, toast, cache }: {
               <div role="radiogroup" aria-label="Kind of list" className="flex gap-2">
                 {([[false, "Playlist"], [true, "Top 10"]] as const).map(([v, l]) => (
                   <button key={l} type="button" role="radio" aria-checked={ranked === v} onClick={() => setRanked(v)}
-                    className="rounded-full border px-4 min-h-[40px] font-body text-[12px] tracking-[0.08em] pp-focus"
+                    className="rounded-full border px-4 min-h-[44px] font-body text-[12px] tracking-[0.08em] pp-focus"
                     style={ranked === v ? { borderColor: C.brass, color: C.brass, background: "#1a1f14" } : { borderColor: C.line, color: C.muted }}>{l}</button>
                 ))}
               </div>

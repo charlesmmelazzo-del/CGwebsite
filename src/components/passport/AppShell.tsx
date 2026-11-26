@@ -151,6 +151,27 @@ function Frame({ children }: { children: ReactNode }) {
     }
     wasOverlay.current = true;
   }, [pathname, overlay]);
+  // File 12: Back slides the page out the way it came in (to the side), over the tab it was opened from. The page keeps
+  // what it showed while it leaves; with "reduce motion" it simply goes.
+  const lastPage = useRef<ReactNode>(null);
+  if (overlay) lastPage.current = children;
+  const [exiting, setExiting] = useState(false);
+  const prevOverlay = useRef(overlay);
+  useLayoutEffect(() => {
+    const was = prevOverlay.current;
+    prevOverlay.current = overlay;
+    if (overlay) { setExiting(false); return; }
+    if (was && !reducedMotion() && typeof Element !== "undefined" && "animate" in Element.prototype) setExiting(true);
+  }, [overlay]);
+  useLayoutEffect(() => {
+    const el = overlayRef.current;
+    if (!exiting || !el || !el.animate) return;
+    const anim = el.animate([{ transform: "none" }, { transform: "translateX(100%)" }], { duration: 220, easing: "cubic-bezier(0.4, 0, 0.8, 0.4)", fill: "forwards" });
+    anim.onfinish = () => setExiting(false);
+    return () => { anim.onfinish = null; anim.cancel(); };
+  }, [exiting]);
+  const pageShown = overlay || exiting;
+
   // While a page is over a tab, the tab behind it is out of reach for keyboards and screen readers.
   const mainRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -241,10 +262,11 @@ function Frame({ children }: { children: ReactNode }) {
         </main>
 
         {/* Pages that open over a tab (and, for a tab's own address, nothing: the tab is drawn above). */}
-        <div ref={overlayRef} className={overlay ? "pp-overlay fixed inset-x-0 bottom-0 z-30 overflow-y-auto" : "hidden"}
-          style={overlay ? { top: 0, background: C.bg, paddingTop: "calc(var(--pp-top) + 20px)" } : undefined}
-          onScroll={(e) => { overlayScroll.current[pathname] = (e.target as HTMLDivElement).scrollTop; }}>
-          <div className="pp-page w-full max-w-xl mx-auto px-5">{children}</div>
+        <div ref={overlayRef} className={pageShown ? "pp-overlay fixed inset-x-0 bottom-0 z-30 overflow-y-auto" : "hidden"}
+          style={pageShown ? { top: 0, background: C.bg, paddingTop: "calc(var(--pp-top) + 20px)", ...(exiting ? { pointerEvents: "none" } : {}) } : undefined}
+          aria-hidden={exiting || undefined}
+          onScroll={(e) => { if (overlay) overlayScroll.current[pathname] = (e.target as HTMLDivElement).scrollTop; }}>
+          <div className="pp-page w-full max-w-xl mx-auto px-5">{exiting ? lastPage.current : children}</div>
         </div>
 
         <nav aria-label="Passport tabs" className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t"

@@ -43,7 +43,7 @@ function longDate(d: string | null) {
   return new Date(`${d.slice(0, 10)}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-const smallBtn = "rounded-full border px-3.5 min-h-[40px] font-body text-[12px] tracking-[0.08em] transition-colors disabled:opacity-50 pp-focus";
+const smallBtn = "rounded-full border px-3.5 min-h-[44px] font-body text-[12px] tracking-[0.08em] transition-colors disabled:opacity-50 pp-focus";
 
 // ── A cocktail or bottle page: favorite, stars, note, and whether they've ordered it ──
 // No tap is ever lost (lib/passport/saveQueue.ts): each tap shows at once and the saves go to the server in order.

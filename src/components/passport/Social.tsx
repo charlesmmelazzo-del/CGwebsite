@@ -23,7 +23,7 @@ import type { Conversation, DmPost, Friend, FriendsOverview, LetsGo, MemberNotic
  */
 
 const OFFLINE = "Couldn't do that. Please try again.";
-const smallBtn = "rounded-full border px-4 min-h-[40px] font-body text-[12px] tracking-[0.12em] uppercase transition-colors disabled:opacity-50 pp-focus pp-press";
+const smallBtn = "rounded-full border px-4 min-h-[44px] font-body text-[12px] tracking-[0.12em] uppercase transition-colors disabled:opacity-50 pp-focus pp-press";
 const kicker = "font-body text-[10px] tracking-[0.25em] uppercase";
 const heading = "font-body text-[11px] tracking-[0.3em] uppercase mb-3";
 const labelCls = "block font-body text-[11px] tracking-[0.2em] uppercase mb-1.5";
@@ -46,7 +46,7 @@ function useSend() {
 }
 function Pill({ on, children, onClick, disabled }: { on: boolean; children: ReactNode; onClick: () => void; disabled?: boolean }) {
   return (
-    <button type="button" aria-pressed={on} onClick={onClick} disabled={disabled} className="rounded-full border px-3.5 min-h-[40px] font-body text-[14px] pp-focus pp-press disabled:opacity-50"
+    <button type="button" aria-pressed={on} onClick={onClick} disabled={disabled} className="rounded-full border px-3.5 min-h-[44px] font-body text-[14px] pp-focus pp-press disabled:opacity-50"
       style={{ borderColor: on ? C.brass : C.line, color: on ? C.bg : C.text, background: on ? C.brass : "transparent" }}>{children}</button>
   );
 }

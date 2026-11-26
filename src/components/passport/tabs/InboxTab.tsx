@@ -20,7 +20,7 @@ export default function InboxTab() {
     <TabView<BottleRequests & { inbox?: InboxData | null; social?: SocialInbox | null }> name="inbox" skeleton={<ScreenSkeleton rows={4} cards={1} />}>
       {(d) => (
         <>
-          <PageTitle kicker="For you" title="Inbox" />
+          <PageTitle kicker="Messages, requests and bottles" title="Inbox" />
           <InboxActions />
           <InboxSections inbox={d.inbox ?? null} bottles={d.requests} title={(id, children) => <div id={id}><SectionTitle>{children}</SectionTitle></div>} />
           <InboxFriends social={d.social} title={(id, children) => <div id={id}><SectionTitle>{children}</SectionTitle></div>} />
