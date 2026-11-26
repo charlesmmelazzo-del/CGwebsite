@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { C, Notice, postJson } from "./ui";
 import { BackLink, ItemRow } from "./bits";
+import { Thumb } from "./PhotoBits";
 import { useShell } from "./shellContext";
 import { notifyChanged } from "./appEvents";
 import { TAX_LINE, flightLine, houseHref, listKicker, pourLabel } from "@/lib/passport/bar";
@@ -57,6 +58,7 @@ function HouseRow({ it, rank }: { it: HouseItem; rank: number | null }) {
         </span>
         {it.note && <span className="block font-body text-sm mt-0.5 leading-relaxed" style={{ color: C.muted }}>{it.note}</span>}
       </span>
+      {href && <span className="self-center"><Thumb kind={it.kind} id={it.id} photo={it.photo} size={48} /></span>}
     </span>
   );
   return <ItemRow item={href && it.id ? { kind: it.kind, id: it.id, name: it.name } : null} href={href} pad="py-3">{body}</ItemRow>;

@@ -42,6 +42,9 @@ export const LIMITS = {
   // too) and votes (one tap each; a member may change a pick until voting closes).
   "passport-comments":     { max: 120, windowMs: HOUR },
   "passport-votes":        { max: 300, windowMs: HOUR },
+  // File 11: adding or deleting your own photos (the Bible caps 20 a day too), and seeing photos (thumbnails on lists).
+  "passport-photos":       { max: 60,  windowMs: HOUR },
+  "passport-photo-read":   { max: 3000, windowMs: HOUR },
   // Invitation codes typed in or opened from a link: few, so a code can't be guessed (the Bible also caps wrong codes overall).
   "passport-code":   { max: 10,  windowMs: HOUR },
 } as const;

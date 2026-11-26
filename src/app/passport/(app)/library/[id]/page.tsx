@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Unavailable from "@/components/passport/Unavailable";
 import { CocktailPage } from "@/components/passport/Library";
 import { ItemControls } from "@/components/passport/Personal";
+import { MyItemPhotos } from "@/components/passport/Photos";
 import { AskAboutThis } from "@/components/passport/Inbox";
 import { ShareButton } from "@/components/passport/Social";
 import { getCocktail, getMine } from "@/lib/passport/bible";
@@ -22,6 +23,8 @@ export default async function CocktailRoute({ params }: { params: { id: string }
     <>
       <CocktailPage c={r.data.c} />
       <ItemControls key={`cocktail-${id}`} kind="cocktail" id={id} name={r.data.c.name} initial={r.data.mine} />
+      {/* File 11: the member's own photos (up to three here), private to them and the Common Good team. */}
+      <MyItemPhotos key={`photos-cocktail-${id}`} kind="cocktail" id={id} name={r.data.c.name} />
       {/* File 08: a message to the bar with this cocktail attached. */}
       <AskAboutThis kind="cocktail" id={id} name={r.data.c.name} />
       {/* File 09: share it with friends (it opens for them only if they may open it). */}
