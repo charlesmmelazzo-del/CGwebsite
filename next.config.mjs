@@ -24,6 +24,15 @@ const nextConfig = {
   async headers() {
     return [
       {
+        // Passport's background helper (notifications, file 13) may look after /passport itself, not just
+        // /passport/…, and is always checked for a newer copy. It never controls any other part of the site.
+        source: "/passport/sw.js",
+        headers: [
+          { key: "Service-Worker-Allowed", value: "/passport" },
+          { key: "Cache-Control", value: "no-cache" },
+        ],
+      },
+      {
         // Apply security headers to every route
         source: "/(.*)",
         headers: [

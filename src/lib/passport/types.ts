@@ -192,6 +192,8 @@ export interface InboxLimits {
 export interface InboxData { threads: InboxThread[]; member_requests: MemberRequest[]; inquiries: EventInquiry[]; limits: InboxLimits }
 /** Account → Notifications. news is the member's marketing choice. digest_hour: bar time, 6 to 22. */
 export interface NotifyPrefs { messages: boolean; requests: boolean; bottles: boolean; friends?: boolean; comments?: boolean; votes?: boolean; news: boolean; digest: boolean; digest_hour: number }
+/** File 13: notifications on this device. public_key is the Bible's PUBLIC web-push key (not a secret); never the private one. */
+export interface PushStatus { public_key: string; subscribed: boolean; devices: number }
 
 // ── File 09: friends, direct messages, sharing, Let's go, I'm here and Passport events (the Bible's approved list). ──
 // What a member ever sees of another member is a display name. Numbers here name a friendship, a request, a

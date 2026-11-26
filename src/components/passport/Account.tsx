@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import InstallHint from "./InstallHint";
+import { markPromptDone, pushState, turnOff, turnOn, type PushState } from "./pushClient";
 import { notifyChanged } from "./appEvents";
 import { Button, C, Check, Field, Notice, inputCls, postJson, useBotFields } from "./ui";
 import type { FriendsOverview, Me, NotifyPrefs } from "@/lib/passport/bible";
@@ -136,7 +137,7 @@ function Notifications({ initial, onNews }: { initial: NotifyPrefs; onNews: (on:
   };
   return (
     <Block title="Notifications">
-      <p className="font-body text-xs leading-relaxed" style={{ color: C.faint }}>Email me when{saving && <span> · Saving…</span>}</p>
+      <p className="font-body text-xs leading-relaxed" style={{ color: C.faint }}>Email me, and notify my devices if they&rsquo;re on, when{saving && <span> · Saving…</span>}</p>
       <Check checked={p.messages} onChange={(v) => save({ messages: v })}>The bar replies to a message</Check>
       <Check checked={p.requests} onChange={(v) => save({ requests: v })}>Something changes on a request or event inquiry</Check>
       <Check checked={p.bottles} onChange={(v) => save({ bottles: v })}>There is news about a bottle request <span style={{ color: C.faint }}>(a bottle ready for pickup is always emailed)</span></Check>
@@ -155,9 +156,55 @@ function Notifications({ initial, onNews }: { initial: NotifyPrefs; onNews: (on:
           </label>
         )}
       </div>
-      <p className="font-body text-xs leading-relaxed" style={{ color: C.faint }}>Emails only say that something is waiting; read it in your Inbox. At most one an hour about the same conversation, and none while you have it open. Notifications on this phone are coming in a later update. Account emails, like password resets, always come through.</p>
+      <p className="font-body text-xs leading-relaxed" style={{ color: C.faint }}>Emails only say that something is waiting; read it in your Inbox. At most one an hour about the same conversation, and none while you have it open. Account emails, like password resets, always come through.</p>
       {error && <Notice>{error}</Notice>}
+      <ThisDevice />
     </Block>
+  );
+}
+
+/**
+ * File 13: "Notify me on this device". Off until the member turns it on here (or on Home's one-time card); the
+ * browser's permission box opens only after this tap. The switches above choose which kinds count, for email and
+ * notifications alike.
+ */
+function ThisDevice() {
+  const [state, setState] = useState<PushState | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+  const [showInstall, setShowInstall] = useState(false);
+  useEffect(() => { let live = true; pushState().then((s) => { if (live) setState(s); }); return () => { live = false; }; }, []);
+  const flip = async (on: boolean) => {
+    setBusy(true);
+    setNote("");
+    const r = on ? await turnOn() : await turnOff();
+    setBusy(false);
+    setState(r.state);
+    if (on) markPromptDone("answered");
+    if (r.error) setNote(r.error);
+    else if (on && r.state === "blocked") setNote("Notifications are blocked for this site. Allow them in your browser's settings, then try again.");
+  };
+  return (
+    <div className="pt-3 border-t space-y-2" style={{ borderColor: C.line }} aria-busy={state === null || busy}>
+      <p className="font-body text-xs leading-relaxed" style={{ color: C.faint }}>On this device</p>
+      {state === "needs-install" ? (
+        <>
+          <p className="font-body text-sm leading-relaxed" style={{ color: C.text }}>On iPhone, notifications work once Passport is on your home screen. Add it, open Passport from there, then turn them on here.</p>
+          {showInstall
+            ? <InstallHint force onClose={() => setShowInstall(false)} />
+            : <button type="button" onClick={() => setShowInstall(true)} className="inline-flex items-center min-h-[44px] font-body text-sm underline underline-offset-4 pp-focus rounded" style={{ color: C.text }}>How to add Passport to your home screen</button>}
+        </>
+      ) : state === "unsupported" ? (
+        <p className="font-body text-sm leading-relaxed" style={{ color: C.muted }}>This browser can&rsquo;t show notifications from Passport. Emails still come through.</p>
+      ) : (
+        <Check checked={state === "on"} onChange={(v) => { if (!busy && state !== null) flip(v); }}>
+          Notify me on this device {busy && <span style={{ color: C.faint }}>· {state === "on" ? "Turning off…" : "Turning on…"}</span>}
+        </Check>
+      )}
+      {state === "blocked" && !note && <p className="font-body text-xs leading-relaxed" style={{ color: C.muted }}>Notifications are blocked for this site in your browser&rsquo;s settings. Allow them there to turn this on.</p>}
+      <p className="font-body text-xs leading-relaxed" style={{ color: C.faint }}>A short note on this device when the bar replies or asks you something, a bottle price is ready, a bottle is ordered or ready for pickup, a friend writes, a place opens up or an event is cancelled, someone replies to your comment, a bracket moves on, or there&rsquo;s news from the bar. It never shows what anyone wrote, a price or anyone&rsquo;s last name. Nothing between 10 PM and 9 AM, and at most six a day; the rest wait in your Inbox. The switches above choose which kinds you get.</p>
+      {note && <Notice>{note}</Notice>}
+    </div>
   );
 }
 
