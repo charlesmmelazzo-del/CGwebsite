@@ -298,8 +298,9 @@ const group = (name: string, n: number): MenuGroup => ({ name, items: Array.from
     assert.ok(/export function PageTitle[\s\S]*?<h1 className="pp-t-page/.test(lib) && /export function SectionTitle[\s\S]*?<h2 className="pp-t-section/.test(lib));
     assert.ok(/export function SectionHeading[\s\S]*?as = "h2"/.test(comp("Drill.tsx")));
     for (const f of ["tabs/MenuTab.tsx", "tabs/IndexTab.tsx", "tabs/HomeTab.tsx", "tabs/InboxTab.tsx", "tabs/EventsTab.tsx"]) {
-      const src = comp(f).replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "");
-      const h1s = (src.match(/<h1\b/g) || []).length + (src.match(/<PageTitle\b/g) || []).length - (f.endsWith("IndexTab.tsx") ? 1 : 0); // IndexTab's skeleton shows the same title while loading
+      // A tab's loading placeholder shows the same title while its data arrives (never both at once): left out here.
+      const src = comp(f).replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "").replace(/function \w*Skeleton\(\) \{[\s\S]*?\n\}\n/g, "");
+      const h1s = (src.match(/<h1\b/g) || []).length + (src.match(/<PageTitle\b/g) || []).length;
       assert.equal(h1s, 1, `${f}: ${h1s} page titles`);
       assert.ok(!/<h2 className="font-body text-\[1[01]px\]/.test(src), `${f}: no tiny small-caps h2`);
     }

@@ -30,7 +30,7 @@ const menuItemCover = (items: MenuItem[]): Cover | null =>
 
 /** The two letters of a monogram tile for a place with no photo anywhere inside it. */
 export function monogram(label: string): string {
-  const words = label.replace(/[^A-Za-z0-9& ]/g, " ").split(/\s+/).filter((w) => w && !/^(the|and|of|&)$/i.test(w));
+  const words = label.replace(/[^A-Za-z0-9& ]/g, " ").split(/\s+/).filter((w) => w && !/^(the|and|of|&)$/i.test(w) && !/^\d+$/.test(w));
   if (!words.length) return "CG";
   return (words.length === 1 ? words[0].slice(0, 2) : words[0][0] + words[1][0]).toUpperCase().replace(/^(.)(.)$/, (_m, a: string, b: string) => a + b.toLowerCase());
 }

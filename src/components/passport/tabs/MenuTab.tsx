@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { C } from "../theme";
-import { ScreenSkeleton } from "../bits";
+import { SkelRows } from "../bits";
 import { PageTitle, Quiet } from "../Library";
 import SearchArea from "../Search";
 import TabView from "./TabView";
@@ -38,10 +38,16 @@ export default function MenuTab() {
   );
 }
 
+/** First paint: the title, the search bar's place and the tab strip's shape, at once (the names follow with the data). */
 function MenuSkeleton() {
   return (
     <div role="status" aria-label="Loading">
-      <ScreenSkeleton rows={6} />
+      <PageTitle kicker="What we're pouring" title="Menu" />
+      <div className="pp-skel rounded-xl h-12" />
+      <div className="-mx-5 mt-3 px-5 border-b flex gap-4 py-3" style={{ borderColor: C.line }} aria-hidden>
+        {[88, 120, 76, 104].map((w, i) => <span key={i} className="pp-skel rounded h-5 shrink-0" style={{ width: w }} />)}
+      </div>
+      <SkelRows n={6} tall />
     </div>
   );
 }
