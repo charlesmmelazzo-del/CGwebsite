@@ -6,6 +6,7 @@ import { C } from "../theme";
 import { SeeAll, Skel } from "../bits";
 import { CocktailFeature } from "../Library";
 import InstallHint from "../InstallHint";
+import PushPrompt from "../PushPrompt";
 import PhonePrompt from "../PhonePrompt";
 import TabView from "./TabView";
 import { FromTheBar, HereButtons, NewestList, SharedWithYou, Tonight, WhatsNew } from "./Slots";
@@ -97,6 +98,8 @@ export default function HomeTab() {
             <h1 className="font-display text-[30px] leading-tight mt-1" style={{ color: C.text }}>Welcome, {d.first_name}</h1>
             {/* File 12: under the welcome, so the page's heading comes first. */}
             <div className="mt-6 -mb-6"><InstallHint /></div>
+            {/* File 13: once, after the member has used Passport for a bit: notifications on this phone. */}
+            <PushPrompt />
             <HereButtons presence={d.social?.presence} hasFriends={d.social?.has_friends} />
             <FriendsHere friends={d.social?.friends_here} />
             {now.length > 0 && (

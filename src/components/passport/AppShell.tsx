@@ -17,6 +17,7 @@ import MenuTab from "./tabs/MenuTab";
 import IndexTab from "./tabs/IndexTab";
 import EventsTab from "./tabs/EventsTab";
 import InboxTab from "./tabs/InboxTab";
+import { countOpen } from "./pushClient";
 
 /**
  * File 06: the Passport app frame. Five tabs along the bottom (a top bar on a wide screen): Menu · Index · CG · Events ·
@@ -68,6 +69,8 @@ function Frame({ children }: { children: ReactNode }) {
   const views = useMemo(() => new ViewStore(() => window.location.assign("/passport?signed_out=1")), []);
 
   // The tab under the page that is open, and which tabs have been opened (they stay mounted from then on).
+  // File 13: count this open, so Home's notifications card waits until the member has used Passport for a bit.
+  useEffect(() => { countOpen(); }, []);
   useEffect(() => { setPending(null); }, [pathname]);
   useEffect(() => { if (pathTab) setUnder(pathTab); }, [pathTab]);
   useEffect(() => {

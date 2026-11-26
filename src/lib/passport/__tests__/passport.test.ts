@@ -733,6 +733,65 @@ function slowServer() {
     });
   }
 
+  console.log("File 13: notifications on this device");
+  {
+    const root = join(APP, "..", "..");
+    const sw = readFileSync(join(root, "public", "passport", "sw.js"), "utf8");
+    const compP = (f: string) => readFileSync(join(APP, "..", "components", "passport", f), "utf8");
+    await test("the helper has no fetch handler (it never changes how any page loads) and only opens /passport addresses", () => {
+      assert.ok(!/addEventListener\(\s*["']fetch["']/.test(sw), "no fetch handler");
+      assert.ok(sw.includes('addEventListener("push"') && sw.includes('addEventListener("notificationclick"'));
+      const m = sw.match(/function safeUrl\(u\) \{\s*return ([^;]+);/);
+      assert.ok(m, "safeUrl found");
+      // eslint-disable-next-line no-new-func
+      const safeUrl = new Function("u", `return ${m![1]};`) as (u: unknown) => string;
+      assert.equal(safeUrl("/passport/inbox/messages/4"), "/passport/inbox/messages/4");
+      for (const bad of ["https://evil.example/passport", "//evil.example/x", "/passport/../admin", "/passport/%2e%2e/admin", "/admin", "javascript:alert(1)", "/passport\\x", 5, null]) assert.equal(safeUrl(bad), "/passport", String(bad));
+    });
+    await test("it is registered for /passport only, and the site allows exactly that scope", () => {
+      const pc = compP("pushClient.ts");
+      assert.ok(pc.includes('const SW_URL = "/passport/sw.js"') && pc.includes('const SCOPE = "/passport"') && pc.includes("{ scope: SCOPE }"));
+      const cfg = readFileSync(join(root, "next.config.mjs"), "utf8");
+      assert.ok(/source: "\/passport\/sw\.js"[\s\S]{0,200}Service-Worker-Allowed", value: "\/passport"/.test(cfg));
+    });
+    await test("the browser's permission box opens only from our own button, and Home's card never on a first open", () => {
+      const pc = compP("pushClient.ts");
+      const calls = pc.split("Notification.requestPermission(").length - 1;
+      assert.equal(calls, 1, "one place asks");
+      assert.ok(/export async function turnOn\(\)[\s\S]*?Notification\.requestPermission\(/.test(pc), "inside turnOn");
+      const prompt = compP("PushPrompt.tsx");
+      assert.ok(prompt.includes("usedForABit()") && prompt.includes("promptDone()") && prompt.includes("installHintShowing()"));
+      assert.ok(/p\.n >= 4 && Array\.isArray\(p\.days\) && p\.days\.length >= 2/.test(pc), "four opens on two days");
+      assert.ok(!compP("tabs/HomeTab.tsx").includes("turnOn("), "Home never asks by itself");
+    });
+    await test("Account says plainly that on iPhone it works once Passport is on the home screen", () => {
+      assert.ok(compP("Account.tsx").includes("On iPhone, notifications work once Passport is on your home screen"));
+    });
+    await test("the push route passes only an https endpoint and its two keys to the Bible, never a member number", () => {
+      const route = readFileSync(join(APP, "api", "passport", "push", "route.ts"), "utf8");
+      assert.ok(route.includes("memberRequest(") && !/member_id|memberId:/.test(route.replace("auth", "")));
+      assert.ok(route.includes('subscription: { endpoint, keys: { p256dh, auth: key } }, label'));
+    });
+  }
+
+  console.log("File 13: order history with a household");
+  {
+    const compP = (f: string) => readFileSync(join(APP, "..", "components", "passport", f), "utf8");
+    await test("Account has the member's own \"Share order history with my household\" switch, sent only as true or false", () => {
+      assert.ok(compP("Account.tsx").includes("Share order history with my household") && compP("Account.tsx").includes('{ household_history: on }'));
+      const me = readFileSync(join(APP, "api", "passport", "me", "route.ts"), "utf8");
+      assert.ok(me.includes('typeof body.household_history === "boolean"'));
+    });
+    await test("History offers Me and my household and Just me; a household-only row shows no date", () => {
+      const page = readFileSync(join(APP, "passport", "(app)", "history", "page.tsx"), "utf8");
+      assert.ok(page.includes("Me and my household") && page.includes("/passport/history?view=me") && page.includes('"Ordered by your household"'));
+    });
+    await test("an item page says \"You or your household have ordered this\" only when the Bible says so", () => {
+      const p = compP("Personal.tsx");
+      assert.ok(p.includes("mine.ordered_household") && p.includes("You or your household have ordered this"));
+    });
+  }
+
   console.log(`\n${passed} passed, ${failed} failed`);
   if (failed) process.exit(1);
 })();

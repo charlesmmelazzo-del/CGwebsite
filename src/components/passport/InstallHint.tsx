@@ -24,6 +24,12 @@ function dismissedRecently() {
   const at = Number(v);
   return Number.isFinite(at) && Date.now() - at < QUIET_MS;
 }
+/** File 13: whether the card would show on Home right now (the notifications prompt waits until it doesn't). */
+export function installHintShowing(): boolean {
+  if (typeof window === "undefined") return false;
+  const installed = standalone() || read(INSTALLED) === "1";
+  return !installed && !dismissedRecently();
+}
 type Prompt = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
 
 function standalone() {
