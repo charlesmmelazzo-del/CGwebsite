@@ -12,22 +12,24 @@ import SearchArea from "../Search";
 import TabView from "./TabView";
 import { ForYouIndex } from "../ForYou";
 import { VoteCardLink } from "../Votes";
-import { CompactBottle, CompactCocktail, CountRow, KindLabel, SectionHeading, TileGrid, Trail, accentCardStyle, useLevelMotion } from "../Drill";
+import { Collage, CompactBottle, CompactCocktail, CountRow, KindLabel, PartyBanner, SectionHeading, TileGrid, Trail, accentCardStyle, useLevelMotion } from "../Drill";
+import { BackLink } from "../bits";
+import { setTabAtRoot } from "../appEvents";
 import { readRecent } from "../recent";
 import { chartHref, houseHref, listKicker } from "@/lib/passport/bar";
-import { INDEX_HREF, indexLevel, indexPathOf, jumpBackIn, type IndexLevel, type Recent } from "@/lib/passport/nav";
+import { INDEX_HREF, PAST_VOTES_HREF, chartCoversOf, houseListCovers, indexLevel, indexPathOf, jumpBackIn, type IndexLevel, type Recent } from "@/lib/passport/nav";
 import { barPhotoSrc, markKey, type Chart, type HouseList, type IndexData, type Marks, type PassportList, type VoteCard } from "@/lib/passport/types";
 
 /** What the Index view sends (api/passport/view/index). */
-export interface IndexView extends IndexData { lists: PassportList[]; marks: Marks; house_lists?: HouseList[]; charts?: Chart[]; past_count?: number; votes?: VoteCard[]; past_votes_count?: number }
+export interface IndexView extends IndexData { lists: PassportList[]; marks: Marks; house_lists?: HouseList[]; charts?: Chart[]; past_count?: number; votes?: VoteCard[]; vote_results?: VoteCard[]; past_votes_count?: number }
 
 // Remembered while the app is open: the "Pouring now / Everything" choice and each level's scroll position.
 let everythingChoice = false;
 const scrollAt = new Map<string, number>();
 
 /**
- * File 14: the Index as a drill-down, like an iPod's menus. The top is six large tiles (Cocktails, Spirits, Beer &
- * wine, Lists, From Common Good, Yours) under "Jump back in"; each level is a short set of choices that slides over
+ * File 14: the Index as a drill-down, like an iPod's menus. The top is the Party Picks banner (file 15) and six large
+ * tiles (Cocktails, Spirits, Beer & wine, Lists, CG Picks, Journal) under "Jump back in"; each level is a short set of choices that slides over
  * the last, until a final list the member chose (one album, one spirit, one letter, one category or producer), in
  * compact rows. The search bar stays at the top of every level, and "Index › Cocktails › By spirit" shows where you
  * are. Every level has its own address (/passport/library?at=…), so Back, refresh and sharing work; old addresses
@@ -48,7 +50,7 @@ function IndexSkeleton() {
       <PageTitle kicker="Everything we've served" title="Index" />
       <div className="pp-skel rounded-xl h-12" />
       <ul className="grid grid-cols-2 gap-3 mt-6" aria-hidden>
-        {["Cocktails", "Spirits", "Beer & wine", "Lists", "From Common Good", "Yours"].map((t) => (
+        {["Cocktails", "Spirits", "Beer & wine", "Lists", "CG Picks", "Journal"].map((t) => (
           <li key={t} className="rounded-xl overflow-hidden border" style={{ borderColor: C.line }}>
             <span className="block aspect-[4/3] pp-skel" />
             <span className="block px-3 py-3 pp-t-card" style={{ color: C.faint }}>{t}</span>
@@ -91,10 +93,14 @@ function Index({ d, version }: { d: IndexView; version: number }) {
     if (rootRef.current?.offsetParent) window.scrollTo({ top: scrollAt.get(key) || 0, behavior: "instant" as ScrollBehavior });
   }, [key]);
   const motion = useLevelMotion(key, path.length);
+  // File 15, Part B: the Index's top level, for tapping the Index tab again.
+  useEffect(() => { setTabAtRoot("index", !level.path.length); }, [level.path.length]);
 
   const parent = level.trail.length > 1 ? level.trail[level.trail.length - 2]?.label : null;
   return (
     <div ref={rootRef}>
+      {/* File 15, Part B: every level below the top has Back at the top left: one level up, the trail's previous step. */}
+      {level.trail.length > 1 && <div className="-mt-3 mb-1"><BackLink exact to={level.trail[level.trail.length - 2]} /></div>}
       <PageTitle kicker={parent && level.path.length > 1 ? parent : "Everything we've served"} title={level.title} />
       <SearchArea initial={initialQ}>
         <Trail trail={level.trail} title={level.title} />
@@ -113,10 +119,11 @@ function LevelBody({ level, d, version, everything, setEverything }: { level: In
       return (
         <>
           {level.path.length === 0 && <JumpBackIn d={d} />}
+          {level.path.length === 0 && <PartyBanner b={level.banner} />}
           {spiritsSwitch}
           {level.tiles.length ? <TileGrid tiles={level.tiles} big={level.path.length === 0} /> : <Quiet>Nothing here yet.</Quiet>}
-          {/* "My Cocktails" (the member's recipe book, Index only) keeps its "Add a cocktail" under Yours. */}
-          {level.path.length === 1 && level.path[0] === "yours" && (
+          {/* "My Cocktails" (the member's recipe book, Index only) keeps its "Add a cocktail" under Journal. */}
+          {level.path.length === 1 && level.path[0] === "journal" && (
             <Link href="/passport/bespoke?new=1" scroll={false} className="mt-4 inline-flex items-center rounded-full border px-4 min-h-[44px] pp-t-secondary pp-focus pp-press"
               style={{ borderColor: C.brass, color: C.brass }}>+ Add a cocktail to My Cocktails</Link>
           )}
@@ -184,10 +191,13 @@ function LevelBody({ level, d, version, everything, setEverything }: { level: In
         <ul className="space-y-3">
           {level.lists.map((l) => (
             <li key={l.id}>
-              <Link href={houseHref(l.id)} scroll={false} className="block rounded-xl border p-4 pp-focus pp-row pp-card pp-accent-card" style={accentCardStyle("bar")}>
-                <KindLabel section="bar">{listKicker(l)}</KindLabel>
-                <span className="pp-t-card block mt-1" style={{ color: C.text }}>{l.title}</span>
-                <span className="pp-t-secondary block mt-1" style={{ color: C.muted }}>{l.count} {l.kind === "cocktail" ? "cocktail" : "bottle"}{l.count === 1 ? "" : "s"}</span>
+              <Link href={houseHref(l.id)} scroll={false} className="flex items-stretch gap-3 rounded-xl border pl-4 pp-focus pp-row pp-card pp-accent-card overflow-hidden" style={accentCardStyle("bar")}>
+                <span className="flex-1 min-w-0 py-4">
+                  <KindLabel section="bar">{listKicker(l)}</KindLabel>
+                  <span className="pp-t-card block mt-1" style={{ color: C.text }}>{l.title}</span>
+                  <span className="pp-t-secondary block mt-1" style={{ color: C.muted }}>{l.count} {l.kind === "cocktail" ? "cocktail" : "bottle"}{l.count === 1 ? "" : "s"}</span>
+                </span>
+                <span className="block w-[88px] shrink-0"><Collage covers={houseListCovers(l)} section="bar" label={l.title} /></span>
               </Link>
             </li>
           ))}
@@ -198,16 +208,32 @@ function LevelBody({ level, d, version, everything, setEverything }: { level: In
         <ul className="space-y-3">
           {level.charts.map((c) => (
             <li key={c.key}>
-              <Link href={chartHref(c.key)} scroll={false} className="block rounded-xl border p-4 pp-focus pp-row pp-card pp-accent-card" style={accentCardStyle("bar")}>
-                <KindLabel section="bar">{c.season_name}</KindLabel>
-                <span className="pp-t-card block mt-1" style={{ color: C.text }}>{c.title}</span>
+              <Link href={chartHref(c.key)} scroll={false} className="flex items-stretch gap-3 rounded-xl border pl-4 pp-focus pp-row pp-card pp-accent-card overflow-hidden" style={accentCardStyle("bar")}>
+                <span className="flex-1 min-w-0 py-4">
+                  <KindLabel section="bar">{c.season_name}</KindLabel>
+                  <span className="pp-t-card block mt-1" style={{ color: C.text }}>{c.title}</span>
+                </span>
+                <span className="block w-[88px] shrink-0"><Collage covers={chartCoversOf(c)} section="bar" label={c.title} /></span>
               </Link>
             </li>
           ))}
         </ul>
       );
-    case "votes":
-      return <ul className="space-y-3">{level.votes.map((v) => <li key={`${v.kind}${v.id}`}><VoteCardLink c={v} /></li>)}</ul>;
+    case "party":
+      // File 15, Part A: everything a member votes on or takes part in: open flights and brackets, results, past votes.
+      return (
+        <>
+          <p className="pp-t-secondary -mt-2 mb-4" style={{ color: C.muted }}>Vote on flights and brackets. Your picks are yours alone.</p>
+          {level.open.length > 0 && <ul className="space-y-3">{level.open.map((v) => <li key={`${v.kind}${v.id}`}><VoteCardLink c={v} big /></li>)}</ul>}
+          {level.results.length > 0 && (
+            <>
+              <SectionHeading section="party">The results are in</SectionHeading>
+              <ul className="space-y-3">{level.results.map((v) => <li key={`r${v.kind}${v.id}`}><VoteCardLink c={v} /></li>)}</ul>
+            </>
+          )}
+          {level.past > 0 && <ul className="mt-3"><CountRow href={PAST_VOTES_HREF} label="Past votes" count={level.past} /></ul>}
+        </>
+      );
     case "for-you":
       return <ForYouIndex items={d.recommendations} enough={d.enough} suggest={d.suggest} />;
     default:

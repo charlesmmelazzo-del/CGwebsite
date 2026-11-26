@@ -15,9 +15,9 @@ export default async function NotesPage() {
   if (!r.data) return <Unavailable />;
   return (
     <>
-      <BackLink fallback="/passport/library" label="Index" />
+      <BackLink fallback="/passport/library?at=journal" label="Journal" />
       <div className="mt-3" />
-      <PageTitle kicker="Yours" title="My notes">
+      <PageTitle kicker="Journal" title="My notes">
         <p className="font-body text-[0.875rem] mt-2" style={{ color: C.faint }}>{PRIVATE_LINE}</p>
       </PageTitle>
       {r.data.length ? (

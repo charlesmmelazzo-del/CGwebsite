@@ -62,7 +62,7 @@ const VIEWS: Record<string, (auth: MemberAuth) => Promise<unknown>> = {
   index: async (auth) => {
     const [index, lists, marks, bar, votes] = await Promise.all([getIndex(auth), getLists(auth), getMarksSafe(auth), getBarLists(auth).catch(() => null), getVotes(auth).catch(() => null)]);
     // File 10: open votes and brackets, then how many are under "Past votes".
-    return { ...index, lists, marks, house_lists: bar?.house_lists ?? [], charts: bar?.charts ?? [], past_count: bar?.past_count ?? 0, votes: votes?.votes ?? [], past_votes_count: votes?.past_count ?? 0 };
+    return { ...index, lists, marks, house_lists: bar?.house_lists ?? [], charts: bar?.charts ?? [], past_count: bar?.past_count ?? 0, votes: votes?.votes ?? [], vote_results: votes?.vote_results ?? [], past_votes_count: votes?.past_count ?? 0 };
   },
   // File 09: upcoming Passport events first (the member's own answers and friends going), then the same as before.
   events: async (auth) => {

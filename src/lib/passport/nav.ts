@@ -5,7 +5,7 @@
  * and those are compact rows. Nothing here asks the Bible for anything: every level is built from the one answer the
  * tab already loaded. The tests (__tests__/passport.test.ts) check the rules on these models, not on pixels.
  */
-import type { Album, BaseSpirit, Chart, HouseList, IndexBottle, IndexCocktail, IndexDrink, ItemKind, MenuGroup, MenuItem, MenuTabDef, PassportList, Recommendation, ToastMenu, VoteCard } from "./types";
+import type { Album, BaseSpirit, Chart, HouseItem, HouseList, IndexBottle, IndexCocktail, IndexDrink, ItemKind, Marks, MenuGroup, MenuItem, MenuTabDef, PassportList, Recommendation, ToastMenu, VoteCard } from "./types";
 import type { SectionId } from "./accents";
 
 /** About a dozen rows before the member has chosen something. */
@@ -16,24 +16,63 @@ export const PRODUCER_THRESHOLD = 40;
 export const TILE_COLUMNS = 2;
 
 // ── Covers ───────────────────────────────────────────────────────────────────
-/** A photo to show for a place: the bar's photo of one of its own items. */
-export interface Cover { kind: ItemKind; id: number; photo: string; name: string }
-interface Pictured { id: number | null; name: string; photo?: string | null; cover?: boolean }
+/**
+ * A photo to show for a place: the bar's photo of one of its own items. clear: the photo has a transparent background
+ * (a bottle cut out, file 15 Part D), so it is drawn without a box, contain-fit on the section's tint.
+ */
+export interface Cover { kind: ItemKind; id: number; photo: string; name: string; clear?: boolean }
+interface Pictured { id: number | null; name: string; photo?: string | null; cover?: boolean; photo_clear?: boolean }
+const toCover = (x: Pictured, kind: ItemKind): Cover => ({ kind, id: x.id as number, photo: x.photo as string, name: x.name, ...(x.photo_clear ? { clear: true } : {}) });
 /** The admin's "Use as cover" first, otherwise the first item that has a photo; null when none does. */
 export function coverOf(items: Pictured[], kind: ItemKind | ((x: Pictured) => ItemKind)): Cover | null {
+  return coversOf(items, kind, 1)[0] ?? null;
+}
+/** File 15, Part C: the most photos a collage shows (a 2×2, like a playlist's art). */
+export const COLLAGE_MAX = 4;
+/**
+ * File 15, Part C: the photos of a collage, chosen stably: the item an admin marked "Use as cover" first, then the first
+ * items in the collection's own order that have a photo, never the same item twice, at most four. The same collection
+ * gives the same picture on every visit; it changes only when the collection (or a photo in it) changes. Only items
+ * the app was sent can appear, and the Bible sends only items this member may open.
+ */
+export function coversOf(items: Pictured[], kind: ItemKind | ((x: Pictured) => ItemKind), n = COLLAGE_MAX): Cover[] {
   const k = (x: Pictured) => (typeof kind === "function" ? kind(x) : kind);
-  const pick = items.find((x) => x.cover && x.photo && x.id) || items.find((x) => x.photo && x.id);
-  return pick && pick.photo && pick.id ? { kind: k(pick), id: pick.id, photo: pick.photo, name: pick.name } : null;
+  const out: Cover[] = [];
+  const seen = new Set<string>();
+  const add = (x: Pictured) => {
+    if (out.length >= n || !x.photo || !x.id) return;
+    const key = `${k(x)}:${x.id}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(toCover(x, k(x)));
+  };
+  items.filter((x) => x.cover).forEach(add);
+  items.forEach(add);
+  return out;
 }
+/** Several collections' collages laid end to end (Lists, CG Picks, Party Picks): the first photos of each, in order. */
+export function mergeCovers(groups: (Cover[] | null | undefined)[], n = COLLAGE_MAX): Cover[] {
+  const out: Cover[] = [];
+  const seen = new Set<string>();
+  // One from each collection first, so four lists give four different pictures; then the rest in order.
+  const lists = groups.map((g) => g || []);
+  for (let round = 0; out.length < n && lists.some((g) => g.length > round); round++) {
+    for (const g of lists) {
+      const c = g[round];
+      if (!c || out.length >= n) continue;
+      const key = `${c.kind}:${c.id}`;
+      if (!seen.has(key)) { seen.add(key); out.push(c); }
+    }
+  }
+  return out;
+}
+const fromCovers = (xs: { kind: ItemKind; id: number; photo: string; name?: string; photo_clear?: boolean }[] | null | undefined): Cover[] =>
+  (xs || []).filter((x) => x && x.id && x.photo).slice(0, COLLAGE_MAX).map((x) => ({ kind: x.kind, id: x.id, photo: x.photo, name: x.name || "", ...(x.photo_clear ? { clear: true } : {}) }));
 const menuItemCover = (items: MenuItem[]): Cover | null =>
-  coverOf(items.map((it) => ({ id: it.cocktail_id || it.bottle_id, name: it.name, photo: it.photo, cover: it.cover, k: it.cocktail_id ? "cocktail" : "bottle" })) as (Pictured & { k: ItemKind })[], (x) => (x as Pictured & { k: ItemKind }).k);
-
-/** The two letters of a monogram tile for a place with no photo anywhere inside it. */
-export function monogram(label: string): string {
-  const words = label.replace(/[^A-Za-z0-9& ]/g, " ").split(/\s+/).filter((w) => w && !/^(the|and|of|&)$/i.test(w) && !/^\d+$/.test(w));
-  if (!words.length) return "CG";
-  return (words.length === 1 ? words[0].slice(0, 2) : words[0][0] + words[1][0]).toUpperCase().replace(/^(.)(.)$/, (_m, a: string, b: string) => a + b.toLowerCase());
-}
+  coverOf(items.map((it) => ({ id: it.cocktail_id || it.bottle_id, name: it.name, photo: it.photo, cover: it.cover, photo_clear: it.photo_clear, k: it.cocktail_id ? "cocktail" : "bottle" })) as (Pictured & { k: ItemKind })[], (x) => (x as Pictured & { k: ItemKind }).k);
+const menuItemCovers = (items: MenuItem[]): Cover[] =>
+  coversOf(items.map((it) => ({ id: it.cocktail_id || it.bottle_id, name: it.name, photo: it.photo, cover: it.cover, photo_clear: it.photo_clear, k: it.cocktail_id ? "cocktail" : "bottle" })) as (Pictured & { k: ItemKind })[], (x) => (x as Pictured & { k: ItemKind }).k);
+export { menuItemCovers };
 
 // ── The Menu tab ─────────────────────────────────────────────────────────────
 export type MenuTabKind = "exclusives" | "menu" | "spirits";
@@ -80,17 +119,17 @@ export function chosenTab(tabs: MenuTabModel[], asked: string | null | undefined
 
 // ── Spirits, the same drill-down on the Menu tab and in the Index ─────────────
 /** One bottle in a spirits drill-down (from the spirits list or from the Index). */
-export interface SpiritEntry { id: number | null; name: string; category: string; producer: string; out: boolean; photo?: string | null; cover?: boolean }
-export interface CountTile { name: string; count: number; cover: Cover | null }
+export interface SpiritEntry { id: number | null; name: string; category: string; producer: string; out: boolean; photo?: string | null; cover?: boolean; photo_clear?: boolean }
+export interface CountTile { name: string; count: number; covers: Cover[] }
 const OTHER_PRODUCER = "Other producers";
 const producerOf = (x: SpiritEntry) => x.producer.trim() || OTHER_PRODUCER;
 /** "Out right now" sinks to the bottom of its list (kept in the list's own order otherwise). */
 export const outLast = <T extends { out: boolean }>(xs: T[]): T[] => [...xs.filter((x) => !x.out), ...xs.filter((x) => x.out)];
-/** The category tiles, in the list's own order, each with its count and a cover photo if any bottle in it has one. */
+/** The category tiles, in the list's own order, each with its count and a collage of its own bottles' photos. */
 export function spiritCategories(items: SpiritEntry[]): CountTile[] {
   const at = new Map<string, SpiritEntry[]>();
   for (const x of items) { const k = x.category || "Other"; if (!at.has(k)) at.set(k, []); at.get(k)!.push(x); }
-  return Array.from(at.entries()).map(([name, xs]) => ({ name, count: xs.length, cover: coverOf(xs, "bottle") }));
+  return Array.from(at.entries()).map(([name, xs]) => ({ name, count: xs.length, covers: coversOf(xs, "bottle") }));
 }
 export type SpiritLevel =
   | { kind: "producers"; category: string; producers: CountTile[] }
@@ -107,7 +146,7 @@ export function spiritLevel(items: SpiritEntry[], category: string, producer?: s
   if (inCat.length > PRODUCER_THRESHOLD) {
     const by = new Map<string, SpiritEntry[]>();
     for (const x of inCat) { const p = producerOf(x); if (!by.has(p)) by.set(p, []); by.get(p)!.push(x); }
-    const producers = Array.from(by.entries()).map(([name, xs]) => ({ name, count: xs.length, cover: coverOf(xs, "bottle") }))
+    const producers = Array.from(by.entries()).map(([name, xs]) => ({ name, count: xs.length, covers: coversOf(xs, "bottle") }))
       .sort((a, b) => (a.name === OTHER_PRODUCER ? 1 : b.name === OTHER_PRODUCER ? -1 : a.name.localeCompare(b.name)));
     return { kind: "producers", category, producers };
   }
@@ -115,11 +154,11 @@ export function spiritLevel(items: SpiritEntry[], category: string, producer?: s
 }
 /** The spirits list (Menu tab) as drill-down entries. */
 export const spiritsFromMenu = (groups: MenuGroup[]): (SpiritEntry & { item: MenuItem })[] =>
-  groups.flatMap((g) => g.items.map((it) => ({ id: it.bottle_id, name: it.name, category: g.name, producer: it.producer || "", out: it.unavailable, photo: it.photo, cover: it.cover, item: it })));
+  groups.flatMap((g) => g.items.map((it) => ({ id: it.bottle_id, name: it.name, category: g.name, producer: it.producer || "", out: it.unavailable, photo: it.photo, cover: it.cover, photo_clear: it.photo_clear, item: it })));
 /** The Index's bottles as drill-down entries; "Pouring now" keeps only bottles on the spirits list. */
 export const spiritsFromIndex = (bottles: IndexBottle[], everything: boolean): (SpiritEntry & { bottle: IndexBottle })[] =>
   bottles.filter((b) => everything || b.on_list || b.available)
-    .map((b) => ({ id: b.id, name: b.name, category: b.category, producer: b.producer || "", out: !b.available && (b.on_list || b.status_label === "Out right now"), photo: b.photo, cover: b.cover, bottle: b }));
+    .map((b) => ({ id: b.id, name: b.name, category: b.category, producer: b.producer || "", out: !b.available && (b.on_list || b.status_label === "Out right now"), photo: b.photo, cover: b.cover, photo_clear: b.photo_clear, bottle: b }));
 
 // ── Index addresses ──────────────────────────────────────────────────────────
 export const INDEX_HREF = "/passport/library";
@@ -133,14 +172,30 @@ export function parseAt(at: string | null | undefined): string[] {
   if (!at) return [];
   return at.split("/").filter(Boolean).slice(0, 4).map((p) => { try { return decodeURIComponent(p); } catch { return p; } });
 }
-const HASHES: Record<string, string[]> = { lists: ["lists"], "from-common-good": ["cg"], yours: ["yours"], cocktails: ["cocktails"], spirits: ["spirits"], "beer-wine": ["beer-wine"] };
+/**
+ * File 15, Part A: the places renamed and moved. "Yours" is "Journal" (journal), "From Common Good" is "CG Picks" (cg,
+ * curated things only), and votes and brackets moved to "Party Picks" (party). An address from before keeps working:
+ * ?at=yours/… opens Journal, ?at=cg/votes (Home's old "See all") opens Party Picks.
+ */
+export function normalizePath(path: string[]): string[] {
+  const [a, b] = path;
+  if (a === "yours") return ["journal", ...path.slice(1)];
+  if (a === "cg" && (b === "votes" || b === "past-votes")) return ["party"];
+  if (a === "party-picks") return ["party"];
+  if (a === "cg-picks") return ["cg", ...path.slice(1)];
+  return path;
+}
+const HASHES: Record<string, string[]> = {
+  lists: ["lists"], "from-common-good": ["cg"], "cg-picks": ["cg"], yours: ["journal"], journal: ["journal"], "party-picks": ["party"], party: ["party"],
+  cocktails: ["cocktails"], spirits: ["spirits"], "beer-wine": ["beer-wine"],
+};
 /**
  * Every Index address, old and new, to its level: ?at= (file 14), ?spirit= (an old Library filter link → By spirit),
- * and the old jump links (#lists, #yours, …). ?q= stays a search (the search box fills, on top of the level).
+ * and the old jump links (#lists, #yours, #from-common-good, …). ?q= stays a search (the search box fills, on top of the level).
  */
 export function indexPathOf(params: { get(name: string): string | null } | null | undefined, hash = ""): string[] {
   const at = params?.get("at");
-  if (at) return parseAt(at);
+  if (at) return normalizePath(parseAt(at));
   const spirit = (params?.get("spirit") || "").slice(0, 40);
   if (spirit) return ["cocktails", "spirit", spirit];
   return HASHES[hash.replace(/^#/, "")] ?? [];
@@ -149,14 +204,18 @@ export function indexPathOf(params: { get(name: string): string | null } | null 
 // ── The Index tree ───────────────────────────────────────────────────────────
 export interface IndexInput {
   cocktails: IndexCocktail[]; bottles: IndexBottle[]; drinks: IndexDrink[]; base_spirits: BaseSpirit[]; albums?: Album[];
-  lists?: PassportList[]; house_lists?: HouseList[]; charts?: Chart[]; past_count?: number; votes?: VoteCard[]; past_votes_count?: number;
+  lists?: PassportList[]; house_lists?: HouseList[]; charts?: Chart[]; past_count?: number; votes?: VoteCard[]; vote_results?: VoteCard[]; past_votes_count?: number;
   recommendations?: Recommendation[];
+  /** The member's own hearts and stars (Journal's collage is their favorites' photos). */
+  marks?: Marks;
 }
-export interface Tile { id: string; label: string; count?: number; line?: string; cover: Cover | null; href: string; section: SectionId }
+export interface Tile { id: string; label: string; count?: number; line?: string; covers: Cover[]; href: string; section: SectionId }
+/** File 15: the Party Picks banner across the top of the Index (shorter than a tile). */
+export interface Banner { label: string; line: string; covers: Cover[]; href: string; section: SectionId }
 export interface Crumb { label: string; href: string }
 interface LevelBase { title: string; trail: Crumb[]; section: SectionId | null; path: string[] }
 export type IndexLevel = LevelBase & (
-  | { kind: "tiles"; tiles: Tile[]; note?: string }
+  | { kind: "tiles"; tiles: Tile[]; note?: string; banner?: Banner | null }
   | { kind: "letters"; letters: { letter: string; count: number; href: string }[] }
   | { kind: "cocktails"; items: IndexCocktail[] }
   | { kind: "bottles"; items: (SpiritEntry & { bottle: IndexBottle })[] }
@@ -165,12 +224,12 @@ export type IndexLevel = LevelBase & (
   | { kind: "lists" }
   | { kind: "house"; lists: HouseList[] }
   | { kind: "charts"; charts: Chart[] }
-  | { kind: "votes"; votes: VoteCard[] }
+  | { kind: "party"; open: VoteCard[]; results: VoteCard[]; past: number }
   | { kind: "for-you" }
   | { kind: "missing" }
 );
 /** Kinds that are a final list the member deliberately opened (compact rows, any length). */
-export const FINAL_KINDS = new Set(["cocktails", "bottles", "producers", "drinks", "lists", "house", "charts", "votes", "for-you"]);
+export const FINAL_KINDS = new Set(["cocktails", "bottles", "producers", "drinks", "lists", "house", "charts", "party", "for-you"]);
 
 export const NOW_ALBUM = "On the menu now";
 const DRINK_KINDS: { id: string; kind: IndexDrink["kind"]; label: string }[] = [
@@ -187,77 +246,116 @@ const houseKinds = (lists: HouseList[]) => ({
 export const PAST_LISTS_HREF = "/passport/house/past";
 export const PAST_VOTES_HREF = "/passport/votes/past";
 
-/** The top level's six tiles (each only when it has something, except Lists and Yours, which always do). */
+// ── Names (file 15, Part A) ──────────────────────────────────────────────────
+export const JOURNAL = "Journal";
+export const CG_PICKS = "CG Picks";
+export const PARTY_PICKS = "Party Picks";
+export const JOURNAL_HREF = indexHref(["journal"]);
+export const CG_HREF = indexHref(["cg"]);
+export const PARTY_HREF = indexHref(["party"]);
+export const LISTS_HREF = indexHref(["lists"]);
+
+// ── Collages for each place ──────────────────────────────────────────────────
+const drinkCovers = (xs: IndexDrink[]) => coversOf(xs.map((x) => ({ id: x.id ?? null, name: x.name, photo: x.photo, cover: x.cover, photo_clear: x.photo_clear })), "bottle");
+/** Journal and Favorites: the photos of the member's own favorites (cocktails, then bottles, in the Index's order). */
+export function favoriteCovers(d: Pick<IndexInput, "cocktails" | "bottles" | "marks">): Cover[] {
+  const m = d.marks || {};
+  const fav = (kind: ItemKind, id: number) => !!m[`${kind}:${id}`]?.favorite;
+  return mergeCovers([coversOf(d.cocktails.filter((c) => fav("cocktail", c.id)), "cocktail"), coversOf(d.bottles.filter((b) => fav("bottle", b.id)), "bottle")]);
+}
+const houseCovers = (l: HouseList) => (l.covers?.length ? fromCovers(l.covers) : coversOf((l.items || []).map((x) => ({ ...x, id: x.opens ? x.id : null })), (x) => (x as unknown as HouseItem).kind));
+const chartCovers = (c: Chart) => coversOf(c.items.map((x) => ({ ...x, id: x.opens ? x.id : null })), (x) => (x as unknown as HouseItem).kind);
+/** One vote's or bracket's collage (its own options or entries a member may open, chosen by the Bible). */
+export const voteCovers = (v: VoteCard) => fromCovers(v.covers);
+/** One of the member's own lists. */
+export const listCovers = (l: PassportList) => fromCovers(l.covers);
+export const houseListCovers = houseCovers;
+export const chartCoversOf = chartCovers;
+/** The Party Picks banner: open votes first, then results; past votes only. Nothing at all when there is nothing. */
+export function partyBanner(d: Pick<IndexInput, "votes" | "vote_results" | "past_votes_count">): Banner | null {
+  const open = d.votes || [];
+  const results = d.vote_results || [];
+  const past = d.past_votes_count || 0;
+  if (!open.length && !results.length && !past) return null;
+  const line = open.length ? `Voting is open: ${open.length}` : results.length ? "The results are in" : "See past votes";
+  return { label: PARTY_PICKS, line, covers: mergeCovers([...open, ...results].map(voteCovers)), href: PARTY_HREF, section: "party" };
+}
+
+/** The top level's six tiles (each only when it has something, except Lists and Journal, which always do). */
 function topTiles(d: IndexInput, everything: boolean): Tile[] {
   const spirits = spiritsFromIndex(d.bottles, everything);
-  const fcg = cgTiles(d);
+  const cg = cgTiles(d);
   const tiles: Tile[] = [];
-  if (d.cocktails.length) tiles.push({ id: "cocktails", label: "Cocktails", count: d.cocktails.length, cover: coverOf(d.cocktails, "cocktail"), href: indexHref(["cocktails"]), section: "cocktails" });
-  if (d.bottles.length) tiles.push({ id: "spirits", label: "Spirits", count: spirits.length || d.bottles.length, cover: coverOf(d.bottles, "bottle"), href: indexHref(["spirits"]), section: "spirits" });
-  if (d.drinks.length) tiles.push({ id: "beer-wine", label: "Beer & wine", count: d.drinks.length, cover: null, href: indexHref(["beer-wine"]), section: "beer-wine" });
-  tiles.push({ id: "lists", label: "Lists", count: d.lists?.length ?? 0, line: "Your own lists", cover: null, href: indexHref(["lists"]), section: "yours" });
-  if (fcg.length) tiles.push({ id: "cg", label: "From Common Good", line: "House lists, picks and votes", cover: null, href: indexHref(["cg"]), section: "bar" });
-  tiles.push({ id: "yours", label: "Yours", line: "Favorites, notes, history", cover: null, href: indexHref(["yours"]), section: "yours" });
+  if (d.cocktails.length) tiles.push({ id: "cocktails", label: "Cocktails", count: d.cocktails.length, covers: coversOf(d.cocktails, "cocktail"), href: indexHref(["cocktails"]), section: "cocktails" });
+  if (d.bottles.length) tiles.push({ id: "spirits", label: "Spirits", count: spirits.length || d.bottles.length, covers: coversOf(spirits.length ? spirits : d.bottles, "bottle"), href: indexHref(["spirits"]), section: "spirits" });
+  if (d.drinks.length) tiles.push({ id: "beer-wine", label: "Beer & wine", count: d.drinks.length, covers: drinkCovers(d.drinks), href: indexHref(["beer-wine"]), section: "beer-wine" });
+  tiles.push({ id: "lists", label: "Lists", count: d.lists?.length ?? 0, line: "Your own lists", covers: mergeCovers((d.lists || []).map(listCovers)), href: LISTS_HREF, section: "yours" });
+  if (cg.length) tiles.push({ id: "cg", label: CG_PICKS, line: "House lists, staff picks, flights", covers: mergeCovers(cg.map((t) => t.covers)), href: CG_HREF, section: "bar" });
+  tiles.push({ id: "journal", label: JOURNAL, line: "Your favorites, notes and cocktails", covers: favoriteCovers(d), href: JOURNAL_HREF, section: "yours" });
   return tiles;
 }
+/** CG Picks: only the bar's curated, non-interactive things (votes and brackets live in Party Picks). */
 function cgTiles(d: IndexInput): Tile[] {
   const k = houseKinds(d.house_lists || []);
-  const t = (id: string, label: string, count: number, href = indexHref(["cg", id])): Tile => ({ id, label, count, cover: null, href, section: "bar" });
+  const t = (id: string, label: string, count: number, covers: Cover[], href = indexHref(["cg", id])): Tile => ({ id, label, count, covers, href, section: "bar" });
+  const of = (ls: HouseList[]) => mergeCovers(ls.map(houseCovers));
   return [
-    k.house.length ? t("house", "House lists", k.house.length) : null,
-    k.staff.length ? t("staff", "Staff picks", k.staff.length) : null,
-    k.flights.length ? t("flights", "Flights", k.flights.length) : null,
-    d.charts?.length ? t("charts", "Charts", d.charts.length) : null,
-    d.votes?.length ? t("votes", "Votes and brackets", d.votes.length) : null,
-    d.past_count ? t("past", "Past lists", d.past_count, PAST_LISTS_HREF) : null,
-    d.past_votes_count ? t("past-votes", "Past votes", d.past_votes_count, PAST_VOTES_HREF) : null,
+    k.house.length ? t("house", "House lists", k.house.length, of(k.house)) : null,
+    k.staff.length ? t("staff", "Staff picks", k.staff.length, of(k.staff)) : null,
+    k.flights.length ? t("flights", "Flights", k.flights.length, of(k.flights)) : null,
+    d.charts?.length ? t("charts", "Charts", d.charts.length, mergeCovers(d.charts.map(chartCovers))) : null,
+    d.past_count ? t("past", "Past lists", d.past_count, [], PAST_LISTS_HREF) : null,
   ].filter(Boolean) as Tile[];
 }
-export const YOURS_PAGES = [
-  { id: "for-you", label: "For you", line: "Suggestions from your own picks", href: indexHref(["yours", "for-you"]) },
+/** Journal: the member's personal reflections and personal cocktails. */
+export const JOURNAL_PAGES = [
+  { id: "for-you", label: "For you", line: "Suggestions from your own picks", href: indexHref(["journal", "for-you"]) },
   { id: "favorites", label: "Favorites", line: "What you love, and your ratings", href: "/passport/favorites" },
   { id: "bespoke", label: "My Cocktails", line: "Drinks made for you, and your own", href: "/passport/bespoke" },
   { id: "notes", label: "Notes", line: "Your tasting notes", href: "/passport/notes" },
   { id: "history", label: "History", line: "What you've ordered", href: "/passport/history" },
   { id: "photos", label: "My photos", line: "Only for you and our team", href: "/passport/photos" },
 ];
+/** @deprecated file 14's name for Journal's pages. */
+export const YOURS_PAGES = JOURNAL_PAGES;
 
 /** The cocktails of one album ("On the menu now" or a library menu), A to Z. */
 export function albumCocktails(cocktails: IndexCocktail[], album: string): IndexCocktail[] {
   return byName(album === NOW_ALBUM ? cocktails.filter((c) => c.menu_status === "current") : cocktails.filter((c) => (c.menus || [c.menu_name]).includes(album)));
 }
-/** "By menu": "On the menu now" first, then each album newest first, each with its count and cover. */
+/** "By menu": "On the menu now" first, then each album newest first, each with its count and collage. */
 export function albumTiles(d: IndexInput): Tile[] {
   const now = albumCocktails(d.cocktails, NOW_ALBUM);
   const names = d.albums?.length ? d.albums.map((a) => a.name) : Array.from(new Set(d.cocktails.map((c) => c.menu_name)));
   const tiles: Tile[] = [];
-  if (now.length) tiles.push({ id: NOW_ALBUM, label: NOW_ALBUM, count: now.length, cover: coverOf(now, "cocktail"), href: indexHref(["cocktails", "menu", NOW_ALBUM]), section: "cocktails" });
+  if (now.length) tiles.push({ id: NOW_ALBUM, label: NOW_ALBUM, count: now.length, covers: coversOf(now, "cocktail"), href: indexHref(["cocktails", "menu", NOW_ALBUM]), section: "cocktails" });
   for (const name of names) {
     const xs = albumCocktails(d.cocktails, name);
-    if (xs.length) tiles.push({ id: name, label: name, count: xs.length, cover: coverOf(xs, "cocktail"), href: indexHref(["cocktails", "menu", name]), section: "cocktails" });
+    if (xs.length) tiles.push({ id: name, label: name, count: xs.length, covers: coversOf(xs, "cocktail"), href: indexHref(["cocktails", "menu", name]), section: "cocktails" });
   }
   return tiles;
 }
 
 /** One level of the Index, from the Index's one answer. Unknown addresses say so (and offer the way back). */
-export function indexLevel(d: IndexInput, path: string[], { everything = false }: { everything?: boolean } = {}): IndexLevel {
+export function indexLevel(d: IndexInput, rawPath: string[], { everything = false }: { everything?: boolean } = {}): IndexLevel {
+  const path = normalizePath(rawPath);
   const crumbs: Crumb[] = [{ label: "Index", href: INDEX_HREF }];
   const at = (n: number, label: string) => { crumbs.push({ label, href: indexHref(path.slice(0, n)) }); return crumbs.slice(); };
   const base = (title: string, section: SectionId | null): LevelBase => ({ title, trail: crumbs.slice(), section, path });
   const missing = (): IndexLevel => ({ ...base("Not here any more", null), kind: "missing" });
   const [a, b, c] = path;
-  if (!a) return { ...base("Index", null), kind: "tiles", tiles: topTiles(d, everything) };
+  if (!a) return { ...base("Index", null), kind: "tiles", tiles: topTiles(d, everything), banner: partyBanner(d) };
   if (a === "cocktails") {
     at(1, "Cocktails");
     if (!b) {
-      const now = d.cocktails.filter((x) => x.available).length;
+      const nowList = d.cocktails.filter((x) => x.available);
       const albums = albumTiles(d);
       const letters = new Set(d.cocktails.map((x) => letterOf(x.name))).size;
       const tiles: Tile[] = [
-        { id: "menu", label: "By menu", count: albums.length, line: "Each season, newest first", cover: albums[0]?.cover ?? null, href: indexHref(["cocktails", "menu"]), section: "cocktails" },
-        ...(d.base_spirits.length ? [{ id: "spirit", label: "By spirit", count: d.base_spirits.length, line: "Gin, mezcal, whiskey…", cover: null, href: indexHref(["cocktails", "spirit"]), section: "cocktails" as SectionId }] : []),
-        { id: "az", label: "A to Z", count: letters, line: "By first letter", cover: null, href: indexHref(["cocktails", "az"]), section: "cocktails" },
-        ...(now ? [{ id: "now", label: "Available now", count: now, line: "Being served right now", cover: coverOf(d.cocktails.filter((x) => x.available), "cocktail"), href: indexHref(["cocktails", "now"]), section: "cocktails" as SectionId }] : []),
+        { id: "menu", label: "By menu", count: albums.length, line: "Each season, newest first", covers: albums[0]?.covers ?? [], href: indexHref(["cocktails", "menu"]), section: "cocktails" },
+        ...(d.base_spirits.length ? [{ id: "spirit", label: "By spirit", count: d.base_spirits.length, line: "Gin, mezcal, whiskey…", covers: coversOf(d.cocktails.filter((x) => x.spirits?.length), "cocktail"), href: indexHref(["cocktails", "spirit"]), section: "cocktails" as SectionId }] : []),
+        { id: "az", label: "A to Z", count: letters, line: "By first letter", covers: coversOf(byName(d.cocktails), "cocktail"), href: indexHref(["cocktails", "az"]), section: "cocktails" },
+        ...(nowList.length ? [{ id: "now", label: "Available now", count: nowList.length, line: "Being served right now", covers: coversOf(nowList, "cocktail"), href: indexHref(["cocktails", "now"]), section: "cocktails" as SectionId }] : []),
       ];
       return { ...base("Cocktails", "cocktails"), kind: "tiles", tiles };
     }
@@ -274,7 +372,7 @@ export function indexLevel(d: IndexInput, path: string[], { everything = false }
       if (!c) {
         const tiles = d.base_spirits.map((s) => {
           const xs = d.cocktails.filter((x) => x.spirits?.includes(s.key));
-          return { id: s.key, label: s.label, count: xs.length || s.count, cover: coverOf(xs, "cocktail"), href: indexHref(["cocktails", "spirit", s.key]), section: "cocktails" as SectionId };
+          return { id: s.key, label: s.label, count: xs.length || s.count, covers: coversOf(xs, "cocktail"), href: indexHref(["cocktails", "spirit", s.key]), section: "cocktails" as SectionId };
         });
         return { ...base("By spirit", "cocktails"), kind: "tiles", tiles };
       }
@@ -305,7 +403,7 @@ export function indexLevel(d: IndexInput, path: string[], { everything = false }
   if (a === "spirits") {
     at(1, "Spirits");
     const entries = spiritsFromIndex(d.bottles, everything);
-    if (!b) return { ...base("Spirits", "spirits"), kind: "tiles", tiles: spiritCategories(entries).map((t) => ({ id: t.name, label: t.name, count: t.count, cover: t.cover, href: indexHref(["spirits", t.name]), section: "spirits" as SectionId })) };
+    if (!b) return { ...base("Spirits", "spirits"), kind: "tiles", tiles: spiritCategories(entries).map((t) => ({ id: t.name, label: t.name, count: t.count, covers: t.covers, href: indexHref(["spirits", t.name]), section: "spirits" as SectionId })) };
     const lvl = spiritLevel(entries, b, c);
     if (lvl.kind === "missing") return missing();
     at(2, b);
@@ -316,8 +414,8 @@ export function indexLevel(d: IndexInput, path: string[], { everything = false }
   if (a === "beer-wine") {
     at(1, "Beer & wine");
     if (!b) {
-      const tiles = DRINK_KINDS.map((k) => ({ ...k, n: d.drinks.filter((x) => x.kind === k.kind).length })).filter((k) => k.n)
-        .map((k) => ({ id: k.id, label: k.label, count: k.n, cover: null, href: indexHref(["beer-wine", k.id]), section: "beer-wine" as SectionId }));
+      const tiles = DRINK_KINDS.map((k) => ({ ...k, xs: d.drinks.filter((x) => x.kind === k.kind) })).filter((k) => k.xs.length)
+        .map((k) => ({ id: k.id, label: k.label, count: k.xs.length, covers: drinkCovers(k.xs), href: indexHref(["beer-wine", k.id]), section: "beer-wine" as SectionId }));
       return { ...base("Beer & wine", "beer-wine"), kind: "tiles", tiles };
     }
     const k = DRINK_KINDS.find((x) => x.id === b);
@@ -327,21 +425,29 @@ export function indexLevel(d: IndexInput, path: string[], { everything = false }
     return { ...base(k.label, "beer-wine"), kind: "drinks", items: [...items.filter((x) => !x.status_label), ...items.filter((x) => x.status_label)] };
   }
   if (a === "lists") { at(1, "Lists"); return { ...base("Your lists", "yours"), kind: "lists" }; }
+  if (a === "party") {
+    at(1, PARTY_PICKS);
+    if (b) return missing();
+    const open = d.votes || [];
+    const results = d.vote_results || [];
+    const past = d.past_votes_count || 0;
+    return open.length || results.length || past ? { ...base(PARTY_PICKS, "party"), kind: "party", open, results, past } : missing();
+  }
   if (a === "cg") {
-    at(1, "From Common Good");
-    if (!b) return { ...base("From Common Good", "bar"), kind: "tiles", tiles: cgTiles(d) };
+    at(1, CG_PICKS);
+    if (!b) return { ...base(CG_PICKS, "bar"), kind: "tiles", tiles: cgTiles(d) };
     const k = houseKinds(d.house_lists || []);
-    const label = { house: "House lists", staff: "Staff picks", flights: "Flights", charts: "Charts", votes: "Votes and brackets" }[b];
+    const label = ({ house: "House lists", staff: "Staff picks", flights: "Flights", charts: "Charts" } as Record<string, string>)[b];
     if (!label) return missing();
     at(2, label);
     if (b === "charts") return d.charts?.length ? { ...base(label, "bar"), kind: "charts", charts: d.charts } : missing();
-    if (b === "votes") return d.votes?.length ? { ...base(label, "bar"), kind: "votes", votes: d.votes } : missing();
     const lists = k[b as "house" | "staff" | "flights"];
     return lists.length ? { ...base(label, "bar"), kind: "house", lists } : missing();
   }
-  if (a === "yours") {
-    at(1, "Yours");
-    if (!b) return { ...base("Yours", "yours"), kind: "tiles", tiles: YOURS_PAGES.map((p) => ({ id: p.id, label: p.label, line: p.line, cover: null, href: p.href, section: "yours" as SectionId })) };
+  if (a === "journal") {
+    at(1, JOURNAL);
+    const fav = favoriteCovers(d);
+    if (!b) return { ...base(JOURNAL, "yours"), kind: "tiles", tiles: JOURNAL_PAGES.map((p) => ({ id: p.id, label: p.label, line: p.line, covers: p.id === "favorites" ? fav : [], href: p.href, section: "yours" as SectionId })) };
     if (b === "for-you") { at(2, "For you"); return { ...base("For you", "yours"), kind: "for-you" }; }
     return missing();
   }
@@ -351,9 +457,10 @@ export function indexLevel(d: IndexInput, path: string[], { everything = false }
 /**
  * How many rows a level shows before the member chooses something: a tile grid is two to a row; the letter strip
  * wraps seven to a row; a list is one row each. A final list the member opened is allowed to be long (compact rows).
+ * The Party Picks banner is one row of its own.
  */
 export function rowsBeforeChoice(level: IndexLevel): number {
-  if (level.kind === "tiles") return Math.ceil(level.tiles.length / TILE_COLUMNS);
+  if (level.kind === "tiles") return Math.ceil(level.tiles.length / TILE_COLUMNS) + (level.banner ? 1 : 0);
   if (level.kind === "letters") return Math.ceil(level.letters.length / 7);
   return 0;
 }
@@ -371,6 +478,7 @@ export function allLevels(d: IndexInput, opts: { everything?: boolean } = {}): I
     out.push(lvl);
     const next: string[][] = [];
     if (lvl.kind === "tiles") for (const t of lvl.tiles) { const p = pathOfHref(t.href); if (p) next.push(p); }
+    if (lvl.kind === "tiles" && lvl.banner) next.push(pathOfHref(lvl.banner.href)!);
     if (lvl.kind === "letters") for (const l of lvl.letters) next.push(pathOfHref(l.href)!);
     if (lvl.kind === "producers") for (const p of lvl.producers) next.push(pathOfHref(p.href)!);
     next.forEach(walk);
@@ -417,4 +525,89 @@ export function shortLine(it: { card?: { flavor?: string; tagline?: string; ingr
   const lines = String(it.description || "").split(/\n+/).map((l) => l.trim()).filter(Boolean);
   const flavor = lines.find((l) => /^\[[^[\]]+\]$/.test(l));
   return clean(flavor || lines[0] || "");
+}
+
+// ── File 15, Part B: always a way back ───────────────────────────────────────
+export type TabKey = "menu" | "index" | "home" | "events" | "inbox";
+export interface Parent { href: string; label: string; tab: TabKey }
+const MENU_HREF_ = "/passport/menu";
+/**
+ * Every page in the app (src/app/passport/(app)) and the place one level above it: where its Back control goes when
+ * there is no step in the app's own history to go back to (a page opened from a link, or a step that belongs to another
+ * tab). The test checks that every route folder has an entry here, so a new page can't arrive without a way back.
+ * A tab's own top level (Home, Menu, Index, Events, Inbox) has no parent.
+ */
+export const PAGE_PARENTS: { route: string; test: RegExp; parent: Parent }[] = [
+  { route: "library/[id]", test: /^\/passport\/library\/\d+\/?$/, parent: { href: INDEX_HREF, label: "Index", tab: "index" } },
+  { route: "spirits/[id]", test: /^\/passport\/spirits\/\d+\/?$/, parent: { href: indexHref(["spirits"]), label: "Spirits", tab: "index" } },
+  { route: "producers/[id]", test: /^\/passport\/producers\/\d+\/?$/, parent: { href: indexHref(["spirits"]), label: "Spirits", tab: "index" } },
+  { route: "lists/[id]", test: /^\/passport\/lists\/\d+\/?$/, parent: { href: LISTS_HREF, label: "Lists", tab: "index" } },
+  { route: "house/[id]", test: /^\/passport\/house\/\d+\/?$/, parent: { href: CG_HREF, label: CG_PICKS, tab: "index" } },
+  { route: "house/past", test: /^\/passport\/house\/past\/?$/, parent: { href: CG_HREF, label: CG_PICKS, tab: "index" } },
+  { route: "house/charts/[key]", test: /^\/passport\/house\/charts\/[^/]+\/?$/, parent: { href: indexHref(["cg", "charts"]), label: "Charts", tab: "index" } },
+  { route: "votes/[id]", test: /^\/passport\/votes\/\d+\/?$/, parent: { href: PARTY_HREF, label: PARTY_PICKS, tab: "index" } },
+  { route: "votes/past", test: /^\/passport\/votes\/past\/?$/, parent: { href: PARTY_HREF, label: PARTY_PICKS, tab: "index" } },
+  { route: "brackets/[id]", test: /^\/passport\/brackets\/\d+\/?$/, parent: { href: PARTY_HREF, label: PARTY_PICKS, tab: "index" } },
+  { route: "favorites", test: /^\/passport\/favorites\/?$/, parent: { href: JOURNAL_HREF, label: JOURNAL, tab: "index" } },
+  { route: "notes", test: /^\/passport\/notes\/?$/, parent: { href: JOURNAL_HREF, label: JOURNAL, tab: "index" } },
+  { route: "bespoke", test: /^\/passport\/bespoke\/?$/, parent: { href: JOURNAL_HREF, label: JOURNAL, tab: "index" } },
+  { route: "history", test: /^\/passport\/history\/?$/, parent: { href: JOURNAL_HREF, label: JOURNAL, tab: "index" } },
+  { route: "photos", test: /^\/passport\/photos\/?$/, parent: { href: JOURNAL_HREF, label: JOURNAL, tab: "index" } },
+  { route: "account", test: /^\/passport\/account\/?$/, parent: { href: "/passport", label: "Home", tab: "home" } },
+  { route: "friends", test: /^\/passport\/friends\/?$/, parent: { href: "/passport/account", label: "Account", tab: "home" } },
+  { route: "letsgo", test: /^\/passport\/letsgo\/?$/, parent: { href: "/passport", label: "Home", tab: "home" } },
+  { route: "shared/[id]", test: /^\/passport\/shared\/\d+\/?$/, parent: { href: "/passport", label: "Home", tab: "home" } },
+  { route: "from-the-bar/[id]", test: /^\/passport\/from-the-bar\/\d+\/?$/, parent: { href: "/passport", label: "Home", tab: "home" } },
+  { route: "events/[id]", test: /^\/passport\/events\/\d+\/?$/, parent: { href: "/passport/events", label: "Events", tab: "events" } },
+  { route: "inbox/new", test: /^\/passport\/inbox\/new\/?$/, parent: { href: "/passport/inbox", label: "Inbox", tab: "inbox" } },
+  { route: "inbox/messages/[id]", test: /^\/passport\/inbox\/messages\/\d+\/?$/, parent: { href: "/passport/inbox", label: "Inbox", tab: "inbox" } },
+  { route: "inbox/requests/[id]", test: /^\/passport\/inbox\/requests\/\d+\/?$/, parent: { href: "/passport/inbox", label: "Inbox", tab: "inbox" } },
+  { route: "inbox/events/[id]", test: /^\/passport\/inbox\/events\/\d+\/?$/, parent: { href: "/passport/inbox", label: "Inbox", tab: "inbox" } },
+  { route: "inbox/friends/[id]", test: /^\/passport\/inbox\/friends\/\d+\/?$/, parent: { href: "/passport/inbox", label: "Inbox", tab: "inbox" } },
+];
+/** Route folders that are not a screen of their own: a tab's top level, a redirect to one, a picture or a file. */
+export const NOT_PAGES = ["", "[tab]", "menu", "library", "events", "inbox", "lists", "spirits", "bottles", "photo", "library/[id]/home-recipe"];
+
+/**
+ * One level up from where the member is: an Index level's previous trail step, a Spirits level on the Menu tab, or a
+ * page's parent above. Null at a tab's own top level (nothing above it).
+ */
+export function parentOf(pathname: string, search = ""): Parent | null {
+  const p = pathname.replace(/\/+$/, "") || "/passport";
+  const params = new URLSearchParams(search.replace(/^\?/, ""));
+  if (p === INDEX_HREF) {
+    const path = indexPathOf(params);
+    if (!path.length) return null;
+    const up = path.slice(0, -1);
+    return { href: indexHref(up), label: up.length ? indexCrumbLabel(up) : "Index", tab: "index" };
+  }
+  if (p === MENU_HREF_) {
+    const s = parseAt(params.get("s"));
+    if (params.get("tab") !== "spirits" || !s.length) return null;
+    const up = s.slice(0, -1);
+    return { href: `${MENU_HREF_}?tab=spirits${up.length ? `&s=${encodeURIComponent(up.map((x) => encodeURIComponent(x)).join("/"))}` : ""}`, label: up.length ? up[up.length - 1] : "Spirits", tab: "menu" };
+  }
+  for (const r of PAGE_PARENTS) if (r.test.test(p)) return r.parent;
+  return null;
+}
+const CRUMB: Record<string, string> = { cocktails: "Cocktails", spirits: "Spirits", "beer-wine": "Beer & wine", lists: "Lists", cg: CG_PICKS, journal: JOURNAL, party: PARTY_PICKS, menu: "By menu", spirit: "By spirit", az: "A to Z", now: "Available now", house: "House lists", staff: "Staff picks", flights: "Flights", charts: "Charts", "for-you": "For you", beer: "Beer", wine: "Wine", other: "Cider and more" };
+const indexCrumbLabel = (path: string[]) => { const last = path[path.length - 1]; return path.length === 1 || ["cocktails", "cg", "journal", "beer-wine"].includes(path[0]) ? CRUMB[last] ?? last : last; };
+
+/**
+ * Tapping the tab you are on (bottom bar or the wide-screen top bar): below its top level (a page over it, a deeper
+ * Index or Spirits level, a Menu tab other than the first) it returns to the top level and scrolls to the top; at the top
+ * level but scrolled down, it scrolls up; at the top level and the top already, nothing happens.
+ */
+export type TabPress = "root" | "top" | "none";
+export function tabPress(s: { overlay: boolean; atRoot: boolean; scrollY: number }): TabPress {
+  if (s.overlay || !s.atRoot) return "root";
+  return s.scrollY > 4 ? "top" : "none";
+}
+/** Whether an address is its tab's top level (the Menu tab also needs to be on its first section). */
+export function isTabRoot(tab: TabKey, pathname: string, search = "", menuOnFirst = true): boolean {
+  const p = pathname.replace(/\/+$/, "") || "/passport";
+  const params = new URLSearchParams(search.replace(/^\?/, ""));
+  if (tab === "index") return p === INDEX_HREF && !indexPathOf(params).length && !params.get("q");
+  if (tab === "menu") return p === MENU_HREF_ && !params.get("s") && menuOnFirst;
+  return p === ({ home: "/passport", events: "/passport/events", inbox: "/passport/inbox" } as Record<string, string>)[tab];
 }

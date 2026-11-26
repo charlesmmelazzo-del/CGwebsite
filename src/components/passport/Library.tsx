@@ -123,7 +123,7 @@ export function CocktailPage({ c }: { c: Cocktail }) {
       </div>
       <h1 className="font-display text-[2.5rem] leading-[1.05] mt-3" style={{ color: C.text }}>{c.name}</h1>
       {c.tagline && <p className="font-display italic text-xl mt-2" style={{ color: C.muted }}>{c.tagline}</p>}
-      <BarPhoto kind="cocktail" id={c.id} photo={c.photo} alt={c.photo_alt} name={c.name} />
+      <BarPhoto kind="cocktail" id={c.id} photo={c.photo} alt={c.photo_alt} name={c.name} clear={c.photo_clear} />
       <div className="w-14 h-px my-6" style={{ background: C.brass, opacity: 0.6 }} />
       {c.ingredients && (
         <section>
@@ -204,7 +204,7 @@ export function BottlePage({ b }: { b: Bottle | ArchivedBottle }) {
           : b.producer)}
       </p>
       {r.prices && r.prices.length > 0 && <p className="mt-3"><Prices prices={r.prices} /></p>}
-      <BarPhoto kind="bottle" id={b.id} photo={r.photo} alt={r.photo_alt} name={b.name} />
+      <BarPhoto kind="bottle" id={b.id} photo={r.photo} alt={r.photo_alt} name={b.name} clear={r.photo_clear} credit={r.photo_credit} />
       <div className="w-14 h-px my-6" style={{ background: C.brass, opacity: 0.6 }} />
       {/* The Toast description leads; the approved Passport text (Part 6) follows. Either alone reads as complete. */}
       {b.description && <Description text={b.description} large />}

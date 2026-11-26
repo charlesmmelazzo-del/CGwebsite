@@ -39,9 +39,9 @@ export default async function HistoryPage({ searchParams }: { searchParams?: { v
   const h = r.data;
   return (
     <>
-      <BackLink fallback="/passport/library" label="Index" />
+      <BackLink fallback="/passport/library?at=journal" label="Journal" />
       <div className="mt-3" />
-      <PageTitle kicker="Yours" title="Your history" />
+      <PageTitle kicker="Journal" title="Your history" />
       {h.household && (
         <nav aria-label="Whose orders" className="flex gap-2 mt-4 mb-2">
           {([["household", "Me and my household", "/passport/history"], ["me", "Just me", "/passport/history?view=me"]] as const).map(([v, label, href]) => (

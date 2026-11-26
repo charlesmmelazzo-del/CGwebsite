@@ -8,7 +8,7 @@ import { Avail, ItemRow } from "./bits";
 import { MarkBadge, Prices } from "./Library";
 import { reducedMotion } from "./appEvents";
 import { ACCENTS, type SectionId } from "@/lib/passport/accents";
-import { monogram, shortLine, type Cover, type Crumb, type Tile } from "@/lib/passport/nav";
+import { shortLine, type Banner, type Cover, type Crumb, type Tile } from "@/lib/passport/nav";
 import { barPhotoSrc, markKey, type IndexBottle, type IndexCocktail, type Mark, type Marks, type MenuItem } from "@/lib/passport/types";
 
 /**
@@ -27,7 +27,9 @@ const ICON_PATHS: Record<SectionId, ReactNode> = {
   inbox: <><path d="M4 13.5 6.5 5h11l2.5 8.5V19H4z" /><path d="M4 13.5h4.5l1.2 2h4.6l1.2-2H20" /></>,
   friends: <><circle cx="9" cy="9" r="3" /><circle cx="16.5" cy="10" r="2.4" /><path d="M3.5 19c.8-3 3-4.5 5.5-4.5s4.7 1.5 5.5 4.5M14.5 15c2.6-.5 4.8.8 5.6 3.5" /></>,
   bar: <><path d="M5 20V9l7-5 7 5v11" /><path d="M9.5 20v-5h5v5" /></>,
-  yours: <><path d="M12 20s-7-4.4-7-9.5A3.8 3.8 0 0 1 12 8a3.8 3.8 0 0 1 7 2.5C19 15.6 12 20 12 20z" /></>,
+  yours: <><path d="M6 4.5h10.5a1.5 1.5 0 0 1 1.5 1.5v14H7.5A1.5 1.5 0 0 1 6 18.5z" /><path d="M6 18.5A1.5 1.5 0 0 1 7.5 17H18M9.5 8.5h5M9.5 11.5h5" /></>,
+  // File 15: Party Picks (votes and brackets): a ballot with a tick.
+  party: <><rect x="4.5" y="4" width="15" height="16" rx="1.5" /><path d="m8.5 12.5 2.3 2.3 4.7-5" /></>,
 };
 export function SectionIcon({ section, size = 14, color }: { section: SectionId; size?: number; color?: string }) {
   return (
@@ -62,21 +64,42 @@ export function SectionHeading({ children, section, id, as = "h2", aside, classN
 }
 
 // ── Covers and tiles ─────────────────────────────────────────────────────────
-/** A cover photo (thumbnail size, lazy, alt = the item's name), or a brass-on-dark monogram in the section's tint. */
-export function CoverArt({ cover, label, section, className = "", eager = false, size = "thumb" }: { cover: Cover | null; label: string; section: SectionId | null; className?: string; eager?: boolean; size?: "thumb" | "full" }) {
-  if (cover) {
+/**
+ * File 15, Part C: a collection's cover, like a playlist's art: four photos as a 2×2; three as one tall and two small;
+ * two side by side; one alone; none, the section's icon large, in its colour on its tint. Photos load lazily at
+ * thumbnail size with each item's name as alt text, inside a box of fixed shape (nothing moves as they arrive). A bottle
+ * is shown whole (contain-fit) and a photo with a transparent background without a box, both on the section's tint.
+ */
+export function Collage({ covers, section, label, className = "", eager = false, size = "thumb" }: { covers: Cover[]; section: SectionId | null; label: string; className?: string; eager?: boolean; size?: "thumb" | "full" }) {
+  const a = section ? ACCENTS[section] : null;
+  const tint = a ? a.tint : C.card;
+  const cs = covers.slice(0, 4);
+  if (!cs.length) {
     return (
-      <img src={barPhotoSrc(cover.kind, cover.id, cover.photo, size)} alt={cover.name} loading={eager ? "eager" : "lazy"} decoding="async"
-        className={`w-full h-full object-cover ${className}`} style={{ background: C.card }} />
+      <span aria-hidden className={`w-full h-full flex items-center justify-center ${className}`} style={{ background: tint }} data-collage="0">
+        {section ? <SectionIcon section={section} size={44} /> : <span className="font-display" style={{ color: C.brass, fontSize: "2rem" }}>CG</span>}
+      </span>
     );
   }
-  const a = section ? ACCENTS[section] : null;
+  const img = (c: Cover, i: number, extra = "") => {
+    const fit = c.clear || c.kind === "bottle";
+    return (
+      <span key={`${c.kind}${c.id}`} className={`block overflow-hidden min-w-0 min-h-0 ${extra}`} style={{ background: tint }}>
+        <img src={barPhotoSrc(c.kind, c.id, c.photo, size)} alt={c.name} loading={eager && i === 0 ? "eager" : "lazy"} decoding="async"
+          className={`w-full h-full ${fit ? "object-contain" : "object-cover"}`} style={fit ? { padding: c.clear ? "8%" : "4%" } : undefined} />
+      </span>
+    );
+  };
+  const grid = cs.length === 4 ? "grid-cols-2 grid-rows-2" : cs.length === 3 ? "grid-cols-2 grid-rows-2" : cs.length === 2 ? "grid-cols-2 grid-rows-1" : "grid-cols-1 grid-rows-1";
   return (
-    <span aria-hidden className={`w-full h-full flex items-center justify-center ${className}`}
-      style={{ background: a ? `radial-gradient(circle at 30% 25%, ${a.tint}, ${C.bg} 85%)` : `radial-gradient(circle at 30% 25%, #1f2619, ${C.bg} 85%)` }}>
-      <span className="font-display leading-none" style={{ fontSize: "2.1rem", color: C.brass, opacity: 0.85, letterSpacing: "0.02em" }}>{monogram(label)}</span>
+    <span className={`w-full h-full grid gap-px ${grid} ${className}`} style={{ background: C.bg }} data-collage={cs.length} aria-label={`${label}: ${cs.map((c) => c.name).join(", ")}`} role="img">
+      {cs.map((c, i) => img(c, i, cs.length === 3 && i === 0 ? "row-span-2" : ""))}
     </span>
   );
+}
+/** @deprecated file 14: one cover photo; now a collage of one. */
+export function CoverArt({ cover, label, section, className = "", eager = false, size = "thumb" }: { cover: Cover | null; label: string; section: SectionId | null; className?: string; eager?: boolean; size?: "thumb" | "full" }) {
+  return <Collage covers={cover ? [cover] : []} label={label} section={section} className={className} eager={eager} size={size} />;
 }
 
 export function TileGrid({ tiles, onPick, big = false }: { tiles: Tile[]; onPick?: () => void; big?: boolean }) {
@@ -96,8 +119,7 @@ function TileLink({ t, onPick, eager }: { t: Tile; onPick?: () => void; eager?: 
     <Link href={t.href} scroll={false} onClick={onPick} className="flex flex-col h-full rounded-xl overflow-hidden border pp-focus pp-row pp-card"
       style={{ borderColor: `${a.edge}40` }}>
       <span className="block relative aspect-[4/3] overflow-hidden">
-        <CoverArt cover={t.cover} label={t.label} section={t.section} eager={eager} />
-        {t.cover && <span aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(19,23,15,0) 45%, rgba(19,23,15,0.55) 100%)" }} />}
+        <Collage covers={t.covers} label={t.label} section={t.section} eager={eager} />
       </span>
       <span className="block flex-1 px-3 pt-2.5 pb-3 border-t-2" style={{ borderTopColor: a.edge, background: a.tint }}>
         <span className="flex flex-wrap items-baseline justify-between gap-x-2">
@@ -110,11 +132,32 @@ function TileLink({ t, onPick, eager }: { t: Tile; onPick?: () => void; eager?: 
   );
 }
 
+/**
+ * File 15, Part A: the Party Picks banner at the top of the Index, above the tiles: one full-width card about a third of
+ * a tile's height, with its name, one line ("Voting is open: 2", "See past votes") and its collage. Not drawn at all
+ * when nothing is open and there are no past votes.
+ */
+export function PartyBanner({ b }: { b: Banner | null | undefined }) {
+  if (!b) return null;
+  const a = ACCENTS[b.section];
+  return (
+    <Link href={b.href} scroll={false} className="pp-party-banner flex items-stretch h-[84px] rounded-xl overflow-hidden border mb-4 pp-focus pp-row pp-card"
+      style={{ borderColor: `${a.edge}55`, borderLeftWidth: 3, borderLeftColor: a.edge, background: a.tint }}>
+      <span className="flex-1 min-w-0 flex flex-col justify-center px-4">
+        <KindLabel section={b.section}>Take part</KindLabel>
+        <span className="pp-t-card block leading-tight mt-0.5" style={{ color: C.text }}>{b.label}</span>
+        <span className="pp-t-secondary block" style={{ color: a.ink }}>{b.line}</span>
+      </span>
+      <span className="block w-[84px] h-full shrink-0 overflow-hidden"><Collage covers={b.covers} label={b.label} section={b.section} eager /></span>
+    </Link>
+  );
+}
+
 /** A wide cover across the top of a Menu tab, with the tab's name over it. */
 export function CoverBanner({ cover, title, section }: { cover: Cover | null; title: string; section: SectionId }) {
   if (!cover) return null;
   return (
-    <figure className="relative -mx-5 sm:mx-0 mt-4 aspect-[16/7] overflow-hidden sm:rounded-xl" style={{ background: C.card }}>
+    <figure className="relative -mx-5 sm:mx-0 mt-4 aspect-[16/7] overflow-hidden sm:rounded-xl" style={{ background: ACCENTS[section].tint }}>
       <CoverArt cover={cover} label={title} section={section} eager size="full" />
       <span aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(19,23,15,0) 35%, rgba(19,23,15,0.88) 100%)" }} />
       <figcaption className="absolute left-5 right-5 bottom-3 pp-t-section !m-0" style={{ color: C.text, textShadow: "0 1px 12px rgba(0,0,0,0.6)" }}>{title}</figcaption>
@@ -165,9 +208,12 @@ export function useLevelMotion(key: string, depth: number) {
 }
 
 // ── Compact rows ─────────────────────────────────────────────────────────────
-function RowThumb({ kind, id, photo, name }: { kind: "cocktail" | "bottle"; id: number | null; photo?: string | null; name: string }) {
+function RowThumb({ kind, id, photo, name, clear }: { kind: "cocktail" | "bottle"; id: number | null; photo?: string | null; name: string; clear?: boolean }) {
   if (!photo || !id) return null;
-  return <img src={barPhotoSrc(kind, id, photo, "thumb")} alt={name} loading="lazy" decoding="async" width={44} height={44} className="shrink-0 rounded-md object-cover" style={{ width: 44, height: 44, background: C.card }} />;
+  // File 15: a bottle (portrait) is shown whole; a cut-out photo without a box; both on the app's dark tint.
+  const fit = clear || kind === "bottle";
+  return <img src={barPhotoSrc(kind, id, photo, "thumb")} alt={name} loading="lazy" decoding="async" width={44} height={44}
+    className={`shrink-0 rounded-md ${fit ? "object-contain" : "object-cover"}`} style={{ width: 44, height: 44, background: "#1F251A", padding: fit ? 2 : 0 }} />;
 }
 const oneLine: CSSProperties = { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
 
@@ -183,13 +229,13 @@ export function CompactCocktail({ c, mark }: { c: IndexCocktail; mark?: Mark }) 
           </span>
           {(c.flavor || c.menu_name) && <span className="pp-t-secondary block" style={{ color: C.muted, ...oneLine }}>{c.flavor || c.menu_name}</span>}
         </span>
-        <RowThumb kind="cocktail" id={c.id} photo={c.photo} name={c.name} />
+        <RowThumb kind="cocktail" id={c.id} photo={c.photo} name={c.name} clear={c.photo_clear} />
       </span>
     </ItemRow>
   );
 }
 /** A bottle in a final list: name, its label, the dot, thumbnail and "+"; "out right now" dimmed. */
-export function CompactBottle({ b, out, mark, prices }: { b: Pick<IndexBottle, "id" | "name" | "photo" | "available" | "status_label">; out: boolean; mark?: Mark; prices?: MenuItem["prices"] }) {
+export function CompactBottle({ b, out, mark, prices }: { b: Pick<IndexBottle, "id" | "name" | "photo" | "available" | "status_label" | "photo_clear">; out: boolean; mark?: Mark; prices?: MenuItem["prices"] }) {
   return (
     <ItemRow item={{ kind: "bottle", id: b.id, name: b.name }} href={`/passport/spirits/${b.id}`} pad="py-2.5" lazy>
       <span className="flex items-center gap-3 min-h-[44px]" style={{ opacity: out ? 0.6 : 1 }}>
@@ -201,7 +247,7 @@ export function CompactBottle({ b, out, mark, prices }: { b: Pick<IndexBottle, "
           {b.status_label && <span className="pp-t-secondary block" style={{ color: C.faint }}>{b.status_label}</span>}
         </span>
         {prices && prices.length > 0 && <span className="pp-num"><Prices prices={prices} /></span>}
-        <RowThumb kind="bottle" id={b.id} photo={b.photo} name={b.name} />
+        <RowThumb kind="bottle" id={b.id} photo={b.photo} name={b.name} clear={b.photo_clear} />
       </span>
     </ItemRow>
   );
@@ -223,7 +269,7 @@ export function CompactMenuItem({ it, marks, spirit = false }: { it: MenuItem; m
           {line && <span className="pp-t-secondary block" style={{ color: it.unavailable ? C.faint : C.muted, ...oneLine }}>{line}</span>}
         </span>
         {it.prices.length > 0 && <span className="pp-num shrink-0"><Prices prices={it.prices} /></span>}
-        <RowThumb kind={it.cocktail_id ? "cocktail" : "bottle"} id={it.cocktail_id || it.bottle_id} photo={it.photo} name={it.name} />
+        <RowThumb kind={it.cocktail_id ? "cocktail" : "bottle"} id={it.cocktail_id || it.bottle_id} photo={it.photo} name={it.name} clear={it.photo_clear} />
       </span>
     </ItemRow>
   );

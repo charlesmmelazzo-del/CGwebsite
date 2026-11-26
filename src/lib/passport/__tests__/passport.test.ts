@@ -327,7 +327,7 @@ function slowServer() {
     assert.equal(dayLong("2026-12-04"), "Friday, December 4");
     assert.deepEqual([partyOf(1), partyOf(4)], ["Just you", "Party of 4"]);
   });
-  await test("the recipe book is called My Cocktails, sits in the Index under Yours with Add a cocktail, and never in the Menu", () => {
+  await test("the recipe book is called My Cocktails, sits in the Index under Journal (file 15: was Yours) with Add a cocktail, and never in the Menu", () => {
     const comp = (f: string) => readFileSync(join(__dirname, "..", "..", "..", "components", "passport", f), "utf8");
     // File 14: the Index is a drill-down; My Cocktails is a tile under Index › Yours (lib/passport/nav.ts), and the Yours
     // level keeps "+ Add a cocktail". (Updated from the flat Index's card, which this file replaced.)
@@ -375,7 +375,7 @@ function slowServer() {
         ["From the bar", React.createElement(S.FromTheBar, { messages: [] })], ["From the bar (none sent)", React.createElement(S.FromTheBar, {})],
         ["What's new", React.createElement(S.WhatsNew, { cards: [] })], ["Spirit of the Day", React.createElement(S.SpiritOfTheDay, { spirit: null })],
         ["Welcome Aperitif", React.createElement(S.WelcomeAperitif, { aperitif: null })], ["Welcome Aperitif (blank name)", React.createElement(S.WelcomeAperitif, { aperitif: { name: "", description: "x" } })],
-        ["Newest list", React.createElement(S.NewestList, { list: null })], ["From Common Good", React.createElement(S.HouseLists, { lists: [], charts: [], pastCount: 0 })],
+        ["Newest list", React.createElement(S.NewestList, { list: null })], ["CG Picks", React.createElement(S.HouseLists, { lists: [], charts: [], pastCount: 0 })],
       ] as const) assert.equal(html(el), "", name);
     });
     await test("… and shows when filled", () => {
@@ -393,7 +393,8 @@ function slowServer() {
       const nl = html(React.createElement(S.NewestList, { list }));
       assert.ok(nl.includes("Rye flight") && nl.includes("Staff pick · by Sam") && nl.includes("Flight · $28"), nl);
       const hl = html(React.createElement(S.HouseLists, { lists: [list], charts: [{ key: "top", title: "Top of the Charts", season_name: "Winter 2026", items: [] }], pastCount: 2 }));
-      assert.ok(hl.includes("From Common Good") && hl.includes('href="/passport/house/charts/top"') && hl.includes("Past lists from Common Good") && hl.includes('href="/passport/house/past"'), hl);
+      // File 15: "From Common Good" is now "CG Picks" (updated from file 07's wording).
+      assert.ok(hl.includes("CG Picks") && hl.includes('href="/passport/house/charts/top"') && hl.includes("Past lists") && hl.includes('href="/passport/house/past"'), hl);
     });
     await test("links from the bar only ever open pages inside Passport", () => {
       assert.equal(B.messageHref({ link_kind: "list", link_id: 3 }), "/passport/house/3");
@@ -663,7 +664,7 @@ function slowServer() {
       assert.ok(!/member_id|memberId/.test(api), "never takes a member number");
       assert.ok(LIMITS["passport-photos"].max > 0 && LIMITS["passport-photo-read"].max > 0);
     });
-    await test("the privacy line shows where a member adds a photo; My photos is under Index → Yours", () => {
+    await test("the privacy line shows where a member adds a photo; My photos is under Index → Journal (file 15: was Yours)", () => {
       const photos = comp11("Photos.tsx");
       assert.ok(photos.includes('"Only you and the Common Good team can see your photos."') && /MyItemPhotos[\s\S]*PHOTO_PRIVATE_LINE/.test(photos));
       assert.ok(photos.includes("MAX_SIDE = 1600") && photos.includes("TARGET = 400 * 1024") && photos.includes('"image/jpeg"'), "shrunk on the device: 1600px, JPEG, under 400 KB");

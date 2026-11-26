@@ -31,7 +31,7 @@ export interface SignedIn { member: Member; session_token: string; expires_at: s
 /** Sign-up answers "check your email", or (a personal invitation sent to that same email) signs in at once. */
 export type SignUpResult = { ok: true; check_email: true } | (SignedIn & { signed_in: true })
 export interface CocktailCard { id: number; name: string; flavor: string; menu_name: string; menu_status: "current" | "past"; passport: "current" | "past" | null }
-export interface Cocktail extends CocktailCard { ingredients: string; tagline: string; notes: string; bottles?: DrinkBottle[]; home_recipe?: boolean; photo?: string | null; photo_alt?: string }
+export interface Cocktail extends CocktailCard { ingredients: string; tagline: string; notes: string; bottles?: DrinkBottle[]; home_recipe?: boolean; photo?: string | null; photo_alt?: string; photo_clear?: boolean }
 /**
  * "Bottles in this drink" (Nov 25, 2026): from the Bible's own recipe, names and categories only, in recipe order.
  * id is the bottle page; null for a recipe placeholder, which arrives as a plain spirit word ("Bourbon"). Absent when
@@ -41,7 +41,7 @@ export interface DrinkBottle { id: number | null; name: string; category: string
 export interface ArchivedBottle { id: number; name: string; category: string; producer: string; description: string; status_label: string | null }
 /** Toast menus as the Bible's approved list sends them (menu reader). */
 export interface MenuPrice { label: string | null; price: number }
-export interface MenuItem { name: string; description: string; prices: MenuPrice[]; cocktail_id: number | null; bottle_id: number | null; unavailable: boolean; card?: MenuCard; photo?: string | null; cover?: boolean; producer?: string }
+export interface MenuItem { name: string; description: string; prices: MenuPrice[]; cocktail_id: number | null; bottle_id: number | null; unavailable: boolean; card?: MenuCard; photo?: string | null; cover?: boolean; producer?: string; photo_clear?: boolean }
 /**
  * The matched library cocktail's tagline, ingredients and flavor line, sent with the menu item (no call per cocktail).
  * Only when the Toast item has that cocktail's own name; a variant ("… - Free Spirited") has none and keeps its own
@@ -60,7 +60,9 @@ export interface MenuTabDef { label: string; menu: number; groups: number[] | nu
 export interface Album { name: string; current: boolean }
 export interface Fact { label: string; value: string }
 export interface BottleCocktail { id: number; name: string; menu_name: string; menu_status: "current" | "past" }
-export interface Bottle extends ArchivedBottle { producer_id: number | null; passport_description?: string; prices: MenuPrice[]; facts: Fact[]; cocktails: BottleCocktail[]; photo?: string | null; photo_alt?: string }
+export interface Bottle extends ArchivedBottle { producer_id: number | null; passport_description?: string; prices: MenuPrice[]; facts: Fact[]; cocktails: BottleCocktail[]; photo?: string | null; photo_alt?: string; photo_clear?: boolean;
+  /** File 15: "Photo: {credit}" in small type, only when the bar typed a credit for its photo. */
+  photo_credit?: string }
 export interface ProducerBottle { id: number; name: string; category: string; status_label: string | null }
 /** passport_description: the approved Passport text (Part 6), or "" when there is none yet. */
 export interface Producer { id: number; name: string; based_in: string; passport_description?: string; bottles: ProducerBottle[] }
@@ -81,7 +83,9 @@ export const markKey = (kind: ItemKind, id: number) => `${kind}:${id}`;
 /** The member's own marks on the page they're looking at. */
 /** File 13: ordered_household is true when ordered_count includes household members' checks (sharing on). */
 export interface Mine { favorite: boolean; rating: number | null; note: string; ordered_count: number; last_ordered: string | null; ordered_household?: boolean }
-export interface PassportList { id: number; name: string; kind: ItemKind; ranked: boolean; count: number; cap: number | null; items?: ListItem[] }
+export interface PassportList { id: number; name: string; kind: ItemKind; ranked: boolean; count: number; cap: number | null; items?: ListItem[]; covers?: CoverPhoto[] }
+/** File 15, Part C: one photo of a collage, from an item this member may open (the Bible chooses them). */
+export interface CoverPhoto { kind: ItemKind; id: number; photo: string; name?: string; photo_clear?: boolean }
 export interface Pick { kind: ItemKind; id: number; name: string; label: string | null }
 export interface BespokeLine { quantity: string; unit: string; name: string; sub_recipe: string }
 /** made_by: the first name of the staff member who added it, or null when the member wrote it. */
@@ -125,11 +129,12 @@ export interface BottleRequest {
 export interface BottleRequests { requests: BottleRequest[]; open_count: number; max_open: number }
 // ── File 06: the new shell (Index tab, search, the member's own upcoming reservations) ──────────────────────────
 /** A cocktail in the Index or in search. available: on a ticked Toast menu today. spirits: base-spirit keys (Index only). */
-export interface IndexCocktail extends CocktailCard { available: boolean; spirits?: string[]; photo?: string | null; menus?: string[]; cover?: boolean }
+export interface IndexCocktail extends CocktailCard { available: boolean; spirits?: string[]; photo?: string | null; menus?: string[]; cover?: boolean; photo_clear?: boolean }
 /** A bottle a member may open. available: on the shown spirits list and not out. */
-export interface IndexBottle { id: number; name: string; category: string; status_label: string | null; available: boolean; photo?: string | null; producer?: string; on_list?: boolean; cover?: boolean }
+export interface IndexBottle { id: number; name: string; category: string; status_label: string | null; available: boolean; photo?: string | null; producer?: string; on_list?: boolean; cover?: boolean; photo_clear?: boolean }
 /** A beer, wine or cider sold on the list (past or present). It has no page of its own. */
-export interface IndexDrink { name: string; kind: "Beer" | "Wine" | "Other"; description: string; status_label: string | null; available: boolean }
+/** File 15: id and photo only so its photo can be shown (it still has no page); cover: the admin's "Use as cover". */
+export interface IndexDrink { name: string; kind: "Beer" | "Wine" | "Other"; description: string; status_label: string | null; available: boolean; id?: number | null; photo?: string | null; photo_clear?: boolean; cover?: boolean }
 export interface FoundProducer { id: number; name: string; based_in: string }
 export interface IndexData { cocktails: IndexCocktail[]; bottles: IndexBottle[]; drinks: IndexDrink[]; base_spirits: BaseSpirit[]; recommendations?: Recommendation[]; enough?: boolean; suggest?: boolean; albums?: Album[] }
 // ── File 12: "For you" ────────────────────────────────────────────────────────
@@ -138,7 +143,7 @@ export interface IndexData { cocktails: IndexCocktail[]; bottles: IndexBottle[];
  * anyone else's): something being served right now, with one plain reason ("Because you love …").
  */
 export interface Recommendation {
-  kind: ItemKind; id: number; name: string; reason: string; available: boolean; photo?: string | null;
+  kind: ItemKind; id: number; name: string; reason: string; available: boolean; photo?: string | null; photo_clear?: boolean;
   flavor?: string; menu_name?: string; menu_status?: "current" | "past"; passport?: "current" | "past" | null; category?: string;
 }
 /** What "For you" holds: suggest false (switched off in Account), enough false (too little of their own history yet). */
@@ -148,7 +153,7 @@ export interface FindResults { cocktails: IndexCocktail[]; bottles: IndexBottle[
 export interface Reservation { date: string; time: string; party_size: number; status: "requested" | "approved" | "guest_confirmed" }
 // ── File 07: From the bar (house lists, the two charts, Spirit of the Day, the Welcome Aperitif, messages, What's new) ──
 /** One cocktail or bottle on a house list or a chart. id is null (name only) when it can no longer be opened. */
-export interface HouseItem { kind: ItemKind; id: number | null; name: string; label: string | null; opens: boolean; note?: string; pour_oz?: number | null; photo?: string | null }
+export interface HouseItem { kind: ItemKind; id: number | null; name: string; label: string | null; opens: boolean; note?: string; pour_oz?: number | null; photo?: string | null; photo_clear?: boolean }
 
 // ── File 11: photos. The bar's photo is an opaque code (`photo`) on items a member may open; the picture itself comes
 // only through /passport/photo/… for the signed-in member. A member's own photos reach only that member.
@@ -165,7 +170,7 @@ export const myPhotoSrc = (token: string, size: "thumb" | "full" = "thumb") => `
 /** A house list: playlist or ranked; a staff pick carries the team member's first name; a flight carries a price in whole dollars. */
 export interface HouseList {
   id: number; title: string; intro: string; kind: ItemKind; ranked: boolean; by: string | null; staff_pick: boolean; price: number | null; count: number;
-  past: boolean; ended_on?: string | null; chart?: "top" | "critics" | null; season_name?: string | null; items?: HouseItem[];
+  past: boolean; ended_on?: string | null; chart?: "top" | "critics" | null; season_name?: string | null; items?: HouseItem[]; covers?: CoverPhoto[];
 }
 /** Top of the Charts or Critics' Choice: five cocktails in order. Never a number but the cocktails' own page numbers. */
 export interface Chart { key: "top" | "critics"; title: string; season_name: string; items: HouseItem[] }
@@ -257,7 +262,7 @@ export interface PComment {
 }
 export interface CommentThread { locked: boolean; can_write: boolean; why_not: string | null; first_time: boolean; note: string; items: PComment[] }
 export interface CommentNotice { id: number; name: string; title: string; link_kind: CommentType; link_id: number; at: string; unread: boolean }
-export interface VoteCard { kind: "flight" | "bracket"; id: number; title: string; status: "open" | "closed"; line: string; winner: string | null; done: boolean }
+export interface VoteCard { kind: "flight" | "bracket"; id: number; title: string; status: "open" | "closed"; line: string; winner: string | null; done: boolean; covers?: CoverPhoto[] }
 export interface FlightOption { id: number; bottle_id: number | null; name: string; category: string; opens: boolean; winner: boolean; pct: number | null }
 export interface FlightSlot { id: number; label: string; my_pick: number | null; options: FlightOption[] }
 export interface FlightVote { id: number; title: string; intro: string; pour_oz: number | null; status: "open" | "closed"; status_label: string; when: string; slots: FlightSlot[]; done: boolean }

@@ -10,7 +10,8 @@ import { PAST_HREF, chartHref, discountLine, feedHref, feedKicker, flightLine, h
 import type { BarMessage, Chart, FeedCard, HouseList, SpiritOfTheDay as Spirit, VoteCard, WelcomeAperitif as Aperitif } from "@/lib/passport/types";
 import { PAST_VOTES_HREF } from "@/lib/passport/votes";
 import { VoteCardLink } from "../Votes";
-import { KindLabel, accentCardStyle } from "../Drill";
+import { Collage, KindLabel, accentCardStyle } from "../Drill";
+import { houseListCovers } from "@/lib/passport/nav";
 import { ACCENTS, type SectionId } from "@/lib/passport/accents";
 
 /** File 14, Part 7: a What's new card's section (a new list, chart or vote: from the bar; a new menu: cocktails). */
@@ -169,7 +170,7 @@ export function NewestList({ list }: { list?: HouseList | null }) {
   if (!list) return null;
   return (
     <section aria-labelledby="pp-newest-list" className="mt-10">
-      <h2 id="pp-newest-list" className={heading} style={{ color: ACCENTS["bar"].ink }}>From Common Good</h2>
+      <h2 id="pp-newest-list" className={heading} style={{ color: ACCENTS["bar"].ink }}>CG Picks</h2>
       <ListCard l={list} big />
     </section>
   );
@@ -178,24 +179,28 @@ export function NewestList({ list }: { list?: HouseList | null }) {
 function ListCard({ l, big = false }: { l: HouseList; big?: boolean }) {
   const flight = flightLine(l.price);
   return (
-    <Link href={houseHref(l.id)} scroll={false} className="block rounded-xl border p-4 pp-focus pp-row pp-card pp-accent-card" style={accentCardStyle("bar")}>
+    <Link href={houseHref(l.id)} scroll={false} className="flex items-stretch gap-3 rounded-xl border pl-4 overflow-hidden pp-focus pp-row pp-card pp-accent-card" style={accentCardStyle("bar")}>
+      <span className="flex-1 min-w-0 py-4">
       <KindLabel section="bar">{listKicker(l)}</KindLabel>
       <span className={`block font-display leading-tight mt-1.5 ${big ? "text-[1.5rem]" : "text-[1.3125rem]"}`} style={{ color: C.text }}>{l.title}</span>
       {big && l.intro && <span className="block font-body text-sm mt-1 leading-relaxed line-clamp-2" style={{ color: C.muted }}>{l.intro}</span>}
       <span className="block font-body text-[0.75rem] tracking-[0.12em] uppercase mt-2" style={{ color: C.faint }}>
         {l.count} {l.kind === "cocktail" ? "cocktail" : "bottle"}{l.count === 1 ? "" : "s"}{flight ? ` · ${flight}` : ""}
       </span>
+      </span>
+      {/* File 15, Part C: the list's own items as a collage. */}
+      <span className="block w-[96px] shrink-0"><Collage covers={houseListCovers(l)} section="bar" label={l.title} /></span>
     </Link>
   );
 }
 
-/** The Index's "From Common Good" (file 07): live house lists (staff picks marked), the charts, and the way to past lists. */
+/** The Index's "CG Picks" (file 07; file 15 renamed "From Common Good"): live house lists (staff picks marked), the charts, and the way to past lists. */
 export function HouseLists({ lists, charts, pastCount = 0, votes, pastVotes = 0 }: { lists?: HouseList[] | null; charts?: Chart[] | null; pastCount?: number; votes?: VoteCard[] | null; pastVotes?: number }) {
   if (!lists?.length && !charts?.length && !pastCount && !votes?.length && !pastVotes) return null;
   return (
     <section id="from-common-good" aria-labelledby="pp-house-lists">
       <div className="flex items-baseline justify-between mt-10 mb-3">
-        <h2 id="pp-house-lists" className="pp-t-section mb-3" style={{ color: ACCENTS["bar"].ink }}>From Common Good</h2>
+        <h2 id="pp-house-lists" className="pp-t-section mb-3" style={{ color: ACCENTS["bar"].ink }}>CG Picks</h2>
       </div>
       {!!charts?.length && (
         <ul className="grid grid-cols-2 gap-3 mb-3">
@@ -212,7 +217,7 @@ export function HouseLists({ lists, charts, pastCount = 0, votes, pastVotes = 0 
       {!!lists?.length && <ul className="space-y-3">{lists.map((l) => <li key={l.id}><ListCard l={l} /></li>)}</ul>}
       {pastCount > 0 && (
         <Link href={PAST_HREF} scroll={false} className="mt-2 inline-flex items-center min-h-[44px] font-body text-sm underline underline-offset-4 pp-focus" style={{ color: C.text }}>
-          Past lists from Common Good
+          Past lists
         </Link>
       )}
       {/* File 10: open votes and brackets, then "Past votes". */}
