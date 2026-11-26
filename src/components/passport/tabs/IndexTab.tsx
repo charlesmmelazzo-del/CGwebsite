@@ -19,6 +19,7 @@ import { readRecent } from "../recent";
 import { chartHref, houseHref, listKicker } from "@/lib/passport/bar";
 import { INDEX_HREF, PAST_VOTES_HREF, chartCoversOf, houseListCovers, indexLevel, indexPathOf, jumpBackIn, type IndexLevel, type Recent } from "@/lib/passport/nav";
 import { barPhotoSrc, markKey, type Chart, type HouseList, type IndexData, type Marks, type PassportList, type VoteCard } from "@/lib/passport/types";
+import { stripMarks } from "@/lib/passport/description";
 
 /** What the Index view sends (api/passport/view/index). */
 export interface IndexView extends IndexData { lists: PassportList[]; marks: Marks; house_lists?: HouseList[]; charts?: Chart[]; past_count?: number; votes?: VoteCard[]; vote_results?: VoteCard[]; past_votes_count?: number }
@@ -183,7 +184,7 @@ function LevelBody({ level, d, version, everything, setEverything }: { level: In
                 <Avail on={x.available} />
                 {x.status_label && <span className="pp-t-eyebrow" style={{ color: C.faint }}>{x.status_label}</span>}
               </span>
-              {x.description && <span className="pp-t-secondary block mt-0.5 line-clamp-2" style={{ color: C.muted }}>{x.description}</span>}
+              {x.description && <span className="pp-t-secondary block mt-0.5 line-clamp-2" style={{ color: C.muted }}>{stripMarks(x.description)}</span>}
             </li>
           ))}
         </ul>

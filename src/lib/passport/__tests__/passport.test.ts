@@ -868,6 +868,15 @@ function slowServer() {
       const route = readFileSync(join(__dirname, "..", "..", "..", "app", "api", "passport", "share", "route.ts"), "utf8");
       assert.ok(route.includes("findPublicEvent(") && route.includes('public: { id: e.id, title: e.title, date: e.date }'), "only an event the public page shows, and only its id, title and date");
     });
+    await test("formatting marks in a description are dropped, the words kept", async () => {
+      const { stripMarks, descriptionParts } = await import("../description");
+      assert.equal(stripMarks("**1792 Full Proof** — Kentucky straight bourbon"), "1792 Full Proof — Kentucky straight bourbon");
+      assert.equal(stripMarks("## Tasting\n- Dried cherry\n- *Oak* and __spice__"), "Tasting\nDried cherry\nOak and spice");
+      assert.equal(stripMarks("Aged 2 * 3 years, 5*6"), "Aged 2 * 3 years, 5*6");
+      assert.deepEqual(descriptionParts("**Bold** start\n[Smoky, Dry]").map((p) => p.text), ["Bold start", "Smoky, Dry"]);
+      const { shortLine } = await import("../nav");
+      assert.equal(shortLine({ description: "**1792 Full Proof** — a bourbon" }), "1792 Full Proof — a bourbon");
+    });
   }
 
   console.log(`\n${passed} passed, ${failed} failed`);
