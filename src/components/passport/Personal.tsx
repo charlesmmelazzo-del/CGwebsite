@@ -101,7 +101,10 @@ export function ItemControls({ kind, id, name, initial }: { kind: ItemKind; id: 
 
       <p className="font-body text-sm" style={{ color: C.muted }}>
         {mine.ordered_count > 0
-          ? <>You&rsquo;ve ordered this {mine.ordered_count === 1 ? "once" : `${mine.ordered_count} times`}{mine.last_ordered ? `, most recently ${longDate(mine.last_ordered)}` : ""}.</>
+          ? mine.ordered_household
+            // File 13: the count includes household members' checks (they share order history); only the member's own date shows.
+            ? <>You or your household have ordered this {mine.ordered_count === 1 ? "once" : `${mine.ordered_count} times`}{mine.last_ordered ? `. You last had it ${longDate(mine.last_ordered)}` : ""}.</>
+            : <>You&rsquo;ve ordered this {mine.ordered_count === 1 ? "once" : `${mine.ordered_count} times`}{mine.last_ordered ? `, most recently ${longDate(mine.last_ordered)}` : ""}.</>
           : "Not in your order history yet."}
       </p>
 

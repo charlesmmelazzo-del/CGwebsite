@@ -18,6 +18,8 @@ export interface Member {
   needs_phone: boolean;
   /** File 12: their own "Suggest things for me" switch (on by default). */
   suggest?: boolean;
+  /** File 13: their own "Share order history with my household" switch (on by default). */
+  household_history?: boolean;
 }
 export interface HouseholdMember { first_name: string; last_name: string; status: "invited" | "active" }
 export interface Me { member: Member; household: HouseholdMember[] }
@@ -63,19 +65,22 @@ export interface FavoriteItem extends MyItem { added_at: string }
 export interface RatingItem extends MyItem { stars: number; rated_at: string }
 export interface NoteItem extends MyItem { body: string; updated_at: string }
 export interface ListItem extends MyItem { position: number }
-export interface HistoryItem extends Omit<MyItem, "ref"> { count: number; last_ordered: string }
+/** File 13: last_ordered is null when only household members' checks count for it (their dates are never shown). */
+export interface HistoryItem extends Omit<MyItem, "ref"> { count: number; last_ordered: string | null }
 /** The member's own heart and stars on a card. */
 export interface Mark { kind: ItemKind; id: number; favorite: boolean; rating: number | null }
 export type Marks = Record<string, Mark>;
 export const markKey = (kind: ItemKind, id: number) => `${kind}:${id}`;
 /** The member's own marks on the page they're looking at. */
-export interface Mine { favorite: boolean; rating: number | null; note: string; ordered_count: number; last_ordered: string | null }
+/** File 13: ordered_household is true when ordered_count includes household members' checks (sharing on). */
+export interface Mine { favorite: boolean; rating: number | null; note: string; ordered_count: number; last_ordered: string | null; ordered_household?: boolean }
 export interface PassportList { id: number; name: string; kind: ItemKind; ranked: boolean; count: number; cap: number | null; items?: ListItem[] }
 export interface Pick { kind: ItemKind; id: number; name: string; label: string | null }
 export interface BespokeLine { quantity: string; unit: string; name: string; sub_recipe: string }
 /** made_by: the first name of the staff member who added it, or null when the member wrote it. */
 export interface Bespoke { id: number; name: string; notes: string; lines: BespokeLine[]; made_by: string | null; by_staff: boolean; created_at: string; updated_at: string }
-export interface History { empty: boolean; cocktails: HistoryItem[]; spirits: HistoryItem[] }
+/** File 13: view "household" (Me and my household, the default when it applies) or "me" (Just me); household: whether both views apply. */
+export interface History { empty: boolean; cocktails: HistoryItem[]; spirits: HistoryItem[]; view?: "household" | "me"; household?: boolean }
 export type BottleRequestStatus =
   | "submitted" | "quoted" | "accepted" | "ordered" | "ready" | "picked_up" | "declined" | "cancelled" | "quote_declined" | "pickup_declined";
 /** A confirmed price only (a price a manager has not confirmed is never sent). */

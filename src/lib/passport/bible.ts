@@ -139,7 +139,7 @@ export const getNotes = (auth: MemberAuth) => passport<{ notes: NoteItem[] }>("G
 export const getLists = (auth: MemberAuth) => passport<{ lists: PassportList[] }>("GET", "/lists", { auth }).then((r) => r.lists);
 export const getList = (auth: MemberAuth, id: number) => passport<{ list: PassportList }>("GET", `/lists/${id}`, { auth }).then((r) => r.list);
 export const getRecipes = (auth: MemberAuth) => passport<{ recipes: Bespoke[]; units: string[] }>("GET", "/bespoke", { auth });
-export const getHistory = (auth: MemberAuth) => passport<{ history: History }>("GET", "/history", { auth }).then((r) => r.history);
+export const getHistory = (auth: MemberAuth, view: "me" | null = null) => passport<{ history: History }>("GET", `/history${view === "me" ? "?view=me" : ""}`, { auth }).then((r) => r.history);
 
 // ── File 05: bottle requests. Only the signed-in member's own requests (the Bible looks each one up by its number
 // AND the member behind the session). Prices are whole cents, never including tax. Never a cost or markup. ──────

@@ -774,6 +774,24 @@ function slowServer() {
     });
   }
 
+  console.log("File 13: order history with a household");
+  {
+    const compP = (f: string) => readFileSync(join(APP, "..", "components", "passport", f), "utf8");
+    await test("Account has the member's own \"Share order history with my household\" switch, sent only as true or false", () => {
+      assert.ok(compP("Account.tsx").includes("Share order history with my household") && compP("Account.tsx").includes('{ household_history: on }'));
+      const me = readFileSync(join(APP, "api", "passport", "me", "route.ts"), "utf8");
+      assert.ok(me.includes('typeof body.household_history === "boolean"'));
+    });
+    await test("History offers Me and my household and Just me; a household-only row shows no date", () => {
+      const page = readFileSync(join(APP, "passport", "(app)", "history", "page.tsx"), "utf8");
+      assert.ok(page.includes("Me and my household") && page.includes("/passport/history?view=me") && page.includes('"Ordered by your household"'));
+    });
+    await test("an item page says \"You or your household have ordered this\" only when the Bible says so", () => {
+      const p = compP("Personal.tsx");
+      assert.ok(p.includes("mine.ordered_household") && p.includes("You or your household have ordered this"));
+    });
+  }
+
   console.log(`\n${passed} passed, ${failed} failed`);
   if (failed) process.exit(1);
 })();

@@ -43,6 +43,17 @@ export default function Account({ me: initial, prefs, friends }: { me: Me; prefs
     else { setMe(before); setError(r.data.error || "Couldn't save that. Please try again."); }
   };
 
+  // File 13: "Share order history with my household" (on by default). Shown at once; put back if the bar can't be reached.
+  const setHouseholdHistory = async (on: boolean) => {
+    const before = me;
+    setMe({ ...me, member: { ...m, household_history: on } });
+    setError("");
+    const r = await postJson<Me>("/api/passport/me", { household_history: on }, "PUT");
+    if (r.ok) { setMe(r.data); notifyChanged("recs"); }
+    else if (r.data.signed_out) router.refresh();
+    else { setMe(before); setError(r.data.error || "Couldn't save that. Please try again."); }
+  };
+
   const signOut = async () => {
     await postJson("/api/passport/signout", {});
     router.replace("/passport");
@@ -76,7 +87,13 @@ export default function Account({ me: initial, prefs, friends }: { me: Me; prefs
         ) : (
           <p className="font-body text-sm" style={{ color: C.muted }}>Nobody else yet.</p>
         )}
-        <p className="font-body text-xs leading-relaxed" style={{ color: C.faint }}>Everyone in a household has their own sign-in and sees only their own history and notes.</p>
+        <p className="font-body text-xs leading-relaxed" style={{ color: C.faint }}>Everyone in a household has their own sign-in. Favorites, ratings, notes, lists, photos and messages are never shared.</p>
+        {me.household.some((h) => h.status === "active") && (
+          <>
+            <Check checked={m.household_history !== false} onChange={setHouseholdHistory}>Share order history with my household</Check>
+            <p className="font-body text-xs leading-relaxed" style={{ color: C.faint }}>One person often pays for both. With this on, a check paid by anyone in your household who also shares counts in both your histories. Off: your checks count only for you, and you see only your own.</p>
+          </>
+        )}
         {sentTo && <Notice kind="ok">Invitation sent to {sentTo}.</Notice>}
         {full && m.can_invite_household && <p className="font-body text-xs" style={{ color: C.faint }}>A household can have up to 3 people.</p>}
         {m.can_invite_household && !full && (inviting
