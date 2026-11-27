@@ -190,8 +190,8 @@ const overview = (): ChatOverview => ({
     assert.equal(m.name, "Common Good Passport");
     assert.equal(m.short_name, "Passport");
     const by = (p: string) => m.icons.filter((i: { purpose: string }) => i.purpose === p).map((i: { src: string; sizes: string }) => `${i.src} ${i.sizes}`);
-    assert.deepEqual(by("any"), ["/passport/icons/icon-192.png 192x192", "/passport/icons/icon-512.png 512x512"]);
-    assert.deepEqual(by("maskable"), ["/passport/icons/icon-maskable-512.png 512x512"]);
+    assert.deepEqual(by("any"), ["/passport/icons/icon-192.png?v=book2 192x192", "/passport/icons/icon-512.png?v=book2 512x512"]);
+    assert.deepEqual(by("maskable"), ["/passport/icons/icon-maskable-512.png?v=book2 512x512"]);
     const pub = join(ROOT, "..", "public", "passport", "icons");
     for (const f of ["icon.svg", "icon-maskable.svg", "apple-touch-icon.png", "icon-192.png", "icon-512.png", "icon-maskable-512.png"]) assert.ok(existsSync(join(pub, f)), f);
     const png = readFileSync(join(pub, "apple-touch-icon.png"));
@@ -215,7 +215,7 @@ const overview = (): ChatOverview => ({
   });
   await test("the apple-touch-icon is on Passport pages only, never the public site's own pages", () => {
     const pl = readFileSync(join(ROOT, "app", "passport", "layout.tsx"), "utf8");
-    assert.ok(pl.includes('apple: [{ url: "/passport/icons/apple-touch-icon.png"'));
+    assert.ok(pl.includes('apple: [{ url: "/passport/icons/apple-touch-icon.png?v=book2"'));
     const root = readFileSync(join(ROOT, "app", "layout.tsx"), "utf8");
     assert.ok(!root.includes("/passport/icons") && !root.includes("passport/apple-touch-icon"));
   });

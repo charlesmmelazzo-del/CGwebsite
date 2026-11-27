@@ -9,8 +9,8 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: "Passport", statusBarStyle: "black-translucent" },
   icons: {
     // File 16, Part 10: the passport booklet icon (Passport pages only; the public site keeps its own favicon).
-    icon: [{ url: "/passport/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
-    apple: [{ url: "/passport/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    icon: [{ url: "/passport/icons/icon-192.png?v=book2", sizes: "192x192", type: "image/png" }],
+    apple: [{ url: "/passport/icons/apple-touch-icon.png?v=book2", sizes: "180x180", type: "image/png" }],
   },
 };
 
