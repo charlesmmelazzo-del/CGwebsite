@@ -186,10 +186,11 @@ writeFileSync(join(OUT, "icon-maskable.svg"), await svgFile({ variant: "hand", m
 console.log("icon.svg, icon-maskable.svg written");
 
 // The hand alone, for the app's own header and Home button: white lines on transparent, used as a CSS mask so the
-// app can colour it (brass in the header, dark green on the brass Home button). Drawn at 4x the largest size it is
-// shown (about 40px), with lines about 1.6px wide at that size.
+// app can colour it (brass in the header, dark green on the brass Home button). Drawn at 3x the size it is shown on
+// a phone (38px tall), so a 3x screen shows it pixel for pixel, with fine lines (about 1px at that size) so it
+// stays crisp rather than soft.
 {
-  const mk = await mark("hand", 160, 160, 1.6 * 4);
+  const mk = await mark("hand", 38 * 3 * (138 / 167), 38 * 3, 1.0 * 3);
   const { data, info: mi } = await sharp(mk.png).raw().toBuffer({ resolveWithObject: true });
   for (let i = 0; i < mi.width * mi.height; i++) { data[i * 4] = 255; data[i * 4 + 1] = 255; data[i * 4 + 2] = 255; }
   const png = await sharp(data, { raw: { width: mi.width, height: mi.height, channels: 4 } }).png({ compressionLevel: 9 }).toBuffer();
