@@ -17,6 +17,7 @@ import {
 } from "@/lib/passport/social";
 import type { Conversation, DmPost, Friend, FriendsOverview, LetsGo, MemberNotice, Presence, ShareCard, ShareKind, SocialInbox } from "@/lib/passport/types";
 import { KindLabel, SectionIcon, accentCardStyle } from "./Drill";
+import { Thumb } from "./PhotoBits";
 import { ChatScreen, useRoomPoll, type UiPost } from "./Chat";
 
 /**
@@ -238,7 +239,11 @@ export function SharedWithYou({ shared }: { shared?: ShareCard[] | null }) {
 }
 export function ShareCardView({ s, inThread = false }: { s: ShareCard; inThread?: boolean }) {
   const href = shareHref(s);
-  const inner = (
+  // File 17: a shared cocktail or bottle the member may open shows its small picture (a brand logo on its light panel).
+  const pic = (s.kind === "cocktail" || s.kind === "bottle") && s.opens && s.ref_id && s.photo
+    ? <Thumb kind={s.kind} id={s.ref_id} photo={s.photo} size={52} clear={s.photo_clear} logo={s.kind === "bottle" && s.photo_logo} name={s.name} />
+    : null;
+  const words = (
     <>
       <KindLabel section="friends">{inThread ? SHARE_WORDS[s.kind] : `${SHARE_WORDS[s.kind]} from ${s.from_name || "a friend"}`}</KindLabel>
       <span className="block font-display text-[1.25rem] leading-tight mt-1 pr-8" style={{ color: C.text }}>{s.name}</span>
@@ -246,6 +251,8 @@ export function ShareCardView({ s, inThread = false }: { s: ShareCard; inThread?
       {!s.opens && <span className="block font-body text-[0.875rem] mt-1" style={{ color: C.faint }}>This isn&rsquo;t available to open right now.</span>}
     </>
   );
+  // On the left, so it never sits under the Dismiss button in the top right corner.
+  const inner = pic ? <span className="flex items-center gap-3">{pic}<span className="flex-1 min-w-0 block">{words}</span></span> : words;
   const cls = "block h-full rounded-xl border p-4 pp-focus pp-card pp-accent-card";
   const style = accentCardStyle("friends");
   return href ? <Link href={href} scroll={false} className={`${cls} pp-row`} style={style}>{inner}</Link> : <div className={cls} style={style}>{inner}</div>;

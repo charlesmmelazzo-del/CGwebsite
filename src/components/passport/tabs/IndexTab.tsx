@@ -4,7 +4,8 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { C } from "../theme";
+import { C, logoAlt } from "../theme";
+import { LogoImg } from "../PhotoBits";
 import { Avail } from "../bits";
 import { PageTitle, Quiet } from "../Library";
 import { ListsManager } from "../Personal";
@@ -176,7 +177,7 @@ function LevelBody({ level, d, version, everything, setEverything }: { level: In
       return (
         <ul>
           {level.items.map((x, i) => x.id
-            ? <CompactBottle key={`d${x.id}`} b={{ id: x.id, name: x.name, photo: x.photo, photo_clear: x.photo_clear, available: x.available, status_label: x.status_label }} out={!!x.status_label} mark={d.marks[markKey("bottle", x.id)]} />
+            ? <CompactBottle key={`d${x.id}`} b={{ id: x.id, name: x.name, photo: x.photo, photo_clear: x.photo_clear, photo_logo: x.photo_logo, available: x.available, status_label: x.status_label }} out={!!x.status_label} mark={d.marks[markKey("bottle", x.id)]} />
             : (
             <li key={`${x.name}-${i}`} className="py-3 border-b" style={{ borderColor: C.line, contentVisibility: "auto", containIntrinsicSize: "auto 64px", opacity: x.status_label ? 0.7 : 1 }}>
               <span className="flex items-center gap-2">
@@ -289,7 +290,9 @@ function JumpBackIn({ d }: { d: IndexView }) {
             <Link href={x.kind === "cocktail" ? `/passport/library/${x.id}` : `/passport/spirits/${x.id}`} scroll={false}
               className="flex flex-col h-full rounded-lg border overflow-hidden pp-focus pp-row" style={{ borderColor: C.line, background: C.card }}>
               <span className="block aspect-square overflow-hidden" style={{ background: C.card }}>
-                {x.photo
+                {x.photo && x.photo_logo
+                  ? <LogoImg src={barPhotoSrc(x.kind, x.id, x.photo, "thumb")} alt={logoAlt(x.name)} rounded="" className="w-full h-full" />
+                  : x.photo
                   ? <img src={barPhotoSrc(x.kind, x.id, x.photo, "thumb")} alt={x.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                   : <span aria-hidden className="w-full h-full flex items-center justify-center font-display" style={{ color: C.brass, fontSize: "1.6rem", background: "#1a2015" }}>{x.name.slice(0, 1)}</span>}
               </span>

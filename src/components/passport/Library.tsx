@@ -163,16 +163,20 @@ export function CocktailPage({ c }: { c: Cocktail }) {
           <Band section="cocktails" className="mb-3">Bottles in this drink</Band>
           <ul className="mt-1">
             {c.bottles.map((b, i) => {
+              // File 17: the bottle's small picture when it has one (a brand logo on its light panel).
               const body = (
                 <>
-                  <span className="font-body text-[1rem]" style={{ color: C.text }}>{b.name}</span>
+                  <span className="flex items-center gap-3 min-w-0">
+                    {b.id && b.photo ? <Thumb kind="bottle" id={b.id} photo={b.photo} size={36} clear={b.photo_clear} logo={b.photo_logo} name={b.name} /> : null}
+                    <span className="font-body text-[1rem] min-w-0" style={{ color: C.text }}>{b.name}</span>
+                  </span>
                   {b.category && <span className="font-body text-[0.75rem] tracking-[0.15em] uppercase whitespace-nowrap" style={{ color: C.faint }}>{b.category}</span>}
                 </>
               );
               return (
                 <li key={`${b.id ?? "word"}-${i}`}>
                   {b.id
-                    ? <Link href={`/passport/spirits/${b.id}`} scroll={false} className="flex items-baseline justify-between gap-3 py-2.5 border-b" style={{ borderColor: C.line }}>{body}</Link>
+                    ? <Link href={`/passport/spirits/${b.id}`} scroll={false} className={`flex ${b.photo ? "items-center" : "items-baseline"} justify-between gap-3 py-2.5 border-b`} style={{ borderColor: C.line }}>{body}</Link>
                     : <div className="flex items-baseline justify-between gap-3 py-2.5 border-b" style={{ borderColor: C.line }}>{body}</div>}
                 </li>
               );
@@ -197,7 +201,7 @@ export function CocktailPage({ c }: { c: Cocktail }) {
 }
 
 /** A bottle in a list. File 06: the available-now marker when the list knows it, "+", and long-press. */
-export function BottleRow({ b, mark, lazy = false }: { b: Pick<ArchivedBottle, "id" | "name" | "status_label"> & { available?: boolean; photo?: string | null }; mark?: Mark; lazy?: boolean }) {
+export function BottleRow({ b, mark, lazy = false }: { b: Pick<ArchivedBottle, "id" | "name" | "status_label"> & { available?: boolean; photo?: string | null; photo_clear?: boolean; photo_logo?: boolean }; mark?: Mark; lazy?: boolean }) {
   return (
     <ItemRow item={{ kind: "bottle", id: b.id, name: b.name }} href={`/passport/spirits/${b.id}`} lazy={lazy}>
       <span className={`flex ${b.photo ? "items-center" : "items-baseline"} justify-between gap-3`}>
@@ -205,7 +209,7 @@ export function BottleRow({ b, mark, lazy = false }: { b: Pick<ArchivedBottle, "
           <span className="min-w-0">{b.name}</span><Avail on={b.available} /><MarkBadge mark={mark} />
         </span>
         {b.status_label && <span className="font-body text-[0.75rem] tracking-[0.15em] uppercase text-right shrink-0" style={{ color: C.faint }}>{b.status_label}</span>}
-        <Thumb kind="bottle" id={b.id} photo={b.photo} size={40} />
+        <Thumb kind="bottle" id={b.id} photo={b.photo} size={40} clear={b.photo_clear} logo={b.photo_logo} name={b.name} />
       </span>
     </ItemRow>
   );
@@ -231,7 +235,7 @@ export function BottlePage({ b }: { b: Bottle | ArchivedBottle }) {
           : b.producer)}
       </p>
       {r.prices && r.prices.length > 0 && <p className="mt-3"><Prices prices={r.prices} /></p>}
-      <BarPhoto kind="bottle" id={b.id} photo={r.photo} alt={r.photo_alt} name={b.name} clear={r.photo_clear} credit={r.photo_credit} />
+      <BarPhoto kind="bottle" id={b.id} photo={r.photo} alt={r.photo_alt} name={b.name} clear={r.photo_clear} credit={r.photo_credit} logo={r.photo_logo} producer={b.producer} />
       <div className="w-14 h-px my-6" style={{ background: C.brass, opacity: 0.6 }} />
       {/* The Toast description leads; the approved Passport text (Part 6) follows. Either alone reads as complete. */}
       {b.description && <Description text={b.description} large />}
@@ -351,7 +355,7 @@ function ItemBody({ it, mark }: { it: MenuItem; mark?: Mark }) {
         <span className="font-display text-[1.25rem] leading-tight flex items-baseline gap-2" style={{ color: C.text }}>{it.name}<MarkBadge mark={mark} /></span>
         <span className="flex items-center gap-3 shrink-0">
           {it.prices.length > 0 && <Prices prices={it.prices} />}
-          <Thumb kind={it.cocktail_id ? "cocktail" : "bottle"} id={it.cocktail_id || it.bottle_id} photo={it.photo} size={48} />
+          <Thumb kind={it.cocktail_id ? "cocktail" : "bottle"} id={it.cocktail_id || it.bottle_id} photo={it.photo} size={48} clear={it.photo_clear} logo={!it.cocktail_id && it.photo_logo} name={it.name} />
         </span>
       </div>
       {body.kind === "card" ? (
@@ -382,7 +386,7 @@ export function SpiritRow({ it, marks, lazy = false }: { it: MenuItem; marks?: M
       </span>
       <span className="flex items-center gap-3 shrink-0">
         {it.prices.length > 0 && <Prices prices={it.prices} />}
-        <Thumb kind="bottle" id={it.bottle_id} photo={it.photo} size={36} />
+        <Thumb kind="bottle" id={it.bottle_id} photo={it.photo} size={36} clear={it.photo_clear} logo={it.photo_logo} name={it.name} />
       </span>
     </span>
   );

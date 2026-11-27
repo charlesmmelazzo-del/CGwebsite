@@ -468,6 +468,59 @@ const group = (name: string, n: number): MenuGroup => ({ name, items: Array.from
     assert.deepEqual(top.banner!.covers.map((c) => c.id), [5000]);
   });
 
+  console.log("File 17: brand logos when there is no bottle photo");
+  const logo = (id: number, photo: string | null, cover = false) => ({ id, name: `L${id}`, photo, cover, photo_logo: true });
+  await test("a collage never uses a logo while any bottle photo exists in the collection", () => {
+    assert.deepEqual(coversOf([logo(1, "a"), pic(2, "b"), logo(3, "c"), pic(4, "d")], "bottle").map((c) => c.id), [2, 4]);
+    assert.deepEqual(coversOf([logo(1, "a", true), pic(2, "b")], "bottle").map((c) => c.id), [2], "an admin's cover mark on a logo is never used");
+    assert.equal(coverOf([logo(1, "a"), pic(2, "b")], "bottle")!.id, 2, "a single cover: the real photo");
+  });
+  await test("a collection with only logos gets no collage (the section's icon, as with no photos)", () => {
+    assert.deepEqual(coversOf([logo(1, "a"), logo(2, "b")], "bottle"), []);
+    assert.equal(coverOf([logo(1, "a")], "bottle"), null);
+    const groups: MenuGroup[] = [{ name: "Rye", items: [{ name: "L1", description: "", prices: [], cocktail_id: null, bottle_id: 1, unavailable: false, photo: "a", photo_logo: true }] }];
+    const tabs = menuTabs({ exclusives: [], menus: [], spirits: { name: "Spirits", groups }, available: true });
+    assert.equal(tabs.find((t) => t.id === SPIRITS_TAB)!.cover, null, "the Menu tab's Spirits cover is never a logo");
+    assert.deepEqual(spiritCategories(spiritsFromIndex([{ id: 1, name: "L1", category: "Rye", status_label: null, available: true, photo: "a", photo_logo: true, on_list: true }], true)).map((c) => c.covers.length), [0]);
+  });
+  await test("the Spirits and Beer & wine tiles prefer real bottles too; a logo-only bottle still shows in lists", () => {
+    const bottles: IndexBottle[] = [
+      { id: 1, name: "L1", category: "Rye", status_label: null, available: true, photo: "a", photo_logo: true, on_list: true },
+      { id: 2, name: "B2", category: "Rye", status_label: null, available: true, photo: "b", on_list: true },
+    ];
+    const dd: IndexInput = { ...withVotes, bottles, drinks: [{ name: "Pils", kind: "Beer", description: "", status_label: null, available: true, id: 7001, photo: "pp", photo_logo: true }] };
+    const top = indexLevel(dd, []);
+    assert.ok(top.kind === "tiles");
+    if (top.kind !== "tiles") return;
+    assert.deepEqual(top.tiles.find((x) => x.id === "spirits")!.covers.map((c) => c.id), [2]);
+    assert.deepEqual(top.tiles.find((x) => x.id === "beer-wine")!.covers, []);
+  });
+  await test("Jump back in knows a logo, so it is drawn on the light panel (never cover-cropped)", () => {
+    const d = { cocktails: [], bottles: [{ id: 1, name: "L1", category: "Rye", status_label: null, available: true, photo: "a", photo_logo: true }] as IndexBottle[] };
+    assert.equal(jumpBackIn([{ kind: "bottle", id: 1, name: "L1" }], d)[0].photo_logo, true);
+  });
+  await test("every place a bottle picture is drawn passes photo_logo on (rows, tiles, page, search, shares, Bottles in this drink, lists, My bottles)", () => {
+    const comp = (f: string) => readFileSync(join(ROOT, "components", "passport", f), "utf8");
+    assert.ok(/RowThumb[^\n]*logo=\{b\.photo_logo\}/.test(comp("Drill.tsx")) && /logo=\{!it\.cocktail_id && it\.photo_logo\}/.test(comp("Drill.tsx")), "compact rows");
+    assert.ok(comp("Library.tsx").includes("logo={r.photo_logo} producer={b.producer}"), "the bottle page");
+    assert.ok(/Bottles in this drink[\s\S]*logo=\{b\.photo_logo\}/.test(comp("Library.tsx")), "Bottles in this drink");
+    assert.ok(comp("Search.tsx").includes("logo={b.photo_logo}"), "search results");
+    assert.ok(comp("Social.tsx").includes('logo={s.kind === "bottle" && s.photo_logo}'), "shares and cards in Messages");
+    assert.ok(comp("Rooms.tsx").includes("p.share.photo_logo"), "a share in a group or channel");
+    assert.ok(comp("HouseList.tsx").includes("logo={it.photo_logo}"), "house lists");
+    assert.ok(comp("Bottles.tsx").includes("logo={r.photo_logo}"), "My bottles");
+    assert.ok(comp("ForYou.tsx").includes("logo={r.photo_logo}"), "For you");
+    assert.ok(comp("tabs/IndexTab.tsx").includes("x.photo_logo") && comp("tabs/MenuTab.tsx").includes("photo_logo: x.photo_logo"), "Index and Menu");
+  });
+  await test("a logo is drawn on the light cream panel, contain-fit inside 15% padding, never on the dark tint", () => {
+    const bits = readFileSync(join(ROOT, "components", "passport", "PhotoBits.tsx"), "utf8");
+    const theme = readFileSync(join(ROOT, "components", "passport", "theme.ts"), "utf8");
+    assert.ok(theme.includes('LOGO_PANEL = "#F5F0E8"') && ACCENTS.bar && bits.includes("background: LOGO_PANEL"));
+    assert.ok(bits.includes('left: "15%", top: "15%", width: "70%", height: "70%"') && /LogoImg[\s\S]*object-contain/.test(bits) && !/LogoImg[^\n]*object-cover/.test(bits));
+    assert.ok(bits.includes('loading={eager ? "eager" : "lazy"}'), "lazy by default");
+    assert.ok(contrast("#1d1d1d", "#F5F0E8") > 7, "dark lettering reads on the panel");
+  });
+
   console.log(`\n${passed} passed, ${failed} failed`);
   if (failed) process.exit(1);
 })();

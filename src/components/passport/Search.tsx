@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { C } from "./theme";
 import { Avail, ItemRow, Skel } from "./bits";
+import { Thumb } from "./PhotoBits";
 import { useView } from "./shellContext";
 import { localFind, resultCount, searchable } from "@/lib/passport/shell";
 import type { FindResults, IndexData } from "@/lib/passport/types";
@@ -117,12 +118,18 @@ function Results({ q, results, busy, partial, error }: { q: string; results: Fin
               <ul>
                 {results.bottles.map((b) => (
                   <ItemRow key={b.id} item={{ kind: "bottle", id: b.id, name: b.name }} href={`/passport/spirits/${b.id}`}>
-                    <span className="flex items-center gap-2">
-                      <span className="font-body text-[1rem]" style={{ color: C.text }}>{b.name}</span>
-                      <Avail on={b.available} />
-                    </span>
-                    <span className="block font-body text-[0.75rem] tracking-[0.15em] uppercase mt-1" style={{ color: C.faint }}>
-                      {[b.category, b.status_label].filter(Boolean).join(" · ")}
+                    <span className="flex items-center gap-3">
+                      <span className="flex-1 min-w-0">
+                        <span className="flex items-center gap-2">
+                          <span className="font-body text-[1rem]" style={{ color: C.text }}>{b.name}</span>
+                          <Avail on={b.available} />
+                        </span>
+                        <span className="block font-body text-[0.75rem] tracking-[0.15em] uppercase mt-1" style={{ color: C.faint }}>
+                          {[b.category, b.status_label].filter(Boolean).join(" · ")}
+                        </span>
+                      </span>
+                      {/* File 17: the bottle's small picture (a brand logo on its light panel). */}
+                      <Thumb kind="bottle" id={b.id} photo={b.photo} size={40} clear={b.photo_clear} logo={b.photo_logo} name={b.producer || b.name} />
                     </span>
                   </ItemRow>
                 ))}

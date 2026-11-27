@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { C, Notice, inputCls, postJson } from "./ui";
+import { Thumb } from "./PhotoBits";
 import { MAX_QTY, MIN_QTY, NAME_MAX, NOTE_MAX, NO_PRICE_LINE, longDay, money, sortRequests } from "@/lib/passport/bottles";
 import type { BottleRequest, BottleRequests } from "@/lib/passport/types";
 import { notifyChanged } from "./appEvents";
@@ -113,7 +114,9 @@ function RequestCard({ r, onChange }: { r: BottleRequest; onChange: (r: BottleRe
   return (
     <li className="rounded-xl border p-5" style={{ borderColor: r.status === "ready" ? `${C.brass}99` : C.line, background: C.card, opacity: closed ? 0.75 : 1 }}>
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+        {/* File 17: the bottle's small picture while its page opens (a brand logo on its light panel). */}
+        {r.bottle_id && r.photo ? <Thumb kind="bottle" id={r.bottle_id} photo={r.photo} size={48} clear={r.photo_clear} logo={r.photo_logo} name={r.name} /> : null}
+        <div className="min-w-0 flex-1">
           {r.bottle_id ? <Link href={`/passport/spirits/${r.bottle_id}`} scroll={false}>{title}</Link> : title}
           <p className="font-body text-[0.875rem] mt-1" style={{ color: C.faint }}>{r.quantity} {r.quantity === 1 ? "bottle" : "bottles"}{r.kind === "other" ? " · something we don't carry" : ""}</p>
         </div>
