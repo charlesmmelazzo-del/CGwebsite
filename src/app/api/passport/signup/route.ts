@@ -43,6 +43,8 @@ export async function POST(req: NextRequest) {
         marketing_consent: body.marketing_consent === true,
         household,
         invitation_code: str(body.invitation_code, 20),
+        // File 18: a card passcode is only good with the sign-up page's address.
+        join_slug: str(body.join_slug, 64),
       },
     });
     // Always the same "check your email" unless the Bible signed them in (a personal invitation to this same email).

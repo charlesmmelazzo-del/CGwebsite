@@ -49,6 +49,10 @@ export const LIMITS = {
   "passport-photo-read":   { max: 3000, windowMs: HOUR },
   // Invitation codes typed in or opened from a link: few, so a code can't be guessed (the Bible also caps wrong codes overall).
   "passport-code":   { max: 10,  windowMs: HOUR },
+  // File 18: card passcodes on the sign-up page: 5 tries in 15 minutes per address and, separately, per device
+  // (the Bible also pauses passcode checks for everyone after many wrong ones).
+  "passport-passcode":        { max: 5, windowMs: 15 * 60 * 1000 },
+  "passport-passcode-device": { max: 5, windowMs: 15 * 60 * 1000 },
 } as const;
 
 export type BucketName = keyof typeof LIMITS;

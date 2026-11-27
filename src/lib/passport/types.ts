@@ -25,7 +25,11 @@ export interface HouseholdMember { first_name: string; last_name: string; status
 export interface Me { member: Member; household: HouseholdMember[] }
 /** Sign-up: off (nobody joins), invite (a valid invitation is needed), open (anyone). */
 export type SignupMode = "off" | "invite" | "open";
-export interface Config { signup_mode: SignupMode; terms_version: number; terms_text: string }
+export interface Config {
+  signup_mode: SignupMode; terms_version: number; terms_text: string;
+  /** File 18: the sign-in page's "Sign up" button (an admin setting, off by default), and only then where it goes. */
+  signup_button?: boolean; join_path?: string;
+}
 export interface LinkInfo { kind: "set_password" | "reset"; first_name: string; needs_details: boolean; phone: string }
 export interface SignedIn { member: Member; session_token: string; expires_at: string; household_invited?: number }
 /** Sign-up answers "check your email", or (a personal invitation sent to that same email) signs in at once. */
