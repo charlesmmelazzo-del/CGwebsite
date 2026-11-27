@@ -2,8 +2,8 @@
 
 import { ArrowDown, ArrowUp, X } from "lucide-react";
 import {
-  composeTabs, sectionsByTab, priceLine, tabKind,
-  type CoffeeFeed, type CoffeeLiveConfig, type TabInput,
+  composeTabs, sectionsByTab, priceLine, tabKind, defaultGroupLabel, groupLine, displaySectionsOf, newDisplayId,
+  type CoffeeFeed, type CoffeeLiveConfig, type TabInput, type FeedAddonGroup, type DisplaySection,
 } from "@/lib/coffee/live";
 
 /**
@@ -53,6 +53,24 @@ export default function CoffeeLivePanel({
   const hiddenS = new Set(cfg.hiddenSections ?? []);
   const hiddenI = new Set(cfg.hiddenItems ?? []);
   const chosen = Array.isArray(cfg.sections);
+  const hiddenG = new Set((cfg.hiddenGroups ?? []).map((n) => n.toLowerCase()));
+  const displays = displaySectionsOf(cfg);
+  const placed = new Set(displays.flatMap((d) => d.items));
+  const itemName = new Map<string, string>();
+  feed.sections.forEach((sec) => sec.items.forEach((it) => itemName.set(it.id, it.name)));
+  const setDisplay = (id: string, patch: Partial<DisplaySection>) =>
+    set({ displaySections: displays.map((d) => (d.id === id ? { ...d, ...patch } : d)) });
+  // Every Toast option group this tab can show (one entry per name; the first one seen is the example).
+  const groups: FeedAddonGroup[] = [];
+  const seenG = new Set<string>();
+  for (const sec of feed.sections) {
+    if (!included.has(sec.id) && !sec.items.some((it) => picks.has(it.id) || placed.has(it.id))) continue;
+    for (const g of [...(sec.addon_groups ?? []), ...sec.items.flatMap((it) => it.addon_groups ?? [])]) {
+      if (seenG.has(g.name.toLowerCase())) continue;
+      seenG.add(g.name.toLowerCase());
+      groups.push(g);
+    }
+  }
 
   // The sections this tab has anything from, in the order they show.
   const order = new Map((cfg.order ?? []).map((id, i) => [id, i]));
@@ -144,6 +162,73 @@ export default function CoffeeLivePanel({
           ))}
         </select>
         <p className="text-xs text-gray-400 mt-1">A picked item shows only on the tab(s) that picked it, so it leaves the tab it would normally be on.</p>
+      </div>
+
+      {groups.length > 0 && (
+        <div>
+          <p className={small}>Options from Toast</p>
+          <p className="text-xs text-gray-400 mb-2">
+            Toast&apos;s milk, temperature and syrup options show automatically: under a section&apos;s heading when the whole section
+            has them, otherwise under the item. They follow Toast every night. Rename how they read, or hide one on this tab.
+          </p>
+          <ul className="space-y-2">
+            {groups.map((g) => (
+              <li key={g.name} className={`border border-gray-200 rounded-sm p-2 ${hiddenG.has(g.name.toLowerCase()) ? "opacity-60" : ""}`}>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500 flex-1">Toast: {g.name}</span>
+                  <label className="flex items-center gap-1 text-xs text-gray-500">
+                    <input type="checkbox" checked={hiddenG.has(g.name.toLowerCase())} onChange={(e) => set({ hiddenGroups: toggle(cfg.hiddenGroups, g.name, e.target.checked) })} /> Hide
+                  </label>
+                </div>
+                <input className={`${input} mt-1 text-xs py-1`} value={cfg.groupLabels?.[g.name] ?? ""} placeholder={defaultGroupLabel(g.name) || "(no label: just the options)"} aria-label={`Name guests see for ${g.name}`}
+                  onChange={(e) => set({ groupLabels: text(cfg.groupLabels, g.name, e.target.value) })} />
+                <p className="text-xs italic text-gray-400 mt-1">Guests see: {groupLine(g, cfg.groupLabels?.[g.name])}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div>
+        <p className={small}>Display sections</p>
+        <p className="text-xs text-gray-400 mb-2">
+          Split a Toast section on the website only (Toast&apos;s “Tea” as “Tea Lattes”, “Hot Tea”, “Iced Tea”). Items placed here leave their
+          Toast section; items not placed stay where they are, so a new Toast item never goes missing.
+        </p>
+        <ul className="space-y-2">
+          {displays.map((d) => (
+            <li key={d.id} className="border border-gray-200 rounded-sm p-3">
+              <div className="grid sm:grid-cols-2 gap-2 mb-2">
+                <input className={input} value={d.heading} placeholder="Heading, e.g. Hot Tea" aria-label="Display section heading"
+                  onChange={(e) => setDisplay(d.id, { heading: e.target.value })} />
+                <input className={input} value={d.note ?? ""} placeholder="Note under the heading (optional)" aria-label="Display section note"
+                  onChange={(e) => setDisplay(d.id, { note: e.target.value })} />
+              </div>
+              <ul className="text-sm text-gray-700 space-y-1 mb-2">
+                {d.items.map((id) => (
+                  <li key={id} className="flex items-center gap-2">
+                    <span className="flex-1">{itemName.get(id) ?? "(no longer on Toast)"}</span>
+                    <button type="button" onClick={() => setDisplay(d.id, { items: d.items.filter((x) => x !== id) })} className="text-gray-400 hover:text-gray-700" aria-label="Remove from this section"><X size={12} /></button>
+                  </li>
+                ))}
+              </ul>
+              <div className="flex gap-2">
+                <select className={input} value="" aria-label="Add an item to this display section"
+                  onChange={(e) => { if (e.target.value) setDisplay(d.id, { items: [...d.items, e.target.value] }); }}>
+                  <option value="">Add an item…</option>
+                  {feed.sections.map((s) => (
+                    <optgroup key={s.id} label={s.name}>
+                      {s.items.filter((it) => !placed.has(it.id)).map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
+                    </optgroup>
+                  ))}
+                </select>
+                <button type="button" onClick={() => set({ displaySections: displays.filter((x) => x.id !== d.id) })} className="text-xs text-gray-500 hover:text-red-600 whitespace-nowrap">Delete section</button>
+              </div>
+            </li>
+          ))}
+        </ul>
+        <button type="button" onClick={() => set({ displaySections: [...displays, { id: newDisplayId(), heading: "", items: [] }] })}
+          className="mt-2 text-xs uppercase tracking-wider text-[#C97D5A]">+ Add a display section</button>
       </div>
 
       {candidates.length === 0 ? (

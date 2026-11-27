@@ -213,6 +213,11 @@ function LiveMenu({ tab, textColor, mutedColor }: { tab: ComposedTab; textColor:
               {line}
             </p>
           ))}
+          {(s.options ?? []).map((line, i) => (
+            <p key={`o${i}`} className="text-center text-xs italic tracking-wide mt-1" style={{ color: mutedColor }}>
+              {line}
+            </p>
+          ))}
           <div className="w-10 h-px mx-auto mt-3 mb-4" style={{ backgroundColor: `${mutedColor}80` }} />
           <ul className="space-y-3">
             {s.items.map((it) => (
@@ -227,6 +232,9 @@ function LiveMenu({ tab, textColor, mutedColor }: { tab: ComposedTab; textColor:
                 {it.description && (
                   <p className="text-[13px] italic leading-snug mt-0.5 pr-14" style={{ color: mutedColor }}>{it.description}</p>
                 )}
+                {(it.flavors ?? []).map((line, i) => (
+                  <p key={`f${i}`} className="text-[12px] leading-snug mt-0.5 pr-14 opacity-90" style={{ color: mutedColor }}>{line}</p>
+                ))}
                 {it.note && (
                   <p className="text-[12px] leading-snug mt-0.5 pr-14 opacity-90" style={{ color: mutedColor }}>{it.note}</p>
                 )}

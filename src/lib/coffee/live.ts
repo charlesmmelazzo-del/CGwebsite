@@ -11,10 +11,21 @@
 //     so picking "Ain't You Just A Peach" into Limited Time Lattes takes it off the Coffee Menu without touching Toast.
 //   - A section can be renamed, given a note line under its heading, hidden, or moved; an item can be hidden or given a
 //     note line (e.g. "Add any latte flavor +0.50"). Never modifiers.
+//   - Coffee 02: Toast's guest-facing option groups (milk, temperature, syrup / flavor) show automatically, with friendly
+//     names: once under a section's heading when the whole section has them ("Milk options: Whole, Oat" · "Iced or Hot"),
+//     otherwise under the item ("Available syrup flavors (+0.50): Madagascar Vanilla, …"). They follow Toast every night.
+//     The admin can rename a group's display name or hide a group (per tab).
+//   - Coffee 02: display sections. A tab can split a Toast section for the page only (Toast's single "Tea" group shown as
+//     "Tea Lattes" / "Hot Tea" / "Iced Tea"): a heading, an optional note and items picked from the feed. An item in a
+//     display section shows there instead of in its Toast section (a Toast section left empty is hidden); items not
+//     placed in one stay in their Toast section, so a new Toast item never goes missing. Display sections are ordered
+//     together with the Toast sections.
 
 export interface FeedPrice { label: string | null; price: number }
-export interface FeedItem { id: string; name: string; description: string; prices: FeedPrice[]; ordinal: number }
-export interface FeedSection { id: string; name: string; ordinal: number; items: FeedItem[] }
+/** Coffee 02: a Toast flavor add-on group ("Syrup Flavors"): option names only, one price (null when they differ). */
+export interface FeedAddonGroup { name: string; price: number | null; options: string[] }
+export interface FeedItem { id: string; name: string; description: string; prices: FeedPrice[]; ordinal: number; addon_groups: FeedAddonGroup[] }
+export interface FeedSection { id: string; name: string; ordinal: number; items: FeedItem[]; addon_groups?: FeedAddonGroup[] }
 export interface CoffeeFeed { updated_at: string | null; menu_read_at: string | null; sections: FeedSection[] }
 
 /** What the owner sets for one tab (stored on coffee_menus.live). Every field is optional. */
@@ -35,7 +46,16 @@ export interface CoffeeLiveConfig {
   hiddenItems?: string[];
   /** Item id → note line under the item. */
   itemNotes?: Record<string, string>;
+  /** Coffee 02: Toast option group name → the name guests see ("Milk Option" → "Milk options"); unset = the default. */
+  groupLabels?: Record<string, string>;
+  /** Coffee 02: Toast option group names not shown on this tab. */
+  hiddenGroups?: string[];
+  /** Coffee 02: display-only sections on this tab (ids "d_…"), ordered with the Toast sections through `order`. */
+  displaySections?: DisplaySection[];
 }
+
+/** Coffee 02: a section that exists only on the website, holding items picked from the feed (in the owner's order). */
+export interface DisplaySection { id: string; heading: string; note?: string; items: string[] }
 
 export interface TabInput {
   id: string;
@@ -44,8 +64,8 @@ export interface TabInput {
   hasPdf?: boolean;     // has PDF pages or an image to fall back on
 }
 
-export interface ShownItem { id: string; name: string; description: string; prices: FeedPrice[]; note: string }
-export interface ShownSection { id: string; heading: string; note: string; items: ShownItem[] }
+export interface ShownItem { id: string; name: string; description: string; prices: FeedPrice[]; note: string; flavors: string[] }
+export interface ShownSection { id: string; heading: string; note: string; options: string[]; items: ShownItem[]; display?: boolean }
 export type Showing = "live" | "pdf" | "empty";
 export interface ComposedTab { id: string; label: string; showing: Showing; sections: ShownSection[]; itemCount: number }
 export interface NotShown { id: string; name: string; section: string; reason: string }
@@ -70,8 +90,55 @@ export function priceLine(prices: FeedPrice[]): string {
   return prices.map((p) => (p.label ? `${p.label} ${formatPrice(p.price)}` : formatPrice(p.price))).join(" / ");
 }
 
+/** Coffee 02: the add-on groups the website will show, by name (the Bible applies the same allow-list first). */
+export const ADDON_GROUP_ALLOW = /syrup|flavou?r|milk|temperature|\btemp\b|iced or hot/i;
+
+export type GroupKind = "milk" | "temperature" | "flavor" | "other";
+export function groupKind(name: string): GroupKind {
+  if (/milk/i.test(name)) return "milk";
+  if (/temperature|\btemp\b|iced or hot/i.test(name)) return "temperature";
+  if (/syrup|flavou?r/i.test(name)) return "flavor";
+  return "other";
+}
+/** The name guests see for a Toast option group, unless the admin set one ("" shows the options with no label). */
+export function defaultGroupLabel(name: string): string {
+  switch (groupKind(name)) {
+    case "milk": return "Milk options";
+    case "temperature": return "";
+    case "flavor": return "Available syrup flavors";
+    default: return name;
+  }
+}
+/**
+ * Coffee 02: the line guests see for one option group. Temperature reads "Iced or Hot"; the others
+ * "Milk options: Whole, 2%, Oat" / "Available syrup flavors (+0.50): Madagascar Vanilla, Charred Cinnamon".
+ */
+export function groupLine(g: FeedAddonGroup, label?: string | null): string {
+  const custom = typeof label === "string" ? label.replace(/\s+/g, " ").trim() : null;
+  const l = custom !== null && custom !== "" ? custom : defaultGroupLabel(g.name);
+  const price = g.price ? `+${formatPrice(g.price)}` : "";
+  const opts = groupKind(g.name) === "temperature" ? g.options.join(" or ") : g.options.join(", ");
+  if (!l) return price ? `${opts} (${price})` : opts;
+  return `${l}${price ? ` (${price})` : ""}: ${opts}`;
+}
+
 const str = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max) : "");
 const idOk = (v: unknown): v is string => typeof v === "string" && /^[a-z]_[0-9a-f]{6,32}$/i.test(v);
+
+function sanitizeGroups(raw: unknown): FeedAddonGroup[] {
+  const out: FeedAddonGroup[] = [];
+  for (const g of (Array.isArray(raw) ? raw : []).slice(0, 6)) {
+    if (!g || typeof g !== "object") continue;
+    const go = g as Record<string, unknown>;
+    const name = str(go.name, 60);
+    if (!name || !ADDON_GROUP_ALLOW.test(name)) continue;
+    const options = (Array.isArray(go.options) ? go.options : []).map((o) => str(o, 60)).filter(Boolean).slice(0, 40);
+    if (!options.length) continue;
+    const price = typeof go.price === "number" && go.price > 0 && go.price < 100 ? Math.round(go.price * 100) / 100 : null;
+    out.push({ name, price, options });
+  }
+  return out;
+}
 
 /** Keep only well-formed, guest-safe fields from whatever the Bible sent (null when it isn't a feed at all). */
 export function sanitizeFeed(raw: unknown): CoffeeFeed | null {
@@ -92,9 +159,10 @@ export function sanitizeFeed(raw: unknown): CoffeeFeed | null {
         .slice(0, 6)
         .map((p) => ({ label: str(p.label, 30) || null, price: Math.round(p.price * 100) / 100 }));
       if (!prices.length) continue;
-      items.push({ id: io.id, name: str(io.name, 80), description: str(io.description, 300), prices, ordinal: typeof io.ordinal === "number" ? io.ordinal : items.length });
+      const addon_groups = sanitizeGroups(io.addon_groups);
+      items.push({ id: io.id, name: str(io.name, 80), description: str(io.description, 300), prices, ordinal: typeof io.ordinal === "number" ? io.ordinal : items.length, addon_groups });
     }
-    sections.push({ id: so.id, name: str(so.name, 80), ordinal: typeof so.ordinal === "number" ? so.ordinal : sections.length, items });
+    sections.push({ id: so.id, name: str(so.name, 80), ordinal: typeof so.ordinal === "number" ? so.ordinal : sections.length, items, addon_groups: sanitizeGroups(so.addon_groups) });
   }
   const at = (v: unknown) => (typeof v === "string" && !Number.isNaN(Date.parse(v)) ? v : null);
   return { updated_at: at(r.updated_at), menu_read_at: at(r.menu_read_at), sections };
@@ -135,10 +203,17 @@ export function composeTabs(tabs: TabInput[], feed: CoffeeFeed | null): { tabs: 
   }
   const included = sectionsByTab(tabs, feed);
   const pickedBy = new Map<string, Set<string>>();
-  for (const t of tabs) for (const id of t.live?.items ?? []) {
+  const pick = (id: string, tabId: string) => {
     if (!pickedBy.has(id)) pickedBy.set(id, new Set());
-    pickedBy.get(id)!.add(t.id);
+    pickedBy.get(id)!.add(tabId);
+  };
+  // An item placed in a display section is picked into that tab, like a single picked item.
+  for (const t of tabs) {
+    for (const id of t.live?.items ?? []) pick(id, t.id);
+    for (const d of displaySectionsOf(t.live)) for (const id of d.items) pick(id, t.id);
   }
+  const byId = new Map<string, FeedItem>();
+  feed.sections.forEach((s) => s.items.forEach((it) => byId.set(it.id, it)));
   const shownAnywhere = new Set<string>();
   const hiddenWhy = new Map<string, string>();
 
@@ -147,30 +222,48 @@ export function composeTabs(tabs: TabInput[], feed: CoffeeFeed | null): { tabs: 
     const inc = included.get(t.id) ?? new Set<string>();
     const hiddenS = new Set(cfg.hiddenSections ?? []);
     const hiddenI = new Set(cfg.hiddenItems ?? []);
-    const order = new Map((cfg.order ?? []).map((id, i) => [id, i]));
-    const sorted = [...feed.sections].sort((a, b) =>
-      (order.has(a.id) ? order.get(a.id)! : 1e4 + a.ordinal) - (order.has(b.id) ? order.get(b.id)! : 1e4 + b.ordinal));
+    const displays = displaySectionsOf(cfg);
+    const inDisplay = displayItemMap(displays);
+    const hiddenG = new Set((cfg.hiddenGroups ?? []).map((n) => n.toLowerCase()));
+    const lines = (gs: FeedAddonGroup[] | undefined) => (gs ?? []).filter((g) => !hiddenG.has(g.name.toLowerCase())).map((g) => groupLine(g, cfg.groupLabels?.[g.name]));
+    // Items shown outside their Toast section (a display section, or picked into another tab) carry that section's
+    // options with them, so "Iced or Hot" never gets lost when an item moves.
+    const sectionGroupsOf = new Map<string, FeedAddonGroup[]>();
+    feed.sections.forEach((s) => s.items.forEach((it) => sectionGroupsOf.set(it.id, s.addon_groups ?? [])));
+    const shownItem = (it: FeedItem, carry: boolean): ShownItem => ({
+      id: it.id, name: it.name, description: it.description, prices: it.prices, note: str(cfg.itemNotes?.[it.id], 120),
+      flavors: lines([...(carry ? sectionGroupsOf.get(it.id) ?? [] : []), ...(it.addon_groups ?? [])]),
+    });
     const sections: ShownSection[] = [];
-    for (const s of sorted) {
-      const take = s.items.filter((it) => {
-        const picks = pickedBy.get(it.id);
-        if (picks) return picks.has(t.id);
-        return inc.has(s.id);
-      });
+    for (const b of orderedBlocks(cfg, feed)) {
+      // Toast's section: its items on this tab, less those placed in one of this tab's display sections.
+      // A display section: its picked items that are still on Toast, in the owner's order.
+      const name = b.kind === "toast" ? b.section.name : b.display.heading || "Untitled section";
+      const take = b.kind === "toast"
+        ? b.section.items.filter((it) => {
+          if (inDisplay.has(it.id)) return false;
+          const picks = pickedBy.get(it.id);
+          if (picks) return picks.has(t.id);
+          return inc.has(b.section.id);
+        })
+        : b.display.items.filter((id) => inDisplay.get(id) === b.id && byId.has(id)).map((id) => byId.get(id)!);
       if (!take.length) continue;
-      if (hiddenS.has(s.id)) { take.forEach((it) => hiddenWhy.set(it.id, `its section "${s.name}" is hidden on the ${t.label} tab`)); continue; }
+      if (hiddenS.has(b.id)) { take.forEach((it) => hiddenWhy.set(it.id, `its section "${name}" is hidden on the ${t.label} tab`)); continue; }
       const items = take.filter((it) => {
         if (hiddenI.has(it.id)) { hiddenWhy.set(it.id, `hidden on the ${t.label} tab in the website admin`); return false; }
         return true;
       });
       if (!items.length) continue;
       items.forEach((it) => shownAnywhere.add(it.id));
-      sections.push({
-        id: s.id,
-        heading: str(cfg.labels?.[s.id], 80) || s.name,
-        note: typeof cfg.notes?.[s.id] === "string" ? cfg.notes[s.id].trim().slice(0, 300) : "",
-        items: items.map((it) => ({ id: it.id, name: it.name, description: it.description, prices: it.prices, note: str(cfg.itemNotes?.[it.id], 120) })),
-      });
+      sections.push(b.kind === "toast"
+        ? {
+          id: b.id,
+          heading: str(cfg.labels?.[b.id], 80) || b.section.name,
+          note: typeof cfg.notes?.[b.id] === "string" ? cfg.notes[b.id].trim().slice(0, 300) : "",
+          options: lines(b.section.addon_groups),
+          items: items.map((it) => shownItem(it, false)),
+        }
+        : { id: b.id, heading: str(b.display.heading, 80) || "Untitled section", note: (b.display.note ?? "").trim().slice(0, 300), options: [], items: items.map((it) => shownItem(it, true)), display: true });
     }
     const itemCount = sections.reduce((n, s) => n + s.items.length, 0);
     let showing: Showing;
@@ -195,4 +288,47 @@ export function composeTabs(tabs: TabInput[], feed: CoffeeFeed | null): { tabs: 
     notShown.push({ id: it.id, name: it.name, section: s.name, reason });
   }
   return { tabs: composed, notShown };
+}
+
+// ── Coffee 02: display sections ──────────────────────────────────────────────
+
+const DISPLAY_ID = /^d_[0-9a-f]{6,32}$/i;
+/** A tab's display sections, well-formed only. */
+export function displaySectionsOf(cfg: CoffeeLiveConfig | null | undefined): DisplaySection[] {
+  const list = Array.isArray(cfg?.displaySections) ? cfg!.displaySections : [];
+  return list.filter((d): d is DisplaySection => !!d && typeof d === "object" && DISPLAY_ID.test(String(d.id)) && Array.isArray(d.items));
+}
+/** Item id → the display section (on this tab) it shows in; the first one wins if it was placed twice. */
+export function displayItemMap(displays: DisplaySection[]): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const d of displays) for (const id of d.items) if (typeof id === "string" && !m.has(id)) m.set(id, d.id);
+  return m;
+}
+/** A new display section id ("d_" + 12 hex). */
+export function newDisplayId(): string {
+  let h = "";
+  for (let i = 0; i < 12; i++) h += Math.floor(Math.random() * 16).toString(16);
+  return `d_${h}`;
+}
+
+export type Block =
+  | { kind: "toast"; id: string; section: FeedSection }
+  | { kind: "display"; id: string; display: DisplaySection };
+
+/**
+ * Every Toast section and display section of a tab, in the order they show: first the ones the owner ordered, then the
+ * rest in Toast's order. An unordered display section sits just after the Toast section its first item comes from (so
+ * "Tea Lattes" / "Hot Tea" / "Iced Tea" land where Toast's "Tea" was), in the order they were added.
+ */
+export function orderedBlocks(cfg: CoffeeLiveConfig | null | undefined, feed: CoffeeFeed): Block[] {
+  const order = new Map((cfg?.order ?? []).map((id, i) => [id, i]));
+  const sectionOf = new Map<string, FeedSection>();
+  feed.sections.forEach((s) => s.items.forEach((it) => sectionOf.set(it.id, s)));
+  const keyed: { b: Block; k: number }[] = feed.sections.map((s) => ({ b: { kind: "toast" as const, id: s.id, section: s }, k: order.has(s.id) ? order.get(s.id)! : 1e4 + s.ordinal }));
+  displaySectionsOf(cfg).forEach((d, i) => {
+    const home = d.items.map((id) => sectionOf.get(id)).find(Boolean);
+    const k = order.has(d.id) ? order.get(d.id)! : 1e4 + (home ? home.ordinal : 1e3) + (i + 1) / 1e3;
+    keyed.push({ b: { kind: "display", id: d.id, display: d }, k });
+  });
+  return keyed.sort((a, b) => a.k - b.k).map((x) => x.b);
 }
