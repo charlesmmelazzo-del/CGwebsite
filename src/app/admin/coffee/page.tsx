@@ -20,6 +20,8 @@ import { CSS } from "@dnd-kit/utilities";
 import ImagePicker from "@/components/ui/ImagePicker";
 import { PdfUploader } from "@/components/admin/PdfTabPanel";
 import type { MenuPdfPage } from "@/types";
+import CoffeeLivePanel from "@/components/admin/CoffeeLivePanel";
+import type { CoffeeFeed, CoffeeLiveConfig, TabInput } from "@/lib/coffee/live";
 
 interface CoffeeMenu {
   id: string;
@@ -30,7 +32,10 @@ interface CoffeeMenu {
   active: boolean;
   pdfUrl?: string;            // a PDF menu, shown instead of the image
   pdfPages?: MenuPdfPage[];
+  live?: CoffeeLiveConfig | null; // Coffee 01: the live Toast menu settings for this tab
 }
+
+const toTab = (m: CoffeeMenu): TabInput => ({ id: m.id, label: m.label, live: m.live, hasPdf: !!(m.pdfPages?.length || m.imageUrl) });
 
 function newId() {
   return `cm-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -43,6 +48,9 @@ export default function AdminCoffeePage() {
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [saveWarning, setSaveWarning] = useState("");
+  const [feed, setFeed] = useState<CoffeeFeed | null>(null);
+  const [feedSource, setFeedSource] = useState("none");
 
   const sensors = useSensors(useSensor(PointerSensor));
 
@@ -56,6 +64,10 @@ export default function AdminCoffeePage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+    fetch("/api/admin/coffee/feed")
+      .then((r) => r.json())
+      .then((d) => { setFeed(d.feed ?? null); setFeedSource(d.source ?? "none"); })
+      .catch(() => {});
   }, []);
 
   function handleDragEnd(event: DragEndEvent) {
@@ -94,6 +106,7 @@ export default function AdminCoffeePage() {
     setSaving(true);
     setSaved(false);
     setSaveError("");
+    setSaveWarning("");
     try {
       const res = await fetch("/api/admin/coffee", {
         method: "POST",
@@ -102,6 +115,7 @@ export default function AdminCoffeePage() {
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error ?? `Server error ${res.status}`);
+      if (data.warning) setSaveWarning(data.warning);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
@@ -136,6 +150,12 @@ export default function AdminCoffeePage() {
         </button>
       </div>
 
+      {saveWarning && (
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 text-amber-700 text-xs rounded-sm">
+          {saveWarning}
+        </div>
+      )}
+
       {saveError && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-xs rounded-sm">
           {saveError}
@@ -153,6 +173,9 @@ export default function AdminCoffeePage() {
                 onToggleExpand={() => setExpandedId(expandedId === menu.id ? null : menu.id)}
                 onUpdate={(updates) => updateMenu(menu.id, updates)}
                 onRemove={() => removeMenu(menu.id)}
+                tabs={menus.filter((m) => m.active).map(toTab)}
+                feed={feed}
+                feedSource={feedSource}
               />
             ))}
           </SortableContext>
@@ -183,12 +206,18 @@ function SortableMenuCard({
   onToggleExpand,
   onUpdate,
   onRemove,
+  tabs,
+  feed,
+  feedSource,
 }: {
   menu: CoffeeMenu;
   expanded: boolean;
   onToggleExpand: () => void;
   onUpdate: (updates: Partial<CoffeeMenu>) => void;
   onRemove: () => void;
+  tabs: TabInput[];
+  feed: CoffeeFeed | null;
+  feedSource: string;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: menu.id });
@@ -280,7 +309,21 @@ function SortableMenuCard({
             />
           </div>
 
-          {/* Menu image */}
+          {/* Coffee 01: the live menu from Toast */}
+          <div className="border-t border-gray-100 pt-4">
+            <p className="block text-[10px] tracking-widest uppercase text-gray-400 mb-2">
+              Live Menu from Toast
+            </p>
+            <CoffeeLivePanel
+              tab={toTab(menu)}
+              tabs={tabs}
+              feed={feed}
+              feedSource={feedSource}
+              onChange={(live) => onUpdate({ live })}
+            />
+          </div>
+
+          {/* Menu image — the fallback when "Show PDF instead" is on, or there's no live menu */}
           <ImagePicker
             label="Menu Image"
             value={menu.imageUrl ?? undefined}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import type { MenuPdfPage } from "@/types";
+import type { CoffeeLiveConfig } from "@/lib/coffee/live";
 
 export interface CoffeeMenu {
   id: string;
@@ -11,6 +12,7 @@ export interface CoffeeMenu {
   active: boolean;
   pdfUrl?: string;            // a PDF menu, shown instead of the image
   pdfPages?: MenuPdfPage[];
+  live?: CoffeeLiveConfig | null; // Coffee 01: the live Toast menu settings for this tab
 }
 
 // GET — return all menus ordered by order_num
@@ -33,6 +35,7 @@ export async function GET() {
       active: r.active,
       pdfUrl: r.pdf_url ?? undefined,
       pdfPages: r.pdf_pages ?? undefined,
+      live: r.live ?? null,
     }));
 
     return NextResponse.json({ menus });
@@ -65,21 +68,26 @@ export async function POST(req: NextRequest) {
     }
 
     // Upsert all current menus
+    let warning = "";
     if (menuList.length > 0) {
-      const { error } = await sb.from("coffee_menus").upsert(
-        menuList.map((m) => ({
-          id: m.id,
-          label: m.label,
-          image_url: m.imageUrl,
-          alt: m.alt ?? "",
-          order_num: m.order,
-          active: m.active,
-          pdf_url: m.pdfUrl ?? null,
-          pdf_pages: m.pdfPages ?? null,
-          updated_at: new Date().toISOString(),
-        })),
-        { onConflict: "id" }
-      );
+      const rows = menuList.map((m) => ({
+        id: m.id,
+        label: m.label,
+        image_url: m.imageUrl,
+        alt: m.alt ?? "",
+        order_num: m.order,
+        active: m.active,
+        pdf_url: m.pdfUrl ?? null,
+        pdf_pages: m.pdfPages ?? null,
+        live: cleanLive(m.live),
+        updated_at: new Date().toISOString(),
+      }));
+      let { error } = await sb.from("coffee_menus").upsert(rows, { onConflict: "id" });
+      // Coffee 01: before db/coffee-live-menu.sql has been run there is no "live" column. Save everything else and say so.
+      if (error && /\blive\b/.test(error.message ?? "")) {
+        ({ error } = await sb.from("coffee_menus").upsert(rows.map((r) => ({ ...r, live: undefined })).map((r) => { delete r.live; return r; }), { onConflict: "id" }));
+        warning = "Saved, except the live menu settings: run db/coffee-live-menu.sql in Supabase first.";
+      }
       if (error) throw error;
       console.log("[coffee POST] upserted", menuList.length, "menus OK");
     }
@@ -88,10 +96,37 @@ export async function POST(req: NextRequest) {
     const { data: verify } = await sb.from("coffee_menus").select("id");
     console.log("[coffee POST] verified", verify?.length, "menus in DB");
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, ...(warning ? { warning } : {}) });
   } catch (e) {
     const msg = e instanceof Error ? e.message : JSON.stringify(e);
     console.error("[POST /api/admin/coffee]", msg);
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
+}
+
+/** Coffee 01: keep only the known live-menu settings, with short strings (ids are the feed's hashed ids). */
+function cleanLive(v: unknown): CoffeeLiveConfig | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  const ID = /^[a-z]_[0-9a-f]{6,32}$/i;
+  const ids = (x: unknown) => (Array.isArray(x) ? x.filter((i): i is string => typeof i === "string" && ID.test(i)).slice(0, 500) : undefined);
+  const texts = (x: unknown, max: number) => {
+    if (!x || typeof x !== "object") return undefined;
+    const out: Record<string, string> = {};
+    for (const [k, t] of Object.entries(x as Record<string, unknown>)) {
+      if (ID.test(k) && typeof t === "string" && t.trim()) out[k] = t.trim().slice(0, max);
+    }
+    return out;
+  };
+  return {
+    ...(typeof o.showPdf === "boolean" ? { showPdf: o.showPdf } : {}),
+    ...(Array.isArray(o.sections) ? { sections: ids(o.sections) } : {}),
+    items: ids(o.items) ?? [],
+    order: ids(o.order) ?? [],
+    labels: texts(o.labels, 80) ?? {},
+    notes: texts(o.notes, 300) ?? {},
+    hiddenSections: ids(o.hiddenSections) ?? [],
+    hiddenItems: ids(o.hiddenItems) ?? [],
+    itemNotes: texts(o.itemNotes, 120) ?? {},
+  };
 }
