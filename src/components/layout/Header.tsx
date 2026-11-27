@@ -78,6 +78,7 @@ function splitNav(links: NavLink[]): [NavLink[], NavLink[]] {
 interface NavFit {
   font: number | null;   // px; null until measured in the browser
   count: number;         // how many links are shown inline (the rest go under More)
+  sideW: number | null;  // px; both nav sides get this width so the whole row sits centred
 }
 
 export default function Header({ config, settings }: { config: HeaderConfig; settings?: SiteSettings }) {
@@ -106,7 +107,7 @@ export default function Header({ config, settings }: { config: HeaderConfig; set
   // ── Fit the desktop nav to the window ──────────────────────────────────────
   const rowRef     = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLDivElement>(null);
-  const [fit, setFit] = useState<NavFit>({ font: null, count: visibleLinks.length });
+  const [fit, setFit] = useState<NavFit>({ font: null, count: visibleLinks.length, sideW: null });
   const linkKey = visibleLinks.map((l) => `${l.id}:${l.label}`).join("|");
 
   useIsoLayoutEffect(() => {
@@ -127,18 +128,21 @@ export default function Header({ config, settings }: { config: HeaderConfig; set
       const sum   = (ls: NavLink[]) => ls.reduce((t, l) => t + (widths[l.id] ?? 0), 0);
 
       const n = visibleLinks.length;
-      let best: NavFit = { font: MIN_NAV_FONT, count: Math.min(n, 2) };
+      let best: NavFit = { font: MIN_NAV_FONT, count: Math.min(n, 2), sideW: null };
       for (let k = n; k >= 1; k--) {
         const [l, r] = splitNav(visibleLinks.slice(0, k));
         const widest = Math.max(sum(l), sum(r) + (k < n ? moreW : 0));
         const scale  = widest > 0 ? Math.min(1, side / widest) : 1;
         const font   = Math.floor(fontSize * scale * 100) / 100;
         if (font >= Math.min(MIN_NAV_FONT, fontSize) || k === 1) {
-          best = { font: Math.max(font, Math.min(MIN_NAV_FONT, fontSize)), count: k };
+          const f = Math.max(font, Math.min(MIN_NAV_FONT, fontSize));
+          // Both sides as wide as the wider one (at the chosen size): the shorter side spreads its links out, so the
+          // row starts and ends the same distance from each edge while the logo stays dead centre.
+          best = { font: f, count: k, sideW: Math.min(side, Math.ceil(widest * f / fontSize) + 1) };
           break;
         }
       }
-      setFit((prev) => (prev.font === best.font && prev.count === best.count ? prev : best));
+      setFit((prev) => (prev.font === best.font && prev.count === best.count && prev.sideW === best.sideW ? prev : best));
     };
 
     compute();
@@ -232,7 +236,8 @@ export default function Header({ config, settings }: { config: HeaderConfig; set
         </div>
 
         {/* Left nav */}
-        <nav className="flex items-stretch justify-end min-w-0" aria-label="Main">
+        <nav className="flex items-stretch justify-between min-w-0" aria-label="Main"
+          style={fit.sideW != null ? { width: fit.sideW, justifySelf: "end" } : { justifyContent: "flex-end" }}>
           {leftNav.map((link) => (
             <Link
               key={link.id}
@@ -256,7 +261,8 @@ export default function Header({ config, settings }: { config: HeaderConfig; set
         </Link>
 
         {/* Right nav */}
-        <nav className="flex items-stretch justify-start min-w-0" aria-label="Main, continued">
+        <nav className="flex items-stretch justify-between min-w-0" aria-label="Main, continued"
+          style={fit.sideW != null ? { width: fit.sideW, justifySelf: "start" } : { justifyContent: "flex-start" }}>
           {rightNav.map((link) => (
             <Link
               key={link.id}
