@@ -173,4 +173,14 @@ test("display sections split Toast's Tea without losing a new item", () => {
   assert.ok(tabs[0].sections[2].items.find((i) => i.name === "Matcha Latte")!.flavors[0].startsWith("Available syrup flavors"));
 });
 
+test("Toast subgroups under Food (partners) stay on the Food tab", () => {
+  const f = sanitizeFeed({ updated_at: null, menu_read_at: null, sections: [
+    { id: "s_00000000aa01", name: "Specialty Lattes", group: "Specialty Lattes", ordinal: 0, items: [{ id: "i_00000000aa11", name: "Latte", description: "", prices: [{ label: null, price: 6 }], ordinal: 0 }] },
+    { id: "s_00000000aa02", name: "Bang Bang Pie & Biscuits", group: "Food", ordinal: 1, items: [{ id: "i_00000000aa21", name: "Scratch Biscuit", description: "", prices: [{ label: null, price: 5 }], ordinal: 0 }] },
+  ] }) as CoffeeFeed;
+  const { tabs } = composeTabs([{ id: "coffee", label: "Coffee Menu" }, { id: "food", label: "Food Menu" }], f);
+  assert.deepEqual(tabs[1].sections.map((s) => s.heading), ["Bang Bang Pie & Biscuits"]);
+  assert.deepEqual(tabs[0].sections.map((s) => s.heading), ["Specialty Lattes"]);
+});
+
 console.log(`\n${checks} passed`);

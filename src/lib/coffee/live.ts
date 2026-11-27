@@ -25,7 +25,7 @@ export interface FeedPrice { label: string | null; price: number }
 /** Coffee 02: a Toast flavor add-on group ("Syrup Flavors"): option names only, one price (null when they differ). */
 export interface FeedAddonGroup { name: string; price: number | null; options: string[] }
 export interface FeedItem { id: string; name: string; description: string; prices: FeedPrice[]; ordinal: number; addon_groups: FeedAddonGroup[] }
-export interface FeedSection { id: string; name: string; ordinal: number; items: FeedItem[]; addon_groups?: FeedAddonGroup[] }
+export interface FeedSection { id: string; name: string; group?: string; ordinal: number; items: FeedItem[]; addon_groups?: FeedAddonGroup[] }
 export interface CoffeeFeed { updated_at: string | null; menu_read_at: string | null; sections: FeedSection[] }
 
 /** What the owner sets for one tab (stored on coffee_menus.live). Every field is optional. */
@@ -162,7 +162,7 @@ export function sanitizeFeed(raw: unknown): CoffeeFeed | null {
       const addon_groups = sanitizeGroups(io.addon_groups);
       items.push({ id: io.id, name: str(io.name, 80), description: str(io.description, 300), prices, ordinal: typeof io.ordinal === "number" ? io.ordinal : items.length, addon_groups });
     }
-    sections.push({ id: so.id, name: str(so.name, 80), ordinal: typeof so.ordinal === "number" ? so.ordinal : sections.length, items, addon_groups: sanitizeGroups(so.addon_groups) });
+    sections.push({ id: so.id, name: str(so.name, 80), group: str(so.group, 80) || undefined, ordinal: typeof so.ordinal === "number" ? so.ordinal : sections.length, items, addon_groups: sanitizeGroups(so.addon_groups) });
   }
   const at = (v: unknown) => (typeof v === "string" && !Number.isNaN(Date.parse(v)) ? v : null);
   return { updated_at: at(r.updated_at), menu_read_at: at(r.menu_read_at), sections };
@@ -183,7 +183,7 @@ export function sectionsByTab(tabs: TabInput[], feed: CoffeeFeed): Map<string, S
       if (!restTab) restTab = t.id;
       continue;
     }
-    out.set(t.id, new Set(feed.sections.filter((s) => DEFAULT_SECTION[kind].test(s.name)).map((s) => s.id)));
+    out.set(t.id, new Set(feed.sections.filter((s) => DEFAULT_SECTION[kind].test(s.name) || (!!s.group && DEFAULT_SECTION[kind].test(s.group))).map((s) => s.id)));
   }
   if (restTab) {
     const taken = new Set<string>();
