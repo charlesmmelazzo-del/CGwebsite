@@ -2,10 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Cover, Field, Notice, TextLink, inputCls, postJson, useBotFields } from "./ui";
+import { Button, C, Cover, Field, Notice, TextLink, inputCls, postJson, useBotFields } from "./ui";
 
-/** signupOpen: only with sign-up set to Open is the sign-up page linked from here (never for Invite only). */
-export default function SignIn({ signupOpen, notice }: { signupOpen: boolean; notice?: string }) {
+/**
+ * signupOpen: only with sign-up set to Open is the sign-up page linked from here (never for Invite only).
+ * signUpHref (file 18): the invitation-card sign-up page, only while an admin has the "Sign up" button on (off by default).
+ */
+export default function SignIn({ signupOpen, notice, signUpHref = null }: { signupOpen: boolean; notice?: string; signUpHref?: string | null }) {
   const router = useRouter();
   const { trap, fields } = useBotFields();
   const [email, setEmail] = useState("");
@@ -31,7 +34,8 @@ export default function SignIn({ signupOpen, notice }: { signupOpen: boolean; no
       footer={
         <div className="space-y-3">
           <p><TextLink href="/passport/forgot">Forgot your password?</TextLink></p>
-          {signupOpen && <p>New here? <TextLink href="/passport/signup">Create your Passport</TextLink></p>}
+          {signUpHref && <p><a href={signUpHref} className="inline-block px-6 py-2.5 rounded-full border text-[0.875rem] tracking-[0.2em] uppercase" style={{ borderColor: C.brass, color: C.text }}>Sign up</a></p>}
+          {signupOpen && !signUpHref && <p>New here? <TextLink href="/passport/signup">Create your Passport</TextLink></p>}
           <p className="pt-4"><a href="/" className="text-[0.875rem] tracking-[0.2em] uppercase opacity-70 hover:opacity-100">← commongoodcocktailhouse.com</a></p>
         </div>
       }>

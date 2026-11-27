@@ -1,6 +1,7 @@
 import SignIn from "@/components/passport/SignIn";
 import { loadConfig } from "@/lib/passport/page";
 import { currentAuth } from "@/lib/passport/session";
+import { signUpButtonHref } from "@/lib/passport/passcode";
 
 export const dynamic = "force-dynamic";
 
@@ -11,5 +12,5 @@ export const dynamic = "force-dynamic";
 export default async function PassportPage({ searchParams }: { searchParams: { signed_out?: string } }) {
   if (currentAuth()) return null;
   const config = await loadConfig();
-  return <SignIn signupOpen={config.signup_mode === "open"} notice={searchParams.signed_out ? "You've been signed out. Please sign in again." : undefined} />;
+  return <SignIn signupOpen={config.signup_mode === "open"} signUpHref={signUpButtonHref(config)} notice={searchParams.signed_out ? "You've been signed out. Please sign in again." : undefined} />;
 }

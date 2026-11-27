@@ -91,7 +91,8 @@ export async function middleware(req: NextRequest) {
     requestHeaders.set("x-pathname", pathname);
     const res = NextResponse.next({ request: { headers: requestHeaders } });
     // One-time links carry their code in the address: never send it on to another site.
-    if (pathname === "/passport/set-password" || pathname === "/passport/confirm") res.headers.set("Referrer-Policy", "no-referrer");
+    // File 18: so does the invitation-card sign-up page (its address is only on the printed QR code).
+    if (pathname === "/passport/set-password" || pathname === "/passport/confirm" || pathname.startsWith("/passport/join/")) res.headers.set("Referrer-Policy", "no-referrer");
     return pass(res);
   }
 

@@ -14,7 +14,7 @@ const blank = (): Person => ({ first_name: "", last_name: "", email: "" });
  * Reached only as the sign-up page allows (Invite only: with a valid invitation;
  * Open: anyone). The Bible checks again and uses the invitation up on finishing.
  */
-export default function SignUp({ termsText, termsVersion, invitationCode }: { termsText: string; termsVersion: number; invitationCode?: string }) {
+export default function SignUp({ termsText, termsVersion, invitationCode, joinSlug }: { termsText: string; termsVersion: number; invitationCode?: string; /** File 18: the card sign-up page's address, sent with a card passcode. */ joinSlug?: string }) {
   const router = useRouter();
   const { trap, fields } = useBotFields();
   const [step, setStep] = useState<1 | 2>(1);
@@ -47,7 +47,7 @@ export default function SignUp({ termsText, termsVersion, invitationCode }: { te
     setBusy(true);
     const r = await postJson<{ check_email?: boolean; signed_in?: boolean }>("/api/passport/signup", {
       ...me, password, age_confirmed: age, terms_version: termsVersion, marketing_consent: marketing, household,
-      ...(invitationCode ? { invitation_code: invitationCode } : {}), ...fields(),
+      ...(invitationCode ? { invitation_code: invitationCode } : {}), ...(joinSlug ? { join_slug: joinSlug } : {}), ...fields(),
     });
     if (r.ok && r.data.check_email) {
       setSent(true);

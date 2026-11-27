@@ -879,6 +879,45 @@ function slowServer() {
     });
   }
 
+  console.log("\nFile 18: invitation cards — the passcode box, the sign-up page address, the Sign up button");
+  {
+    const { cleanPasscode, typedPasscode, signUpButtonHref, isJoinSlug, PASSCODE_ALPHABET } = await import("../passcode");
+    const { readdirSync, statSync } = await import("node:fs");
+    await test("a passcode is 4 characters from 2-9 and A-Z without I, L, O; any case, spaces and dashes are fine", () => {
+      assert.equal(PASSCODE_ALPHABET.length, 31);
+      assert.equal(cleanPasscode(" ab-c7 "), "ABC7");
+      assert.equal(cleanPasscode("x9 k2"), "X9K2");
+      for (const badOne of ["ABC", "ABCDE", "AB1C", "AB0C", "ABIC", "ABLC", "ABOC", "", null, 1234]) assert.equal(cleanPasscode(badOne), "", String(badOne));
+    });
+    await test("the box shows capitals and keeps only passcode characters, at most 4 (paste-friendly)", () => {
+      assert.equal(typedPasscode("ab-cd"), "ABCD");
+      assert.equal(typedPasscode("  k 7 m 2 9"), "K7M2");
+      assert.equal(typedPasscode("o1l0"), "");
+    });
+    await test("with the Sign up button off (the default), the sign-in page links nowhere", () => {
+      assert.equal(signUpButtonHref({}), null);
+      assert.equal(signUpButtonHref({ signup_button: false, join_path: "/passport/join/abcdefgh2345" }), null);
+      assert.equal(signUpButtonHref({ signup_button: true }), null);
+      assert.equal(signUpButtonHref({ signup_button: true, join_path: "https://evil.example/x" }), null);
+      assert.equal(signUpButtonHref({ signup_button: true, join_path: "/passport/join/abcdefgh2345" }), "/passport/join/abcdefgh2345");
+      assert.ok(isJoinSlug("abcdefgh2345") && !isJoinSlug("ABCDEFGH2345") && !isJoinSlug("short"));
+    });
+    await test("no page, component or link anywhere on the site points at the sign-up page by itself", () => {
+      const files: string[] = [];
+      const walk = (d: string) => { for (const n of readdirSync(d)) { const f = join(d, n); if (statSync(f).isDirectory()) { if (n !== "__tests__") walk(f); } else if (/\.(tsx?|mdx?|json)$/.test(n)) files.push(f); } };
+      walk(join(process.cwd(), "src"));
+      const allowed = new Set(["src/lib/passport/passcode.ts", "src/middleware.ts"].map((f) => join(process.cwd(), f)));
+      const hits = files.filter((f) => !allowed.has(f) && /passport\/join\//.test(readFileSync(f, "utf8")));
+      assert.deepEqual(hits.map((f) => f.replace(process.cwd() + "/", "")), []);
+      const signIn = readFileSync(join(process.cwd(), "src/components/passport/SignIn.tsx"), "utf8");
+      assert.ok(/signUpHref && <p><a href=\{signUpHref\}/.test(signIn), "the Sign up button uses only the address the setting sends");
+    });
+    await test("passcode tries: 5 in 15 minutes per address and per device", () => {
+      assert.deepEqual(LIMITS["passport-passcode"], { max: 5, windowMs: 15 * 60 * 1000 });
+      assert.deepEqual(LIMITS["passport-passcode-device"], { max: 5, windowMs: 15 * 60 * 1000 });
+    });
+  }
+
   console.log(`\n${passed} passed, ${failed} failed`);
   if (failed) process.exit(1);
 })();
