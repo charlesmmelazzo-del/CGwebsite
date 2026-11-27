@@ -11,8 +11,10 @@
 //     so picking "Ain't You Just A Peach" into Limited Time Lattes takes it off the Coffee Menu without touching Toast.
 //   - A section can be renamed, given a note line under its heading, hidden, or moved; an item can be hidden or given a
 //     note line (e.g. "Add any latte flavor +0.50"). Never modifiers.
-//   - Coffee 02: an item can show its flavors from Toast ("Show flavors from Toast": the feed's addon_groups, only
-//     Toast's "Syrup" / "Flavor" groups) as a line under it, e.g. "Available in: Madagascar Vanilla, … (+0.50)".
+//   - Coffee 02: Toast's guest-facing option groups (milk, temperature, syrup / flavor) show automatically, with friendly
+//     names: once under a section's heading when the whole section has them ("Milk options: Whole, Oat" · "Iced or Hot"),
+//     otherwise under the item ("Available syrup flavors (+0.50): Madagascar Vanilla, …"). They follow Toast every night.
+//     The admin can rename a group's display name or hide a group (per tab).
 //   - Coffee 02: display sections. A tab can split a Toast section for the page only (Toast's single "Tea" group shown as
 //     "Tea Lattes" / "Hot Tea" / "Iced Tea"): a heading, an optional note and items picked from the feed. An item in a
 //     display section shows there instead of in its Toast section (a Toast section left empty is hidden); items not
@@ -23,7 +25,7 @@ export interface FeedPrice { label: string | null; price: number }
 /** Coffee 02: a Toast flavor add-on group ("Syrup Flavors"): option names only, one price (null when they differ). */
 export interface FeedAddonGroup { name: string; price: number | null; options: string[] }
 export interface FeedItem { id: string; name: string; description: string; prices: FeedPrice[]; ordinal: number; addon_groups: FeedAddonGroup[] }
-export interface FeedSection { id: string; name: string; ordinal: number; items: FeedItem[] }
+export interface FeedSection { id: string; name: string; ordinal: number; items: FeedItem[]; addon_groups?: FeedAddonGroup[] }
 export interface CoffeeFeed { updated_at: string | null; menu_read_at: string | null; sections: FeedSection[] }
 
 /** What the owner sets for one tab (stored on coffee_menus.live). Every field is optional. */
@@ -44,10 +46,10 @@ export interface CoffeeLiveConfig {
   hiddenItems?: string[];
   /** Item id → note line under the item. */
   itemNotes?: Record<string, string>;
-  /** Coffee 02: item ids with "Show flavors from Toast" switched on (off by default). */
-  flavorItems?: string[];
-  /** Coffee 02: item id → the words before the flavor list (default "Available in:"; "{price}" places the price). */
-  flavorLabels?: Record<string, string>;
+  /** Coffee 02: Toast option group name → the name guests see ("Milk Option" → "Milk options"); unset = the default. */
+  groupLabels?: Record<string, string>;
+  /** Coffee 02: Toast option group names not shown on this tab. */
+  hiddenGroups?: string[];
   /** Coffee 02: display-only sections on this tab (ids "d_…"), ordered with the Toast sections through `order`. */
   displaySections?: DisplaySection[];
 }
@@ -63,7 +65,7 @@ export interface TabInput {
 }
 
 export interface ShownItem { id: string; name: string; description: string; prices: FeedPrice[]; note: string; flavors: string[] }
-export interface ShownSection { id: string; heading: string; note: string; items: ShownItem[]; display?: boolean }
+export interface ShownSection { id: string; heading: string; note: string; options: string[]; items: ShownItem[]; display?: boolean }
 export type Showing = "live" | "pdf" | "empty";
 export interface ComposedTab { id: string; label: string; showing: Showing; sections: ShownSection[]; itemCount: number }
 export interface NotShown { id: string; name: string; section: string; reason: string }
@@ -89,23 +91,54 @@ export function priceLine(prices: FeedPrice[]): string {
 }
 
 /** Coffee 02: the add-on groups the website will show, by name (the Bible applies the same allow-list first). */
-export const ADDON_GROUP_ALLOW = /syrup|flavou?r/i;
-export const DEFAULT_FLAVOR_LABEL = "Available in:";
+export const ADDON_GROUP_ALLOW = /syrup|flavou?r|milk|temperature|\btemp\b|iced or hot/i;
 
+export type GroupKind = "milk" | "temperature" | "flavor" | "other";
+export function groupKind(name: string): GroupKind {
+  if (/milk/i.test(name)) return "milk";
+  if (/temperature|\btemp\b|iced or hot/i.test(name)) return "temperature";
+  if (/syrup|flavou?r/i.test(name)) return "flavor";
+  return "other";
+}
+/** The name guests see for a Toast option group, unless the admin set one ("" shows the options with no label). */
+export function defaultGroupLabel(name: string): string {
+  switch (groupKind(name)) {
+    case "milk": return "Milk options";
+    case "temperature": return "";
+    case "flavor": return "Available syrup flavors";
+    default: return name;
+  }
+}
 /**
- * Coffee 02: the line under an item for one flavor group. "Available in: Madagascar Vanilla, Charred Cinnamon (+0.50)";
- * a label with "{price}" puts the price there instead ("Add a flavor {price} —" → "Add a flavor +0.50 — Madagascar …").
+ * Coffee 02: the line guests see for one option group. Temperature reads "Iced or Hot"; the others
+ * "Milk options: Whole, 2%, Oat" / "Available syrup flavors (+0.50): Madagascar Vanilla, Charred Cinnamon".
  */
-export function flavorLine(g: FeedAddonGroup, label?: string | null): string {
-  const l = (label ?? "").replace(/\s+/g, " ").trim() || DEFAULT_FLAVOR_LABEL;
+export function groupLine(g: FeedAddonGroup, label?: string | null): string {
+  const custom = typeof label === "string" ? label.replace(/\s+/g, " ").trim() : null;
+  const l = custom !== null && custom !== "" ? custom : defaultGroupLabel(g.name);
   const price = g.price ? `+${formatPrice(g.price)}` : "";
-  const opts = g.options.join(", ");
-  if (l.includes("{price}")) return `${l.replace(/\{price\}/g, price)} ${opts}`.replace(/\s+/g, " ").trim();
-  return `${l} ${opts}${price ? ` (${price})` : ""}`.trim();
+  const opts = groupKind(g.name) === "temperature" ? g.options.join(" or ") : g.options.join(", ");
+  if (!l) return price ? `${opts} (${price})` : opts;
+  return `${l}${price ? ` (${price})` : ""}: ${opts}`;
 }
 
 const str = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max) : "");
 const idOk = (v: unknown): v is string => typeof v === "string" && /^[a-z]_[0-9a-f]{6,32}$/i.test(v);
+
+function sanitizeGroups(raw: unknown): FeedAddonGroup[] {
+  const out: FeedAddonGroup[] = [];
+  for (const g of (Array.isArray(raw) ? raw : []).slice(0, 6)) {
+    if (!g || typeof g !== "object") continue;
+    const go = g as Record<string, unknown>;
+    const name = str(go.name, 60);
+    if (!name || !ADDON_GROUP_ALLOW.test(name)) continue;
+    const options = (Array.isArray(go.options) ? go.options : []).map((o) => str(o, 60)).filter(Boolean).slice(0, 40);
+    if (!options.length) continue;
+    const price = typeof go.price === "number" && go.price > 0 && go.price < 100 ? Math.round(go.price * 100) / 100 : null;
+    out.push({ name, price, options });
+  }
+  return out;
+}
 
 /** Keep only well-formed, guest-safe fields from whatever the Bible sent (null when it isn't a feed at all). */
 export function sanitizeFeed(raw: unknown): CoffeeFeed | null {
@@ -126,20 +159,10 @@ export function sanitizeFeed(raw: unknown): CoffeeFeed | null {
         .slice(0, 6)
         .map((p) => ({ label: str(p.label, 30) || null, price: Math.round(p.price * 100) / 100 }));
       if (!prices.length) continue;
-      const addon_groups: FeedAddonGroup[] = [];
-      for (const g of (Array.isArray(io.addon_groups) ? io.addon_groups : []).slice(0, 4)) {
-        if (!g || typeof g !== "object") continue;
-        const go = g as Record<string, unknown>;
-        const name = str(go.name, 60);
-        if (!name || !ADDON_GROUP_ALLOW.test(name)) continue;
-        const options = (Array.isArray(go.options) ? go.options : []).map((o) => str(o, 60)).filter(Boolean).slice(0, 40);
-        if (!options.length) continue;
-        const price = typeof go.price === "number" && go.price > 0 && go.price < 100 ? Math.round(go.price * 100) / 100 : null;
-        addon_groups.push({ name, price, options });
-      }
+      const addon_groups = sanitizeGroups(io.addon_groups);
       items.push({ id: io.id, name: str(io.name, 80), description: str(io.description, 300), prices, ordinal: typeof io.ordinal === "number" ? io.ordinal : items.length, addon_groups });
     }
-    sections.push({ id: so.id, name: str(so.name, 80), ordinal: typeof so.ordinal === "number" ? so.ordinal : sections.length, items });
+    sections.push({ id: so.id, name: str(so.name, 80), ordinal: typeof so.ordinal === "number" ? so.ordinal : sections.length, items, addon_groups: sanitizeGroups(so.addon_groups) });
   }
   const at = (v: unknown) => (typeof v === "string" && !Number.isNaN(Date.parse(v)) ? v : null);
   return { updated_at: at(r.updated_at), menu_read_at: at(r.menu_read_at), sections };
@@ -201,10 +224,15 @@ export function composeTabs(tabs: TabInput[], feed: CoffeeFeed | null): { tabs: 
     const hiddenI = new Set(cfg.hiddenItems ?? []);
     const displays = displaySectionsOf(cfg);
     const inDisplay = displayItemMap(displays);
-    const flavorOn = new Set(cfg.flavorItems ?? []);
-    const shownItem = (it: FeedItem): ShownItem => ({
+    const hiddenG = new Set((cfg.hiddenGroups ?? []).map((n) => n.toLowerCase()));
+    const lines = (gs: FeedAddonGroup[] | undefined) => (gs ?? []).filter((g) => !hiddenG.has(g.name.toLowerCase())).map((g) => groupLine(g, cfg.groupLabels?.[g.name]));
+    // Items shown outside their Toast section (a display section, or picked into another tab) carry that section's
+    // options with them, so "Iced or Hot" never gets lost when an item moves.
+    const sectionGroupsOf = new Map<string, FeedAddonGroup[]>();
+    feed.sections.forEach((s) => s.items.forEach((it) => sectionGroupsOf.set(it.id, s.addon_groups ?? [])));
+    const shownItem = (it: FeedItem, carry: boolean): ShownItem => ({
       id: it.id, name: it.name, description: it.description, prices: it.prices, note: str(cfg.itemNotes?.[it.id], 120),
-      flavors: flavorOn.has(it.id) ? (it.addon_groups ?? []).map((g) => flavorLine(g, cfg.flavorLabels?.[it.id])) : [],
+      flavors: lines([...(carry ? sectionGroupsOf.get(it.id) ?? [] : []), ...(it.addon_groups ?? [])]),
     });
     const sections: ShownSection[] = [];
     for (const b of orderedBlocks(cfg, feed)) {
@@ -232,9 +260,10 @@ export function composeTabs(tabs: TabInput[], feed: CoffeeFeed | null): { tabs: 
           id: b.id,
           heading: str(cfg.labels?.[b.id], 80) || b.section.name,
           note: typeof cfg.notes?.[b.id] === "string" ? cfg.notes[b.id].trim().slice(0, 300) : "",
-          items: items.map(shownItem),
+          options: lines(b.section.addon_groups),
+          items: items.map((it) => shownItem(it, false)),
         }
-        : { id: b.id, heading: str(b.display.heading, 80) || "Untitled section", note: (b.display.note ?? "").trim().slice(0, 300), items: items.map(shownItem), display: true });
+        : { id: b.id, heading: str(b.display.heading, 80) || "Untitled section", note: (b.display.note ?? "").trim().slice(0, 300), options: [], items: items.map((it) => shownItem(it, true)), display: true });
     }
     const itemCount = sections.reduce((n, s) => n + s.items.length, 0);
     let showing: Showing;

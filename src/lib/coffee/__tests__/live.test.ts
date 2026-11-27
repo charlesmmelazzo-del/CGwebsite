@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { composeTabs, formatPrice, priceLine, sanitizeFeed, tabKind, type CoffeeFeed, type TabInput } from "../live";
+import { composeTabs, formatPrice, priceLine, sanitizeFeed, tabKind, groupLine, type CoffeeFeed, type TabInput } from "../live";
 
 let checks = 0;
 function test(name: string, fn: () => void) {
@@ -117,9 +117,60 @@ test("sanitizeFeed keeps only guest fields and drops malformed entries", () => {
   assert.ok(f);
   assert.equal(f!.menu_read_at, null);
   assert.equal(f!.sections.length, 1);
-  assert.deepEqual(Object.keys(f!.sections[0].items[0]).sort(), ["description", "id", "name", "ordinal", "prices"]);
+  assert.deepEqual(Object.keys(f!.sections[0].items[0]).sort(), ["addon_groups", "description", "id", "name", "ordinal", "prices"]);
   assert.equal(f!.sections[0].items.length, 1);
   assert.equal(sanitizeFeed({ error: "x" }), null);
+});
+
+// ── Coffee 02 ────────────────────────────────────────────────────────────────
+const F2 = sanitizeFeed({
+  updated_at: "2026-11-27T10:00:00Z", menu_read_at: "2026-11-27T10:00:00Z",
+  sections: [
+    { id: "s_000000000001", name: "Specialty Lattes", ordinal: 0,
+      addon_groups: [{ name: "Milk Option", price: null, options: ["Whole", "2%", "Oat"] }, { name: "Temperature Option", price: null, options: ["Iced", "Hot"] }, { name: "FIRE: Kitchen", price: null, options: ["Rush"] }],
+      items: [{ id: "i_000000000011", name: "Madagascar Vanilla", description: "", prices: [{ label: null, price: 6 }], ordinal: 0, addon_groups: [] }] },
+    { id: "s_000000000002", name: "Tea", ordinal: 1, addon_groups: [], items: [
+      { id: "i_000000000021", name: "Masala Chai Latte", description: "", prices: [{ label: null, price: 5 }], ordinal: 0, addon_groups: [] },
+      { id: "i_000000000022", name: "Matcha Latte", description: "", prices: [{ label: null, price: 6 }], ordinal: 1, addon_groups: [{ name: "Syrup Flavors", price: 0.5, options: ["Madagascar Vanilla", "Charred Cinnamon"] }] },
+      { id: "i_000000000023", name: "Jasmine Blossom Hot Green Tea", description: "", prices: [{ label: null, price: 4 }], ordinal: 2, addon_groups: [] },
+      { id: "i_000000000024", name: "Iced Rishi Black Tea", description: "", prices: [{ label: null, price: 4 }], ordinal: 3, addon_groups: [] },
+      { id: "i_000000000025", name: "New Tea From Toast", description: "", prices: [{ label: null, price: 4 }], ordinal: 4, addon_groups: [] },
+    ] },
+  ],
+}) as CoffeeFeed;
+const ONE: TabInput[] = [{ id: "coffee", label: "Coffee Menu", hasPdf: true }];
+
+test("option lines: friendly names, Iced or Hot, flavor price; kitchen groups never pass", () => {
+  assert.equal(groupLine({ name: "Milk Option", price: null, options: ["Whole", "Oat"] }), "Milk options: Whole, Oat");
+  assert.equal(groupLine({ name: "Temperature Option", price: null, options: ["Iced", "Hot"] }), "Iced or Hot");
+  assert.equal(groupLine({ name: "Syrup Flavors", price: 0.5, options: ["A", "B"] }), "Available syrup flavors (+0.50): A, B");
+  assert.equal(groupLine({ name: "Milk Option", price: null, options: ["Whole"] }, "Milks"), "Milks: Whole");
+  const lattes = composeTabs(ONE, F2).tabs[0].sections[0];
+  assert.deepEqual(lattes.options, ["Milk options: Whole, 2%, Oat", "Iced or Hot"]);
+  assert.ok(!JSON.stringify(F2).includes("Kitchen"));
+});
+
+test("item-level groups show under the item; the admin can rename or hide a group", () => {
+  const tea = composeTabs(ONE, F2).tabs[0].sections[1];
+  assert.deepEqual(tea.items.find((i) => i.name === "Matcha Latte")!.flavors, ["Available syrup flavors (+0.50): Madagascar Vanilla, Charred Cinnamon"]);
+  const cfg = { groupLabels: { "Syrup Flavors": "Add a flavor" }, hiddenGroups: ["temperature option"] };
+  const t = composeTabs([{ ...ONE[0], live: cfg }], F2).tabs[0];
+  assert.deepEqual(t.sections[0].options, ["Milk options: Whole, 2%, Oat"]);
+  assert.deepEqual(t.sections[1].items.find((i) => i.name === "Matcha Latte")!.flavors, ["Add a flavor (+0.50): Madagascar Vanilla, Charred Cinnamon"]);
+});
+
+test("display sections split Toast's Tea without losing a new item", () => {
+  const live = { displaySections: [
+    { id: "d_00000000000a", heading: "Tea Lattes", items: ["i_000000000021", "i_000000000022"] },
+    { id: "d_00000000000b", heading: "Hot Tea", items: ["i_000000000023"] },
+    { id: "d_00000000000c", heading: "Iced Tea", items: ["i_000000000024"] },
+  ] };
+  const { tabs, notShown } = composeTabs([{ ...ONE[0], live }], F2);
+  const heads = tabs[0].sections.map((s) => s.heading);
+  assert.deepEqual(heads, ["Specialty Lattes", "Tea", "Tea Lattes", "Hot Tea", "Iced Tea"]);
+  assert.deepEqual(tabs[0].sections[1].items.map((i) => i.name), ["New Tea From Toast"]);
+  assert.equal(notShown.length, 0);
+  assert.ok(tabs[0].sections[2].items.find((i) => i.name === "Matcha Latte")!.flavors[0].startsWith("Available syrup flavors"));
 });
 
 console.log(`\n${checks} passed`);
