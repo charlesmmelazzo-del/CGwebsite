@@ -25,7 +25,7 @@ const PUB = join(HERE, "..", "public", "passport");
 const OUT = join(PUB, "icons");
 
 // The Passport palette (src/components/passport/theme.ts and the file 16 booklet).
-const BG = "#13170F";
+const BG = "#1C281E"; // the back cover colour (shows only around the maskable icon)
 const BRASS = "#C9A96E"; // C.brass / BRASS in src/lib/passport/accents.ts
 const PAGE = "#E9E1CB";
 const COVER = "#2A3B2C";
@@ -35,19 +35,32 @@ const MASKABLE_SCALE = 0.78; // keeps the booklet inside the central 80% safe zo
 
 const WORD = readFileSync(join(SRC, "passport-word.txt"), "utf8").trim();
 
-/** The booklet, drawn in 512 design units: pages behind, the dark cover, the spine band and "PASSPORT". */
-const booklet = () => `
-  <rect x="148.0" y="95.0" width="236.0" height="322.0" rx="20.0" fill="${PAGE}" opacity="0.55"/>
-  <rect x="143.0" y="91.5" width="236.0" height="329.0" rx="20.0" fill="${PAGE}"/>
-  <rect x="138.0" y="88.0" width="236.0" height="336.0" rx="20.0" fill="${COVER}"/>
-  <path d="M158.0,88.0 H168.0 V424.0 H158.0 A20.0,20.0 0 0 1 138.0,404.0 V108.0 A20.0,20.0 0 0 1 158.0,88.0 Z" fill="${SPINE}"/>
-  <rect x="168.0" y="88.0" width="2.2" height="336.0" fill="${STITCH}"/>
-  <path d="${WORD}" fill="${BRASS}"/>`;
+/**
+ * The passport, drawn in 512 design units as a square book that fills the whole icon: the dark green cover with its
+ * spine band on the left, a fine brass frame, the page edges showing down the right side (the back cover just
+ * behind them), and "PASSPORT" in brass under the logo. Phones round the corners themselves.
+ */
+const PAGE_LINE = "#CFC5A8";
+const BACK = SPINE;
+const WORD_BOX = { x0: 181, y0: 317, x1: 346, y1: 336 }; // where passport-word.txt sits in its own 512 space
+const WORD_AT = { cx: 250, cy: 386, scale: 1.55 };
+const booklet = () => {
+  const wcx = (WORD_BOX.x0 + WORD_BOX.x1) / 2, wcy = (WORD_BOX.y0 + WORD_BOX.y1) / 2;
+  const lines = [462, 470, 478, 486].map((x) => `<rect x="${x}" y="24" width="1.6" height="464" fill="${PAGE_LINE}"/>`).join("");
+  return `
+  <rect x="0" y="0" width="512" height="512" fill="${BACK}"/>
+  <rect x="440" y="18" width="56" height="476" rx="6" fill="${PAGE}"/>${lines}
+  <path d="M0,0 H444 A18,18 0 0 1 462,18 V494 A18,18 0 0 1 444,512 H0 Z" fill="${COVER}"/>
+  <rect x="0" y="0" width="40" height="512" fill="${SPINE}"/>
+  <rect x="40" y="0" width="2.5" height="512" fill="${STITCH}"/>
+  <rect x="66" y="30" width="370" height="452" rx="10" fill="none" stroke="${BRASS}" stroke-width="2" opacity="0.4"/>
+  <g transform="translate(${WORD_AT.cx} ${WORD_AT.cy}) scale(${WORD_AT.scale}) translate(${-wcx} ${-wcy})"><path d="${WORD}" fill="${BRASS}"/></g>`;
+};
 
 /** Where the logo sits on the cover (512 design units): a box, centred, the mark fitted inside it. */
 const BOX = {
-  hand: { cx: 268, cy: 204, w: 166, h: 186 },
-  full: { cx: 271, cy: 203, w: 178, h: 170 },
+  hand: { cx: 252, cy: 208, w: 230, h: 250 },
+  full: { cx: 252, cy: 200, w: 270, h: 250 },
 };
 
 // ---- The logo as ink (0 = paper, 255 = line), split into hand and lettering ------------------------------------
