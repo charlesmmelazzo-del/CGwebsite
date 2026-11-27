@@ -1,0 +1,41 @@
+{
+  "updated_at": "2026-11-26T10:00:00.000Z",
+  "menu_read_at": "2026-11-26T10:05:00.000Z",
+  "sections": [
+    { "id": "s_0a1b2c3d4e01", "name": "Espresso", "ordinal": 0, "items": [
+      { "id": "i_0a1b2c3d4e11", "name": "Espresso", "description": "", "prices": [{ "label": null, "price": 3.75 }], "ordinal": 0 },
+      { "id": "i_0a1b2c3d4e12", "name": "Cortado", "description": "", "prices": [{ "label": null, "price": 4.5 }], "ordinal": 1 },
+      { "id": "i_0a1b2c3d4e13", "name": "Americano", "description": "", "prices": [{ "label": null, "price": 4 }], "ordinal": 2 },
+      { "id": "i_0a1b2c3d4e14", "name": "Cappuccino", "description": "", "prices": [{ "label": null, "price": 5 }], "ordinal": 3 }
+    ] },
+    { "id": "s_0a1b2c3d4e02", "name": "Drip & Pour Over", "ordinal": 1, "items": [
+      { "id": "i_0a1b2c3d4e21", "name": "Drip Coffee", "description": "Rotating single origin", "prices": [{ "label": "12 oz", "price": 3 }, { "label": "16 oz", "price": 3.5 }], "ordinal": 0 },
+      { "id": "i_0a1b2c3d4e22", "name": "Cold Brew", "description": "", "prices": [{ "label": "12 oz", "price": 4.5 }, { "label": "16 oz", "price": 5.25 }], "ordinal": 1 },
+      { "id": "i_0a1b2c3d4e23", "name": "Chemex", "description": "For two", "prices": [{ "label": null, "price": 7 }], "ordinal": 2 }
+    ] },
+    { "id": "s_0a1b2c3d4e03", "name": "Oat Milk Lattes", "ordinal": 2, "items": [
+      { "id": "i_0a1b2c3d4e31", "name": "Latte", "description": "", "prices": [{ "label": null, "price": 5.5 }], "ordinal": 0 },
+      { "id": "i_0a1b2c3d4e32", "name": "Matcha Latte", "description": "", "prices": [{ "label": null, "price": 6 }], "ordinal": 1 },
+      { "id": "i_0a1b2c3d4e33", "name": "Chai Latte", "description": "", "prices": [{ "label": null, "price": 5.75 }], "ordinal": 2 }
+    ] },
+    { "id": "s_0a1b2c3d4e04", "name": "Specialty Lattes", "ordinal": 3, "items": [
+      { "id": "i_0a1b2c3d4e41", "name": "Earl Grey Latte", "description": "Blood Orange, Bergamot", "prices": [{ "label": null, "price": 6.5 }], "ordinal": 0 },
+      { "id": "i_0a1b2c3d4e42", "name": "Cardamom Latte", "description": "Cardamom, Honey, Vanilla", "prices": [{ "label": null, "price": 6.5 }], "ordinal": 1 },
+      { "id": "i_0a1b2c3d4e43", "name": "Ain't You Just A Peach", "description": "Peach, Brown Sugar, Cinnamon", "prices": [{ "label": null, "price": 7 }], "ordinal": 2 },
+      { "id": "i_0a1b2c3d4e44", "name": "She's So Honey", "description": "Honey, Lavender", "prices": [{ "label": null, "price": 7 }], "ordinal": 3 }
+    ] },
+    { "id": "s_0a1b2c3d4e05", "name": "Tea & More", "ordinal": 4, "items": [
+      { "id": "i_0a1b2c3d4e51", "name": "Hot Tea", "description": "Ask for today's selection", "prices": [{ "label": null, "price": 3.5 }], "ordinal": 0 },
+      { "id": "i_0a1b2c3d4e52", "name": "Hot Chocolate", "description": "", "prices": [{ "label": null, "price": 4.5 }], "ordinal": 1 }
+    ] },
+    { "id": "s_0a1b2c3d4e06", "name": "Food", "ordinal": 5, "items": [
+      { "id": "i_0a1b2c3d4e61", "name": "Butter Croissant", "description": "", "prices": [{ "label": null, "price": 4 }], "ordinal": 0 },
+      { "id": "i_0a1b2c3d4e62", "name": "Almond Croissant", "description": "", "prices": [{ "label": null, "price": 5 }], "ordinal": 1 },
+      { "id": "i_0a1b2c3d4e63", "name": "Breakfast Sandwich", "description": "Egg, Cheddar, Bacon, Brioche", "prices": [{ "label": null, "price": 9 }], "ordinal": 2 },
+      { "id": "i_0a1b2c3d4e64", "name": "Avocado Toast", "description": "Sourdough, Chili Crisp", "prices": [{ "label": null, "price": 10 }], "ordinal": 3 }
+    ] },
+    { "id": "s_0a1b2c3d4e07", "name": "Food Sweets", "ordinal": 6, "items": [
+      { "id": "i_0a1b2c3d4e71", "name": "Cookie", "description": "Brown Butter Chocolate Chip", "prices": [{ "label": null, "price": 3.25 }], "ordinal": 0 }
+    ] }
+  ]
+}

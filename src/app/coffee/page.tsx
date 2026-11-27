@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { getCoffeeMenus } from "@/lib/coffeedata";
 import { getPageHeader } from "@/lib/pageheaders";
+import { getCoffeeFeed } from "@/lib/coffee/feed";
+import { composeTabs } from "@/lib/coffee/live";
 import CoffeePageClient from "./CoffeePageClient";
 
 export const metadata: Metadata = {
@@ -11,9 +13,18 @@ export const metadata: Metadata = {
 };
 
 export default async function CoffeePage() {
-  const [menus, header] = await Promise.all([
+  // The tabs and their settings are read on every request (admin changes show at once); the Toast menu itself is
+  // read from the Bible at most every 10 minutes, keeping the last good copy (src/lib/coffee/feed.ts).
+  const [menus, header, { feed }] = await Promise.all([
     getCoffeeMenus(),
     getPageHeader("coffee"),
+    getCoffeeFeed(),
   ]);
-  return <CoffeePageClient menus={menus} header={header} />;
+  const { tabs } = composeTabs(
+    menus.map((m) => ({ id: m.id, label: m.label, live: m.live, hasPdf: !!(m.pdfPages?.length || m.imageUrl) })),
+    feed,
+  );
+  // The tab settings themselves stay on the server; the page gets only what guests see.
+  const pageMenus = menus.map((m) => ({ ...m, live: undefined }));
+  return <CoffeePageClient menus={pageMenus} live={tabs} header={header} />;
 }

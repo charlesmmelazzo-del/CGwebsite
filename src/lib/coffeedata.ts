@@ -1,6 +1,7 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { getSupabaseAdmin } from "./supabase";
 import type { MenuPdfPage } from "@/types";
+import type { CoffeeLiveConfig } from "./coffee/live";
 
 export interface CoffeeMenu {
   id: string;
@@ -11,6 +12,7 @@ export interface CoffeeMenu {
   active: boolean;
   pdfUrl?: string;            // a PDF menu, shown instead of the image
   pdfPages?: MenuPdfPage[];
+  live?: CoffeeLiveConfig | null; // Coffee 01: the live Toast menu settings for this tab
 }
 
 export async function getCoffeeMenus(): Promise<CoffeeMenu[]> {
@@ -34,6 +36,7 @@ export async function getCoffeeMenus(): Promise<CoffeeMenu[]> {
       active: r.active,
       pdfUrl: r.pdf_url ?? undefined,
       pdfPages: r.pdf_pages ?? undefined,
+      live: r.live ?? null,
     }));
   } catch {
     return [];
