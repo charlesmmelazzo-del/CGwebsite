@@ -23,9 +23,9 @@ export function GET() {
       background_color: "#13170F",
       theme_color: "#13170F",
       icons: [
-        { src: "/passport/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-        { src: "/passport/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
-        { src: "/passport/icons/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+        { src: "/passport/icons/icon-192.png?v=book2", sizes: "192x192", type: "image/png", purpose: "any" },
+        { src: "/passport/icons/icon-512.png?v=book2", sizes: "512x512", type: "image/png", purpose: "any" },
+        { src: "/passport/icons/icon-maskable-512.png?v=book2", sizes: "512x512", type: "image/png", purpose: "maskable" },
       ],
     }),
     { headers: { "Content-Type": "application/manifest+json", "Cache-Control": "public, max-age=3600" } },
