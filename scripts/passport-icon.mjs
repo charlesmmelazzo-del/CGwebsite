@@ -43,24 +43,26 @@ const WORD = readFileSync(join(SRC, "passport-word.txt"), "utf8").trim();
 const PAGE_LINE = "#CFC5A8";
 const BACK = SPINE;
 const WORD_BOX = { x0: 181, y0: 317, x1: 346, y1: 336 }; // where passport-word.txt sits in its own 512 space
-const WORD_AT = { cx: 250, cy: 386, scale: 1.55 };
+const WORD_AT = { cx: 254, cy: 382, scale: 1.5 };
 const booklet = () => {
   const wcx = (WORD_BOX.x0 + WORD_BOX.x1) / 2, wcy = (WORD_BOX.y0 + WORD_BOX.y1) / 2;
-  const lines = [462, 470, 478, 486].map((x) => `<rect x="${x}" y="24" width="1.6" height="464" fill="${PAGE_LINE}"/>`).join("");
+  // The cover fills the whole square, so the phone's own rounded mask becomes the passport's rounded corners. The
+  // page block runs down the right edge (the mask rounds it at top and bottom, like a real book's fore-edge).
+  const lines = [474, 482, 490, 498, 506].map((x) => `<rect x="${x}" y="0" width="1.6" height="512" fill="${PAGE_LINE}"/>`).join("");
   return `
-  <rect x="0" y="0" width="512" height="512" fill="${BACK}"/>
-  <rect x="440" y="18" width="56" height="476" rx="6" fill="${PAGE}"/>${lines}
-  <path d="M0,0 H444 A18,18 0 0 1 462,18 V494 A18,18 0 0 1 444,512 H0 Z" fill="${COVER}"/>
-  <rect x="0" y="0" width="40" height="512" fill="${SPINE}"/>
-  <rect x="40" y="0" width="2.5" height="512" fill="${STITCH}"/>
-  <rect x="66" y="30" width="370" height="452" rx="10" fill="none" stroke="${BRASS}" stroke-width="2" opacity="0.4"/>
+  <rect x="0" y="0" width="512" height="512" fill="${COVER}"/>
+  <rect x="466" y="0" width="46" height="512" fill="${PAGE}"/>${lines}
+  <rect x="462" y="0" width="4" height="512" fill="${BACK}" opacity="0.55"/>
+  <rect x="0" y="0" width="44" height="512" fill="${SPINE}"/>
+  <rect x="44" y="0" width="2.5" height="512" fill="${STITCH}"/>
+  <rect x="74" y="44" width="360" height="424" rx="44" fill="none" stroke="${BRASS}" stroke-width="2" opacity="0.4"/>
   <g transform="translate(${WORD_AT.cx} ${WORD_AT.cy}) scale(${WORD_AT.scale}) translate(${-wcx} ${-wcy})"><path d="${WORD}" fill="${BRASS}"/></g>`;
 };
 
 /** Where the logo sits on the cover (512 design units): a box, centred, the mark fitted inside it. */
 const BOX = {
-  hand: { cx: 252, cy: 208, w: 230, h: 250 },
-  full: { cx: 252, cy: 200, w: 270, h: 250 },
+  hand: { cx: 256, cy: 212, w: 220, h: 240 },
+  full: { cx: 256, cy: 204, w: 262, h: 240 },
 };
 
 // ---- The logo as ink (0 = paper, 255 = line), split into hand and lettering ------------------------------------
