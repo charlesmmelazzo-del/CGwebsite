@@ -128,5 +128,29 @@ function cleanLive(v: unknown): CoffeeLiveConfig | null {
     hiddenSections: ids(o.hiddenSections) ?? [],
     hiddenItems: ids(o.hiddenItems) ?? [],
     itemNotes: texts(o.itemNotes, 120) ?? {},
+    // Coffee 02: option-group display names / hidden groups (keyed by Toast's group name), and display sections.
+    groupLabels: groupTexts(o.groupLabels),
+    hiddenGroups: Array.isArray(o.hiddenGroups) ? o.hiddenGroups.filter((g): g is string => typeof g === "string" && !!g.trim()).map((g) => g.trim().slice(0, 60)).slice(0, 50) : [],
+    displaySections: Array.isArray(o.displaySections)
+      ? o.displaySections
+        .filter((d): d is Record<string, unknown> => !!d && typeof d === "object" && typeof (d as { id?: unknown }).id === "string" && /^d_[0-9a-f]{6,32}$/i.test((d as { id: string }).id))
+        .slice(0, 30)
+        .map((d) => ({
+          id: d.id as string,
+          heading: typeof d.heading === "string" ? d.heading.trim().slice(0, 80) : "",
+          ...(typeof d.note === "string" && d.note.trim() ? { note: d.note.trim().slice(0, 300) } : {}),
+          items: ids(d.items) ?? [],
+        }))
+      : [],
   };
+}
+
+/** Coffee 02: Toast group name → the name guests see ("" allowed: show just the options). */
+function groupTexts(x: unknown): Record<string, string> {
+  if (!x || typeof x !== "object") return {};
+  const out: Record<string, string> = {};
+  for (const [k, t] of Object.entries(x as Record<string, unknown>).slice(0, 50)) {
+    if (typeof k === "string" && k.trim() && typeof t === "string") out[k.trim().slice(0, 60)] = t.trim().slice(0, 60);
+  }
+  return out;
 }
