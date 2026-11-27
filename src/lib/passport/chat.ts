@@ -28,7 +28,7 @@ export interface ChatOverview {
 }
 export interface ChatQuote { id: number; name: string; text: string }
 export interface ChatReaction { emoji: string; count: number; mine: boolean; names: string[] }
-export interface ChatShare { kind: "cocktail" | "bottle" | "house_list" | "event"; name: string; ref_id: number | null; opens: boolean; public_event_id?: string; photo?: string | null; photo_clear?: boolean; photo_logo?: boolean }
+export interface ChatShare { kind: "cocktail" | "bottle" | "house_list" | "event"; name: string; ref_id: number | null; opens: boolean; public_event_id?: string; photo?: string | null; photo_clear?: boolean; photo_logo?: boolean; photo_logo_light?: boolean }
 export interface ChatPost {
   id: number; hidden?: boolean; mine?: boolean; from_bar?: boolean; from_name?: string; body?: string; removed?: "bar" | "author" | null; at: string;
   reply_to?: ChatQuote | null; reactions?: ChatReaction[]; share?: ChatShare | null; pinned?: boolean; mentions_me?: boolean; can_report?: boolean; can_delete?: boolean;

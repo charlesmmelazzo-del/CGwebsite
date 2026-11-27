@@ -129,7 +129,7 @@ function Results({ q, results, busy, partial, error }: { q: string; results: Fin
                         </span>
                       </span>
                       {/* File 17: the bottle's small picture (a brand logo on its light panel). */}
-                      <Thumb kind="bottle" id={b.id} photo={b.photo} size={40} clear={b.photo_clear} logo={b.photo_logo} name={b.producer || b.name} />
+                      <Thumb kind="bottle" id={b.id} photo={b.photo} size={40} clear={b.photo_clear} logo={b.photo_logo} logoLight={b.photo_logo_light} name={b.producer || b.name} />
                     </span>
                   </ItemRow>
                 ))}

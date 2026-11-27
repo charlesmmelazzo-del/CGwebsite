@@ -27,8 +27,9 @@ const smallBtn = "rounded-full border px-4 min-h-[44px] font-body text-[0.875rem
 export function uiPost(p: ChatPost, roomId?: number): UiPost {
   if (p.hidden) return { id: p.id, at: p.at, hidden: true };
   const share: ShareCard | null = p.share ? { id: p.id, kind: p.share.kind, name: p.share.name, note: "", from: p.mine ? "me" : "friend", from_name: null, ref_id: p.share.ref_id, opens: p.share.opens, saved: false, at: p.at, ...(p.share.public_event_id ? { public_event_id: p.share.public_event_id } : {}),
-    // File 17: the shared item's small picture (photo_logo: a brand logo, drawn on its light panel).
-    ...(p.share.photo ? { photo: p.share.photo, ...(p.share.photo_clear ? { photo_clear: true } : {}), ...(p.share.photo_logo ? { photo_logo: true } : {}) } : {}) } : null;
+    // File 17: the shared item's small picture (photo_logo: a brand logo, drawn on its light panel; file 17b:
+    // photo_logo_light, a light logo, on the dark panel).
+    ...(p.share.photo ? { photo: p.share.photo, ...(p.share.photo_clear ? { photo_clear: true } : {}), ...(p.share.photo_logo ? { photo_logo: true, ...(p.share.photo_logo_light ? { photo_logo_light: true } : {}) } : {}) } : {}) } : null;
   return {
     id: p.id, at: p.at, mine: p.mine, author: p.from_name, fromBar: p.from_bar, body: p.body,
     gone: p.removed === "bar" ? "Removed by Common Good" : p.removed === "author" ? "Message deleted" : null,
