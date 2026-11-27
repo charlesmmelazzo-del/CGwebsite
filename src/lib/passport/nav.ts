@@ -22,7 +22,7 @@ export const TILE_COLUMNS = 2;
  * (a bottle cut out, file 15 Part D), so it is drawn without a box, contain-fit on the section's tint.
  */
 export interface Cover { kind: ItemKind; id: number; photo: string; name: string; clear?: boolean }
-interface Pictured { id: number | null; name: string; photo?: string | null; cover?: boolean; photo_clear?: boolean }
+interface Pictured { id: number | null; name: string; photo?: string | null; cover?: boolean; photo_clear?: boolean; photo_logo?: boolean }
 const toCover = (x: Pictured, kind: ItemKind): Cover => ({ kind, id: x.id as number, photo: x.photo as string, name: x.name, ...(x.photo_clear ? { clear: true } : {}) });
 /** The admin's "Use as cover" first, otherwise the first item that has a photo; null when none does. */
 export function coverOf(items: Pictured[], kind: ItemKind | ((x: Pictured) => ItemKind)): Cover | null {
@@ -35,19 +35,21 @@ export const COLLAGE_MAX = 4;
  * items in the collection's own order that have a photo, never the same item twice, at most four. The same collection
  * gives the same picture on every visit; it changes only when the collection (or a photo in it) changes. Only items
  * the app was sent can appear, and the Bible sends only items this member may open.
+ * File 17: a brand logo never goes into a collage or a cover. While any real photo exists in the collection it is used
+ * instead; a collection with only logos gets none (the section's icon, as with no photos at all).
  */
 export function coversOf(items: Pictured[], kind: ItemKind | ((x: Pictured) => ItemKind), n = COLLAGE_MAX): Cover[] {
   const k = (x: Pictured) => (typeof kind === "function" ? kind(x) : kind);
   const out: Cover[] = [];
   const seen = new Set<string>();
   const add = (x: Pictured) => {
-    if (out.length >= n || !x.photo || !x.id) return;
+    if (out.length >= n || !x.photo || !x.id || x.photo_logo) return;
     const key = `${k(x)}:${x.id}`;
     if (seen.has(key)) return;
     seen.add(key);
     out.push(toCover(x, k(x)));
   };
-  items.filter((x) => x.cover).forEach(add);
+  items.filter((x) => x.cover && !x.photo_logo).forEach(add);
   items.forEach(add);
   return out;
 }
@@ -67,12 +69,12 @@ export function mergeCovers(groups: (Cover[] | null | undefined)[], n = COLLAGE_
   }
   return out;
 }
-const fromCovers = (xs: { kind: ItemKind; id: number; photo: string; name?: string; photo_clear?: boolean }[] | null | undefined): Cover[] =>
-  (xs || []).filter((x) => x && x.id && x.photo).slice(0, COLLAGE_MAX).map((x) => ({ kind: x.kind, id: x.id, photo: x.photo, name: x.name || "", ...(x.photo_clear ? { clear: true } : {}) }));
+const fromCovers = (xs: { kind: ItemKind; id: number; photo: string; name?: string; photo_clear?: boolean; photo_logo?: boolean }[] | null | undefined): Cover[] =>
+  (xs || []).filter((x) => x && x.id && x.photo && !x.photo_logo).slice(0, COLLAGE_MAX).map((x) => ({ kind: x.kind, id: x.id, photo: x.photo, name: x.name || "", ...(x.photo_clear ? { clear: true } : {}) }));
 const menuItemCover = (items: MenuItem[]): Cover | null =>
-  coverOf(items.map((it) => ({ id: it.cocktail_id || it.bottle_id, name: it.name, photo: it.photo, cover: it.cover, photo_clear: it.photo_clear, k: it.cocktail_id ? "cocktail" : "bottle" })) as (Pictured & { k: ItemKind })[], (x) => (x as Pictured & { k: ItemKind }).k);
+  coverOf(items.map((it) => ({ id: it.cocktail_id || it.bottle_id, name: it.name, photo: it.photo, cover: it.cover, photo_clear: it.photo_clear, photo_logo: !it.cocktail_id && it.photo_logo, k: it.cocktail_id ? "cocktail" : "bottle" })) as (Pictured & { k: ItemKind })[], (x) => (x as Pictured & { k: ItemKind }).k);
 const menuItemCovers = (items: MenuItem[]): Cover[] =>
-  coversOf(items.map((it) => ({ id: it.cocktail_id || it.bottle_id, name: it.name, photo: it.photo, cover: it.cover, photo_clear: it.photo_clear, k: it.cocktail_id ? "cocktail" : "bottle" })) as (Pictured & { k: ItemKind })[], (x) => (x as Pictured & { k: ItemKind }).k);
+  coversOf(items.map((it) => ({ id: it.cocktail_id || it.bottle_id, name: it.name, photo: it.photo, cover: it.cover, photo_clear: it.photo_clear, photo_logo: !it.cocktail_id && it.photo_logo, k: it.cocktail_id ? "cocktail" : "bottle" })) as (Pictured & { k: ItemKind })[], (x) => (x as Pictured & { k: ItemKind }).k);
 export { menuItemCovers };
 
 // ── The Menu tab ─────────────────────────────────────────────────────────────
@@ -120,7 +122,7 @@ export function chosenTab(tabs: MenuTabModel[], asked: string | null | undefined
 
 // ── Spirits, the same drill-down on the Menu tab and in the Index ─────────────
 /** One bottle in a spirits drill-down (from the spirits list or from the Index). */
-export interface SpiritEntry { id: number | null; name: string; category: string; producer: string; out: boolean; photo?: string | null; cover?: boolean; photo_clear?: boolean }
+export interface SpiritEntry { id: number | null; name: string; category: string; producer: string; out: boolean; photo?: string | null; cover?: boolean; photo_clear?: boolean; photo_logo?: boolean }
 export interface CountTile { name: string; count: number; covers: Cover[] }
 const OTHER_PRODUCER = "Other producers";
 const producerOf = (x: SpiritEntry) => x.producer.trim() || OTHER_PRODUCER;
@@ -155,11 +157,11 @@ export function spiritLevel(items: SpiritEntry[], category: string, producer?: s
 }
 /** The spirits list (Menu tab) as drill-down entries. */
 export const spiritsFromMenu = (groups: MenuGroup[]): (SpiritEntry & { item: MenuItem })[] =>
-  groups.flatMap((g) => g.items.map((it) => ({ id: it.bottle_id, name: it.name, category: g.name, producer: it.producer || "", out: it.unavailable, photo: it.photo, cover: it.cover, photo_clear: it.photo_clear, item: it })));
+  groups.flatMap((g) => g.items.map((it) => ({ id: it.bottle_id, name: it.name, category: g.name, producer: it.producer || "", out: it.unavailable, photo: it.photo, cover: it.cover, photo_clear: it.photo_clear, photo_logo: it.photo_logo, item: it })));
 /** The Index's bottles as drill-down entries; "Pouring now" keeps only bottles on the spirits list. */
 export const spiritsFromIndex = (bottles: IndexBottle[], everything: boolean): (SpiritEntry & { bottle: IndexBottle })[] =>
   bottles.filter((b) => everything || b.on_list || b.available)
-    .map((b) => ({ id: b.id, name: b.name, category: b.category, producer: b.producer || "", out: !b.available && (b.on_list || b.status_label === "Out right now"), photo: b.photo, cover: b.cover, photo_clear: b.photo_clear, bottle: b }));
+    .map((b) => ({ id: b.id, name: b.name, category: b.category, producer: b.producer || "", out: !b.available && (b.on_list || b.status_label === "Out right now"), photo: b.photo, cover: b.cover, photo_clear: b.photo_clear, photo_logo: b.photo_logo, bottle: b }));
 
 // ── Index addresses ──────────────────────────────────────────────────────────
 export const INDEX_HREF = "/passport/library";
@@ -257,7 +259,7 @@ export const PARTY_HREF = indexHref(["party"]);
 export const LISTS_HREF = indexHref(["lists"]);
 
 // ── Collages for each place ──────────────────────────────────────────────────
-const drinkCovers = (xs: IndexDrink[]) => coversOf(xs.map((x) => ({ id: x.id ?? null, name: x.name, photo: x.photo, cover: x.cover, photo_clear: x.photo_clear })), "bottle");
+const drinkCovers = (xs: IndexDrink[]) => coversOf(xs.map((x) => ({ id: x.id ?? null, name: x.name, photo: x.photo, cover: x.cover, photo_clear: x.photo_clear, photo_logo: x.photo_logo })), "bottle");
 /** Journal and Favorites: the photos of the member's own favorites (cocktails, then bottles, in the Index's order). */
 export function favoriteCovers(d: Pick<IndexInput, "cocktails" | "bottles" | "marks">): Cover[] {
   const m = d.marks || {};
@@ -500,17 +502,17 @@ export interface Recent { kind: ItemKind; id: number; name: string }
  * The last three things the member opened that the Index still holds (so nothing they may no longer open, and never a
  * cocktail the Index rule hides, can appear), newest first.
  */
-export function jumpBackIn(recent: Recent[], d: Pick<IndexInput, "cocktails" | "bottles">, n = 3): (Recent & { photo: string | null })[] {
+export function jumpBackIn(recent: Recent[], d: Pick<IndexInput, "cocktails" | "bottles">, n = 3): (Recent & { photo: string | null; photo_logo?: boolean })[] {
   const cocktails = new Map(d.cocktails.map((c) => [c.id, c]));
   const bottles = new Map(d.bottles.map((b) => [b.id, b]));
-  const out: (Recent & { photo: string | null })[] = [];
+  const out: (Recent & { photo: string | null; photo_logo?: boolean })[] = [];
   const seen = new Set<string>();
   for (const r of recent) {
     const k = `${r.kind}:${r.id}`;
     if (seen.has(k)) continue;
     seen.add(k);
     const x = r.kind === "cocktail" ? cocktails.get(r.id) : bottles.get(r.id);
-    if (x) out.push({ kind: r.kind, id: r.id, name: x.name, photo: x.photo ?? null });
+    if (x) out.push({ kind: r.kind, id: r.id, name: x.name, photo: x.photo ?? null, ...(r.kind === "bottle" && (x as IndexBottle).photo_logo ? { photo_logo: true } : {}) });
     if (out.length >= n) break;
   }
   return out;

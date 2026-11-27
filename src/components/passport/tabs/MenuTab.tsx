@@ -249,7 +249,7 @@ function SpiritsBody({ tab, d, path, go }: { tab: MenuTabModel; d: MenuView; pat
         {lvl.items.map((x, i) => {
           const it = (x as typeof entries[number]).item;
           return x.id
-            ? <CompactBottle key={`${x.id}-${i}`} b={{ id: x.id, name: x.name, photo: x.photo, available: false, status_label: x.out ? "Out right now" : null }} out={x.out} mark={d.marks[markKey("bottle", x.id)]} prices={it.prices} />
+            ? <CompactBottle key={`${x.id}-${i}`} b={{ id: x.id, name: x.name, photo: x.photo, photo_clear: x.photo_clear, photo_logo: x.photo_logo, available: false, status_label: x.out ? "Out right now" : null }} out={x.out} mark={d.marks[markKey("bottle", x.id)]} prices={it.prices} />
             : <CompactMenuItem key={`n-${i}`} it={it} marks={d.marks} spirit />;
         })}
       </ul>
