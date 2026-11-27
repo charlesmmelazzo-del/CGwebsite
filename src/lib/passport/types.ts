@@ -37,11 +37,11 @@ export interface Cocktail extends CocktailCard { ingredients: string; tagline: s
  * id is the bottle page; null for a recipe placeholder, which arrives as a plain spirit word ("Bourbon"). Absent when
  * the cocktail has no bottles to list or the bar keeps its bottles secret.
  */
-export interface DrinkBottle { id: number | null; name: string; category: string; /** File 17: its small picture, while it opens a page. */ photo?: string | null; photo_clear?: boolean; photo_logo?: boolean }
+export interface DrinkBottle { id: number | null; name: string; category: string; /** File 17: its small picture, while it opens a page. */ photo?: string | null; photo_clear?: boolean; photo_logo?: boolean; photo_logo_light?: boolean }
 export interface ArchivedBottle { id: number; name: string; category: string; producer: string; description: string; status_label: string | null }
 /** Toast menus as the Bible's approved list sends them (menu reader). */
 export interface MenuPrice { label: string | null; price: number }
-export interface MenuItem { name: string; description: string; prices: MenuPrice[]; cocktail_id: number | null; bottle_id: number | null; unavailable: boolean; card?: MenuCard; photo?: string | null; cover?: boolean; producer?: string; photo_clear?: boolean; photo_logo?: boolean }
+export interface MenuItem { name: string; description: string; prices: MenuPrice[]; cocktail_id: number | null; bottle_id: number | null; unavailable: boolean; card?: MenuCard; photo?: string | null; cover?: boolean; producer?: string; photo_clear?: boolean; photo_logo?: boolean; photo_logo_light?: boolean }
 /**
  * The matched library cocktail's tagline, ingredients and flavor line, sent with the menu item (no call per cocktail).
  * Only when the Toast item has that cocktail's own name; a variant ("… - Free Spirited") has none and keeps its own
@@ -62,7 +62,7 @@ export interface Fact { label: string; value: string }
 export interface BottleCocktail { id: number; name: string; menu_name: string; menu_status: "current" | "past" }
 export interface Bottle extends ArchivedBottle { producer_id: number | null; passport_description?: string; prices: MenuPrice[]; facts: Fact[]; cocktails: BottleCocktail[]; photo?: string | null; photo_alt?: string; photo_clear?: boolean;
   /** File 17: the picture is the brand's logo (no bottle photo yet): drawn on a light panel, never in a collage. */
-  photo_logo?: boolean;
+  photo_logo?: boolean; photo_logo_light?: boolean;
   /** File 15: "Photo: {credit}" in small type, only when the bar typed a credit for its photo. */
   photo_credit?: string;
   /** File 15, Part F: false for a beer, wine or cider not sold whole, so "Request a bottle for home" is hidden. */
@@ -130,17 +130,17 @@ export interface BottleRequest {
   created_at: string;
   updated_at: string;
   /** File 17: the bottle's small picture, while bottle_id is sent. */
-  photo?: string | null; photo_clear?: boolean; photo_logo?: boolean;
+  photo?: string | null; photo_clear?: boolean; photo_logo?: boolean; photo_logo_light?: boolean;
 }
 export interface BottleRequests { requests: BottleRequest[]; open_count: number; max_open: number }
 // ── File 06: the new shell (Index tab, search, the member's own upcoming reservations) ──────────────────────────
 /** A cocktail in the Index or in search. available: on a ticked Toast menu today. spirits: base-spirit keys (Index only). */
 export interface IndexCocktail extends CocktailCard { available: boolean; spirits?: string[]; photo?: string | null; menus?: string[]; cover?: boolean; photo_clear?: boolean }
 /** A bottle a member may open. available: on the shown spirits list and not out. */
-export interface IndexBottle { id: number; name: string; category: string; status_label: string | null; available: boolean; photo?: string | null; producer?: string; on_list?: boolean; cover?: boolean; photo_clear?: boolean; photo_logo?: boolean }
+export interface IndexBottle { id: number; name: string; category: string; status_label: string | null; available: boolean; photo?: string | null; producer?: string; on_list?: boolean; cover?: boolean; photo_clear?: boolean; photo_logo?: boolean; photo_logo_light?: boolean }
 /** A beer, wine or cider sold on the list (past or present). It has no page of its own. */
 /** File 15: id and photo only so its photo can be shown (it still has no page); cover: the admin's "Use as cover". */
-export interface IndexDrink { name: string; kind: "Beer" | "Wine" | "Other"; description: string; status_label: string | null; available: boolean; id?: number | null; photo?: string | null; photo_clear?: boolean; photo_logo?: boolean; cover?: boolean }
+export interface IndexDrink { name: string; kind: "Beer" | "Wine" | "Other"; description: string; status_label: string | null; available: boolean; id?: number | null; photo?: string | null; photo_clear?: boolean; photo_logo?: boolean; photo_logo_light?: boolean; cover?: boolean }
 export interface FoundProducer { id: number; name: string; based_in: string }
 export interface IndexData { cocktails: IndexCocktail[]; bottles: IndexBottle[]; drinks: IndexDrink[]; base_spirits: BaseSpirit[]; recommendations?: Recommendation[]; enough?: boolean; suggest?: boolean; albums?: Album[] }
 // ── File 12: "For you" ────────────────────────────────────────────────────────
@@ -149,7 +149,7 @@ export interface IndexData { cocktails: IndexCocktail[]; bottles: IndexBottle[];
  * anyone else's): something being served right now, with one plain reason ("Because you love …").
  */
 export interface Recommendation {
-  kind: ItemKind; id: number; name: string; reason: string; available: boolean; photo?: string | null; photo_clear?: boolean; photo_logo?: boolean;
+  kind: ItemKind; id: number; name: string; reason: string; available: boolean; photo?: string | null; photo_clear?: boolean; photo_logo?: boolean; photo_logo_light?: boolean;
   flavor?: string; menu_name?: string; menu_status?: "current" | "past"; passport?: "current" | "past" | null; category?: string;
 }
 /** What "For you" holds: suggest false (switched off in Account), enough false (too little of their own history yet). */
@@ -159,7 +159,7 @@ export interface FindResults { cocktails: IndexCocktail[]; bottles: IndexBottle[
 export interface Reservation { date: string; time: string; party_size: number; status: "requested" | "approved" | "guest_confirmed" }
 // ── File 07: From the bar (house lists, the two charts, Spirit of the Day, the Welcome Aperitif, messages, What's new) ──
 /** One cocktail or bottle on a house list or a chart. id is null (name only) when it can no longer be opened. */
-export interface HouseItem { kind: ItemKind; id: number | null; name: string; label: string | null; opens: boolean; note?: string; pour_oz?: number | null; photo?: string | null; photo_clear?: boolean; photo_logo?: boolean }
+export interface HouseItem { kind: ItemKind; id: number | null; name: string; label: string | null; opens: boolean; note?: string; pour_oz?: number | null; photo?: string | null; photo_clear?: boolean; photo_logo?: boolean; photo_logo_light?: boolean }
 
 // ── File 11: photos. The bar's photo is an opaque code (`photo`) on items a member may open; the picture itself comes
 // only through /passport/photo/… for the signed-in member. A member's own photos reach only that member.
@@ -236,7 +236,7 @@ export interface ShareCard {
   /** File 15, Part G: an event from the public website (its id there), opening its page in Passport. */
   public_event_id?: string;
   /** File 17: a shared cocktail or bottle the member may open carries its small picture (photo_logo: a brand logo). */
-  photo?: string | null; photo_clear?: boolean; photo_logo?: boolean;
+  photo?: string | null; photo_clear?: boolean; photo_logo?: boolean; photo_logo_light?: boolean;
   list?: { kind: ItemKind; ranked: boolean; items: SharedListItem[] };
   recipe?: { name: string; notes: string; lines: BespokeLine[]; made_by: string | null };
 }

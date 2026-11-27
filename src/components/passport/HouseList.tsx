@@ -58,7 +58,7 @@ function HouseRow({ it, rank }: { it: HouseItem; rank: number | null }) {
         </span>
         {it.note && <span className="block font-body text-sm mt-0.5 leading-relaxed" style={{ color: C.muted }}>{it.note}</span>}
       </span>
-      {href && <span className="self-center"><Thumb kind={it.kind} id={it.id} photo={it.photo} size={48} clear={it.photo_clear} logo={it.photo_logo} name={it.name} /></span>}
+      {href && <span className="self-center"><Thumb kind={it.kind} id={it.id} photo={it.photo} size={48} clear={it.photo_clear} logo={it.photo_logo} logoLight={it.photo_logo_light} name={it.name} /></span>}
     </span>
   );
   return <ItemRow item={href && it.id ? { kind: it.kind, id: it.id, name: it.name } : null} href={href} pad="py-3">{body}</ItemRow>;

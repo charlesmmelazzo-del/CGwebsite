@@ -241,7 +241,7 @@ export function ShareCardView({ s, inThread = false }: { s: ShareCard; inThread?
   const href = shareHref(s);
   // File 17: a shared cocktail or bottle the member may open shows its small picture (a brand logo on its light panel).
   const pic = (s.kind === "cocktail" || s.kind === "bottle") && s.opens && s.ref_id && s.photo
-    ? <Thumb kind={s.kind} id={s.ref_id} photo={s.photo} size={52} clear={s.photo_clear} logo={s.kind === "bottle" && s.photo_logo} name={s.name} />
+    ? <Thumb kind={s.kind} id={s.ref_id} photo={s.photo} size={52} clear={s.photo_clear} logo={s.kind === "bottle" && s.photo_logo} logoLight={s.kind === "bottle" && s.photo_logo_light} name={s.name} />
     : null;
   const words = (
     <>

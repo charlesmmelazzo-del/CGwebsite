@@ -16,6 +16,14 @@ export const C = {
  * padding each side, never cropped or stretched.
  */
 export const LOGO_PANEL = "#F5F0E8";
+/**
+ * File 17b: about one in four official logos is a light one (white, cream or pale gold lettering made for dark
+ * backgrounds; the Bible measures it at import, photo_logo_light). It sits on a dark panel instead: the public site's
+ * "Mid Olive" (#2A3020, brandColors.ts), with the same rounded corners, padding and contain-fit as the cream panel, and
+ * a hairline border in the site's "Olive Muted" (#5A6A4A) so it reads as a deliberate box on the dark app background.
+ */
+export const LOGO_PANEL_DARK = "#2A3020";
+export const LOGO_PANEL_DARK_EDGE = "#5A6A4A";
 export const LOGO_PAD = "15%";
 /** Alt text for a brand logo: "{brand} logo" (the producer when known, else the bottle's own name). */
 export const logoAlt = (name: string, producer?: string | null) => `${(producer || name).trim()} logo`;
