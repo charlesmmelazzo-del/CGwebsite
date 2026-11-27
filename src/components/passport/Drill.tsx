@@ -217,10 +217,11 @@ export function useLevelMotion(key: string, depth: number) {
 }
 
 // ── Compact rows ─────────────────────────────────────────────────────────────
-function RowThumb({ kind, id, photo, name, clear, logo }: { kind: "cocktail" | "bottle"; id: number | null; photo?: string | null; name: string; clear?: boolean; logo?: boolean }) {
+function RowThumb({ kind, id, photo, name, clear, logo, logoLight }: { kind: "cocktail" | "bottle"; id: number | null; photo?: string | null; name: string; clear?: boolean; logo?: boolean; logoLight?: boolean }) {
   if (!photo || !id) return null;
   // File 17: a brand logo on the light panel, contain-fit with generous padding (never on the dark tint).
-  if (logo && kind === "bottle") return <LogoImg src={barPhotoSrc(kind, id, photo, "thumb")} alt={logoAlt(name)} size={44} />;
+  // File 17b: a light logo (white or pale lettering) on the dark panel instead.
+  if (logo && kind === "bottle") return <LogoImg src={barPhotoSrc(kind, id, photo, "thumb")} alt={logoAlt(name)} size={44} light={logoLight} />;
   // File 15: a bottle (portrait) is shown whole; a cut-out photo without a box; both on the app's dark tint.
   const fit = clear || kind === "bottle";
   return <img src={barPhotoSrc(kind, id, photo, "thumb")} alt={name} loading="lazy" decoding="async" width={44} height={44}
@@ -246,7 +247,7 @@ export function CompactCocktail({ c, mark }: { c: IndexCocktail; mark?: Mark }) 
   );
 }
 /** A bottle in a final list: name, its label, the dot, thumbnail and "+"; "out right now" dimmed. */
-export function CompactBottle({ b, out, mark, prices }: { b: Pick<IndexBottle, "id" | "name" | "photo" | "available" | "status_label" | "photo_clear" | "photo_logo">; out: boolean; mark?: Mark; prices?: MenuItem["prices"] }) {
+export function CompactBottle({ b, out, mark, prices }: { b: Pick<IndexBottle, "id" | "name" | "photo" | "available" | "status_label" | "photo_clear" | "photo_logo" | "photo_logo_light">; out: boolean; mark?: Mark; prices?: MenuItem["prices"] }) {
   return (
     <ItemRow item={{ kind: "bottle", id: b.id, name: b.name }} href={`/passport/spirits/${b.id}`} pad="py-2.5" lazy>
       <span className="flex items-center gap-3 min-h-[44px]" style={{ opacity: out ? 0.6 : 1 }}>
@@ -258,7 +259,7 @@ export function CompactBottle({ b, out, mark, prices }: { b: Pick<IndexBottle, "
           {b.status_label && <span className="pp-t-secondary block" style={{ color: C.faint }}>{b.status_label}</span>}
         </span>
         {prices && prices.length > 0 && <span className="pp-num"><Prices prices={prices} /></span>}
-        <RowThumb kind="bottle" id={b.id} photo={b.photo} name={b.name} clear={b.photo_clear} logo={b.photo_logo} />
+        <RowThumb kind="bottle" id={b.id} photo={b.photo} name={b.name} clear={b.photo_clear} logo={b.photo_logo} logoLight={b.photo_logo_light} />
       </span>
     </ItemRow>
   );
@@ -280,7 +281,7 @@ export function CompactMenuItem({ it, marks, spirit = false }: { it: MenuItem; m
           {line && <span className="pp-t-secondary block" style={{ color: it.unavailable ? C.faint : C.muted, ...oneLine }}>{line}</span>}
         </span>
         {it.prices.length > 0 && <span className="pp-num shrink-0"><Prices prices={it.prices} /></span>}
-        <RowThumb kind={it.cocktail_id ? "cocktail" : "bottle"} id={it.cocktail_id || it.bottle_id} photo={it.photo} name={it.name} clear={it.photo_clear} logo={!it.cocktail_id && it.photo_logo} />
+        <RowThumb kind={it.cocktail_id ? "cocktail" : "bottle"} id={it.cocktail_id || it.bottle_id} photo={it.photo} name={it.name} clear={it.photo_clear} logo={!it.cocktail_id && it.photo_logo} logoLight={!it.cocktail_id && it.photo_logo_light} />
       </span>
     </ItemRow>
   );

@@ -77,7 +77,7 @@ export function ForYouHome({ items }: { items?: Recommendation[] | null }) {
                   <span className="flex items-center gap-2"><KindLabel section="yours">For you · {kickerOf(r)}</KindLabel> <Avail on={r.available} /></span>
                   <span className="block font-display text-[1.3125rem] leading-tight mt-1.5" style={{ color: C.text }}>{r.name}</span>
                 </span>
-                <Thumb kind={r.kind} id={r.id} photo={r.photo} size={44} clear={r.photo_clear} logo={r.photo_logo} name={r.name} />
+                <Thumb kind={r.kind} id={r.id} photo={r.photo} size={44} clear={r.photo_clear} logo={r.photo_logo} logoLight={r.photo_logo_light} name={r.name} />
               </span>
               <span className="block font-body text-[0.875rem] leading-snug mt-2" style={{ color: C.muted }}>{r.reason}</span>
             </PressLink>
@@ -128,7 +128,7 @@ export function ForYouIndex({ items, enough, suggest }: { items?: Recommendation
                       <span className="block font-body text-[0.75rem] tracking-[0.12em] uppercase mt-1" style={{ color: C.faint }}>{kickerOf(r)}</span>
                       <span className="block font-body text-sm mt-1 leading-snug" style={{ color: C.muted }}>{r.reason}</span>
                     </span>
-                    <Thumb kind={r.kind} id={r.id} photo={r.photo} size={r.kind === "cocktail" ? 52 : 40} clear={r.photo_clear} logo={r.photo_logo} name={r.name} />
+                    <Thumb kind={r.kind} id={r.id} photo={r.photo} size={r.kind === "cocktail" ? 52 : 40} clear={r.photo_clear} logo={r.photo_logo} logoLight={r.photo_logo_light} name={r.name} />
                   </span>
                 </PressLink>
                 <NotForMe r={r} onClick={() => void notForMe(r)} />
