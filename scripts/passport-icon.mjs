@@ -31,7 +31,7 @@ const PAGE = "#E9E1CB";
 const COVER = "#2A3B2C";
 const SPINE = "#1C281E";
 const STITCH = "#3B5040";
-const MASKABLE_SCALE = 0.78; // keeps the booklet inside the central 80% safe zone
+const MASKABLE_SCALE = 0.86; // keeps the book inside the central safe zone; the background bleeds to the edges
 
 const WORD = readFileSync(join(SRC, "passport-word.txt"), "utf8").trim();
 
@@ -43,26 +43,34 @@ const WORD = readFileSync(join(SRC, "passport-word.txt"), "utf8").trim();
 const PAGE_LINE = "#CFC5A8";
 const BACK = SPINE;
 const WORD_BOX = { x0: 181, y0: 317, x1: 346, y1: 336 }; // where passport-word.txt sits in its own 512 space
-const WORD_AT = { cx: 254, cy: 382, scale: 1.5 };
+const WORD_AT = { cx: 285, cy: 322, scale: 1.05 };
 const booklet = () => {
   const wcx = (WORD_BOX.x0 + WORD_BOX.x1) / 2, wcy = (WORD_BOX.y0 + WORD_BOX.y1) / 2;
-  // The cover fills the whole square, so the phone's own rounded mask becomes the passport's rounded corners. The
-  // page block runs down the right edge (the mask rounds it at top and bottom, like a real book's fore-edge).
-  const lines = [474, 482, 490, 498, 506].map((x) => `<rect x="${x}" y="0" width="1.6" height="512" fill="${PAGE_LINE}"/>`).join("");
+  // A small square book sitting on the icon, like a classic book app icon: a dark spine down the left, the cream
+  // page block showing along the bottom, the green front cover over it with rounded corners, a soft shadow below.
+  const pageLines = [370, 388, 406].map((y) => `<rect x="156" y="${y}" width="236" height="2" rx="1" fill="${PAGE_LINE}"/>`).join("");
   return `
-  <rect x="0" y="0" width="512" height="512" fill="${COVER}"/>
-  <rect x="466" y="0" width="46" height="512" fill="${PAGE}"/>${lines}
-  <rect x="462" y="0" width="4" height="512" fill="${BACK}" opacity="0.55"/>
-  <rect x="0" y="0" width="44" height="512" fill="${SPINE}"/>
-  <rect x="44" y="0" width="2.5" height="512" fill="${STITCH}"/>
-  <rect x="74" y="44" width="360" height="424" rx="44" fill="none" stroke="${BRASS}" stroke-width="2" opacity="0.4"/>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="0%" r="110%"><stop offset="0" stop-color="#4A5A3C"/><stop offset="0.55" stop-color="#26301F"/><stop offset="1" stop-color="#13170F"/></radialGradient>
+    <linearGradient id="cover" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3B5240"/><stop offset="1" stop-color="#22322A"/></linearGradient>
+    <linearGradient id="pages" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E2D9C0"/><stop offset="0.25" stop-color="#F3ECDA"/><stop offset="1" stop-color="#EDE4CE"/></linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%"><feGaussianBlur stdDeviation="14"/></filter>
+  </defs>
+  <rect x="-160" y="-160" width="832" height="832" fill="url(#bg)"/>
+  <ellipse cx="260" cy="446" rx="168" ry="14" fill="#000" opacity="0.6" filter="url(#shadow)"/>
+  <rect x="96" y="92" width="324" height="344" rx="44" fill="#1E2B21"/>
+  <rect x="130" y="326" width="276" height="96" rx="26" fill="url(#pages)"/>${pageLines}
+  <path d="M146,92 H376 A48,48 0 0 1 424,140 V310 A48,48 0 0 1 376,358 H146 Z" fill="url(#cover)"/>
+  <path d="M148,92 V436 H140 A44,44 0 0 1 96,392 V136 A44,44 0 0 1 140,92 Z" fill="${SPINE}"/>
+  <path d="M118,92 V436 H140 A44,44 0 0 1 96,392 V136 A44,44 0 0 1 140,92 H118 Z" fill="#101812" opacity="0.55"/>
+  <rect x="146" y="92" width="2.5" height="266" fill="${STITCH}"/>
   <g transform="translate(${WORD_AT.cx} ${WORD_AT.cy}) scale(${WORD_AT.scale}) translate(${-wcx} ${-wcy})"><path d="${WORD}" fill="${BRASS}"/></g>`;
 };
 
 /** Where the logo sits on the cover (512 design units): a box, centred, the mark fitted inside it. */
 const BOX = {
-  hand: { cx: 256, cy: 212, w: 220, h: 240 },
-  full: { cx: 256, cy: 204, w: 262, h: 240 },
+  hand: { cx: 285, cy: 196, w: 160, h: 180 },
+  full: { cx: 285, cy: 192, w: 206, h: 186 },
 };
 
 // ---- The logo as ink (0 = paper, 255 = line), split into hand and lettering ------------------------------------
