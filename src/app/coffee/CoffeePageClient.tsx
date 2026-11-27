@@ -75,7 +75,7 @@ export default function CoffeePageClient({ menus, live = [], header }: Props) {
           <div
             role="tablist"
             aria-label="Coffee menus"
-            className="flex gap-0 px-3 mb-6 overflow-x-auto [&>*:first-child]:ml-auto [&>*:last-child]:mr-auto"
+            className="flex gap-0 px-3 mb-6 tab-bar-scroll [&>*:first-child]:ml-auto [&>*:last-child]:mr-auto"
             style={{
               background: "rgba(0,0,0,0.15)",
               backdropFilter: "blur(12px)",
