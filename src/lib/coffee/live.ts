@@ -263,7 +263,16 @@ export function composeTabs(tabs: TabInput[], feed: CoffeeFeed | null): { tabs: 
           options: lines(b.section.addon_groups),
           items: items.map((it) => shownItem(it, false)),
         }
-        : { id: b.id, heading: str(b.display.heading, 80) || "Untitled section", note: (b.display.note ?? "").trim().slice(0, 300), options: [], items: items.map((it) => shownItem(it, true)), display: true });
+        : (() => {
+          // A display section lists the options every one of its items shares once, under its heading (like a Toast
+          // section); options only some items have stay under those items.
+          const shown = items.map((it) => shownItem(it, true));
+          const common = shown.length ? shown[0].flavors.filter((l) => shown.every((x) => x.flavors.includes(l))) : [];
+          return {
+            id: b.id, heading: str(b.display.heading, 80) || "Untitled section", note: (b.display.note ?? "").trim().slice(0, 300),
+            options: common, items: shown.map((x) => ({ ...x, flavors: x.flavors.filter((l) => !common.includes(l)) })), display: true,
+          };
+        })());
     }
     const itemCount = sections.reduce((n, s) => n + s.items.length, 0);
     let showing: Showing;

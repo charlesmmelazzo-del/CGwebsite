@@ -183,4 +183,12 @@ test("Toast subgroups under Food (partners) stay on the Food tab", () => {
   assert.deepEqual(tabs[0].sections.map((s) => s.heading), ["Specialty Lattes"]);
 });
 
+test("a display section shows the options its items share once, under the heading", () => {
+  const live = { displaySections: [{ id: "d_00000000000f", heading: "Limited", items: ["i_000000000011"] }] };
+  const t = composeTabs([{ ...ONE[0], live }], F2).tabs[0];
+  const d = t.sections.find((s) => s.heading === "Limited")!;
+  assert.deepEqual(d.options, ["Milk options: Whole, 2%, Oat", "Iced or Hot"]);
+  assert.deepEqual(d.items[0].flavors, []);
+});
+
 console.log(`\n${checks} passed`);
