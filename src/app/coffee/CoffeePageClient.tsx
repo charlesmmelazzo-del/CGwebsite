@@ -75,7 +75,7 @@ export default function CoffeePageClient({ menus, live = [], header }: Props) {
           <div
             role="tablist"
             aria-label="Coffee menus"
-            className="flex justify-center gap-0 px-3 mb-6 overflow-x-auto"
+            className="flex gap-0 px-3 mb-6 overflow-x-auto [&>*:first-child]:ml-auto [&>*:last-child]:mr-auto"
             style={{
               background: "rgba(0,0,0,0.15)",
               backdropFilter: "blur(12px)",
@@ -95,7 +95,7 @@ export default function CoffeePageClient({ menus, live = [], header }: Props) {
                 onKeyDown={(e) => onTabKey(e, i)}
                 onClick={() => setActiveId(menu.id)}
                 className={clsx(
-                  "px-4 py-3 text-xs tracking-widest uppercase whitespace-nowrap transition-all duration-200 border-b-2",
+                  "px-3 sm:px-4 py-3 text-xs tracking-widest uppercase whitespace-nowrap transition-all duration-200 border-b-2 shrink-0",
                   activeId === menu.id
                     ? "border-[#C97D5A] text-[#C97D5A]"
                     : "border-transparent opacity-60 hover:opacity-90"
@@ -203,10 +203,10 @@ function LiveMenu({ tab, textColor, mutedColor }: { tab: ComposedTab; textColor:
         <section key={s.id} className="break-inside-avoid mb-10" aria-labelledby={`coffee-sec-${s.id}`}>
           <h2
             id={`coffee-sec-${s.id}`}
-            className="text-center text-lg md:text-xl tracking-[0.18em] leading-snug"
-            style={{ fontFamily: "var(--font-display)", fontVariant: "small-caps", color: textColor }}
+            className="text-center text-[15px] md:text-base uppercase tracking-[0.24em] leading-snug"
+            style={{ fontFamily: "var(--font-display)", color: textColor }}
           >
-            {s.heading.toLowerCase()}
+            {s.heading}
           </h2>
           {s.note && s.note.split(/\n+/).map((line, i) => (
             <p key={i} className="text-center text-xs italic tracking-wide mt-1" style={{ color: mutedColor }}>
