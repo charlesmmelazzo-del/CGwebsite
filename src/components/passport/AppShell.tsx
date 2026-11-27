@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { C } from "./theme";
-import { PassportMark } from "./ui";
+import { HandMark } from "./ui";
 import AddToList from "./AddToList";
 import { CHANGED_EVENT, TAB_ROOT_EVENT, appMoved, recordStep, reducedMotion, tabAtRoot, type Changed } from "./appEvents";
 import { isTabRoot, tabPress } from "@/lib/passport/nav";
@@ -40,6 +40,8 @@ const VIEW_OF: Record<TabId, ViewName> = { menu: "menu", index: "index", home: "
 // File 12: a heart, a star or a list also changes "For you" (Home and the Index); so does "Not for me".
 const WHAT_CHANGES: Record<Changed, ViewName[]> = { marks: ["menu", "index", "home"], lists: ["index", "home"], inbox: ["inbox", "home"], votes: ["home", "index"], recs: ["home", "index"] };
 const STALE_MS = 5 * 60 * 1000;
+/** The Home button's hand: the dark green of the Passport cover, on the brass button. */
+const HAND_GREEN = "#1F2C21";
 
 function Icon({ id, on }: { id: TabId; on: boolean }) {
   return (
@@ -235,8 +237,8 @@ function Frame({ children }: { children: ReactNode }) {
       return (
         <Link href={t.href} scroll={false} onClick={(e) => onTab(e, t.id)} aria-current={on ? "page" : undefined} aria-label={label}
           className={`pp-focus pp-press rounded-full flex items-center justify-center shrink-0 ${where === "bottom" ? "w-[62px] h-[62px] -mt-6 shadow-lg" : "w-12 h-12"}`}
-          style={{ background: on ? C.brass : "#1d2318", border: `1.5px solid ${C.brass}`, color: on ? C.bg : C.brass, boxShadow: where === "bottom" ? `0 6px 18px rgba(0,0,0,0.45), 0 0 0 5px ${C.bg}` : undefined }}>
-          <span className="font-display text-[1.375rem] leading-none tracking-wide" style={{ marginTop: 2 }}>CG</span>
+          style={{ background: C.brass, border: `1.5px solid ${on ? "#E2CB98" : C.brass}`, boxShadow: where === "bottom" ? `0 6px 18px rgba(0,0,0,0.45), 0 0 0 5px ${C.bg}` : undefined }}>
+          <HandMark size={where === "bottom" ? 38 : 30} color={HAND_GREEN} />
         </Link>
       );
     }
@@ -263,8 +265,7 @@ function Frame({ children }: { children: ReactNode }) {
           style={{ paddingTop: "env(safe-area-inset-top)", background: "rgba(19,23,15,0.94)", borderColor: C.line }}>
           <div className="max-w-5xl mx-auto h-14 px-4 md:px-6 flex items-center justify-between gap-4">
             <Link href="/passport" scroll={false} onClick={(e) => onTab(e, "home")} className="flex items-center gap-2.5 pp-focus rounded-lg min-h-[44px] md:w-48" aria-label="Passport home">
-              <PassportMark size={28} />
-              <span className="font-body text-[0.75rem] tracking-[0.4em] uppercase" style={{ color: C.brass }}>Passport</span>
+              <HandMark size={34} />
             </Link>
             <nav aria-label="Passport" className="hidden md:flex items-center gap-1">
               {TABS.map((t) => <span key={t.id}>{tabLink(t, "top")}</span>)}

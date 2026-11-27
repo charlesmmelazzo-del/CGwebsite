@@ -23,6 +23,18 @@ export function PassportMark({ size = 72 }: { size?: number }) {
   );
 }
 
+/**
+ * The Common Good hand (the logo's hand and wormwood, without the lettering), in any colour. The drawing is
+ * public/passport/icons/hand-mark.png (made by scripts/passport-icon.mjs), used as a mask over a solid colour.
+ */
+export function HandMark({ size = 28, color = C.brass }: { size?: number; color?: string }) {
+  const mask = "url(/passport/icons/hand-mark.png) center / contain no-repeat";
+  return (
+    <span aria-hidden className="inline-block shrink-0"
+      style={{ width: size * (138 / 167), height: size, background: color, WebkitMask: mask, mask }} />
+  );
+}
+
 /** The centred frame for the signed-out screens (sign in, forgot, set password, sign up). */
 export function Cover({ title, subtitle, children, footer }: { title: string; subtitle?: ReactNode; children: ReactNode; footer?: ReactNode }) {
   return (
