@@ -1,10 +1,12 @@
 /**
  * Makes /passport installable to a phone's home screen as "Passport", opening
  * without browser bars. Scoped to /passport only; the rest of the site is unchanged.
- * Icons (file 16, Part 10): a small passport booklet with the Common Good mark on its cover, drawn once as
- * public/passport/icons/icon.svg (and icon-maskable.svg, the booklet inside the central 80% safe zone) and committed as
- * PNGs in public/passport/icons/. The old addresses (public/passport/icon-192.png and friends) hold the same pictures,
- * so a phone that installed Passport before keeps a matching icon.
+ * Icons (file 16, Part 10): a small passport booklet with the Common Good logo on its cover in brass, made by
+ * scripts/passport-icon.mjs from the owner's logo and committed as PNGs in public/passport/icons/ (with icon.svg and
+ * icon-maskable.svg, the booklet inside the central 80% safe zone). The 512 icon carries the full logo; the smaller
+ * ones and the maskable one carry the hand and wormwood only, since the lettering would be unreadable that small.
+ * The old addresses (public/passport/icon-192.png and friends) hold the same pictures, so a phone that installed
+ * Passport before keeps a matching icon.
  */
 export const dynamic = "force-static";
 
