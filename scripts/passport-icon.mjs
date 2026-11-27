@@ -184,3 +184,15 @@ for (const f of ["apple-touch-icon.png", "icon-192.png", "icon-512.png"]) copyFi
 writeFileSync(join(OUT, "icon.svg"), await svgFile({ variant: "full" }));
 writeFileSync(join(OUT, "icon-maskable.svg"), await svgFile({ variant: "hand", maskable: true }));
 console.log("icon.svg, icon-maskable.svg written");
+
+// The hand alone, for the app's own header and Home button: white lines on transparent, used as a CSS mask so the
+// app can colour it (brass in the header, dark green on the brass Home button). Drawn at 4x the largest size it is
+// shown (about 40px), with lines about 1.6px wide at that size.
+{
+  const mk = await mark("hand", 160, 160, 1.6 * 4);
+  const { data, info: mi } = await sharp(mk.png).raw().toBuffer({ resolveWithObject: true });
+  for (let i = 0; i < mi.width * mi.height; i++) { data[i * 4] = 255; data[i * 4 + 1] = 255; data[i * 4 + 2] = 255; }
+  const png = await sharp(data, { raw: { width: mi.width, height: mi.height, channels: 4 } }).png({ compressionLevel: 9 }).toBuffer();
+  writeFileSync(join(OUT, "hand-mark.png"), png);
+  console.log(`hand-mark.png: ${mi.width}x${mi.height}, ${png.length} bytes`);
+}
