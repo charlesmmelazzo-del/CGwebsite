@@ -198,6 +198,21 @@ const overview = (): ChatOverview => ({
     assert.equal(png.readUInt32BE(16), 180, "180 wide");
     assert.equal(png[25], 2, "colour type 2: RGB, no transparency (iOS rounds the corners itself)");
   });
+  await test("the cover carries the real Common Good logo (made by scripts/passport-icon.mjs), not the placeholder CG ring", () => {
+    const pub = join(ROOT, "..", "public", "passport", "icons");
+    const scripts = join(ROOT, "..", "scripts");
+    assert.ok(existsSync(join(scripts, "passport-icon.mjs")) && existsSync(join(scripts, "passport-icon", "cg-logo-hand.png")));
+    for (const f of ["icon.svg", "icon-maskable.svg"]) {
+      const svg = readFileSync(join(pub, f), "utf8");
+      assert.ok(!svg.includes("<circle"), `${f}: no placeholder ring`);
+      assert.ok(svg.includes('xlink:href="data:image/png;base64,'), `${f}: the logo is embedded, never fetched`);
+    }
+    for (const [f, w] of [["icon-192.png", 192], ["icon-512.png", 512], ["icon-maskable-512.png", 512]] as const) {
+      const png = readFileSync(join(pub, f));
+      assert.equal(png.readUInt32BE(16), w, `${f} width`);
+      assert.equal(png[25], 2, `${f}: opaque RGB`);
+    }
+  });
   await test("the apple-touch-icon is on Passport pages only, never the public site's own pages", () => {
     const pl = readFileSync(join(ROOT, "app", "passport", "layout.tsx"), "utf8");
     assert.ok(pl.includes('apple: [{ url: "/passport/icons/apple-touch-icon.png"'));
